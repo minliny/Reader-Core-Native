@@ -356,7 +356,8 @@ int main(void) {
     return fail("no core.info event");
   }
   ev++;
-  if (!contains(event, "\"requestId\":10") || !contains(event, "capabilities") ||
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"requestId\":10") || !contains(event, "capabilities") ||
       !contains(event, "runtime.ping")) {
     fprintf(stderr, "unexpected core.info event: %s\n", event);
     return fail("core.info event shape");
@@ -372,7 +373,8 @@ int main(void) {
     return fail("no ping event");
   }
   ev++;
-  if (!contains(event, "\"requestId\":11") || !contains(event, "\"pong\":true")) {
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"requestId\":11") || !contains(event, "\"pong\":true")) {
     fprintf(stderr, "unexpected ping event: %s\n", event);
     return fail("ping event shape");
   }
@@ -392,7 +394,8 @@ int main(void) {
     return fail("no host.request for 50");
   }
   ev++;
-  if (!contains(event, "\"type\":\"host.request\"") ||
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
       !contains(event, "\"requestId\":50")) {
     return fail("host.request(50) shape");
   }
@@ -413,7 +416,8 @@ int main(void) {
     return fail("no cancelled event for 50");
   }
   ev++;
-  if (!contains(event, "\"requestId\":50") ||
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"requestId\":50") ||
       !contains(event, "\"CANCELLED\"")) {
     return fail("cancelled(50) shape");
   }
@@ -431,6 +435,7 @@ int main(void) {
   ev++;
   uint64_t op60 = 0;
   if (!json_u64(event, "operationId", &op60) ||
+      !contains(event, "\"protocolVersion\":1") ||
       !contains(event, "\"capability\":\"host.smoke.echo\"") ||
       !contains(event, "\"hello\":\"world\"")) {
     fprintf(stderr, "host.request(60): %s\n", event);
@@ -450,7 +455,8 @@ int main(void) {
     return fail("no result event for 60");
   }
   ev++;
-  if (!contains(event, "\"type\":\"result\"") ||
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
       !contains(event, "\"requestId\":60") ||
       !contains(event, "\"echoed\":true")) {
     fprintf(stderr, "result(60): %s\n", event);
@@ -469,7 +475,10 @@ int main(void) {
   }
   ev++;
   uint64_t op62 = 0;
-  if (!json_u64(event, "operationId", &op62)) {
+  if (!json_u64(event, "operationId", &op62) ||
+      !contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":62")) {
     return fail("host.request(62) shape");
   }
   char err_cmd[320];
@@ -485,7 +494,8 @@ int main(void) {
     return fail("no error event for 62");
   }
   ev++;
-  if (!contains(event, "\"type\":\"error\"") ||
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
       !contains(event, "\"requestId\":62") ||
       !contains(event, "\"INTERNAL\"") || !contains(event, "\"retryable\":true")) {
     fprintf(stderr, "error(62): %s\n", event);
@@ -503,7 +513,8 @@ int main(void) {
     return fail("no error event for unknown host.complete");
   }
   ev++;
-  if (!contains(event, "\"type\":\"error\"") ||
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
       !contains(event, "\"requestId\":66") ||
       !contains(event, "\"INVALID_PARAMS\"")) {
     fprintf(stderr, "unknown host.complete error: %s\n", event);
@@ -524,7 +535,8 @@ int main(void) {
     return fail("no error event for 64");
   }
   ev++;
-  if (!contains(event, "\"requestId\":64") ||
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"requestId\":64") ||
       !contains(event, "\"UNKNOWN_METHOD\"")) {
     fprintf(stderr, "error(64): %s\n", event);
     return fail("unknown method error shape");
@@ -541,6 +553,12 @@ int main(void) {
     return fail("no host.request for 65");
   }
   ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":65")) {
+    fprintf(stderr, "host.request(65): %s\n", event);
+    return fail("host.request(65) shape");
+  }
   if (rc_runtime_cancel(rt, 65) != RC_CANCEL_OK) {
     return fail("cancel(65) failed");
   }
@@ -548,7 +566,8 @@ int main(void) {
     return fail("no cancelled event for 65");
   }
   ev++;
-  if (!contains(event, "\"requestId\":65") ||
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"requestId\":65") ||
       !contains(event, "\"CANCELLED\"")) {
     fprintf(stderr, "cancelled(65): %s\n", event);
     return fail("cancelled(65) shape");

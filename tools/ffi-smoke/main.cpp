@@ -314,7 +314,8 @@ int main() {
     return fail("core.info send failed");
   }
   auto event = wait_event(ch, ev++);
-  if (!contains(event, "\"requestId\":10") || !contains(event, "capabilities")) {
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"requestId\":10") || !contains(event, "capabilities")) {
     return fail("core.info event shape");
   }
 
@@ -326,7 +327,8 @@ int main() {
   }
   event = wait_event(ch, ev++);
   uint64_t op = 0;
-  if (!contains(event, "\"type\":\"host.request\"") ||
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
       !contains(event, "\"requestId\":20") ||
       !contains(event, "\"capability\":\"host.smoke.echo\"") ||
       !contains(event, "\"hello\":\"world\"") ||
@@ -341,7 +343,8 @@ int main() {
     return fail("host.complete(20) send failed");
   }
   event = wait_event(ch, ev++);
-  if (!contains(event, "\"type\":\"result\"") ||
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
       !contains(event, "\"requestId\":20") ||
       !contains(event, "\"echoed\":true")) {
     std::cerr << "result(20): " << event << '\n';
@@ -355,7 +358,10 @@ int main() {
     return fail("hostSmoke(22) send failed");
   }
   event = wait_event(ch, ev++);
-  if (!json_u64(event, "operationId", &op)) {
+  if (!json_u64(event, "operationId", &op) ||
+      !contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":22")) {
     return fail("host.request(22) shape");
   }
   std::string err_cmd =
@@ -366,7 +372,8 @@ int main() {
     return fail("host.error(22) send failed");
   }
   event = wait_event(ch, ev++);
-  if (!contains(event, "\"type\":\"error\"") ||
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
       !contains(event, "\"requestId\":22") ||
       !contains(event, "\"INTERNAL\"") ||
       !contains(event, "\"retryable\":true")) {
@@ -381,7 +388,8 @@ int main() {
     return fail("unknown host.complete send failed");
   }
   event = wait_event(ch, ev++);
-  if (!contains(event, "\"type\":\"error\"") ||
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
       !contains(event, "\"requestId\":25") ||
       !contains(event, "\"INVALID_PARAMS\"")) {
     std::cerr << "unknown host.complete error: " << event << '\n';
@@ -398,11 +406,18 @@ int main() {
     return fail("hostSmoke(24) send failed");
   }
   event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":24")) {
+    std::cerr << "host.request(24): " << event << '\n';
+    return fail("host.request(24) shape");
+  }
   if (rc_runtime_cancel(rt, 24) != RC_CANCEL_OK) {
     return fail("cancel(24) failed");
   }
   event = wait_event(ch, ev++);
-  if (!contains(event, "\"requestId\":24") ||
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"requestId\":24") ||
       !contains(event, "\"CANCELLED\"")) {
     return fail("cancelled(24) shape");
   }

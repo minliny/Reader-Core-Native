@@ -178,6 +178,7 @@ mod tests {
         assert_eq!(evs.len(), 1);
         let v: serde_json::Value = serde_json::from_slice(&evs[0]).unwrap();
         assert_eq!(v["type"], "result");
+        assert_eq!(v["protocolVersion"], 1);
         assert_eq!(v["requestId"], 42);
         assert_eq!(v["data"]["pong"], true);
     }
@@ -518,6 +519,7 @@ mod tests {
         let evs = wait_events(&events, 1);
         let req: serde_json::Value = serde_json::from_slice(&evs[0]).unwrap();
         assert_eq!(req["type"], "host.request");
+        assert_eq!(req["protocolVersion"], 1);
         assert_eq!(req["requestId"], 100);
         assert_eq!(req["capability"], "host.smoke.echo");
         assert_eq!(req["params"]["hello"], "world");
@@ -542,6 +544,7 @@ mod tests {
         let evs = wait_events(&events, 2);
         let res: serde_json::Value = serde_json::from_slice(&evs[1]).unwrap();
         assert_eq!(res["type"], "result");
+        assert_eq!(res["protocolVersion"], 1);
         assert_eq!(res["requestId"], 100);
         assert_eq!(res["data"]["echoed"], true);
 
@@ -556,6 +559,9 @@ mod tests {
         let smoke = br#"{"protocolVersion":1,"requestId":200,"method":"runtime.hostSmoke","params":{"capability":"host.smoke.echo","params":{}}}"#;
         assert_eq!(unsafe { send(handle, smoke.as_ptr(), smoke.len()) }, 0);
         let req: serde_json::Value = serde_json::from_slice(&wait_events(&events, 1)[0]).unwrap();
+        assert_eq!(req["type"], "host.request");
+        assert_eq!(req["protocolVersion"], 1);
+        assert_eq!(req["requestId"], 200);
         let operation_id = req["operationId"].as_u64().unwrap();
 
         let error = serde_json::json!({
@@ -577,6 +583,7 @@ mod tests {
         let evs = wait_events(&events, 2);
         let err: serde_json::Value = serde_json::from_slice(&evs[1]).unwrap();
         assert_eq!(err["type"], "error");
+        assert_eq!(err["protocolVersion"], 1);
         assert_eq!(err["requestId"], 200);
         assert_eq!(err["error"]["code"], "INTERNAL");
         assert_eq!(err["error"]["retryable"], true);
@@ -595,6 +602,7 @@ mod tests {
         let evs = wait_events(&events, 1);
         let err: serde_json::Value = serde_json::from_slice(&evs[0]).unwrap();
         assert_eq!(err["type"], "error");
+        assert_eq!(err["protocolVersion"], 1);
         assert_eq!(err["requestId"], 300);
         assert_eq!(err["error"]["code"], "UNKNOWN_METHOD");
 
@@ -615,6 +623,7 @@ mod tests {
         let evs = wait_events(&events, 2);
         let err: serde_json::Value = serde_json::from_slice(&evs[1]).unwrap();
         assert_eq!(err["type"], "error");
+        assert_eq!(err["protocolVersion"], 1);
         assert_eq!(err["requestId"], 400);
         assert_eq!(err["error"]["code"], "CANCELLED");
 
@@ -637,6 +646,7 @@ mod tests {
         assert_eq!(evs.len(), 1);
         let req: serde_json::Value = serde_json::from_slice(&evs[0]).unwrap();
         assert_eq!(req["type"], "host.request");
+        assert_eq!(req["protocolVersion"], 1);
         assert_eq!(req["requestId"], 450);
     }
 
@@ -655,6 +665,7 @@ mod tests {
         let evs = wait_events(&events, 1);
         let err: serde_json::Value = serde_json::from_slice(&evs[0]).unwrap();
         assert_eq!(err["type"], "error");
+        assert_eq!(err["protocolVersion"], 1);
         assert_eq!(err["requestId"], 500);
         assert_eq!(err["error"]["code"], "INVALID_PARAMS");
 
