@@ -9,7 +9,9 @@
 
 1. C ABI version is incremented when the function signatures of `reader_core.h` change.
 2. Protocol version is incremented when the JSON command/event schema changes in a non-backward-compatible way.
-3. Both are checked at runtime via `core.info` on startup.
+3. Protocol v1 is accepted only when `protocolVersion == 1`; a different
+   integer returns `INVALID_PROTOCOL_VERSION`.
+4. Both ABI and protocol versions are checked at runtime via `core.info` on startup.
 
 ## Compatibility Guarantees (v1)
 
@@ -18,15 +20,49 @@
 - Adding new `method` values → backward compatible (no version bump).
 - Removing or renaming fields → **protocol version bump required**.
 - Changing field semantics → **protocol version bump required**.
+- Unknown top-level command fields and runtime config fields are rejected as
+  `INVALID_MESSAGE`; hosts must not depend on silent field dropping.
+- `params` must be a JSON object. Method-specific invalid params return
+  `INVALID_PARAMS`.
+- `runtime.ping` is the advertised v1 ping method. `core.ping` is accepted as a
+  bootstrap alias for current ABI smoke harnesses, but it is not advertised in
+  `core.info.capabilities`.
 
 ## Platform Contract
 
 Platforms MUST call `core.info` after `rc_runtime_create` and verify:
 - `abiVersion` matches expected value
-- `protocolVersion` is compatible (same major)
+- `protocolVersion` is compatible (v1 currently requires exact value `1`)
+- `capabilities` contains every method/capability the host plans to use
 
 Platforms MUST NOT rely on undocumented fields.
 Platforms MUST handle unknown event `type`s gracefully (ignore or log).
+
+## Runtime Config
+
+Runtime config is JSON validated against `reader-runtime-config.schema.json`.
+The v1 type contains:
+
+- `dataDirectory`: optional non-empty string for persistent Core data.
+- `cacheDirectory`: optional non-empty string for disposable Core cache data.
+
+Unknown config fields, invalid JSON, or wrong value types return structured
+`INVALID_MESSAGE` / `INVALID_PARAMS` errors at the runtime boundary that parses
+the config.
+
+## Host Bus Semantics
+
+Host capability calls are represented as events and completion commands:
+
+1. Core emits `type: "host.request"` with the original `requestId`, a generated
+   `operationId`, `capability`, and object `params`.
+2. The host answers with `method: "host.complete"` and params
+   `{ "operationId": ..., "result": ... }`, or `method: "host.error"` and params
+   `{ "operationId": ..., "error": ... }`.
+3. Core routes the completion back to the original `requestId`. Unknown
+   operation IDs return `INVALID_PARAMS` on the completion command request.
+4. Cancelling the original request cancels its pending host operation and emits
+   a `CANCELLED` error for that original request.
 
 ## Memory & Lifetime Contract (ABI v1)
 

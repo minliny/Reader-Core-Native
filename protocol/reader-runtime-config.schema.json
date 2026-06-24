@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reader-core-native/reader-runtime-config.schema.json",
+  "title": "Reader Core Runtime Config",
+  "description": "JSON config supplied when a host creates a Reader-Core runtime.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "dataDirectory": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Host-owned persistent data directory for Core state."
+    },
+    "cacheDirectory": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Host-owned cache directory for disposable Core data."
+    }
+  }
+}

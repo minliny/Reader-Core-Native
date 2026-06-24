@@ -4,6 +4,7 @@
   "title": "Reader Core Command Protocol",
   "description": "JSON message protocol for platform → Core commands.",
   "type": "object",
+  "additionalProperties": false,
   "required": ["protocolVersion", "requestId", "method"],
   "properties": {
     "protocolVersion": {
@@ -20,7 +21,8 @@
       "description": "Command method name, dot-separated.",
       "examples": [
         "core.info",
-        "core.ping",
+        "runtime.ping",
+        "runtime.hostSmoke",
         "book.search",
         "book.detail",
         "book.toc",
@@ -35,7 +37,45 @@
     },
     "params": {
       "type": "object",
+      "default": {},
       "description": "Method-specific parameters."
+    }
+  },
+  "$defs": {
+    "HostCompleteParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operationId", "result"],
+      "properties": {
+        "operationId": { "type": "integer" },
+        "result": {
+          "description": "Host capability result payload.",
+          "type": "object"
+        }
+      }
+    },
+    "HostErrorParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operationId", "error"],
+      "properties": {
+        "operationId": { "type": "integer" },
+        "error": { "$ref": "reader-event.schema.json#/$defs/CoreError" }
+      }
+    },
+    "HostSmokeParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "capability": {
+          "type": "string",
+          "default": "host.smoke.echo"
+        },
+        "params": {
+          "type": "object",
+          "default": {}
+        }
+      }
     }
   }
 }

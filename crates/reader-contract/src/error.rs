@@ -21,7 +21,7 @@ pub enum ErrorCode {
 
 /// A structured Core error. Mirrors the `error` object in
 /// `reader-event.schema.json`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CoreError {
     pub code: ErrorCode,
     pub message: String,
@@ -53,6 +53,14 @@ impl CoreError {
         )
     }
 
+    pub fn invalid_message(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::InvalidMessage, message, false)
+    }
+
+    pub fn invalid_params(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::InvalidParams, message, false)
+    }
+
     pub fn invalid_protocol_version(version: u32) -> Self {
         Self::new(
             ErrorCode::InvalidProtocolVersion,
@@ -63,6 +71,15 @@ impl CoreError {
 
     pub fn cancelled() -> Self {
         Self::new(ErrorCode::Cancelled, "request cancelled", false)
+    }
+
+    pub fn host_operation_not_found(operation_id: u64) -> Self {
+        Self::new(
+            ErrorCode::InvalidParams,
+            format!("unknown host operationId: {operation_id}"),
+            false,
+        )
+        .with_details(serde_json::json!({ "operationId": operation_id }))
     }
 
     pub fn internal(message: impl Into<String>) -> Self {

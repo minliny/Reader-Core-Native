@@ -7,7 +7,7 @@ use crate::PROTOCOL_VERSION;
 /// Core → platform event. Mirrors `reader-event.schema.json`.
 ///
 /// Discriminated by the `type` field (`"result"` / `"error"` / `"host.request"`).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Event {
     #[serde(rename = "result")]
@@ -32,6 +32,8 @@ pub enum Event {
     HostRequest {
         #[serde(rename = "protocolVersion")]
         protocol_version: u32,
+        #[serde(rename = "requestId")]
+        request_id: u64,
         #[serde(rename = "operationId")]
         operation_id: u64,
         capability: String,
@@ -55,6 +57,22 @@ impl Event {
             protocol_version: PROTOCOL_VERSION,
             request_id,
             error,
+        }
+    }
+
+    /// Build a `host.request` event linked to the originating command.
+    pub fn host_request(
+        request_id: u64,
+        operation_id: u64,
+        capability: impl Into<String>,
+        params: Value,
+    ) -> Self {
+        Event::HostRequest {
+            protocol_version: PROTOCOL_VERSION,
+            request_id,
+            operation_id,
+            capability: capability.into(),
+            params,
         }
     }
 }

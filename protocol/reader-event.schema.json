@@ -11,6 +11,7 @@
   "$defs": {
     "ResultEvent": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["protocolVersion", "requestId", "type", "data"],
       "properties": {
         "protocolVersion": { "type": "integer", "const": 1 },
@@ -21,32 +22,51 @@
     },
     "ErrorEvent": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["protocolVersion", "requestId", "type", "error"],
       "properties": {
         "protocolVersion": { "type": "integer", "const": 1 },
         "requestId": { "type": "integer" },
         "type": { "type": "string", "const": "error" },
-        "error": {
-          "type": "object",
-          "required": ["code", "message", "retryable"],
-          "properties": {
-            "code": { "type": "string", "description": "Machine-readable error code." },
-            "message": { "type": "string", "description": "Human-readable message." },
-            "retryable": { "type": "boolean" },
-            "details": { "type": "object" }
-          }
-        }
+        "error": { "$ref": "#/$defs/CoreError" }
       }
     },
     "HostRequestEvent": {
       "type": "object",
-      "required": ["protocolVersion", "type", "operationId", "capability", "params"],
+      "additionalProperties": false,
+      "required": ["protocolVersion", "requestId", "type", "operationId", "capability", "params"],
       "properties": {
         "protocolVersion": { "type": "integer", "const": 1 },
+        "requestId": {
+          "type": "integer",
+          "description": "Original Core command requestId that is blocked on this host operation."
+        },
         "type": { "type": "string", "const": "host.request" },
         "operationId": { "type": "integer" },
         "capability": { "type": "string" },
         "params": { "type": "object" }
+      }
+    },
+    "CoreError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "retryable"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "UNKNOWN_METHOD",
+            "INVALID_PARAMS",
+            "INVALID_PROTOCOL_VERSION",
+            "CANCELLED",
+            "INVALID_MESSAGE",
+            "INTERNAL"
+          ],
+          "description": "Machine-readable error code."
+        },
+        "message": { "type": "string", "description": "Human-readable message." },
+        "retryable": { "type": "boolean" },
+        "details": { "type": "object" }
       }
     }
   }
