@@ -1,0 +1,30 @@
+{
+  "id": "rf-001",
+  "source_type": "rss-feed",
+  "format": "xml",
+  "source_description": "Sanitized RSS 2.0 feed with a channel and three items (title, link, description, pubDate, guid). Exercises RSS feed parsing, item iteration, and field extraction. Intended for remote RSS reading and feed-rule validation.",
+  "sanitization": "All content is synthetic ('Sanitized Demo Feed', 'Sample Volume One Update'). Hostnames use example.test. pubDate values are fixed placeholder timestamps in 2026. No real feed URL, no credentials, no copyrighted text.",
+  "capability_tags": [
+    "rss-parsing",
+    "feed-parsing",
+    "xml-parsing",
+    "remote-reading"
+  ],
+  "privacy_check": {
+    "passed": true,
+    "checked_for": [
+      "real-tokens",
+      "cookies",
+      "account-credentials",
+      "private-content",
+      "copyrighted-long-text"
+    ],
+    "notes": "Synthetic RSS feed; no real source, credentials, or private data."
+  },
+  "consumer_branch": {
+    "primary": "codex/remote-reading-vertical",
+    "secondary": ["codex/rule-engine-parity"]
+  },
+  "fixture_file": "rf-001-fixture.xml",
+  "added_in_round": 1
+}
