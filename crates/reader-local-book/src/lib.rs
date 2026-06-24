@@ -4,18 +4,25 @@
 //! TXT ingestion with Unicode BOM handling and deterministic chapter splitting;
 //! EPUB remains a future format instead of being faked through this API.
 
+use std::collections::HashMap;
 use std::path::Path;
 
 use reader_domain::{Book, TocEntry};
+use serde::{Deserialize, Serialize};
+
+/// Current local-book library snapshot schema version.
+pub const LOCAL_BOOK_LIBRARY_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
 
 /// Supported local-book formats.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum LocalBookFormat {
     Txt,
 }
 
 /// Text encoding detected while ingesting a TXT file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum LocalBookEncoding {
     Utf8,
     Utf8Bom,
@@ -34,7 +41,8 @@ pub struct LocalBookInput<'a> {
 }
 
 /// Parsed local book ready to be inserted into a library/storage layer.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LocalBook {
     pub book: Book,
     pub format: LocalBookFormat,
@@ -46,7 +54,8 @@ pub struct LocalBook {
 }
 
 /// One parsed local-book chapter.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LocalBookChapter {
     pub index: u32,
     pub title: String,
@@ -57,12 +66,61 @@ pub struct LocalBookChapter {
     pub end_char: usize,
 }
 
+/// Complete export/import unit for local-book library state.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LocalBookLibrarySnapshot {
+    pub schema_version: u32,
+    pub exported_at: i64,
+    #[serde(default)]
+    pub books: Vec<LocalBook>,
+}
+
+impl LocalBookLibrarySnapshot {
+    pub fn empty(exported_at: i64) -> Self {
+        Self {
+            schema_version: LOCAL_BOOK_LIBRARY_SNAPSHOT_SCHEMA_VERSION,
+            exported_at,
+            books: Vec::new(),
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), LocalBookError> {
+        if self.schema_version != LOCAL_BOOK_LIBRARY_SNAPSHOT_SCHEMA_VERSION {
+            return Err(LocalBookError::InvalidSnapshot {
+                field: "schema_version".into(),
+            });
+        }
+
+        let mut book_ids = HashMap::<String, ()>::new();
+        for book in &self.books {
+            validate_local_book(book)?;
+            if book_ids.insert(book.book.book_id.clone(), ()).is_some() {
+                return Err(LocalBookError::InvalidSnapshot {
+                    field: "books".into(),
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
+/// In-memory local-book library for parsed offline books.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct LocalBookLibrary {
+    books: HashMap<String, LocalBook>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LocalBookError {
     EmptyInput,
     InvalidMetadata { field: String },
+    InvalidBook { field: String },
+    InvalidSnapshot { field: String },
     UnsupportedEncoding,
     Decode { reason: String },
+    BookNotFound { book_id: String },
+    ChapterNotFound { book_id: String, chapter_index: u32 },
 }
 
 impl std::fmt::Display for LocalBookError {
@@ -72,8 +130,24 @@ impl std::fmt::Display for LocalBookError {
             LocalBookError::InvalidMetadata { field } => {
                 write!(f, "invalid local book metadata field: {field}")
             }
+            LocalBookError::InvalidBook { field } => {
+                write!(f, "invalid local book field: {field}")
+            }
+            LocalBookError::InvalidSnapshot { field } => {
+                write!(f, "invalid local book snapshot field: {field}")
+            }
             LocalBookError::UnsupportedEncoding => write!(f, "unsupported local book encoding"),
             LocalBookError::Decode { reason } => write!(f, "failed to decode local book: {reason}"),
+            LocalBookError::BookNotFound { book_id } => {
+                write!(f, "local book not found: {book_id}")
+            }
+            LocalBookError::ChapterNotFound {
+                book_id,
+                chapter_index,
+            } => write!(
+                f,
+                "local book chapter not found: book={book_id} chapter={chapter_index}"
+            ),
         }
     }
 }
@@ -148,6 +222,105 @@ pub fn parse_txt_text(
     })
 }
 
+impl LocalBookLibrary {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn upsert_book(&mut self, book: LocalBook) -> Result<LocalBook, LocalBookError> {
+        validate_local_book(&book)?;
+        self.books.insert(book.book.book_id.clone(), book.clone());
+        Ok(book)
+    }
+
+    pub fn parse_and_upsert_txt(
+        &mut self,
+        input: LocalBookInput<'_>,
+    ) -> Result<LocalBook, LocalBookError> {
+        let book = parse_txt_book(input)?;
+        self.upsert_book(book)
+    }
+
+    pub fn get_book(&self, book_id: &str) -> Result<Option<LocalBook>, LocalBookError> {
+        let book_id = normalize_required(book_id, "book_id")?;
+        Ok(self.books.get(&book_id).cloned())
+    }
+
+    pub fn list_books(&self) -> Vec<LocalBook> {
+        let mut books = self.books.values().cloned().collect::<Vec<_>>();
+        books.sort_by(|a, b| {
+            a.book
+                .title
+                .cmp(&b.book.title)
+                .then_with(|| a.book.book_id.cmp(&b.book.book_id))
+        });
+        books
+    }
+
+    pub fn get_chapter(
+        &self,
+        book_id: &str,
+        chapter_index: u32,
+    ) -> Result<LocalBookChapter, LocalBookError> {
+        let book_id = normalize_required(book_id, "book_id")?;
+        let book = self
+            .books
+            .get(&book_id)
+            .ok_or_else(|| LocalBookError::BookNotFound {
+                book_id: book_id.clone(),
+            })?;
+        book.chapters
+            .iter()
+            .find(|chapter| chapter.index == chapter_index)
+            .cloned()
+            .ok_or(LocalBookError::ChapterNotFound {
+                book_id,
+                chapter_index,
+            })
+    }
+
+    pub fn remove_book(&mut self, book_id: &str) -> Result<bool, LocalBookError> {
+        let book_id = normalize_required(book_id, "book_id")?;
+        Ok(self.books.remove(&book_id).is_some())
+    }
+
+    pub fn export_snapshot(
+        &self,
+        exported_at: i64,
+    ) -> Result<LocalBookLibrarySnapshot, LocalBookError> {
+        let mut snapshot = LocalBookLibrarySnapshot {
+            schema_version: LOCAL_BOOK_LIBRARY_SNAPSHOT_SCHEMA_VERSION,
+            exported_at,
+            books: self.books.values().cloned().collect(),
+        };
+        sort_local_book_snapshot(&mut snapshot);
+        snapshot.validate()?;
+        Ok(snapshot)
+    }
+
+    pub fn replace_with_snapshot(
+        &mut self,
+        snapshot: LocalBookLibrarySnapshot,
+    ) -> Result<(), LocalBookError> {
+        snapshot.validate()?;
+        let mut books = HashMap::new();
+        for book in snapshot.books {
+            books.insert(book.book.book_id.clone(), book);
+        }
+        self.books = books;
+        Ok(())
+    }
+}
+
+fn sort_local_book_snapshot(snapshot: &mut LocalBookLibrarySnapshot) {
+    snapshot.books.sort_by(|a, b| {
+        a.book
+            .book_id
+            .cmp(&b.book.book_id)
+            .then_with(|| a.book.title.cmp(&b.book.title))
+    });
+}
+
 fn decode_txt_bytes(bytes: &[u8]) -> Result<(String, LocalBookEncoding), LocalBookError> {
     if bytes.starts_with(&[0xef, 0xbb, 0xbf]) {
         let text = std::str::from_utf8(&bytes[3..]).map_err(|e| LocalBookError::Decode {
@@ -199,6 +372,67 @@ fn normalize_required(value: &str, field: &str) -> Result<String, LocalBookError
         });
     }
     Ok(trimmed.to_string())
+}
+
+fn validate_local_book(book: &LocalBook) -> Result<(), LocalBookError> {
+    if book.book.book_id.trim().is_empty() {
+        return Err(LocalBookError::InvalidBook {
+            field: "book.book_id".into(),
+        });
+    }
+    if book.book.title.trim().is_empty() {
+        return Err(LocalBookError::InvalidBook {
+            field: "book.title".into(),
+        });
+    }
+    if book.byte_len == 0 {
+        return Err(LocalBookError::InvalidBook {
+            field: "byte_len".into(),
+        });
+    }
+    if book.char_len == 0 {
+        return Err(LocalBookError::InvalidBook {
+            field: "char_len".into(),
+        });
+    }
+    if book.toc.len() != book.chapters.len() || book.chapters.is_empty() {
+        return Err(LocalBookError::InvalidBook {
+            field: "chapters".into(),
+        });
+    }
+
+    for (expected_index, chapter) in book.chapters.iter().enumerate() {
+        if chapter.index != expected_index as u32 {
+            return Err(LocalBookError::InvalidBook {
+                field: "chapters.index".into(),
+            });
+        }
+        if chapter.title.trim().is_empty() {
+            return Err(LocalBookError::InvalidBook {
+                field: "chapters.title".into(),
+            });
+        }
+        if chapter.start_char > chapter.end_char || chapter.end_char > book.char_len {
+            return Err(LocalBookError::InvalidBook {
+                field: "chapters.range".into(),
+            });
+        }
+    }
+
+    for (expected_index, toc) in book.toc.iter().enumerate() {
+        if toc.index != expected_index as u32 {
+            return Err(LocalBookError::InvalidBook {
+                field: "toc.index".into(),
+            });
+        }
+        if toc.title.trim().is_empty() {
+            return Err(LocalBookError::InvalidBook {
+                field: "toc.title".into(),
+            });
+        }
+    }
+
+    Ok(())
 }
 
 fn derive_title(title: Option<&str>, file_name: Option<&str>, book_id: &str) -> String {
@@ -394,6 +628,208 @@ mod tests {
             author: Some("刘慈欣"),
             bytes,
         }
+    }
+
+    fn sample_text(title: &str) -> String {
+        format!("{title}\n\n第一章 开始\n正文一\n\n第二章 继续\n正文二")
+    }
+
+    fn sample_book(book_id: &str, title: &str) -> LocalBook {
+        parse_txt_text(
+            book_id,
+            Some(title),
+            Some("Author"),
+            Some(&format!("{title}.txt")),
+            &sample_text(title),
+        )
+        .unwrap()
+    }
+
+    fn populate_library(library: &mut LocalBookLibrary) {
+        library.upsert_book(sample_book("b2", "Beta")).unwrap();
+        library.upsert_book(sample_book("b1", "Alpha")).unwrap();
+    }
+
+    #[test]
+    fn local_book_library_upsert_get_list_and_chapter_round_trip() {
+        let mut library = LocalBookLibrary::new();
+        populate_library(&mut library);
+
+        let ids = library
+            .list_books()
+            .into_iter()
+            .map(|book| book.book.book_id)
+            .collect::<Vec<_>>();
+        assert_eq!(ids, vec!["b1", "b2"]);
+
+        assert_eq!(library.get_book("b1").unwrap().unwrap().book.title, "Alpha");
+        let chapter = library.get_chapter("b1", 1).unwrap();
+        assert_eq!(chapter.title, "第一章 开始");
+        assert_eq!(chapter.content, "正文一");
+
+        let updated = sample_book("b1", "Alpha Updated");
+        library.upsert_book(updated.clone()).unwrap();
+        assert_eq!(library.list_books().len(), 2);
+        assert_eq!(
+            library.get_book("b1").unwrap().unwrap().book.title,
+            "Alpha Updated"
+        );
+    }
+
+    #[test]
+    fn local_book_library_parse_and_remove_are_bounded() {
+        let mut library = LocalBookLibrary::new();
+        let text = sample_text("Gamma");
+
+        let stored = library
+            .parse_and_upsert_txt(LocalBookInput {
+                book_id: "g",
+                file_name: Some("gamma.txt"),
+                title: Some("Gamma"),
+                author: None,
+                bytes: text.as_bytes(),
+            })
+            .unwrap();
+
+        assert_eq!(stored.book.book_id, "g");
+        assert!(library.remove_book("g").unwrap());
+        assert!(!library.remove_book("g").unwrap());
+        assert_eq!(
+            library.get_chapter("g", 0).unwrap_err(),
+            LocalBookError::BookNotFound {
+                book_id: "g".into()
+            }
+        );
+        assert_eq!(
+            library.get_chapter("missing", 0).unwrap_err(),
+            LocalBookError::BookNotFound {
+                book_id: "missing".into()
+            }
+        );
+    }
+
+    #[test]
+    fn local_book_library_reports_missing_chapter_and_invalid_keys() {
+        let mut library = LocalBookLibrary::new();
+        library.upsert_book(sample_book("b1", "Alpha")).unwrap();
+
+        assert_eq!(
+            library.get_chapter("b1", 99).unwrap_err(),
+            LocalBookError::ChapterNotFound {
+                book_id: "b1".into(),
+                chapter_index: 99
+            }
+        );
+        assert!(matches!(
+            library.get_book(" "),
+            Err(LocalBookError::InvalidMetadata { .. })
+        ));
+        assert!(matches!(
+            library.remove_book(" "),
+            Err(LocalBookError::InvalidMetadata { .. })
+        ));
+    }
+
+    #[test]
+    fn local_book_snapshot_export_is_stable_and_json_round_trips() {
+        let mut library = LocalBookLibrary::new();
+        populate_library(&mut library);
+
+        let snapshot = library.export_snapshot(42).unwrap();
+
+        assert_eq!(
+            snapshot.schema_version,
+            LOCAL_BOOK_LIBRARY_SNAPSHOT_SCHEMA_VERSION
+        );
+        assert_eq!(snapshot.exported_at, 42);
+        assert_eq!(
+            snapshot
+                .books
+                .iter()
+                .map(|book| book.book.book_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["b1", "b2"]
+        );
+        assert_eq!(snapshot.books[0].chapters[0].index, 0);
+        assert_eq!(snapshot.books[0].toc[1].title, "第一章 开始");
+
+        let json = serde_json::to_string(&snapshot).unwrap();
+        assert!(json.contains(r#""schemaVersion":1"#));
+        let back: LocalBookLibrarySnapshot = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, snapshot);
+    }
+
+    #[test]
+    fn local_book_snapshot_replace_round_trips_and_empty_clears() {
+        let mut source = LocalBookLibrary::new();
+        populate_library(&mut source);
+        let snapshot = source.export_snapshot(77).unwrap();
+
+        let mut restored = LocalBookLibrary::new();
+        restored.replace_with_snapshot(snapshot.clone()).unwrap();
+
+        assert_eq!(restored.export_snapshot(77).unwrap(), snapshot);
+        assert_eq!(restored.get_chapter("b2", 2).unwrap().content, "正文二");
+
+        restored
+            .replace_with_snapshot(LocalBookLibrarySnapshot::empty(100))
+            .unwrap();
+        assert!(restored.list_books().is_empty());
+        assert!(restored.get_book("b1").unwrap().is_none());
+    }
+
+    #[test]
+    fn local_book_snapshot_rejects_schema_duplicates_invalid_books_and_unknown_fields() {
+        let mut wrong_schema = LocalBookLibrarySnapshot::empty(1);
+        wrong_schema.schema_version = 2;
+        assert_eq!(
+            wrong_schema.validate().unwrap_err(),
+            LocalBookError::InvalidSnapshot {
+                field: "schema_version".into()
+            }
+        );
+
+        let mut duplicate = LocalBookLibrarySnapshot::empty(1);
+        duplicate.books.push(sample_book("b1", "Alpha"));
+        duplicate.books.push(sample_book("b1", "Alpha Copy"));
+        assert_eq!(
+            duplicate.validate().unwrap_err(),
+            LocalBookError::InvalidSnapshot {
+                field: "books".into()
+            }
+        );
+
+        let mut invalid_book = LocalBookLibrarySnapshot::empty(1);
+        let mut broken = sample_book("bad", "Broken");
+        broken.chapters[0].index = 9;
+        invalid_book.books.push(broken);
+        assert_eq!(
+            invalid_book.validate().unwrap_err(),
+            LocalBookError::InvalidBook {
+                field: "chapters.index".into()
+            }
+        );
+
+        let unknown = r#"{"schemaVersion":1,"exportedAt":1,"books":[],"bogus":true}"#;
+        assert!(serde_json::from_str::<LocalBookLibrarySnapshot>(unknown).is_err());
+    }
+
+    #[test]
+    fn local_book_snapshot_replace_is_atomic_on_validation_failure() {
+        let mut library = LocalBookLibrary::new();
+        populate_library(&mut library);
+        let before = library.export_snapshot(1).unwrap();
+
+        let mut invalid = LocalBookLibrarySnapshot::empty(2);
+        let mut broken = sample_book("bad", "Broken");
+        broken.toc.pop();
+        invalid.books.push(broken);
+
+        assert!(matches!(
+            library.replace_with_snapshot(invalid),
+            Err(LocalBookError::InvalidBook { .. })
+        ));
+        assert_eq!(library.export_snapshot(1).unwrap(), before);
     }
 
     #[test]

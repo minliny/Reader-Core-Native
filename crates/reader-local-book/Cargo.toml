@@ -8,3 +8,5 @@ authors.workspace = true
 
 [dependencies]
 reader-domain = { path = "../reader-domain" }
+serde.workspace = true
+serde_json.workspace = true
