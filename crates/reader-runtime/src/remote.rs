@@ -15,7 +15,7 @@ use reader_contract::{
     self as contract,
     remote::{
         parse_params, BookDetailParams, BookSearchParams, BookTocParams, ChapterContentParams,
-        HostHttpRequest, ReadingProgressUpdateParams, SourceImportParams,
+        HostHttpRequest, HostHttpResponse, ReadingProgressUpdateParams, SourceImportParams,
     },
     CoreError, Event,
 };
@@ -239,15 +239,56 @@ fn pending_http_request(
     })
 }
 
-fn http_response_body(result: &serde_json::Value) -> Result<String, CoreError> {
-    result
-        .get("body")
-        .and_then(|body| body.as_str())
-        .map(ToOwned::to_owned)
-        .ok_or_else(|| {
+fn parse_http_response(result: serde_json::Value) -> Result<HostHttpResponse, CoreError> {
+    if !result.get("body").is_some_and(serde_json::Value::is_string) {
+        return Err(
             CoreError::invalid_params("http.execute host result.body must be a string")
-                .with_details(serde_json::json!({ "result": result }))
-        })
+                .with_details(serde_json::json!({ "result": result })),
+        );
+    }
+
+    let response = serde_json::from_value::<HostHttpResponse>(result.clone()).map_err(|err| {
+        CoreError::invalid_params("invalid http.execute host result").with_details(
+            serde_json::json!({
+                "source": err.to_string(),
+                "result": result,
+            }),
+        )
+    })?;
+    response.validate()?;
+    Ok(response)
+}
+
+fn http_response_diagnostics(response: &HostHttpResponse) -> Option<serde_json::Value> {
+    let mut diagnostics = serde_json::Map::new();
+    if let Some(status) = response.status {
+        diagnostics.insert("status".to_string(), serde_json::json!(status));
+    }
+    if let Some(headers) = response
+        .headers
+        .as_ref()
+        .filter(|headers| headers.is_object())
+    {
+        diagnostics.insert("headers".to_string(), headers.clone());
+    }
+    if diagnostics.is_empty() {
+        None
+    } else {
+        Some(serde_json::Value::Object(diagnostics))
+    }
+}
+
+fn with_http_diagnostics(
+    mut data: serde_json::Value,
+    diagnostics: Option<serde_json::Value>,
+) -> serde_json::Value {
+    let Some(diagnostics) = diagnostics else {
+        return data;
+    };
+    if let Some(object) = data.as_object_mut() {
+        object.insert("http".to_string(), diagnostics);
+    }
+    data
 }
 
 /// Continue a remote-reading command after its host HTTP request completes.
@@ -256,23 +297,27 @@ pub fn complete_remote_host(
     host_result: serde_json::Value,
     state: &RemoteState,
 ) -> Result<serde_json::Value, CoreError> {
-    let body = http_response_body(&host_result)?;
+    let response = parse_http_response(host_result)?;
+    let diagnostics = http_response_diagnostics(&response);
     match continuation {
         RemoteHostContinuation::BookSearch(mut params) => {
-            params.search_response = body;
+            params.search_response = response.body;
             book_search_from_params(params, state)
+                .map(|data| with_http_diagnostics(data, diagnostics))
         }
         RemoteHostContinuation::BookDetail(mut params) => {
-            params.detail_response = body;
+            params.detail_response = response.body;
             book_detail_from_params(params, state)
+                .map(|data| with_http_diagnostics(data, diagnostics))
         }
         RemoteHostContinuation::BookToc(mut params) => {
-            params.toc_response = body;
-            book_toc_from_params(params, state)
+            params.toc_response = response.body;
+            book_toc_from_params(params, state).map(|data| with_http_diagnostics(data, diagnostics))
         }
         RemoteHostContinuation::ChapterContent(mut params) => {
-            params.chapter_response = body;
+            params.chapter_response = response.body;
             chapter_content_from_params(params, state)
+                .map(|data| with_http_diagnostics(data, diagnostics))
         }
     }
 }

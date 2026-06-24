@@ -65,8 +65,31 @@
       "properties": {
         "operationId": { "type": "integer", "minimum": 1 },
         "result": {
-          "description": "Host capability result payload.",
+          "description": "Host capability result payload. For http.execute remote-reading continuations, see #/$defs/HostHttpResponse.",
           "type": "object"
+        }
+      }
+    },
+    "HostHttpResponse": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["body"],
+      "description": "Result payload accepted when completing a host.request with capability http.execute.",
+      "properties": {
+        "body": {
+          "type": "string",
+          "description": "HTTP response body consumed by Core remote-reading rules."
+        },
+        "status": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599,
+          "description": "Optional HTTP status code accepted by Core for diagnostics."
+        },
+        "headers": {
+          "type": ["object", "null"],
+          "default": {},
+          "description": "Optional HTTP response headers accepted by Core for diagnostics."
         }
       }
     },

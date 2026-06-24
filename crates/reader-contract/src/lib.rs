@@ -26,7 +26,7 @@ pub use host::{
 };
 pub use remote::{
     BookDetailParams, BookSearchParams, BookTocParams, ChapterContentParams, HostHttpRequest,
-    ReadingProgressUpdateParams, SourceImportParams,
+    HostHttpResponse, ReadingProgressUpdateParams, SourceImportParams,
 };
 
 /// JSON protocol version. Bumped on non-backward-compatible schema changes.

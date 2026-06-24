@@ -35,6 +35,45 @@ pub struct HostHttpRequest {
     pub body: Option<String>,
 }
 
+/// Host HTTP response accepted for `http.execute` completion.
+///
+/// This is intentionally scoped to remote-reading continuations. The host bus
+/// remains generic, but once Core has emitted `capability: "http.execute"` the
+/// completion payload has a typed v1 shape.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostHttpResponse {
+    pub body: String,
+    #[serde(default)]
+    pub status: Option<u16>,
+    #[serde(default)]
+    pub headers: Option<Value>,
+}
+
+impl HostHttpResponse {
+    pub fn validate(&self) -> Result<(), CoreError> {
+        if let Some(status) = self.status {
+            if !(100..=599).contains(&status) {
+                return Err(CoreError::invalid_params(
+                    "http.execute host result.status must be between 100 and 599",
+                )
+                .with_details(serde_json::json!({ "status": status })));
+            }
+        }
+
+        if let Some(headers) = &self.headers {
+            if !headers.is_null() && !headers.is_object() {
+                return Err(CoreError::invalid_params(
+                    "http.execute host result.headers must be an object",
+                )
+                .with_details(serde_json::json!({ "headers": headers })));
+            }
+        }
+
+        Ok(())
+    }
+}
+
 /// Parameters for `source.import`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -152,4 +191,55 @@ pub fn parse_params<T: for<'de> Deserialize<'de>>(
             }),
         )
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ErrorCode;
+
+    #[test]
+    fn host_http_response_accepts_metadata_and_extra_fields() {
+        let response: HostHttpResponse = serde_json::from_value(serde_json::json!({
+            "status": 200,
+            "headers": { "content-type": "application/json" },
+            "body": "{\"books\":[]}",
+            "finalUrl": "https://books.example.test/search"
+        }))
+        .unwrap();
+
+        response.validate().unwrap();
+        assert_eq!(response.status, Some(200));
+        assert_eq!(
+            response.headers.unwrap()["content-type"],
+            "application/json"
+        );
+    }
+
+    #[test]
+    fn host_http_response_rejects_invalid_status() {
+        let response: HostHttpResponse = serde_json::from_value(serde_json::json!({
+            "status": 99,
+            "body": "{\"books\":[]}"
+        }))
+        .unwrap();
+
+        let err = response.validate().unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert!(err.message.contains("status"));
+        assert_eq!(err.details["status"], 99);
+    }
+
+    #[test]
+    fn host_http_response_rejects_invalid_headers_shape() {
+        let response: HostHttpResponse = serde_json::from_value(serde_json::json!({
+            "headers": ["content-type", "application/json"],
+            "body": "{\"books\":[]}"
+        }))
+        .unwrap();
+
+        let err = response.validate().unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert!(err.message.contains("headers"));
+    }
 }

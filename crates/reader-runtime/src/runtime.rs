@@ -1778,6 +1778,7 @@ mod tests {
                 "operationId": operation_id,
                 "result": {
                     "status": 200,
+                    "headers": { "content-type": "application/json" },
                     "body": "{\"books\":[{\"bookId\":\"1\",\"title\":\"Dune\",\"author\":\"Herbert\"}]}"
                 }
             }),
@@ -1792,6 +1793,8 @@ mod tests {
                 assert_eq!(*request_id, 21);
                 let books = data["books"].as_array().expect("books array");
                 assert_eq!(books[0]["title"], "Dune");
+                assert_eq!(data["http"]["status"], 200);
+                assert_eq!(data["http"]["headers"]["content-type"], "application/json");
             }
             other => panic!("expected remote result after host completion, got {other:?}"),
         }
@@ -1862,6 +1865,99 @@ mod tests {
                 assert!(error.message.contains("result.body"));
             }
             other => panic!("expected original request error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn remote_host_http_completion_rejects_invalid_status() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send(Command::new(
+            26,
+            methods::BOOK_SEARCH,
+            serde_json::json!({
+                "sourceId": "vtest-src",
+                "searchRequest": { "url": "https://books.example.test/search" },
+                "source": vertical_source(),
+            }),
+        ))
+        .unwrap();
+
+        let operation_id = match &sink.wait_len(1)[0] {
+            Event::HostRequest { operation_id, .. } => *operation_id,
+            other => panic!("expected host request, got {other:?}"),
+        };
+
+        rt.send(Command::new(
+            27,
+            methods::HOST_COMPLETE,
+            serde_json::json!({
+                "operationId": operation_id,
+                "result": {
+                    "status": 99,
+                    "body": "{\"books\":[]}"
+                }
+            }),
+        ))
+        .unwrap();
+
+        let events = sink.wait_len(2);
+        match &events[1] {
+            Event::Error {
+                request_id, error, ..
+            } => {
+                assert_eq!(*request_id, 26);
+                assert_eq!(error.code, ErrorCode::InvalidParams);
+                assert!(error.message.contains("status"));
+                assert_eq!(error.details["status"], 99);
+            }
+            other => panic!("expected invalid status error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn remote_host_http_completion_rejects_invalid_headers_shape() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send(Command::new(
+            28,
+            methods::BOOK_SEARCH,
+            serde_json::json!({
+                "sourceId": "vtest-src",
+                "searchRequest": { "url": "https://books.example.test/search" },
+                "source": vertical_source(),
+            }),
+        ))
+        .unwrap();
+
+        let operation_id = match &sink.wait_len(1)[0] {
+            Event::HostRequest { operation_id, .. } => *operation_id,
+            other => panic!("expected host request, got {other:?}"),
+        };
+
+        rt.send(Command::new(
+            29,
+            methods::HOST_COMPLETE,
+            serde_json::json!({
+                "operationId": operation_id,
+                "result": {
+                    "headers": ["content-type", "application/json"],
+                    "body": "{\"books\":[]}"
+                }
+            }),
+        ))
+        .unwrap();
+
+        let events = sink.wait_len(2);
+        match &events[1] {
+            Event::Error {
+                request_id, error, ..
+            } => {
+                assert_eq!(*request_id, 28);
+                assert_eq!(error.code, ErrorCode::InvalidParams);
+                assert!(error.message.contains("headers"));
+            }
+            other => panic!("expected invalid headers error, got {other:?}"),
         }
     }
 

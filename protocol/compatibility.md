@@ -98,15 +98,20 @@ The host request params are:
 }
 ```
 
-The host completes the operation with an object result containing string
-`body`. Additional fields such as `status`, `headers`, or final URL are allowed
-for host diagnostics, but Core v1 only consumes `body`:
+The host completes the operation with an object result containing required
+string `body`. Optional `status` must be an integer from 100 through 599.
+Optional `headers`, when present and non-null, must be an object. Core consumes
+`body` for remote-reading rules and returns accepted `status` / `headers`
+metadata under result `http` diagnostics:
 
 ```json
 {
   "operationId": 1,
   "result": {
     "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
     "body": "{\"books\":[]}"
   }
 }

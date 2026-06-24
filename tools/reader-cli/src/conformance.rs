@@ -2,7 +2,7 @@ use std::sync::mpsc::{self, Receiver};
 use std::sync::Arc;
 use std::time::Duration;
 
-use reader_contract::{methods, CoreError, ErrorCode, Event, RuntimeConfig};
+use reader_contract::{methods, Command, CoreError, ErrorCode, Event, RuntimeConfig};
 use reader_runtime::{EventSink, Runtime};
 use serde_json::{json, Value};
 
@@ -60,6 +60,10 @@ const HOST_COMPLETE_OPERATION_ZERO: &str =
     include_str!("../../../protocol/fixtures/conformance/host/complete-operation-zero.json");
 const HOST_ERROR_OPERATION_ZERO: &str =
     include_str!("../../../protocol/fixtures/conformance/host/error-operation-zero.json");
+const HOST_HTTP_COMPLETE_WITH_METADATA: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/http-complete-with-metadata.json");
+const HOST_HTTP_COMPLETE_INVALID_STATUS: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/http-complete-invalid-status.json");
 
 const VALID_RUNTIME_CANCEL: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-runtime-cancel.json");
@@ -336,6 +340,61 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         },
     );
 
+    record(
+        &mut report,
+        "remote-http-complete-carries-status-headers",
+        || {
+            let (runtime, rx) = fresh_runtime();
+            runtime
+                .send(remote_http_search_command(501))
+                .map_err(|err| format!("remote http command send failed: {err:?}"))?;
+            expect_http_host_request(&rx, 501)?;
+            runtime
+                .send_json(HOST_HTTP_COMPLETE_WITH_METADATA.as_bytes())
+                .map_err(|err| format!("http host.complete send failed: {err:?}"))?;
+
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 501
+                    && data["books"].as_array().is_some_and(Vec::is_empty)
+                    && data["http"]["status"] == 200
+                    && data["http"]["headers"]["content-type"] == "application/json" =>
+                {
+                    Ok(())
+                }
+                other => Err(format!("unexpected http completion result {other:?}")),
+            }
+        },
+    );
+
+    record(
+        &mut report,
+        "remote-http-complete-rejects-invalid-status",
+        || {
+            let (runtime, rx) = fresh_runtime();
+            runtime
+                .send(remote_http_search_command(504))
+                .map_err(|err| format!("remote http command send failed: {err:?}"))?;
+            expect_http_host_request(&rx, 504)?;
+            runtime
+                .send_json(HOST_HTTP_COMPLETE_INVALID_STATUS.as_bytes())
+                .map_err(|err| format!("http host.complete send failed: {err:?}"))?;
+
+            match recv_event(&rx)? {
+                Event::Error {
+                    request_id, error, ..
+                } if request_id == 504
+                    && error.code == ErrorCode::InvalidParams
+                    && error.message.contains("status") =>
+                {
+                    Ok(())
+                }
+                other => Err(format!("expected invalid http status error, got {other:?}")),
+            }
+        },
+    );
+
     record(&mut report, "cancel-unknown-id-idempotent", || {
         let (runtime, rx) = fresh_runtime();
         let id = serde_json::from_str::<Value>(CANCEL_UNKNOWN)
@@ -545,6 +604,49 @@ fn expect_host_request(rx: &Receiver<Event>) -> Result<(), String> {
     match recv_event(rx)? {
         Event::HostRequest { .. } => Ok(()),
         other => Err(format!("expected host.request, got {other:?}")),
+    }
+}
+
+fn remote_http_search_command(request_id: u64) -> Command {
+    Command::new(
+        request_id,
+        methods::BOOK_SEARCH,
+        json!({
+            "sourceId": "conformance-src",
+            "searchRequest": {
+                "url": "https://books.example.test/search?q=empty",
+                "headers": { "Accept": "application/json" }
+            },
+            "source": {
+                "sourceId": "conformance-src",
+                "name": "Conformance Source",
+                "baseUrl": "https://books.example.test",
+                "rules": {
+                    "search": [ { "kind": "jsonPath", "path": "$.books[*]" } ]
+                }
+            }
+        }),
+    )
+}
+
+fn expect_http_host_request(rx: &Receiver<Event>, expected_request_id: u64) -> Result<u64, String> {
+    match recv_event(rx)? {
+        Event::HostRequest {
+            request_id,
+            operation_id,
+            capability,
+            params,
+            ..
+        } if request_id == expected_request_id
+            && operation_id == 1
+            && capability == "http.execute"
+            && params["url"] == "https://books.example.test/search?q=empty"
+            && params["method"] == "GET"
+            && params["headers"]["Accept"] == "application/json" =>
+        {
+            Ok(operation_id)
+        }
+        other => Err(format!("unexpected http host.request event {other:?}")),
     }
 }
 
