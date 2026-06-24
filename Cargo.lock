@@ -733,6 +733,8 @@ name = "reader-sync"
 version = "0.1.0"
 dependencies = [
  "reader-domain",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

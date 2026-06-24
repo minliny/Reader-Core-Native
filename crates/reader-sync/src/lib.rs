@@ -7,6 +7,11 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+/// Current sync package schema version.
+pub const SYNC_PACKAGE_SCHEMA_VERSION: u32 = 1;
+
 /// Data bucket represented by a sync record.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SyncCollection {
@@ -36,10 +41,43 @@ impl SyncCollection {
         let value = normalize_required(value.into(), "collection")?;
         Ok(SyncCollection::Custom(value))
     }
+
+    pub fn parse(value: impl Into<String>) -> Result<Self, SyncError> {
+        let value = normalize_required(value.into(), "collection")?;
+        Ok(match value.as_str() {
+            "bookshelf" => SyncCollection::Bookshelf,
+            "readingProgress" => SyncCollection::ReadingProgress,
+            "localBook" => SyncCollection::LocalBook,
+            "chapterCache" => SyncCollection::ChapterCache,
+            "rssSubscription" => SyncCollection::RssSubscription,
+            "rssEntry" => SyncCollection::RssEntry,
+            _ => SyncCollection::Custom(value),
+        })
+    }
+}
+
+impl Serialize for SyncCollection {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for SyncCollection {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        SyncCollection::parse(value).map_err(serde::de::Error::custom)
+    }
 }
 
 /// Stable key for a record inside a snapshot.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SyncRecordKey {
     pub collection: SyncCollection,
     pub record_id: String,
@@ -58,7 +96,8 @@ impl SyncRecordKey {
 }
 
 /// One synchronized logical row.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SyncRecord {
     pub collection: SyncCollection,
     pub record_id: String,
@@ -157,7 +196,8 @@ impl SyncRecord {
 
 /// Sync export/import unit. A snapshot may contain duplicate keys from an append
 /// log; normalization reduces those to the current record per key.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SyncSnapshot {
     pub snapshot_id: String,
     pub device_id: String,
@@ -216,8 +256,59 @@ impl SyncSnapshot {
     }
 }
 
+/// Wire package for backup/sync transports.
+///
+/// Packages carry one normalized snapshot plus a schema version so WebDAV,
+/// local backup files, and future transport adapters can reject incompatible
+/// data before applying it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SyncPackage {
+    pub schema_version: u32,
+    pub snapshot: SyncSnapshot,
+}
+
+impl SyncPackage {
+    pub fn new(snapshot: SyncSnapshot) -> Result<Self, SyncError> {
+        let records = snapshot.normalized_records()?;
+        let snapshot = SyncSnapshot::new(
+            snapshot.snapshot_id,
+            snapshot.device_id,
+            snapshot.created_at,
+            records,
+        )?;
+        let package = Self {
+            schema_version: SYNC_PACKAGE_SCHEMA_VERSION,
+            snapshot,
+        };
+        package.validate()?;
+        Ok(package)
+    }
+
+    pub fn validate(&self) -> Result<(), SyncError> {
+        if self.schema_version != SYNC_PACKAGE_SCHEMA_VERSION {
+            return Err(SyncError::InvalidPackage {
+                field: "schema_version".into(),
+            });
+        }
+        self.snapshot.validate()
+    }
+
+    pub fn to_json(&self) -> Result<String, SyncError> {
+        self.validate()?;
+        serde_json::to_string(self).map_err(SyncError::from_codec_error)
+    }
+
+    pub fn from_json(json: &str) -> Result<Self, SyncError> {
+        let package = serde_json::from_str::<Self>(json).map_err(SyncError::from_codec_error)?;
+        package.validate()?;
+        Ok(package)
+    }
+}
+
 /// Conflict details for records that changed differently across snapshots.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SyncConflict {
     pub key: SyncRecordKey,
     pub local: SyncRecord,
@@ -226,7 +317,8 @@ pub struct SyncConflict {
     pub reason: ConflictReason,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum ConflictReason {
     ConcurrentPayloadChange,
     DeleteVsUpdate,
@@ -234,21 +326,44 @@ pub enum ConflictReason {
 }
 
 /// Merge result from two snapshots.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SyncMergeResult {
     pub snapshot: SyncSnapshot,
+    pub conflicts: Vec<SyncConflict>,
+}
+
+/// Merge result from two sync packages.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SyncPackageMergeResult {
+    pub package: SyncPackage,
     pub conflicts: Vec<SyncConflict>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SyncError {
     InvalidRecord { field: String },
+    InvalidPackage { field: String },
+    Codec { message: String },
+}
+
+impl SyncError {
+    fn from_codec_error(error: serde_json::Error) -> Self {
+        Self::Codec {
+            message: error.to_string(),
+        }
+    }
 }
 
 impl std::fmt::Display for SyncError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SyncError::InvalidRecord { field } => write!(f, "invalid sync record field: {field}"),
+            SyncError::InvalidPackage { field } => {
+                write!(f, "invalid sync package field: {field}")
+            }
+            SyncError::Codec { message } => write!(f, "sync codec error: {message}"),
         }
     }
 }
@@ -309,6 +424,29 @@ pub fn merge_snapshots(
     Ok(SyncMergeResult {
         snapshot,
         conflicts,
+    })
+}
+
+/// Merge two wire packages and return a normalized package plus conflicts.
+pub fn merge_packages(
+    local: &SyncPackage,
+    remote: &SyncPackage,
+    merged_snapshot_id: impl Into<String>,
+    merged_device_id: impl Into<String>,
+    merged_created_at: i64,
+) -> Result<SyncPackageMergeResult, SyncError> {
+    local.validate()?;
+    remote.validate()?;
+    let result = merge_snapshots(
+        &local.snapshot,
+        &remote.snapshot,
+        merged_snapshot_id,
+        merged_device_id,
+        merged_created_at,
+    )?;
+    Ok(SyncPackageMergeResult {
+        package: SyncPackage::new(result.snapshot)?,
+        conflicts: result.conflicts,
     })
 }
 
@@ -458,6 +596,119 @@ mod tests {
             SyncError::InvalidRecord {
                 field: "device_id".into()
             }
+        );
+    }
+
+    #[test]
+    fn collection_json_uses_stable_strings_and_accepts_custom_buckets() {
+        assert_eq!(
+            serde_json::to_string(&SyncCollection::ReadingProgress).unwrap(),
+            r#""readingProgress""#
+        );
+        assert_eq!(
+            serde_json::from_str::<SyncCollection>(r#""rssEntry""#).unwrap(),
+            SyncCollection::RssEntry
+        );
+        assert_eq!(
+            serde_json::from_str::<SyncCollection>(r#""deviceSettings""#).unwrap(),
+            SyncCollection::Custom("deviceSettings".into())
+        );
+        assert!(serde_json::from_str::<SyncCollection>(r#""   ""#).is_err());
+    }
+
+    #[test]
+    fn record_json_round_trips_and_denies_unknown_fields() {
+        let record = rec(SyncCollection::Bookshelf, "s1/b1", r#"{"title":"A"}"#, 10);
+
+        let json = serde_json::to_string(&record).unwrap();
+        assert_eq!(serde_json::from_str::<SyncRecord>(&json).unwrap(), record);
+        assert!(json.contains(r#""collection":"bookshelf""#));
+
+        let unknown = r#"{"collection":"bookshelf","recordId":"b","updatedAt":1,"deviceId":"d","revision":1,"payload":"{}","deleted":false,"bogus":true}"#;
+        assert!(serde_json::from_str::<SyncRecord>(unknown).is_err());
+    }
+
+    #[test]
+    fn sync_package_normalizes_records_and_json_round_trips() {
+        let old = rec(SyncCollection::Bookshelf, "b1", r#"{"title":"old"}"#, 1);
+        let latest = rec(SyncCollection::Bookshelf, "b1", r#"{"title":"new"}"#, 2);
+        let rss = rec(
+            SyncCollection::RssSubscription,
+            "feed",
+            r#"{"url":"https://example.test/feed.xml"}"#,
+            1,
+        );
+        let snapshot = snap("snapshot", vec![rss.clone(), old, latest.clone()]);
+
+        let package = SyncPackage::new(snapshot).unwrap();
+
+        assert_eq!(package.schema_version, SYNC_PACKAGE_SCHEMA_VERSION);
+        assert_eq!(package.snapshot.records, vec![latest, rss]);
+        let json = package.to_json().unwrap();
+        assert!(json.contains(r#""schemaVersion":1"#));
+        assert_eq!(SyncPackage::from_json(&json).unwrap(), package);
+    }
+
+    #[test]
+    fn sync_package_rejects_schema_unknown_fields_and_invalid_nested_records() {
+        let mut package = SyncPackage::new(snap("snapshot", Vec::new())).unwrap();
+        package.schema_version = 2;
+        assert_eq!(
+            package.validate().unwrap_err(),
+            SyncError::InvalidPackage {
+                field: "schema_version".into()
+            }
+        );
+
+        let unknown_package_field = r#"{"schemaVersion":1,"snapshot":{"snapshotId":"s","deviceId":"d","createdAt":1,"records":[]},"bogus":true}"#;
+        assert!(matches!(
+            SyncPackage::from_json(unknown_package_field),
+            Err(SyncError::Codec { .. })
+        ));
+
+        let invalid_record = r#"{"schemaVersion":1,"snapshot":{"snapshotId":"s","deviceId":"d","createdAt":1,"records":[{"collection":"bookshelf","recordId":"b","updatedAt":1,"deviceId":"d","revision":1,"payload":"   ","deleted":false}]}}"#;
+        assert_eq!(
+            SyncPackage::from_json(invalid_record).unwrap_err(),
+            SyncError::InvalidRecord {
+                field: "payload".into()
+            }
+        );
+    }
+
+    #[test]
+    fn merge_packages_returns_normalized_package_and_conflicts() {
+        let local = SyncPackage::new(snap(
+            "local",
+            vec![rec(
+                SyncCollection::ReadingProgress,
+                "s1/b1",
+                r#"{"chapter":1}"#,
+                10,
+            )],
+        ))
+        .unwrap();
+        let mut remote_record = rec(
+            SyncCollection::ReadingProgress,
+            "s1/b1",
+            r#"{"chapter":2}"#,
+            11,
+        );
+        remote_record.device_id = "device-b".into();
+        let remote = SyncPackage::new(snap("remote", vec![remote_record.clone()])).unwrap();
+
+        let result = merge_packages(&local, &remote, "merged", "merge-device", 12).unwrap();
+
+        assert_eq!(result.package.schema_version, SYNC_PACKAGE_SCHEMA_VERSION);
+        assert_eq!(result.package.snapshot.snapshot_id, "merged");
+        assert_eq!(result.package.snapshot.records, vec![remote_record.clone()]);
+        assert_eq!(result.conflicts.len(), 1);
+        assert_eq!(
+            result.conflicts[0].reason,
+            ConflictReason::ConcurrentPayloadChange
+        );
+        assert_eq!(
+            SyncPackage::from_json(&result.package.to_json().unwrap()).unwrap(),
+            result.package
         );
     }
 
