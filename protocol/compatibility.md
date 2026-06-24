@@ -22,11 +22,20 @@
 - Changing field semantics → **protocol version bump required**.
 - Unknown top-level command fields and runtime config fields are rejected as
   `INVALID_MESSAGE`; hosts must not depend on silent field dropping.
+- Command `requestId` must be a positive integer. `0` is reserved for
+  process-level errors emitted outside a host command and is rejected on
+  platform-supplied commands.
+- Command `method` must use dot-separated, non-empty tokens without whitespace,
+  for example `runtime.ping` or `host.complete`.
 - `params` must be a JSON object. Method-specific invalid params return
   `INVALID_PARAMS`.
 - `runtime.ping` is the advertised v1 ping method. `core.ping` is accepted as a
   bootstrap alias for current ABI smoke harnesses, but it is not advertised in
   `core.info.capabilities`.
+- `runtime.cancel` is the JSON-protocol cancellation method. It accepts params
+  `{ "requestId": <positive integer> }`, returns `{ "cancelled": <bool> }` on
+  the cancel command request, and emits a separate `CANCELLED` error event on
+  the original request when a pending Core request is cancelled.
 
 ## Platform Contract
 

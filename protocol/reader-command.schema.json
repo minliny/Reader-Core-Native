@@ -7,6 +7,7 @@
     "core.info",
     "runtime.ping",
     "runtime.hostSmoke",
+    "runtime.cancel",
     "host.complete",
     "host.error",
     "host.bus.v1",
@@ -25,15 +26,19 @@
     },
     "requestId": {
       "type": "integer",
-      "description": "Unique request identifier for correlation."
+      "minimum": 1,
+      "description": "Unique positive request identifier for correlation. Value 0 is reserved for process-level errors emitted outside a host command."
     },
     "method": {
       "type": "string",
-      "description": "Command method name, dot-separated.",
+      "minLength": 1,
+      "pattern": "^[^\\s.]+(\\.[^\\s.]+)+$",
+      "description": "Command method name, dot-separated. Must contain two or more non-empty tokens and no whitespace.",
       "examples": [
         "core.info",
         "runtime.ping",
         "runtime.hostSmoke",
+        "runtime.cancel",
         "host.complete",
         "host.error",
         "source.import",
@@ -83,6 +88,19 @@
         "params": {
           "type": "object",
           "default": {}
+        }
+      }
+    },
+    "RuntimeCancelParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId"],
+      "description": "Parameters for runtime.cancel. Cancels an in-flight request by its requestId.",
+      "properties": {
+        "requestId": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The requestId to cancel. Must differ from the runtime.cancel command's own requestId."
         }
       }
     }

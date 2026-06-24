@@ -20,6 +20,15 @@ const INVALID_UNSUPPORTED_PROTOCOL: &str = include_str!(
 );
 const INVALID_MISSING_REQUEST_ID: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/invalid-missing-request-id.json");
+const INVALID_REQUEST_ID_ZERO: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/invalid-request-id-zero.json");
+const INVALID_EMPTY_METHOD: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/invalid-empty-method.json");
+const INVALID_METHOD_WHITESPACE: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/invalid-method-whitespace.json");
+const INVALID_METHOD_EMPTY_SEGMENT: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-method-empty-segment.json"
+);
 const INVALID_PARAMS_NOT_OBJECT: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/invalid-params-not-object.json");
 
@@ -41,6 +50,12 @@ const HOST_COMPLETE: &str =
 const HOST_ERROR: &str = include_str!("../../../protocol/fixtures/conformance/host/error.json");
 const HOST_UNKNOWN_COMPLETE: &str =
     include_str!("../../../protocol/fixtures/conformance/host/unknown-complete.json");
+
+const VALID_RUNTIME_CANCEL: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-runtime-cancel.json");
+const INVALID_RUNTIME_CANCEL_TARGET_ZERO: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-runtime-cancel-target-zero.json"
+);
 
 const CANCEL_UNKNOWN: &str =
     include_str!("../../../protocol/fixtures/conformance/cancel/unknown.json");
@@ -138,6 +153,26 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         (
             "invalid-command-missing-request-id",
             INVALID_MISSING_REQUEST_ID,
+            ErrorCode::InvalidMessage,
+        ),
+        (
+            "invalid-command-request-id-zero",
+            INVALID_REQUEST_ID_ZERO,
+            ErrorCode::InvalidMessage,
+        ),
+        (
+            "invalid-command-empty-method",
+            INVALID_EMPTY_METHOD,
+            ErrorCode::InvalidMessage,
+        ),
+        (
+            "invalid-command-method-whitespace",
+            INVALID_METHOD_WHITESPACE,
+            ErrorCode::InvalidMessage,
+        ),
+        (
+            "invalid-command-method-empty-segment",
+            INVALID_METHOD_EMPTY_SEGMENT,
             ErrorCode::InvalidMessage,
         ),
         (
@@ -289,6 +324,50 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         runtime.cancel(cancel_id);
         runtime.cancel(cancel_id);
         expect_no_event(&rx)
+    });
+
+    record(
+        &mut report,
+        "runtime-cancel-cancels-pending-host-request",
+        || {
+            let (runtime, rx) = send_to_fresh_runtime(HOST_REQUEST)?;
+            expect_host_request(&rx)?;
+            runtime
+                .send_json(VALID_RUNTIME_CANCEL.as_bytes())
+                .map_err(|err| format!("runtime.cancel send failed: {err:?}"))?;
+
+            match recv_event(&rx)? {
+                Event::Error {
+                    request_id, error, ..
+                } if request_id == 301 && error.code == ErrorCode::Cancelled => {}
+                other => return Err(format!("expected cancelled error for 301, got {other:?}")),
+            }
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 310 && data["cancelled"] == true => Ok(()),
+                other => Err(format!("expected cancel result true, got {other:?}")),
+            }
+        },
+    );
+
+    record(
+        &mut report,
+        "runtime-cancel-unknown-id-returns-false",
+        || {
+            let (_runtime, rx) = send_to_fresh_runtime(VALID_RUNTIME_CANCEL)?;
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 310 && data["cancelled"] == false => Ok(()),
+                other => Err(format!("expected cancelled:false result, got {other:?}")),
+            }
+        },
+    );
+
+    record(&mut report, "runtime-cancel-zero-target-id", || {
+        let (_runtime, rx) = send_to_fresh_runtime(INVALID_RUNTIME_CANCEL_TARGET_ZERO)?;
+        expect_event_error(&rx, 311, ErrorCode::InvalidParams)
     });
 
     report

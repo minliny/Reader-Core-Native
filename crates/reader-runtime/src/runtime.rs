@@ -5,7 +5,7 @@ use std::thread::{self, JoinHandle};
 
 use reader_contract::{
     core_info, methods, Command, CoreError, Event, HostCompleteParams, HostErrorParams,
-    HostSmokeParams, RuntimeConfig,
+    HostSmokeParams, RuntimeCancelParams, RuntimeConfig,
 };
 
 use crate::remote::{
@@ -298,6 +298,9 @@ fn dispatch_command(
             host_operations,
             next_operation_id,
         ),
+        methods::RUNTIME_CANCEL => {
+            dispatch_runtime_cancel(cmd, sink, active_requests, cancelled, host_operations)
+        }
         methods::HOST_COMPLETE => dispatch_host_complete(
             cmd,
             sink,
@@ -414,6 +417,63 @@ fn dispatch_host_smoke(
         params.capability,
         params.params,
     ));
+}
+
+fn dispatch_runtime_cancel(
+    cmd: &Command,
+    sink: &Arc<dyn EventSink>,
+    active_requests: &Mutex<HashSet<u64>>,
+    cancelled: &Mutex<HashSet<u64>>,
+    host_operations: &Mutex<HashMap<u64, HostOperation>>,
+) {
+    let params = match parse_runtime_cancel_params(cmd) {
+        Ok(params) => params,
+        Err(error) => {
+            finish_request(
+                sink,
+                active_requests,
+                cancelled,
+                cmd.request_id,
+                Event::error(cmd.request_id, error),
+            );
+            return;
+        }
+    };
+
+    if params.request_id == cmd.request_id {
+        finish_request(
+            sink,
+            active_requests,
+            cancelled,
+            cmd.request_id,
+            Event::error(
+                cmd.request_id,
+                CoreError::invalid_params(
+                    "runtime.cancel requestId must differ from the cancel command requestId",
+                )
+                .with_details(serde_json::json!({ "requestId": params.request_id })),
+            ),
+        );
+        return;
+    }
+
+    let did_cancel = cancel_request_by_id(
+        sink,
+        active_requests,
+        cancelled,
+        host_operations,
+        params.request_id,
+    );
+    finish_request(
+        sink,
+        active_requests,
+        cancelled,
+        cmd.request_id,
+        Event::result(
+            cmd.request_id,
+            serde_json::json!({ "cancelled": did_cancel }),
+        ),
+    );
 }
 
 fn dispatch_remote_host_request(
@@ -582,6 +642,20 @@ fn parse_host_smoke_params(cmd: &Command) -> Result<HostSmokeParams, CoreError> 
     })
 }
 
+fn parse_runtime_cancel_params(cmd: &Command) -> Result<RuntimeCancelParams, CoreError> {
+    let params =
+        serde_json::from_value::<RuntimeCancelParams>(cmd.params.clone()).map_err(|err| {
+            CoreError::invalid_params(format!("invalid params for {}", cmd.method)).with_details(
+                serde_json::json!({
+                    "source": err.to_string(),
+                    "method": cmd.method,
+                }),
+            )
+        })?;
+    params.validate()?;
+    Ok(params)
+}
+
 fn parse_host_complete_params(cmd: &Command) -> Result<HostCompleteParams, CoreError> {
     serde_json::from_value::<HostCompleteParams>(cmd.params.clone()).map_err(|err| {
         CoreError::invalid_params(format!("invalid params for {}", cmd.method)).with_details(
@@ -625,6 +699,32 @@ fn contains_active(active_requests: &Mutex<HashSet<u64>>, request_id: u64) -> bo
         .lock()
         .map(|active| active.contains(&request_id))
         .unwrap_or(false)
+}
+
+fn cancel_request_by_id(
+    sink: &Arc<dyn EventSink>,
+    active_requests: &Mutex<HashSet<u64>>,
+    cancelled: &Mutex<HashSet<u64>>,
+    host_operations: &Mutex<HashMap<u64, HostOperation>>,
+    request_id: u64,
+) -> bool {
+    if !contains_active(active_requests, request_id) {
+        return false;
+    }
+
+    if let Ok(mut set) = cancelled.lock() {
+        set.insert(request_id);
+    }
+
+    let removed_host_operation = remove_host_operations_for_request(host_operations, request_id);
+    if removed_host_operation {
+        if let Ok(mut set) = cancelled.lock() {
+            set.remove(&request_id);
+        }
+        remove_active(active_requests, request_id);
+        sink.emit(&Event::error(request_id, CoreError::cancelled()));
+    }
+    true
 }
 
 fn remove_active(active_requests: &Mutex<HashSet<u64>>, request_id: u64) {
@@ -767,6 +867,7 @@ mod tests {
                     methods::CORE_INFO,
                     methods::RUNTIME_PING,
                     methods::RUNTIME_HOST_SMOKE,
+                    methods::RUNTIME_CANCEL,
                     methods::HOST_COMPLETE,
                     methods::HOST_ERROR,
                 ] {
@@ -839,6 +940,49 @@ mod tests {
 
         assert_eq!(err.code, ErrorCode::InvalidMessage);
         assert!(sink.wait_len(1).is_empty());
+    }
+
+    #[test]
+    fn send_json_rejects_invalid_command_envelope_before_enqueue() {
+        for (name, json) in [
+            (
+                "request-id-zero",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-request-id-zero.json"
+                ),
+            ),
+            (
+                "empty-method",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-empty-method.json"
+                ),
+            ),
+            (
+                "method-whitespace",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-method-whitespace.json"
+                ),
+            ),
+            (
+                "method-empty-segment",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-method-empty-segment.json"
+                ),
+            ),
+        ] {
+            let sink = Arc::new(CollectSink::new());
+            let rt = Runtime::new(sink.clone());
+            let err = match rt.send_json(json.as_bytes()) {
+                Ok(()) => panic!("{name} should be rejected before enqueue"),
+                Err(err) => err,
+            };
+
+            assert_eq!(err.code, ErrorCode::InvalidMessage, "{name}: {err:?}");
+            assert!(
+                sink.wait_len(1).is_empty(),
+                "{name} should not emit runtime events"
+            );
+        }
     }
 
     #[test]
@@ -917,6 +1061,120 @@ mod tests {
                 assert_eq!(data["status"], "ok");
             }
             other => panic!("expected original request result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn runtime_cancel_command_cancels_pending_host_request() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send_json(
+            include_str!("../../../protocol/fixtures/conformance/host/request.json").as_bytes(),
+        )
+        .unwrap();
+
+        let events = sink.wait_len(1);
+        assert!(matches!(events[0], Event::HostRequest { .. }));
+
+        rt.send_json(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/valid-runtime-cancel.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+
+        let events = sink.wait_len(3);
+        match &events[1] {
+            Event::Error {
+                request_id, error, ..
+            } => {
+                assert_eq!(*request_id, 301);
+                assert_eq!(error.code, ErrorCode::Cancelled);
+            }
+            other => panic!("expected cancelled original request, got {other:?}"),
+        }
+        match &events[2] {
+            Event::Result {
+                request_id, data, ..
+            } => {
+                assert_eq!(*request_id, 310);
+                assert_eq!(data["cancelled"], true);
+            }
+            other => panic!("expected runtime.cancel result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn runtime_cancel_command_for_unknown_id_returns_false() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send_json(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/valid-runtime-cancel.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+
+        let events = sink.wait_len(1);
+        match &events[0] {
+            Event::Result {
+                request_id, data, ..
+            } => {
+                assert_eq!(*request_id, 310);
+                assert_eq!(data["cancelled"], false);
+            }
+            other => panic!("expected runtime.cancel result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn runtime_cancel_command_rejects_invalid_params() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send_json(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/invalid-runtime-cancel-target-zero.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+
+        let events = sink.wait_len(1);
+        match &events[0] {
+            Event::Error {
+                request_id, error, ..
+            } => {
+                assert_eq!(*request_id, 311);
+                assert_eq!(error.code, ErrorCode::InvalidParams);
+                assert_eq!(error.details["requestId"], 0);
+            }
+            other => panic!("expected runtime.cancel params error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn runtime_cancel_command_rejects_self_cancel() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send(Command::new(
+            312,
+            methods::RUNTIME_CANCEL,
+            serde_json::json!({ "requestId": 312 }),
+        ))
+        .unwrap();
+
+        let events = sink.wait_len(1);
+        match &events[0] {
+            Event::Error {
+                request_id, error, ..
+            } => {
+                assert_eq!(*request_id, 312);
+                assert_eq!(error.code, ErrorCode::InvalidParams);
+                assert!(error.message.contains("differ"));
+            }
+            other => panic!("expected runtime.cancel self-cancel error, got {other:?}"),
         }
     }
 
@@ -1537,7 +1795,7 @@ mod tests {
             let sink = Arc::new(CollectSink::new());
             let rt = Runtime::new(sink);
             rt.send(Command::new(
-                i,
+                i + 1,
                 methods::RUNTIME_PING,
                 serde_json::json!({}),
             ))

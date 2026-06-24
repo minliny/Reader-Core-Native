@@ -22,6 +22,34 @@ pub struct HostSmokeParams {
     pub params: Value,
 }
 
+/// Parameters for `runtime.cancel`, the JSON-protocol counterpart of the C ABI
+/// `rc_runtime_cancel`. Lets a host driving Core purely over the JSON protocol
+/// cancel an in-flight request by its `requestId`.
+///
+/// Result data: `{ "cancelled": <bool> }` - `true` if the target was active
+/// and got cancelled, `false` if the target was unknown or already completed.
+/// The cancelled original request receives a separate `CANCELLED` error event
+/// on its own `requestId`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeCancelParams {
+    /// The requestId to cancel. Must differ from the `runtime.cancel` command's
+    /// own requestId (self-cancellation is rejected with `INVALID_PARAMS`).
+    pub request_id: u64,
+}
+
+impl RuntimeCancelParams {
+    pub fn validate(&self) -> Result<(), CoreError> {
+        if self.request_id == 0 {
+            return Err(CoreError::invalid_params(
+                "runtime.cancel requestId must be greater than 0",
+            )
+            .with_details(serde_json::json!({ "requestId": self.request_id })));
+        }
+        Ok(())
+    }
+}
+
 /// Parameters sent by the host to complete a pending `host.request`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -60,5 +88,42 @@ mod tests {
         let error: HostErrorParams = serde_json::from_value(error_command.params).unwrap();
         assert_eq!(error.operation_id, 1);
         assert_eq!(error.error.code, ErrorCode::Internal);
+    }
+
+    #[test]
+    fn runtime_cancel_params_parse_and_reject_unknown_fields() {
+        let command: crate::Command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/valid-runtime-cancel.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let params: RuntimeCancelParams = serde_json::from_value(command.params).unwrap();
+        assert_eq!(params.request_id, 301);
+        params.validate().unwrap();
+
+        let err = serde_json::from_value::<RuntimeCancelParams>(serde_json::json!({
+            "requestId": 1,
+            "extra": true
+        }))
+        .unwrap_err();
+        assert!(err.to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn runtime_cancel_rejects_zero_target_request_id() {
+        let command: crate::Command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/invalid-runtime-cancel-target-zero.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let params: RuntimeCancelParams = serde_json::from_value(command.params).unwrap();
+        let err = params.validate().unwrap_err();
+
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert_eq!(err.details["requestId"], 0);
     }
 }
