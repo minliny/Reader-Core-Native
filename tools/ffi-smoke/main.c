@@ -27,6 +27,16 @@ int main(void) {
     return 1;
   }
 
+  if (rc_runtime_send(NULL, (const uint8_t *)"{}", 2) != 1) {
+    fprintf(stderr, "null runtime send did not return status 1\n");
+    return 1;
+  }
+  if (rc_runtime_cancel(NULL, 42) != 1) {
+    fprintf(stderr, "null runtime cancel did not return status 1\n");
+    return 1;
+  }
+  rc_runtime_destroy(NULL);
+
   struct captured_event captured = {0};
   rc_runtime_t *runtime = NULL;
   const char *config = "{}";
@@ -34,6 +44,14 @@ int main(void) {
                                    &captured, &runtime);
   if (code != 0 || runtime == NULL) {
     fprintf(stderr, "rc_runtime_create failed: %d\n", code);
+    return 1;
+  }
+
+  const char *malformed = "{";
+  code = rc_runtime_send(runtime, (const uint8_t *)malformed, strlen(malformed));
+  if (code != 3) {
+    fprintf(stderr, "malformed send returned %d, expected 3\n", code);
+    rc_runtime_destroy(runtime);
     return 1;
   }
 
