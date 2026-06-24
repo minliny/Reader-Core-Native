@@ -13,17 +13,20 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 # 本机验证
 ./scripts/check-local.sh
 
-# 本机构建 Rust workspace、FFI release 产物，并运行 core.info smoke
+# 本机构建 Rust workspace、FFI release 产物，并运行 Rust/C ABI smoke
 ./scripts/build-local.sh
 
 # 阶段 1：仅构建 OHOS Rust staticlib
 rustup target add aarch64-unknown-linux-ohos
 ./scripts/build-ohos.sh
+
+# 阶段 1：构建 HarmonyOS NAPI smoke module（需要 DevEco/OHOS SDK）
+./scripts/build-harmony-napi.sh
 ```
 
 OHOS、Android、iOS 平台产物脚本会按 [ARCHITECTURE.md](./ARCHITECTURE.md)
-阶段 1/2 补齐；当前 `build-ohos.sh` 只验证 Rust 侧 `libreader_core.a`，
-完整 NAPI `.so` 和 HAP 链接仍需要 OpenHarmony SDK clang/sysroot。
+阶段 1/2 补齐；当前 `build-harmony-napi.sh` 验证 Rust staticlib 能链接为
+HarmonyOS NAPI `.so`，HAP 集成和真机加载仍需在 HarmonyOS App 仓库完成。
 
 ## 目录
 
