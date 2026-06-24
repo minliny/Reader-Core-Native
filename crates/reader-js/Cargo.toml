@@ -8,3 +8,5 @@ authors.workspace = true
 
 [dependencies]
 reader-contract = { path = "../reader-contract" }
+rquickjs = "=0.8.1"
+serde_json.workspace = true
