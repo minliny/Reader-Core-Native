@@ -142,7 +142,9 @@ int32_t rc_runtime_send(
 /// Threading: may be called from any host thread while `runtime` is alive.
 /// The host must serialize all send/cancel calls with `rc_runtime_destroy`.
 ///
-/// Returns `RC_CANCEL_OK` on success (including when request is not found),
+/// Returns `RC_CANCEL_OK` on success. Missing or already-completed request IDs
+/// are silent no-op successes: they do not emit an event and they clear
+/// `rc_last_error` like any successful runtime call. Returns
 /// `RC_CANCEL_NULL_RUNTIME` when `runtime` is NULL, or `RC_CANCEL_PANIC` if an
 /// internal Rust panic was caught by the ABI guard.
 /// Every non-panic failure records a structured error via `rc_last_error`.

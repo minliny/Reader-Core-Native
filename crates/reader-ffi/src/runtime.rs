@@ -309,6 +309,20 @@ mod tests {
     }
 
     #[test]
+    fn cancel_missing_request_is_noop_success_via_c_abi() {
+        let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
+        let handle = make_runtime(&events);
+
+        crate::last_error::set(CoreError::internal("stale"));
+        assert_eq!(unsafe { cancel(handle, 404) }, 0);
+        assert_eq!(last_error_code(), 0);
+        std::thread::sleep(std::time::Duration::from_millis(25));
+        assert!(events.0.lock().unwrap().is_empty());
+
+        assert_eq!(unsafe { destroy(handle) }, 0);
+    }
+
+    #[test]
     fn last_error_reports_structured_code_for_send_failures() {
         let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
         let handle = make_runtime(&events);

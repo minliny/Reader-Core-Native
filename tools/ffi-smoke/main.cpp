@@ -239,6 +239,12 @@ int main() {
   if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "command_json")) {
     return fail("null command did not record INVALID_MESSAGE");
   }
+  if (rc_runtime_cancel(rt, 123456) != RC_CANCEL_OK) {
+    return fail("cancel missing request did not return RC_CANCEL_OK");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("cancel missing request did not clear last_error");
+  }
 
   if (rc_runtime_send(rt, nullptr, 0) != RC_SEND_INVALID_COMMAND) {
     return fail("zero-length command did not return RC_SEND_INVALID_COMMAND");

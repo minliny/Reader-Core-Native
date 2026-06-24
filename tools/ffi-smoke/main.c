@@ -263,6 +263,13 @@ int main(void) {
     fprintf(stderr, "null command last_error: code=%d msg=%s\n", code, msg);
     return fail("null command did not record INVALID_MESSAGE");
   }
+  if (rc_runtime_cancel(rt, 123456) != RC_CANCEL_OK) {
+    return fail("cancel missing request did not return RC_CANCEL_OK");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("cancel missing request did not clear last_error");
+  }
 
   if (rc_runtime_send(rt, NULL, 0) != RC_SEND_INVALID_COMMAND) {
     return fail("zero-length command did not return RC_SEND_INVALID_COMMAND");
