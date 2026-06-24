@@ -23,6 +23,10 @@ rustup target add aarch64-unknown-linux-ohos
 # 阶段 1：构建 HarmonyOS NAPI smoke module（需要 DevEco/OHOS SDK）
 ./scripts/build-harmony-napi.sh
 
+# 阶段 1：构建 iOS XCFramework smoke artifact（需要 Xcode）
+rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+./scripts/build-ios-xcframework.sh
+
 # 滚动集成：把已完成 agent 分支接入独立 integration worktree
 scripts/integration-queue.sh \
   codex/core-product-integration \
@@ -42,6 +46,7 @@ HarmonyOS NAPI `.so`，HAP 集成和真机加载仍需在 HarmonyOS App 仓库�
 - [docs/ROLLING_INTEGRATION.md](./docs/ROLLING_INTEGRATION.md) — 并行 agent 滚动集成队列
 - [include/reader_core.h](./include/reader_core.h) — C ABI 头文件
 - [protocol/](./protocol/) — JSON 消息协议 Schema
+- [bindings/ios/README.md](./bindings/ios/README.md) — iOS XCFramework smoke 产物说明
 
 ## 仓库关系
 

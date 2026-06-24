@@ -46,7 +46,7 @@
 
 | 模块 | 状态 | 备注 |
 |------|:----:|------|
-| XCFramework | ⬜ | |
+| XCFramework | 🟡 | Core-side staticlib + header smoke; Swift host wrapper still pending |
 | ReaderCoreClient.swift | ⬜ | |
 | HTTP Transport (URLSession) | ⬜ | 保留为 transport |
 | WebView Login Adapter | ⬜ | 保留 |
