@@ -21,6 +21,9 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
 - SDK behavior smoke: `bindings/harmony/sdk/reader_core.test.ts` uses a fake
   native module to verify `runtime.ping`, `host.complete`, handler failure to
   `host.error`, and `cancelRequest` dispatch.
+- ArkTS package entry: `bindings/harmony/Index.ets` imports
+  `libreader_core_napi.so` and exposes `createReaderCoreRuntime` plus
+  `runHarmonyNapiSmoke`.
 - Build evidence: OHOS and Harmony scripts emit deterministic artifact paths,
   SHA-256 hashes, byte sizes, tool versions, and NAPI symbol evidence.
 
@@ -33,6 +36,7 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
   exports into `ReaderCoreRuntime`, including `coreInfo`, `ping`, `hostSmoke`,
   generic `request`, explicit `readEvent`, explicit `completeHostRequest`, and
   explicit `failHostRequest`.
+- Package entry: `bindings/harmony/oh-package.json5` points to `Index.ets`.
 
 ## ABI Constraints
 
@@ -51,6 +55,7 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
 
 ## Open Harmony Work
 
-- Add an ArkTS package layout once the host app module structure is available.
 - Add device-side smoke tests that import the `.so`, run `coreInfo`, `ping`, and
-  `hostSmoke`, and archive the script output beside the build evidence.
+  `hostSmoke`, and archive the script output beside the build evidence. The
+  repo now provides `runHarmonyNapiSmoke`; the remaining work is running it in
+  a signed HAP on device.

@@ -48,6 +48,15 @@ output="$build_dir/libreader_core_napi.so"
 test -f "$output"
 echo "built $output"
 
+sdk_smoke_output="$build_dir/harmony-sdk-smoke.txt"
+sdk_smoke="skipped"
+if command -v bun >/dev/null 2>&1; then
+  bun test bindings/harmony/sdk/reader_core.test.ts > "$sdk_smoke_output"
+  sdk_smoke="pass"
+else
+  echo "bun not found; skipped bindings/harmony/sdk/reader_core.test.ts" > "$sdk_smoke_output"
+fi
+
 reader_core_static="target/aarch64-unknown-linux-ohos/release/libreader_core.a"
 symbols_file="$build_dir/libreader_core_napi.symbols.txt"
 napi_symbols_file="$build_dir/libreader_core_napi.napi-symbols.txt"
@@ -74,7 +83,12 @@ evidence="$build_dir/harmony-napi-build-evidence.txt"
   echo "ninja=$("$ninja_bin" --version)"
   echo "toolchain=$toolchain"
   echo "ohos_sdk_home=$sdk_root"
+  echo "arkts_entry=bindings/harmony/Index.ets"
+  echo "ohpm_package=bindings/harmony/oh-package.json5"
   echo "exports=abiVersion,createRuntime,releaseRuntime,sendCommand,cancelRequest,readEvent,pendingEventCount,completeHostRequest,failHostRequest,pingSmoke,hostSmoke"
+  echo "sdk_smoke=$sdk_smoke"
+  echo "sdk_smoke_output=$sdk_smoke_output"
+  echo "sdk_smoke_output_sha256=$(artifact_sha256 "$sdk_smoke_output")"
   if [[ -f "$symbols_file" ]]; then
     echo "symbols=$symbols_file"
     echo "symbols_sha256=$(artifact_sha256 "$symbols_file")"
