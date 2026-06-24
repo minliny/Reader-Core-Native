@@ -1,6 +1,6 @@
 package com.reader.core;
 
-final class NativeCoreBridge {
+public final class NativeCoreBridge {
     static {
         System.loadLibrary("reader_core_jni");
     }
@@ -8,9 +8,19 @@ final class NativeCoreBridge {
     private NativeCoreBridge() {
     }
 
-    static int abiVersion() {
+    public static int abiVersion() {
         return nativeAbiVersion();
     }
+
+    public static native String pingSmoke();
+
+    public static native long runtimeCreate(String configJson, Object listener);
+
+    public static native int runtimeSend(long handle, String commandJson);
+
+    public static native int runtimeCancel(long handle, long requestId);
+
+    public static native void runtimeDestroy(long handle);
 
     static long create(byte[] configJson) {
         return nativeCreate(configJson);

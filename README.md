@@ -30,6 +30,10 @@ rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 # 阶段 1：Swift wrapper compile/link/runtime smoke（需要 Xcode）
 ./scripts/check-ios-swift-wrapper.sh
 
+# 阶段 2：构建 Android JNI smoke module（需要 Android NDK）
+rustup target add aarch64-linux-android
+./scripts/build-android-jni.sh
+
 # 滚动集成：把已完成 agent 分支接入独立 integration worktree
 scripts/integration-queue.sh \
   codex/android-integration \
@@ -55,7 +59,9 @@ OHOS、Android、iOS 平台产物脚本会按 [ARCHITECTURE.md](./ARCHITECTURE.m
 HarmonyOS NAPI `.so`，HAP 集成和真机加载仍需在 HarmonyOS App 仓库完成。
 当前 iOS 证据覆盖 Core-side XCFramework / Swift wrapper compile-link-runtime
 smoke（`core.info` / `runtime.ping`）；URLSession/WebView/App 侧接入仍是后续
-滚动接入项。Android JNI 仍未在远端集成分支中完成。
+滚动接入项。Android lane 已新增 Core-side JNI shim 和
+`build-android-jni.sh`，但当前机器缺 Android NDK，`.so` 交叉构建仍需在 NDK
+环境验证；App 仓库侧加载和真机集成仍需完成。
 
 ## 目录
 
@@ -65,6 +71,7 @@ smoke（`core.info` / `runtime.ping`）；URLSession/WebView/App 侧接入仍是
 - [docs/ROLLING_INTEGRATION.md](./docs/ROLLING_INTEGRATION.md) — 并行 agent 滚动集成队列
 - [include/reader_core.h](./include/reader_core.h) — C ABI 头文件
 - [protocol/](./protocol/) — JSON 消息协议 Schema
+- [bindings/android/README.md](./bindings/android/README.md) — Android JNI smoke 产物说明
 - [bindings/ios/README.md](./bindings/ios/README.md) — iOS XCFramework smoke 产物说明
 
 ## 仓库关系

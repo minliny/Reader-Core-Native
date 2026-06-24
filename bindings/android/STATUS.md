@@ -1,9 +1,10 @@
 # Android JNI SDK - Integration Status
 
-Last updated: 2026-06-24
-Baseline: `origin/codex/android-integration` (`084aed52879add17138d9849b0f58c23368e15f6`)
-Scope rule: only `bindings/android/` and `build-android-jni.sh` are modified in
-this lane. Core/FFI files are read-only.
+Last updated: 2026-06-25
+Baseline: consolidated from `codex/reader-core-runtime-protocol`,
+`codex/reader-core-c-abi-stable-boundary`, and `codex/android-jni-sdk`.
+Scope rule: Android files consume the C ABI; Android wrapper work must not set
+Core semantics.
 
 ## Closed Loop
 
@@ -15,7 +16,8 @@ this lane. Core/FFI files are read-only.
 | Cancel | `ReaderCoreRuntime.cancel` over `rc_runtime_cancel` | Java wrapper |
 | `host.complete` / `host.error` | Java helpers build protocol JSON and send it through `rc_runtime_send` | Java/Kotlin samples parse `operationId` from `host.request` before completing |
 | CMake / NDK build | `bindings/android/jni/CMakeLists.txt` plus root `build-android-jni.sh` | `arm64-v8a` and `x86_64` real NDK links passed |
-| Java/Kotlin minimal calls | Samples under `bindings/android/samples/` | Java sample compile gate; Kotlin sample compile gate when `kotlinc` is available |
+| Java/Kotlin minimal calls | Samples under `bindings/android/samples/` plus direct listener sample under `bindings/android/sample/` | Java sample compile gate; Kotlin sample compile gate when `kotlinc` is available |
+| Direct listener API | Public methods on the single Java `NativeCoreBridge` class plus Kotlin `ReaderEventListener` | Consolidated to avoid duplicate `com.reader.core.NativeCoreBridge` classes |
 
 ## Local Validation (2026-06-24)
 
@@ -39,6 +41,14 @@ Passed:
   - both `.so` files export `Java_com_reader_core_NativeCoreBridge_native*`
     JNI entry points and the Core ABI symbols used by the bridge
 
+Consolidated-branch note:
+
+- The JNI source now also exports direct listener entry points:
+  `pingSmoke`, `runtimeCreate`, `runtimeSend`, `runtimeCancel`, and
+  `runtimeDestroy`.
+- Validation above was from the original lane. The consolidated branch still
+  requires a fresh NDK build before Android can be treated as release evidence.
+
 Toolchain installed during this lane:
 
 - Android SDK CMake `3.22.1`
@@ -55,10 +65,10 @@ Toolchain installed during this lane:
    Android completes host work by sending `host.complete` / `host.error` JSON
    commands through `rc_runtime_send`.
 
-3. **No structured last-error ABI on this branch.** `include/reader_core.h`
-   exposes coarse integer statuses only. Android reports those statuses in
-   `ReaderCoreException`; richer structured error text requires a future ABI
-   addition and is not patched here.
+3. **Structured last-error is now available in the consolidated C ABI, but not
+   surfaced by Android yet.** `include/reader_core.h` exposes `rc_last_error`
+   after the C ABI merge. Android still reports coarse statuses in
+   `ReaderCoreException` until a follow-up wrapper change exposes that text.
 
 4. **No Android app project is claimed.** This lane provides the JNI library,
    Java wrapper, and minimal Java/Kotlin call samples. Gradle packaging,
@@ -67,8 +77,10 @@ Toolchain installed during this lane:
 
 ## Threading Notes
 
-- Core invokes `rc_event_callback` from a Core-owned background thread. JNI
-  copies event bytes immediately and never calls Java from that callback.
+- Core invokes `rc_event_callback` from a Core-owned background thread. The
+  queue-style Java wrapper copies event bytes immediately. The direct listener
+  API invokes `ReaderEventListener.onEvent` from that Core-owned thread, so
+  listener implementations must be thread-safe.
 - `ReaderCoreRuntime.pollEvent(...)` can block the calling thread until an event
   arrives or the timeout elapses. Hosts should not call it on the UI thread for
   long waits.
