@@ -1,0 +1,30 @@
+name: Core
+
+on:
+  push:
+    branches:
+      - main
+      - "codex/**"
+  pull_request:
+
+jobs:
+  rust:
+    name: Rust workspace
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check and test
+        run: ./scripts/check-local.sh
+
+      - name: Build and ABI smoke
+        run: ./scripts/build-local.sh
+
+      - name: Protocol conformance smoke
+        run: cargo run -p reader-cli -- --conformance

@@ -7,10 +7,10 @@
 
 | 阶段 | 描述 | 状态 | 开始 | 完成 |
 |------|------|:----:|------|------|
-| 0 | 冻结方向与建立迁移清单 | ⬜ | | |
-| 1 | HarmonyOS Rust 地基 | ⬜ | | |
-| 2 | 统一 C ABI 和三端空壳接入 | ⬜ | | |
-| 3 | 规则内核和 QuickJS | ⬜ | | |
+| 0 | 冻结方向与建立迁移清单 | ✅ | 2026-06-24 | 2026-06-24 |
+| 1 | HarmonyOS Rust 地基 | 🟡 | 2026-06-24 | |
+| 2 | 统一 C ABI 和三端空壳接入 | 🟡 | 2026-06-24 | |
+| 3 | 规则内核和 QuickJS | 🟡 | 2026-06-24 | |
 | 4 | 远程阅读完整纵切 | ⬜ | | |
 | 5 | 统一数据库、缓存和进度 | ⬜ | | |
 | 6 | 补齐规则兼容面 | ⬜ | | |
@@ -23,8 +23,8 @@
 
 | 模块 | 状态 | 备注 |
 |------|:----:|------|
-| NAPI C++ Shim | ⬜ | |
-| ArkTS Wrapper | ⬜ | |
+| NAPI C++ Shim | 🟡 | Core-side `.so` smoke passes; App-side HAP integration is on `codex/harmony-napi-runtime` |
+| ArkTS Wrapper | 🟡 | App-side bridge is being validated separately |
 | HTTP Host Adapter | ⬜ | |
 | WebView Host Adapter | ⬜ | |
 | TTS Host Adapter | ⬜ | |
