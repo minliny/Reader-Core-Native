@@ -10,12 +10,20 @@
 # 安装 Rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-# 安装 OHOS target (阶段 1 需要)
-rustup target add aarch64-unknown-linux-ohos
+# 本机验证
+./scripts/check-local.sh
 
-# 构建所有平台
-./scripts/build-all.sh
+# 本机构建 Rust workspace、FFI release 产物，并运行 core.info smoke
+./scripts/build-local.sh
+
+# 阶段 1：仅构建 OHOS Rust staticlib
+rustup target add aarch64-unknown-linux-ohos
+./scripts/build-ohos.sh
 ```
+
+OHOS、Android、iOS 平台产物脚本会按 [ARCHITECTURE.md](./ARCHITECTURE.md)
+阶段 1/2 补齐；当前 `build-ohos.sh` 只验证 Rust 侧 `libreader_core.a`，
+完整 NAPI `.so` 和 HAP 链接仍需要 OpenHarmony SDK clang/sysroot。
 
 ## 目录
 

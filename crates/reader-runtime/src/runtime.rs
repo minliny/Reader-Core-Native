@@ -1,11 +1,9 @@
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
-use std::collections::HashSet;
 
-use reader_contract::{
-    core_info, methods, Command, CoreError, Event, PROTOCOL_VERSION,
-};
+use reader_contract::{core_info, methods, Command, CoreError, Event, PROTOCOL_VERSION};
 
 use crate::sink::EventSink;
 
@@ -54,14 +52,21 @@ impl Runtime {
             })
             .expect("reader-core worker thread spawn failed");
 
-        Self { tx, worker: Some(worker), cancelled, shutdown }
+        Self {
+            tx,
+            worker: Some(worker),
+            cancelled,
+            shutdown,
+        }
     }
 
     /// Enqueue a command. Returns `Err` for protocol-version mismatch or if
     /// the runtime is shutting down.
     pub fn send(&self, command: Command) -> Result<(), CoreError> {
         if command.protocol_version != PROTOCOL_VERSION {
-            return Err(CoreError::invalid_protocol_version(command.protocol_version));
+            return Err(CoreError::invalid_protocol_version(
+                command.protocol_version,
+            ));
         }
         match self.tx.send(WorkItem::Command(command)) {
             Ok(()) => Ok(()),
@@ -124,12 +129,8 @@ fn is_cancelled(set: &Mutex<HashSet<u64>>, id: u64) -> bool {
 /// are not wired in v1; unknown methods return a structured error.
 fn dispatch(cmd: &Command) -> Event {
     match cmd.method.as_str() {
-        methods::CORE_INFO => {
-            Event::result(cmd.request_id, core_info(ABI_VERSION, BUILD_VERSION))
-        }
-        methods::CORE_PING => {
-            Event::result(cmd.request_id, serde_json::json!({ "pong": true }))
-        }
+        methods::CORE_INFO => Event::result(cmd.request_id, core_info(ABI_VERSION, BUILD_VERSION)),
+        methods::CORE_PING => Event::result(cmd.request_id, serde_json::json!({ "pong": true })),
         other => Event::error(cmd.request_id, CoreError::unknown_method(other)),
     }
 }
@@ -158,7 +159,9 @@ mod tests {
         let events = sink.0.lock().unwrap();
         assert_eq!(events.len(), 1);
         match &events[0] {
-            Event::Result { request_id, data, .. } => {
+            Event::Result {
+                request_id, data, ..
+            } => {
                 assert_eq!(*request_id, 1);
                 assert_eq!(data["pong"], true);
             }
@@ -177,7 +180,9 @@ mod tests {
         let events = sink.0.lock().unwrap();
         assert_eq!(events.len(), 1);
         match &events[0] {
-            Event::Error { request_id, error, .. } => {
+            Event::Error {
+                request_id, error, ..
+            } => {
                 assert_eq!(*request_id, 7);
                 assert_eq!(error.code, reader_contract::ErrorCode::UnknownMethod);
             }

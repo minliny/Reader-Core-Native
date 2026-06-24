@@ -17,7 +17,7 @@ mod sink;
 
 use std::os::raw::c_int;
 
-pub use runtime::{ABI_VERSION, RuntimeHandle};
+pub use runtime::{RuntimeHandle, ABI_VERSION};
 
 /// `rc_abi_version` — C ABI version for compile/load-time checks.
 #[no_mangle]
@@ -35,7 +35,13 @@ pub unsafe extern "C" fn rc_runtime_create(
     out_runtime: *mut *mut RuntimeHandle,
 ) -> c_int {
     panic_guard::guard(|| {
-        runtime::create_runtime(config_json, config_length, callback, callback_context, out_runtime)
+        runtime::create_runtime(
+            config_json,
+            config_length,
+            callback,
+            callback_context,
+            out_runtime,
+        )
     })
 }
 

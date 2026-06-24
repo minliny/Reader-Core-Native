@@ -49,8 +49,12 @@ pub unsafe fn send(
     command_json: *const u8,
     command_length: usize,
 ) -> i32 {
-    let Some(handle) = runtime.as_ref() else { return 1 };
-    let Some(bytes) = borrow_bytes(command_json, command_length) else { return 2 };
+    let Some(handle) = runtime.as_ref() else {
+        return 1;
+    };
+    let Some(bytes) = borrow_bytes(command_json, command_length) else {
+        return 2;
+    };
     let command: Command = match serde_json::from_slice(bytes) {
         Ok(c) => c,
         Err(_) => return 3, // malformed JSON / command
@@ -62,7 +66,9 @@ pub unsafe fn send(
 }
 
 pub unsafe fn cancel(runtime: *mut RuntimeHandle, request_id: u64) -> i32 {
-    let Some(handle) = runtime.as_ref() else { return 1 };
+    let Some(handle) = runtime.as_ref() else {
+        return 1;
+    };
     handle.runtime.cancel(request_id);
     0
 }
@@ -79,6 +85,7 @@ pub unsafe fn destroy(runtime: *mut RuntimeHandle) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ptr;
     use std::sync::{Arc, Mutex};
 
     struct CapturedEvents(Mutex<Vec<Vec<u8>>>);
@@ -97,7 +104,13 @@ mod tests {
         let mut handle: *mut RuntimeHandle = ptr::null_mut();
         let config = b"{}";
         let code = unsafe {
-            create_runtime(config.as_ptr(), config.len(), Some(capture), ctx_ptr, &mut handle)
+            create_runtime(
+                config.as_ptr(),
+                config.len(),
+                Some(capture),
+                ctx_ptr,
+                &mut handle,
+            )
         };
         assert_eq!(code, 0);
         assert!(!handle.is_null());

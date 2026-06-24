@@ -2,9 +2,8 @@ use std::ffi::c_void;
 
 /// The C event callback signature, matching `rc_event_callback` in
 /// `reader_core.h`.
-pub type CEventCallback = Option<
-    unsafe extern "C" fn(context: *mut c_void, json: *const u8, json_length: usize),
->;
+pub type CEventCallback =
+    Option<unsafe extern "C" fn(context: *mut c_void, json: *const u8, json_length: usize)>;
 
 /// Adapter implementing [`reader_runtime::EventSink`] by serializing each event
 /// to JSON and forwarding it through the C callback.
@@ -31,9 +30,13 @@ impl CEventSink {
 
 impl reader_runtime::EventSink for CEventSink {
     fn emit(&self, event: &reader_contract::Event) {
-        let Some(callback) = self.callback else { return };
+        let Some(callback) = self.callback else {
+            return;
+        };
         // Serialize; on failure there's nowhere to report, so skip silently.
-        let Ok(json) = serde_json::to_vec(event) else { return };
+        let Ok(json) = serde_json::to_vec(event) else {
+            return;
+        };
         // SAFETY: the C contract guarantees the callback and context are valid
         // until destroy joins this worker. The buffer is borrowed for the call
         // only and never freed by the platform (see header).
