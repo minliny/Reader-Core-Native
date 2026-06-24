@@ -145,4 +145,54 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn create_rejects_invalid_out_pointer_or_missing_callback() {
+        let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
+        let ctx_ptr = Arc::as_ptr(&events) as *mut c_void;
+
+        let code =
+            unsafe { create_runtime(b"{}".as_ptr(), 2, Some(capture), ctx_ptr, ptr::null_mut()) };
+        assert_eq!(code, 2);
+
+        let mut handle: *mut RuntimeHandle = ptr::null_mut();
+        let code = unsafe { create_runtime(b"{}".as_ptr(), 2, None, ctx_ptr, &mut handle) };
+        assert_eq!(code, 3);
+        assert!(handle.is_null());
+    }
+
+    #[test]
+    fn send_rejects_null_runtime_null_payload_and_malformed_json() {
+        let mut handle: *mut RuntimeHandle = ptr::null_mut();
+        let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
+        let ctx_ptr = Arc::as_ptr(&events) as *mut c_void;
+        let code =
+            unsafe { create_runtime(b"{}".as_ptr(), 2, Some(capture), ctx_ptr, &mut handle) };
+        assert_eq!(code, 0);
+        assert!(!handle.is_null());
+
+        let code = unsafe { send(ptr::null_mut(), b"{}".as_ptr(), 2) };
+        assert_eq!(code, 1);
+
+        let code = unsafe { send(handle, ptr::null(), 1) };
+        assert_eq!(code, 2);
+
+        let malformed = b"{";
+        let code = unsafe { send(handle, malformed.as_ptr(), malformed.len()) };
+        assert_eq!(code, 3);
+
+        let protocol_error =
+            br#"{"protocolVersion":2,"requestId":9,"method":"runtime.ping","params":{}}"#;
+        let code = unsafe { send(handle, protocol_error.as_ptr(), protocol_error.len()) };
+        assert_eq!(code, 4);
+
+        let code = unsafe { destroy(handle) };
+        assert_eq!(code, 0);
+    }
+
+    #[test]
+    fn cancel_and_destroy_accept_null_runtime_contracts() {
+        assert_eq!(unsafe { cancel(ptr::null_mut(), 42) }, 1);
+        assert_eq!(unsafe { destroy(ptr::null_mut()) }, 0);
+    }
 }

@@ -33,10 +33,22 @@ int main() {
     return 1;
   }
 
+  rc_runtime_t *invalid_runtime = nullptr;
+  int32_t code = rc_runtime_create(nullptr, 0, capture_event, nullptr, nullptr);
+  if (code != 2) {
+    std::cerr << "invalid out pointer returned " << code << ", expected 2\n";
+    return 1;
+  }
+  code = rc_runtime_create(nullptr, 0, nullptr, nullptr, &invalid_runtime);
+  if (code != 3 || invalid_runtime != nullptr) {
+    std::cerr << "missing callback returned " << code << ", expected 3\n";
+    return 1;
+  }
+
   CapturedEvent captured;
   rc_runtime_t *runtime = nullptr;
   const std::string config = "{}";
-  int32_t code = rc_runtime_create(
+  code = rc_runtime_create(
       reinterpret_cast<const uint8_t *>(config.data()), config.size(),
       capture_event, &captured, &runtime);
   if (code != 0 || runtime == nullptr) {
