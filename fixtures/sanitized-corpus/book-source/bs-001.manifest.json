@@ -1,0 +1,34 @@
+{
+  "id": "bs-001",
+  "source_type": "book-source",
+  "format": "json",
+  "source_description": "Sanitized legado-style book source definition (search/detail/toc/content rule sets) paired with minimal sample responses. Models a typical HTTP book source that returns JSON for search/detail/toc and a small HTML fragment for chapter content. Exercises JSONPath rules and a CSS `p@text` content rule.",
+  "sanitization": "All hostnames replaced with example.test / img.example.test. Source name, book titles, authors, and intros are synthetic placeholders ('Sanitized Demo Source', 'Sample Volume One', 'Author Alpha', etc.). No real tokens, cookies, accounts, private content, or copyrighted long text. Sample chapter content is two short fictional sentences.",
+  "capability_tags": [
+    "rule-engine",
+    "book-source-parsing",
+    "jsonpath",
+    "css-selector",
+    "search-rule",
+    "detail-rule",
+    "toc-rule",
+    "content-rule"
+  ],
+  "privacy_check": {
+    "passed": true,
+    "checked_for": [
+      "real-tokens",
+      "cookies",
+      "account-credentials",
+      "private-content",
+      "copyrighted-long-text"
+    ],
+    "notes": "No authentic credentials or private data present. All identifiers, URLs, and text are synthetic."
+  },
+  "consumer_branch": {
+    "primary": "codex/rule-engine-parity",
+    "secondary": ["codex/remote-reading-vertical"]
+  },
+  "fixture_file": "bs-001-fixture.json",
+  "added_in_round": 1
+}

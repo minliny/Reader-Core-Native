@@ -1,0 +1,32 @@
+{
+  "id": "xf-001",
+  "source_type": "xml-feed",
+  "format": "xml",
+  "source_description": "Sanitized Atom/OPDS-style XML catalog with two namespaces (Atom + dc). Exercises XML/namespace-aware parsing, attribute selection (link href/rel/type), and repeated entry elements. Intended for XPath / XML rule validation and local content parsing.",
+  "sanitization": "All text and identifiers are synthetic ('Sanitized Demo Catalog', 'Sample Volume One', 'Corpus Bot'). Uses relative hrefs and urn:uuid identifiers. No real feed URL, no credentials, no copyrighted text.",
+  "capability_tags": [
+    "rule-engine",
+    "xml-parsing",
+    "xpath",
+    "namespace-aware",
+    "atom",
+    "opds"
+  ],
+  "privacy_check": {
+    "passed": true,
+    "checked_for": [
+      "real-tokens",
+      "cookies",
+      "account-credentials",
+      "private-content",
+      "copyrighted-long-text"
+    ],
+    "notes": "Synthetic catalog; no real publication data or credentials."
+  },
+  "consumer_branch": {
+    "primary": "codex/rule-engine-parity",
+    "secondary": ["codex/local-content-runtime"]
+  },
+  "fixture_file": "xf-001-fixture.xml",
+  "added_in_round": 1
+}

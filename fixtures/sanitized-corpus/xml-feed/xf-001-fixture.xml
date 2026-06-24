@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <id>urn:uuid:sanitized-demo-feed</id>
+  <title>Sanitized Demo Catalog</title>
+  <updated>2026-01-01T00:00:00Z</updated>
+  <author>
+    <name>Corpus Bot</name>
+  </author>
+  <entry>
+    <id>urn:uuid:bk-1</id>
+    <title>Sample Volume One</title>
+    <dc:creator>Author Alpha</dc:creator>
+    <dc:date>2020</dc:date>
+    <link href="/b/1" rel="http://opds-spec.org/acquisition" type="text/html"/>
+  </entry>
+  <entry>
+    <id>urn:uuid:bk-2</id>
+    <title>Placeholder Tale</title>
+    <dc:creator>Author Beta</dc:creator>
+    <dc:date>2021</dc:date>
+    <link href="/b/2" rel="http://opds-spec.org/acquisition" type="text/html"/>
+  </entry>
+  <entry>
+    <id>urn:uuid:bk-3</id>
+    <title>Test Novel Gamma</title>
+    <dc:creator>Author Gamma</dc:creator>
+    <dc:date>2022</dc:date>
+    <link href="/b/3" rel="http://opds-spec.org/acquisition" type="text/html"/>
+  </entry>
+</feed>

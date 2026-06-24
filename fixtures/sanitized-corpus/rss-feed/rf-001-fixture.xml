@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Sanitized Demo Feed</title>
+    <link>https://feed.example.test</link>
+    <description>A sanitized RSS feed for corpus validation.</description>
+    <language>en</language>
+    <item>
+      <title>Sample Volume One Update</title>
+      <link>https://feed.example.test/item/1</link>
+      <description>A short sanitized item summary.</description>
+      <pubDate>Wed, 01 Jan 2026 00:00:00 GMT</pubDate>
+      <guid>urn:uuid:item-1</guid>
+    </item>
+    <item>
+      <title>Placeholder Tale Update</title>
+      <link>https://feed.example.test/item/2</link>
+      <description>Another short sanitized item summary.</description>
+      <pubDate>Thu, 02 Jan 2026 00:00:00 GMT</pubDate>
+      <guid>urn:uuid:item-2</guid>
+    </item>
+    <item>
+      <title>Test Novel Gamma Update</title>
+      <link>https://feed.example.test/item/3</link>
+      <description>A third short sanitized item summary.</description>
+      <pubDate>Fri, 03 Jan 2026 00:00:00 GMT</pubDate>
+      <guid>urn:uuid:item-3</guid>
+    </item>
+  </channel>
+</rss>

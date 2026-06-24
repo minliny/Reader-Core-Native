@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Sanitized Book Listing</title>
+  </head>
+  <body>
+    <main id="content">
+      <section class="book-list">
+        <article class="book featured" data-id="bk-1">
+          <a class="book-link" href="/b/1">
+            <span class="title">Sample Volume One</span>
+            <span class="author">Author Alpha</span>
+          </a>
+        </article>
+        <article class="book" data-id="bk-2">
+          <a class="book-link" href="/b/2">
+            <span class="title">Placeholder Tale&nbsp;&amp; More</span>
+            <span class="author">Author Beta</span>
+          </a>
+        </article>
+        <article class="book" data-id="bk-3">
+          <a class="book-link">
+            <span class="title">Missing Href Volume</span>
+            <span class="author">Author Gamma</span>
+          </a>
+        </article>
+      </section>
+      <section class="sidebar">
+        <ul class="tags">
+          <li data-tag="alpha">Tag Alpha</li>
+          <li data-tag="beta">Tag Beta</li>
+        </ul>
+        <div class="series">ids: 10, 11</div>
+        <div class="series">ids: 20, 21</div>
+      </section>
+    </main>
+  </body>
+</html>
