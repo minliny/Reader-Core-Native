@@ -44,7 +44,7 @@
 | # | 主题域 | 覆盖范围 | 状态 |
 |---|--------|----------|------|
 | 01 | network / session | HTTP transport、重定向、Cookie 策略与持久化、响应编码、body 解析归属 | 🟡 契约已立 |
-| 02 | local storage / sync | SQLite schema、缓存、阅读进度、下载队列、WebDAV、同步/冲突 | ⬜ 待定 |
+| 02 | local storage / sync | SQLite schema、缓存、阅读进度、下载队列、WebDAV、同步/冲突 | 🟡 契约已立 |
 | 03 | login / auth | WebView 登录、验证码、凭据安全存储、登录态注入 Core | ⬜ 待定 |
 | 04 | local book / files | TXT/EPUB 解析、文件选择、沙箱授权、Core 数据目录管理 | ⬜ 待定 |
 | 05 | tts | TTS 文本切片/播放队列 vs 系统发声 | ⬜ 待定 |
