@@ -437,6 +437,25 @@ mod tests {
         assert_eq!(unsafe { destroy(handle) }, 0);
     }
 
+    #[test]
+    fn null_config_pointer_with_zero_length_uses_defaults() {
+        let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
+        let ctx_ptr = Arc::as_ptr(&events) as *mut c_void;
+        let mut handle: *mut RuntimeHandle = ptr::null_mut();
+
+        crate::last_error::set(CoreError::internal("stale"));
+        let code = unsafe { create_runtime(ptr::null(), 0, Some(capture), ctx_ptr, &mut handle) };
+        assert_eq!(code, 0);
+        assert!(!handle.is_null());
+        assert_eq!(last_error_code(), 0);
+
+        let config = unsafe { (&*handle).runtime.config() };
+        assert!(config.data_directory.is_none());
+        assert!(config.cache_directory.is_none());
+
+        assert_eq!(unsafe { destroy(handle) }, 0);
+    }
+
     // --- host bus round trip via the C ABI --------------------------------
 
     /// Poll the captured events until `n` have arrived, or time out.

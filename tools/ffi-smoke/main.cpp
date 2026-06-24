@@ -217,6 +217,18 @@ int main() {
     return fail("invalid config did not record INVALID_MESSAGE");
   }
 
+  Channel defaults_ch;
+  rc_runtime_t *defaults_rt = nullptr;
+  if (rc_runtime_create(nullptr, 0, capture_event, &defaults_ch, &defaults_rt) !=
+          RC_CREATE_OK ||
+      defaults_rt == nullptr) {
+    return fail("null config with zero length did not create defaults runtime");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("default create did not clear last_error");
+  }
+  rc_runtime_destroy(defaults_rt);
+
   // --- Create a real runtime --------------------------------------------
   Channel ch;
   rc_runtime_t *rt = nullptr;

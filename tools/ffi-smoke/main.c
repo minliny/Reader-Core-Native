@@ -233,6 +233,22 @@ int main(void) {
     return fail("invalid config did not record INVALID_MESSAGE");
   }
 
+  struct channel defaults_ch;
+  memset(&defaults_ch, 0, sizeof defaults_ch);
+  pthread_mutex_init(&defaults_ch.mutex, NULL);
+  rc_runtime_t *defaults_rt = NULL;
+  if (rc_runtime_create(NULL, 0, capture_event, &defaults_ch, &defaults_rt) !=
+          RC_CREATE_OK ||
+      defaults_rt == NULL) {
+    return fail("null config with zero length did not create defaults runtime");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("default create did not clear last_error");
+  }
+  rc_runtime_destroy(defaults_rt);
+  pthread_mutex_destroy(&defaults_ch.mutex);
+
   // --- Create a real runtime --------------------------------------------
   struct channel ch;
   memset(&ch, 0, sizeof ch);
