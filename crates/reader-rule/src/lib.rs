@@ -432,6 +432,18 @@ enum JsonPathSegment {
     /// `..field`, `..*`, or `..[index]` — descend into every object/array and
     /// apply the inner segment at every depth.
     RecursiveDescent(Box<JsonPathSegment>),
+    /// `[start:end:step]` — Python-style slice. `start`/`end` are optional and
+    /// may be negative (counted from the end); `step` defaults to 1 and may be
+    /// negative to reverse iteration. Resolved against the array length at
+    /// evaluation time.
+    Slice(JsonPathSlice),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct JsonPathSlice {
+    start: Option<isize>,
+    end: Option<isize>,
+    step: Option<isize>,
 }
 
 fn apply_step(input: &str, step: &RuleStep) -> RuleResult<Vec<String>> {
@@ -806,6 +818,8 @@ fn parse_json_path_bracket(
         .to_string();
     let segment = if token == "*" {
         JsonPathSegment::Wildcard
+    } else if token.contains(':') {
+        parse_json_path_slice(&token)?
     } else if let Ok(signed) = token.parse::<isize>() {
         if signed >= 0 {
             JsonPathSegment::Index(signed as usize)
@@ -817,6 +831,39 @@ fn parse_json_path_bracket(
     };
 
     Ok((segment, index + 1))
+}
+
+fn parse_json_path_slice(token: &str) -> Result<JsonPathSegment, String> {
+    let parts: Vec<&str> = token.split(':').collect();
+    if parts.len() < 2 || parts.len() > 3 {
+        return Err(format!("invalid slice segment `{token}`"));
+    }
+
+    let parse_opt = |raw: &str| -> Result<Option<isize>, String> {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            Ok(None)
+        } else {
+            trimmed
+                .parse::<isize>()
+                .map(Some)
+                .map_err(|_| format!("invalid slice index `{trimmed}` in `{token}`"))
+        }
+    };
+
+    let start = parse_opt(parts[0])?;
+    let end = parse_opt(parts[1])?;
+    let step = if parts.len() == 3 {
+        parse_opt(parts[2])?
+    } else {
+        None
+    };
+
+    if matches!(step, Some(0)) {
+        return Err(format!("slice step cannot be zero in `{token}`"));
+    }
+
+    Ok(JsonPathSegment::Slice(JsonPathSlice { start, end, step }))
 }
 
 fn evaluate_json_path<'a>(root: &'a JsonValue, segments: &[JsonPathSegment]) -> Vec<&'a JsonValue> {
@@ -877,6 +924,75 @@ fn apply_json_path_segment<'a>(
                 apply_json_path_segment(inner, descendant, output);
             }
         }
+        JsonPathSegment::Slice(slice) => {
+            if let JsonValue::Array(array) = value {
+                let len = array.len() as isize;
+                let step = slice.step.unwrap_or(1);
+                let (start, end) = resolve_slice_bounds(slice.start, slice.end, step, len);
+
+                let mut index = start;
+                if step > 0 {
+                    while index < end {
+                        if (0..len).contains(&index) {
+                            if let Some(child) = array.get(index as usize) {
+                                output.push(child);
+                            }
+                        }
+                        index += step;
+                    }
+                } else {
+                    while index > end {
+                        if (0..len).contains(&index) {
+                            if let Some(child) = array.get(index as usize) {
+                                output.push(child);
+                            }
+                        }
+                        index += step;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Resolves optional, possibly-negative slice bounds against the array length.
+/// For positive `step`, defaults are `start=0` / `end=len`. For negative
+/// `step`, defaults are `start=len-1` / `end=-1` (so index 0 is still visited).
+/// Out-of-range values are clamped to the valid window.
+fn resolve_slice_bounds(
+    start: Option<isize>,
+    end: Option<isize>,
+    step: isize,
+    len: isize,
+) -> (isize, isize) {
+    if step > 0 {
+        let start = start.unwrap_or(0);
+        let start = if start < 0 {
+            (len + start).max(0)
+        } else {
+            start.min(len)
+        };
+        let end = end.unwrap_or(len);
+        let end = if end < 0 {
+            (len + end).max(0)
+        } else {
+            end.min(len)
+        };
+        (start, end)
+    } else {
+        let start = start.unwrap_or(len - 1);
+        let start = if start < 0 {
+            (len + start).max(-1)
+        } else {
+            start.min(len - 1)
+        };
+        let end = end.unwrap_or(-1);
+        let end = if end < 0 {
+            (len + end).max(-1)
+        } else {
+            end.min(len - 1)
+        };
+        (start, end)
     }
 }
 
