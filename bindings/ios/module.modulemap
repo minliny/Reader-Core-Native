@@ -1,0 +1,4 @@
+module ReaderCore {
+  header "reader_core.h"
+  export *
+}
