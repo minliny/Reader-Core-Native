@@ -103,6 +103,10 @@ impl RuleStep {
         Self::RegexExtract(RegexExtractRule::first(pattern, group))
     }
 
+    pub fn regex_captures(pattern: impl Into<String>) -> Self {
+        Self::RegexExtract(RegexExtractRule::all(pattern, CaptureGroup::AllGroups))
+    }
+
     pub fn regex_replace(pattern: impl Into<String>, replacement: impl Into<String>) -> Self {
         Self::RegexReplace(RegexReplaceRule::all(pattern, replacement))
     }
@@ -125,6 +129,15 @@ impl RuleStep {
 
     pub fn xpath(expression: impl Into<String>) -> Self {
         Self::XPath(XPathRule::new(expression))
+    }
+
+    pub fn xpath_with_namespaces<I, P, U>(expression: impl Into<String>, namespaces: I) -> Self
+    where
+        I: IntoIterator<Item = (P, U)>,
+        P: Into<String>,
+        U: Into<String>,
+    {
+        Self::XPath(XPathRule::with_namespaces(expression, namespaces))
     }
 }
 
@@ -156,6 +169,7 @@ impl RegexExtractRule {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CaptureGroup {
     WholeMatch,
+    AllGroups,
     Index(usize),
     Name(String),
 }
@@ -237,12 +251,29 @@ pub enum CssExtraction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XPathRule {
     pub expression: String,
+    pub namespaces: Vec<(String, String)>,
 }
 
 impl XPathRule {
     pub fn new(expression: impl Into<String>) -> Self {
         Self {
             expression: expression.into(),
+            namespaces: Vec::new(),
+        }
+    }
+
+    pub fn with_namespaces<I, P, U>(expression: impl Into<String>, namespaces: I) -> Self
+    where
+        I: IntoIterator<Item = (P, U)>,
+        P: Into<String>,
+        U: Into<String>,
+    {
+        Self {
+            expression: expression.into(),
+            namespaces: namespaces
+                .into_iter()
+                .map(|(prefix, uri)| (prefix.into(), uri.into()))
+                .collect(),
         }
     }
 }
@@ -254,6 +285,10 @@ pub enum RuleError {
         message: String,
     },
     RegexCaptureGroupMissing {
+        pattern: String,
+        group: String,
+    },
+    RegexReplacementCaptureMissing {
         pattern: String,
         group: String,
     },
@@ -295,6 +330,12 @@ impl fmt::Display for RuleError {
                 write!(
                     f,
                     "regex `{pattern}` does not define capture group `{group}`"
+                )
+            }
+            RuleError::RegexReplacementCaptureMissing { pattern, group } => {
+                write!(
+                    f,
+                    "regex replacement references missing capture group `{group}` in `{pattern}`"
                 )
             }
             RuleError::JsonParse { message } => write!(f, "invalid JSON input: {message}"),
@@ -362,17 +403,33 @@ fn apply_regex_extract(input: &str, rule: &RegexExtractRule) -> RuleResult<Vec<S
 
     let mut output = Vec::new();
     for captures in regex.captures_iter(input) {
-        let value = match &rule.group {
-            CaptureGroup::WholeMatch => captures.get(0),
-            CaptureGroup::Index(index) => captures.get(*index),
-            CaptureGroup::Name(name) => captures.name(name),
-        };
-
-        if let Some(value) = value {
-            output.push(value.as_str().to_string());
-            if !rule.all {
-                break;
+        match &rule.group {
+            CaptureGroup::AllGroups => {
+                for index in 1..captures.len() {
+                    if let Some(value) = captures.get(index) {
+                        output.push(value.as_str().to_string());
+                    }
+                }
             }
+            CaptureGroup::WholeMatch => {
+                if let Some(value) = captures.get(0) {
+                    output.push(value.as_str().to_string());
+                }
+            }
+            CaptureGroup::Index(index) => {
+                if let Some(value) = captures.get(*index) {
+                    output.push(value.as_str().to_string());
+                }
+            }
+            CaptureGroup::Name(name) => {
+                if let Some(value) = captures.name(name) {
+                    output.push(value.as_str().to_string());
+                }
+            }
+        }
+
+        if !rule.all {
+            break;
         }
     }
 
@@ -384,6 +441,8 @@ fn apply_regex_replace(input: &str, rule: &RegexReplaceRule) -> RuleResult<Vec<S
         pattern: rule.pattern.clone(),
         message: err.to_string(),
     })?;
+
+    validate_replacement_captures(&regex, &rule.pattern, &rule.replacement)?;
 
     let replaced = if rule.all {
         regex.replace_all(input, rule.replacement.as_str())
@@ -397,6 +456,11 @@ fn apply_regex_replace(input: &str, rule: &RegexReplaceRule) -> RuleResult<Vec<S
 fn validate_capture_group(regex: &Regex, pattern: &str, group: &CaptureGroup) -> RuleResult<()> {
     match group {
         CaptureGroup::WholeMatch => Ok(()),
+        CaptureGroup::AllGroups if regex.captures_len() > 1 => Ok(()),
+        CaptureGroup::AllGroups => Err(RuleError::RegexCaptureGroupMissing {
+            pattern: pattern.to_string(),
+            group: "all".to_string(),
+        }),
         CaptureGroup::Index(index) if *index < regex.captures_len() => Ok(()),
         CaptureGroup::Index(index) => Err(RuleError::RegexCaptureGroupMissing {
             pattern: pattern.to_string(),
@@ -410,6 +474,128 @@ fn validate_capture_group(regex: &Regex, pattern: &str, group: &CaptureGroup) ->
             group: name.clone(),
         }),
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ReplacementCaptureRef {
+    Index(usize),
+    Name(String),
+}
+
+fn validate_replacement_captures(
+    regex: &Regex,
+    pattern: &str,
+    replacement: &str,
+) -> RuleResult<()> {
+    for reference in replacement_capture_refs(replacement) {
+        match reference {
+            ReplacementCaptureRef::Index(index) if index < regex.captures_len() => {}
+            ReplacementCaptureRef::Index(index) => {
+                return Err(RuleError::RegexReplacementCaptureMissing {
+                    pattern: pattern.to_string(),
+                    group: index.to_string(),
+                });
+            }
+            ReplacementCaptureRef::Name(name)
+                if regex
+                    .capture_names()
+                    .any(|capture| capture == Some(name.as_str())) => {}
+            ReplacementCaptureRef::Name(name) => {
+                return Err(RuleError::RegexReplacementCaptureMissing {
+                    pattern: pattern.to_string(),
+                    group: name,
+                });
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn replacement_capture_refs(replacement: &str) -> Vec<ReplacementCaptureRef> {
+    let chars = replacement.chars().collect::<Vec<_>>();
+    let mut refs = Vec::new();
+    let mut index = 0;
+
+    while index < chars.len() {
+        if chars[index] != '$' {
+            index += 1;
+            continue;
+        }
+
+        index += 1;
+        if index >= chars.len() {
+            break;
+        }
+        if chars[index] == '$' {
+            index += 1;
+            continue;
+        }
+
+        if chars[index] == '{' {
+            index += 1;
+            let start = index;
+            while index < chars.len() && chars[index] != '}' {
+                index += 1;
+            }
+            if index >= chars.len() {
+                break;
+            }
+
+            let token = chars[start..index].iter().collect::<String>();
+            if !token.is_empty() {
+                refs.push(capture_ref_from_token(&token));
+            }
+            index += 1;
+            continue;
+        }
+
+        if chars[index].is_ascii_digit() {
+            let start = index;
+            while index < chars.len() && chars[index].is_ascii_digit() {
+                index += 1;
+            }
+            refs.push(ReplacementCaptureRef::Index(
+                chars[start..index]
+                    .iter()
+                    .collect::<String>()
+                    .parse::<usize>()
+                    .unwrap_or(usize::MAX),
+            ));
+            continue;
+        }
+
+        if is_capture_name_start(chars[index]) {
+            let start = index;
+            index += 1;
+            while index < chars.len() && is_capture_name_continue(chars[index]) {
+                index += 1;
+            }
+            refs.push(ReplacementCaptureRef::Name(
+                chars[start..index].iter().collect(),
+            ));
+            continue;
+        }
+
+        index += 1;
+    }
+
+    refs
+}
+
+fn capture_ref_from_token(token: &str) -> ReplacementCaptureRef {
+    token
+        .parse::<usize>()
+        .map(ReplacementCaptureRef::Index)
+        .unwrap_or_else(|_| ReplacementCaptureRef::Name(token.to_string()))
+}
+
+fn is_capture_name_start(value: char) -> bool {
+    value == '_' || value.is_ascii_alphabetic()
+}
+
+fn is_capture_name_continue(value: char) -> bool {
+    value == '_' || value.is_ascii_alphanumeric()
 }
 
 fn apply_json_path(input: &str, rule: &JsonPathRule) -> RuleResult<Vec<String>> {
@@ -594,12 +780,8 @@ fn apply_css(input: &str, rule: &CssRule) -> RuleResult<Vec<String>> {
     for element in document.select(&selector) {
         match &rule.extraction {
             CssExtraction::Text => {
-                let text = element
-                    .text()
-                    .collect::<Vec<_>>()
-                    .join("")
-                    .trim()
-                    .to_string();
+                let text = element.text().collect::<Vec<_>>().join(" ");
+                let text = normalize_text(&text);
                 output.push(text);
             }
             CssExtraction::Attr(attr) => {
@@ -613,7 +795,28 @@ fn apply_css(input: &str, rule: &CssRule) -> RuleResult<Vec<String>> {
     Ok(output)
 }
 
+fn normalize_text(text: &str) -> String {
+    let mut output = String::new();
+    let mut pending_space = false;
+
+    for value in text.chars() {
+        if value.is_whitespace() || value == '\u{a0}' {
+            pending_space = true;
+        } else {
+            if pending_space && !output.is_empty() {
+                output.push(' ');
+            }
+            output.push(value);
+            pending_space = false;
+        }
+    }
+
+    output
+}
+
 fn apply_xpath(input: &str, rule: &XPathRule) -> RuleResult<Vec<String>> {
+    validate_xpath_namespaces(rule)?;
+
     let package = sxd_document::parser::parse(input).map_err(|err| RuleError::XPathInputParse {
         message: err.to_string(),
     })?;
@@ -629,7 +832,10 @@ fn apply_xpath(input: &str, rule: &XPathRule) -> RuleResult<Vec<String>> {
             expression: rule.expression.clone(),
             message: "empty expression".to_string(),
         })?;
-    let context = Context::new();
+    let mut context = Context::new();
+    for (prefix, uri) in &rule.namespaces {
+        context.set_namespace(prefix, uri);
+    }
 
     match xpath
         .evaluate(&context, document.root())
@@ -646,4 +852,65 @@ fn apply_xpath(input: &str, rule: &XPathRule) -> RuleResult<Vec<String>> {
         XPathValue::Number(value) => Ok(vec![value.to_string()]),
         XPathValue::Boolean(value) => Ok(vec![value.to_string()]),
     }
+}
+
+fn validate_xpath_namespaces(rule: &XPathRule) -> RuleResult<()> {
+    for prefix in xpath_prefixes(&rule.expression) {
+        if !rule
+            .namespaces
+            .iter()
+            .any(|(registered, _)| registered == &prefix)
+        {
+            return Err(RuleError::XPathEvaluation {
+                expression: rule.expression.clone(),
+                message: format!("namespace prefix `{prefix}` is not registered"),
+            });
+        }
+    }
+
+    Ok(())
+}
+
+fn xpath_prefixes(expression: &str) -> Vec<String> {
+    let chars = expression.chars().collect::<Vec<_>>();
+    let mut prefixes = Vec::new();
+    let mut quote = None;
+
+    for (index, value) in chars.iter().enumerate() {
+        if let Some(active_quote) = quote {
+            if *value == active_quote {
+                quote = None;
+            }
+            continue;
+        }
+
+        if *value == '\'' || *value == '"' {
+            quote = Some(*value);
+            continue;
+        }
+
+        if *value != ':' || chars.get(index + 1) == Some(&':') || index == 0 {
+            continue;
+        }
+
+        let mut start = index;
+        while start > 0 && is_xpath_name_char(chars[start - 1]) {
+            start -= 1;
+        }
+
+        if start == index || chars.get(index - 1) == Some(&':') {
+            continue;
+        }
+
+        let prefix = chars[start..index].iter().collect::<String>();
+        if !prefixes.contains(&prefix) {
+            prefixes.push(prefix);
+        }
+    }
+
+    prefixes
+}
+
+fn is_xpath_name_char(value: char) -> bool {
+    value == '_' || value == '-' || value == '.' || value.is_ascii_alphanumeric()
 }
