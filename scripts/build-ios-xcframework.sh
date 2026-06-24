@@ -60,7 +60,7 @@ let abiVersion: UInt32 = rc_abi_version()
 _ = abiVersion
 EOF
   xcrun --sdk iphonesimulator swiftc \
-    -target arm64-apple-ios-simulator \
+    -target arm64-apple-ios13.0-simulator \
     -I "$sim_headers" \
     -typecheck "$swift_smoke"
   rm -f "$swift_smoke"

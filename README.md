@@ -27,6 +27,9 @@ rustup target add aarch64-unknown-linux-ohos
 rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 ./scripts/build-ios-xcframework.sh
 
+# 阶段 1：Swift wrapper typecheck smoke（需要 Xcode）
+./scripts/check-ios-swift-wrapper.sh
+
 # 滚动集成：把已完成 agent 分支接入独立 integration worktree
 scripts/integration-queue.sh \
   codex/core-product-integration \
