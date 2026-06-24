@@ -16,12 +16,13 @@ use std::{
     fmt,
     sync::{
         atomic::{AtomicBool, AtomicU8, Ordering},
-        Arc,
+        Arc, Mutex,
     },
     time::{Duration, Instant},
 };
 
 const MAX_JSON_DEPTH: usize = 128;
+const MAX_PROMISE_JOBS: usize = 1024;
 
 pub type JsResult<T> = Result<T, JsError>;
 
@@ -51,6 +52,7 @@ pub struct JsExecutionOptions {
 #[derive(Clone, Debug, PartialEq)]
 pub struct JsEvaluation {
     pub value: JsonValue,
+    pub console: Vec<ConsoleRecord>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -59,7 +61,9 @@ pub struct JsRuntimeCapabilities {
     pub timeout: CapabilityStatus,
     pub cancellation: CapabilityStatus,
     pub memory_limit: CapabilityStatus,
-    pub max_stack_size: CapabilityStatus,
+    pub stack_limit: CapabilityStatus,
+    pub console_capture: CapabilityStatus,
+    pub promise_jobs: CapabilityStatus,
     pub host_callbacks: Vec<String>,
 }
 
@@ -120,6 +124,19 @@ pub enum JsErrorKind {
     Unsupported,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ConsoleRecord {
+    pub level: ConsoleLevel,
+    pub args: Vec<JsonValue>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ConsoleLevel {
+    Log,
+    Warn,
+    Error,
+}
+
 #[derive(Clone, Default)]
 pub struct CancellationToken {
     cancelled: Arc<AtomicBool>,
@@ -175,6 +192,7 @@ impl fmt::Display for HostError {
 impl StdError for HostError {}
 
 type HostCallback = Arc<dyn Fn(HostCall) -> Result<JsonValue, HostError> + Send + Sync + 'static>;
+type ConsoleBuffer = Arc<Mutex<Vec<ConsoleRecord>>>;
 
 #[derive(Clone, Default)]
 pub struct HostCallbackRegistry {
@@ -254,13 +272,39 @@ impl QuickJsSandbox {
         let java = rquickjs::Object::new(ctx.clone())?;
         java.set(
             "get",
-            make_host_callback(ctx.clone(), "java.get", self.host_callbacks.clone())?,
+            make_host_callback(ctx.clone(), HostMethod::Get, self.host_callbacks.clone())?,
         )?;
         java.set(
             "post",
-            make_host_callback(ctx.clone(), "java.post", self.host_callbacks.clone())?,
+            make_host_callback(ctx.clone(), HostMethod::Post, self.host_callbacks.clone())?,
+        )?;
+        java.set(
+            "call",
+            make_host_dispatch_callback(ctx.clone(), self.host_callbacks.clone())?,
         )?;
         ctx.globals().set("java", java)?;
+        Ok(())
+    }
+
+    fn install_console_api<'js>(
+        &self,
+        ctx: &Ctx<'js>,
+        console: ConsoleBuffer,
+    ) -> Result<(), QuickJsError> {
+        let console_object = rquickjs::Object::new(ctx.clone())?;
+        console_object.set(
+            "log",
+            make_console_callback(ctx.clone(), ConsoleLevel::Log, console.clone())?,
+        )?;
+        console_object.set(
+            "warn",
+            make_console_callback(ctx.clone(), ConsoleLevel::Warn, console.clone())?,
+        )?;
+        console_object.set(
+            "error",
+            make_console_callback(ctx.clone(), ConsoleLevel::Error, console)?,
+        )?;
+        ctx.globals().set("console", console_object)?;
         Ok(())
     }
 }
@@ -314,14 +358,24 @@ impl JsSandbox for QuickJsSandbox {
             move || interrupt.should_interrupt()
         })));
 
+        let console = Arc::new(Mutex::new(Vec::new()));
         let context = Context::full(&runtime).map_err(map_quickjs_engine_error)?;
-        context.with(|ctx| {
+        let mut evaluation = context.with(|ctx| {
             self.install_host_api(&ctx)
+                .map_err(map_quickjs_engine_error)?;
+            self.install_console_api(&ctx, console.clone())
                 .map_err(map_quickjs_engine_error)?;
             let result = ctx.eval::<QuickJsValue<'_>, _>(script).catch(&ctx);
             let value = result.map_err(|error| map_caught_error(error, &interrupt))?;
-            quickjs_value_to_json(&value, 0).map(|value| JsEvaluation { value })
-        })
+            let value = resolve_maybe_promise(value, &ctx, &interrupt)?;
+            drain_promise_jobs(&ctx, &interrupt)?;
+            quickjs_value_to_json(&value, 0).map(|value| JsEvaluation {
+                value,
+                console: Vec::new(),
+            })
+        })?;
+        evaluation.console = console_records(&console);
+        Ok(evaluation)
     }
 
     fn capabilities(&self) -> JsRuntimeCapabilities {
@@ -330,7 +384,9 @@ impl JsSandbox for QuickJsSandbox {
             timeout: configured_status(self.config.timeout.is_some()),
             cancellation: CapabilityStatus::SupportedNotConfigured,
             memory_limit: configured_status(self.config.memory_limit_bytes.is_some()),
-            max_stack_size: configured_status(self.config.max_stack_size_bytes.is_some()),
+            stack_limit: configured_status(self.config.max_stack_size_bytes.is_some()),
+            console_capture: CapabilityStatus::Enforced,
+            promise_jobs: CapabilityStatus::Enforced,
             host_callbacks: self.host_callbacks.names(),
         }
     }
@@ -406,9 +462,50 @@ fn configured_status(configured: bool) -> CapabilityStatus {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum HostMethod {
+    Get,
+    Post,
+}
+
+impl HostMethod {
+    fn callback_name(self) -> &'static str {
+        match self {
+            Self::Get => "java.get",
+            Self::Post => "java.post",
+        }
+    }
+
+    fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "get" | "java.get" => Some(Self::Get),
+            "post" | "java.post" => Some(Self::Post),
+            _ => None,
+        }
+    }
+
+    fn validate_args<'js>(self, ctx: &Ctx<'js>, args: &[JsonValue]) -> Result<(), QuickJsError> {
+        let Some(url) = args.first() else {
+            return Err(Exception::throw_type(
+                ctx,
+                format!("{} requires a URL string argument", self.callback_name()).as_str(),
+            ));
+        };
+
+        if !url.is_string() {
+            return Err(Exception::throw_type(
+                ctx,
+                format!("{} URL argument must be a string", self.callback_name()).as_str(),
+            ));
+        }
+
+        Ok(())
+    }
+}
+
 fn make_host_callback<'js>(
     ctx: Ctx<'js>,
-    name: &'static str,
+    method: HostMethod,
     registry: HostCallbackRegistry,
 ) -> Result<rquickjs::Function<'js>, QuickJsError> {
     rquickjs::Function::new(
@@ -416,40 +513,207 @@ fn make_host_callback<'js>(
         move |ctx: Ctx<'js>,
               args: Rest<QuickJsValue<'js>>|
               -> Result<QuickJsValue<'js>, QuickJsError> {
-            let mut json_args = Vec::with_capacity(args.0.len());
-            for arg in args.0.iter() {
-                match quickjs_value_to_json(arg, 0) {
-                    Ok(value) => json_args.push(value),
-                    Err(error) => {
-                        return Err(Exception::throw_type(
-                            &ctx,
-                            format!("host callback argument is not JSON-compatible: {error}")
-                                .as_str(),
-                        ));
-                    }
-                }
-            }
+            let json_args = host_args_to_json(&ctx, &args.0)?;
+            method.validate_args(&ctx, &json_args)?;
 
             let result = registry
                 .call(HostCall {
-                    name: name.to_string(),
+                    name: method.callback_name().to_string(),
                     args: json_args,
                 })
                 .map_err(|error| {
                     Exception::throw_internal(
                         &ctx,
-                        format!("host callback {name} failed: {error}").as_str(),
+                        format!("host callback {} failed: {error}", method.callback_name())
+                            .as_str(),
                     )
                 })?;
 
             json_to_quickjs(&ctx, &result).map_err(|_| {
                 Exception::throw_internal(
                     &ctx,
-                    format!("host callback {name} returned invalid JSON").as_str(),
+                    format!(
+                        "host callback {} returned invalid JSON",
+                        method.callback_name()
+                    )
+                    .as_str(),
                 )
             })
         },
     )
+}
+
+fn make_host_dispatch_callback<'js>(
+    ctx: Ctx<'js>,
+    registry: HostCallbackRegistry,
+) -> Result<rquickjs::Function<'js>, QuickJsError> {
+    rquickjs::Function::new(
+        ctx,
+        move |ctx: Ctx<'js>,
+              args: Rest<QuickJsValue<'js>>|
+              -> Result<QuickJsValue<'js>, QuickJsError> {
+            let mut json_args = host_args_to_json(&ctx, &args.0)?;
+            let Some(method_name) = json_args.first().and_then(JsonValue::as_str) else {
+                return Err(Exception::throw_type(
+                    &ctx,
+                    "java.call requires the host method name as its first string argument",
+                ));
+            };
+            let Some(method) = HostMethod::from_name(method_name) else {
+                return Err(Exception::throw_type(
+                    &ctx,
+                    format!("unknown host method: {method_name}").as_str(),
+                ));
+            };
+
+            json_args.remove(0);
+            method.validate_args(&ctx, &json_args)?;
+            let result = registry
+                .call(HostCall {
+                    name: method.callback_name().to_string(),
+                    args: json_args,
+                })
+                .map_err(|error| {
+                    Exception::throw_internal(
+                        &ctx,
+                        format!("host callback {} failed: {error}", method.callback_name())
+                            .as_str(),
+                    )
+                })?;
+
+            json_to_quickjs(&ctx, &result).map_err(|_| {
+                Exception::throw_internal(
+                    &ctx,
+                    format!(
+                        "host callback {} returned invalid JSON",
+                        method.callback_name()
+                    )
+                    .as_str(),
+                )
+            })
+        },
+    )
+}
+
+fn host_args_to_json<'js>(
+    ctx: &Ctx<'js>,
+    args: &[QuickJsValue<'js>],
+) -> Result<Vec<JsonValue>, QuickJsError> {
+    let mut json_args = Vec::with_capacity(args.len());
+    for arg in args.iter() {
+        match quickjs_value_to_json(arg, 0) {
+            Ok(value) => json_args.push(value),
+            Err(error) => {
+                return Err(Exception::throw_type(
+                    ctx,
+                    format!("host callback argument is not JSON-compatible: {error}").as_str(),
+                ));
+            }
+        }
+    }
+    Ok(json_args)
+}
+
+fn make_console_callback<'js>(
+    ctx: Ctx<'js>,
+    level: ConsoleLevel,
+    console: ConsoleBuffer,
+) -> Result<rquickjs::Function<'js>, QuickJsError> {
+    rquickjs::Function::new(
+        ctx,
+        move |args: Rest<QuickJsValue<'js>>| -> Result<(), QuickJsError> {
+            let record = ConsoleRecord {
+                level: level.clone(),
+                args: args.0.iter().map(console_arg_to_json).collect(),
+            };
+            let mut records = console.lock().map_err(|_| QuickJsError::Unknown)?;
+            records.push(record);
+            Ok(())
+        },
+    )
+}
+
+fn console_arg_to_json(value: &QuickJsValue<'_>) -> JsonValue {
+    quickjs_value_to_json(value, 0).unwrap_or_else(|_| {
+        let mut fallback = JsonMap::new();
+        fallback.insert(
+            "type".to_string(),
+            JsonValue::String(value.type_name().to_string()),
+        );
+        fallback.insert(
+            "display".to_string(),
+            JsonValue::String(format!("[{}]", value.type_name())),
+        );
+        JsonValue::Object(fallback)
+    })
+}
+
+fn console_records(console: &ConsoleBuffer) -> Vec<ConsoleRecord> {
+    console
+        .lock()
+        .map(|records| records.clone())
+        .unwrap_or_default()
+}
+
+fn resolve_maybe_promise<'js>(
+    value: QuickJsValue<'js>,
+    ctx: &Ctx<'js>,
+    interrupt: &InterruptState,
+) -> JsResult<QuickJsValue<'js>> {
+    let Some(promise) = value.as_promise().cloned() else {
+        return Ok(value);
+    };
+
+    for _ in 0..MAX_PROMISE_JOBS {
+        if interrupt.should_interrupt() {
+            return Err(interrupted_error(interrupt));
+        }
+
+        if let Some(result) = promise.result::<QuickJsValue<'js>>() {
+            return result
+                .catch(promise.ctx())
+                .map_err(|error| map_caught_error(error, interrupt));
+        }
+
+        if !ctx.execute_pending_job() {
+            if promise.state() == rquickjs::promise::PromiseState::Pending {
+                return Err(JsError::new(
+                    JsErrorKind::Unsupported,
+                    "promise is still pending and no QuickJS jobs are available",
+                ));
+            }
+        }
+    }
+
+    Err(JsError::new(
+        JsErrorKind::Unsupported,
+        format!("promise job budget exceeded after {MAX_PROMISE_JOBS} jobs"),
+    ))
+}
+
+fn drain_promise_jobs(ctx: &Ctx<'_>, interrupt: &InterruptState) -> JsResult<()> {
+    for _ in 0..MAX_PROMISE_JOBS {
+        if interrupt.should_interrupt() {
+            return Err(interrupted_error(interrupt));
+        }
+
+        if !ctx.execute_pending_job() {
+            return Ok(());
+        }
+    }
+
+    Err(JsError::new(
+        JsErrorKind::Unsupported,
+        format!("promise job drain budget exceeded after {MAX_PROMISE_JOBS} jobs"),
+    ))
+}
+
+fn interrupted_error(interrupt: &InterruptState) -> JsError {
+    match interrupt.current_reason() {
+        InterruptReason::Timeout => JsError::new(JsErrorKind::Timeout, "execution timeout elapsed"),
+        InterruptReason::Cancelled => JsError::new(JsErrorKind::Cancelled, "execution cancelled"),
+        InterruptReason::None => JsError::new(JsErrorKind::Cancelled, "execution interrupted"),
+    }
 }
 
 fn quickjs_value_to_json(value: &QuickJsValue<'_>, depth: usize) -> JsResult<JsonValue> {
@@ -550,15 +814,19 @@ fn map_caught_error(error: rquickjs::CaughtError<'_>, interrupt: &InterruptState
                 .get::<_, Option<String>>("name")
                 .ok()
                 .flatten();
-            let kind = if name.as_deref() == Some("SyntaxError") {
+            let message = exception
+                .message()
+                .or_else(|| name.clone())
+                .unwrap_or_else(|| "JavaScript exception".to_string());
+            let kind = if message.starts_with("host callback ")
+                || message.starts_with("unknown host method")
+            {
+                JsErrorKind::HostCallback
+            } else if name.as_deref() == Some("SyntaxError") {
                 JsErrorKind::Syntax
             } else {
                 JsErrorKind::Exception
             };
-            let message = exception
-                .message()
-                .or(name)
-                .unwrap_or_else(|| "JavaScript exception".to_string());
             JsError::new(kind, message).with_stack(exception.stack())
         }
         rquickjs::CaughtError::Value(value) => {
@@ -688,16 +956,103 @@ mod tests {
     }
 
     #[test]
-    fn reports_memory_limit_capability_when_configured() {
+    fn reports_sandbox_capabilities() {
+        let mut registry = HostCallbackRegistry::new();
+        registry.register("java.get", |_| Ok(json!(null)));
+        registry.register("java.post", |_| Ok(json!(null)));
         let sandbox = QuickJsSandbox::new(JsRuntimeConfig {
+            timeout: Some(Duration::from_secs(1)),
             memory_limit_bytes: Some(1024 * 1024),
+            max_stack_size_bytes: Some(256 * 1024),
             ..JsRuntimeConfig::default()
         });
+        let sandbox = QuickJsSandbox::with_host_callbacks(sandbox.config().clone(), registry);
+        let capabilities = sandbox.capabilities();
 
+        assert_eq!(capabilities.engine, "quickjs/rquickjs");
+        assert_eq!(capabilities.timeout, CapabilityStatus::Enforced);
+        assert_eq!(capabilities.memory_limit, CapabilityStatus::Enforced);
+        assert_eq!(capabilities.stack_limit, CapabilityStatus::Enforced);
+        assert_eq!(capabilities.console_capture, CapabilityStatus::Enforced);
+        assert_eq!(capabilities.promise_jobs, CapabilityStatus::Enforced);
         assert_eq!(
-            sandbox.capabilities().memory_limit,
-            CapabilityStatus::Enforced
+            capabilities.host_callbacks,
+            vec!["java.get".to_string(), "java.post".to_string()]
         );
+    }
+
+    #[test]
+    fn captures_console_records_in_order() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate(
+                r#"
+                console.log("first", { n: 1 });
+                Promise.resolve().then(() => console.warn("second", [2]));
+                console.error("third", false);
+                "done";
+                "#,
+            )
+            .unwrap();
+
+        assert_eq!(result.value, json!("done"));
+        assert_eq!(
+            result.console,
+            vec![
+                ConsoleRecord {
+                    level: ConsoleLevel::Log,
+                    args: vec![json!("first"), json!({ "n": 1 })],
+                },
+                ConsoleRecord {
+                    level: ConsoleLevel::Error,
+                    args: vec![json!("third"), json!(false)],
+                },
+                ConsoleRecord {
+                    level: ConsoleLevel::Warn,
+                    args: vec![json!("second"), json!([2])],
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn resolves_promise_then_result() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate("Promise.resolve(40).then((value) => value + 2)")
+            .unwrap();
+
+        assert_eq!(result.value, json!(42));
+    }
+
+    #[test]
+    fn resolves_async_function_result() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate(
+                r#"
+                (async () => {
+                    const value = await Promise.resolve(21);
+                    return value * 2;
+                })()
+                "#,
+            )
+            .unwrap();
+
+        assert_eq!(result.value, json!(42));
+    }
+
+    #[test]
+    fn returns_unsupported_for_pending_promise_without_jobs() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox.evaluate("new Promise(() => {})").unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::Unsupported);
+        assert!(error.message.contains("still pending"));
     }
 
     #[test]
@@ -743,5 +1098,69 @@ mod tests {
                 json!({ "headers": { "Accept": "text/plain" } })
             ]
         );
+    }
+
+    #[test]
+    fn routes_java_post_and_returns_json() {
+        let mut registry = HostCallbackRegistry::new();
+        registry.register("java.post", |call| {
+            Ok(json!({
+                "method": call.name,
+                "url": call.args[0],
+                "body": call.args[1],
+            }))
+        });
+
+        let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
+        let result = sandbox
+            .evaluate(r#"java.post("https://example.test/post", { q: "reader" })"#)
+            .unwrap();
+
+        assert_eq!(
+            result.value,
+            json!({
+                "method": "java.post",
+                "url": "https://example.test/post",
+                "body": { "q": "reader" }
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_java_get_without_string_url() {
+        let mut registry = HostCallbackRegistry::new();
+        registry.register("java.get", |_| Ok(json!(null)));
+        let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
+
+        let error = sandbox.evaluate("java.get(42)").unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::Exception);
+        assert!(error.message.contains("URL argument must be a string"));
+    }
+
+    #[test]
+    fn propagates_host_callback_errors() {
+        let mut registry = HostCallbackRegistry::new();
+        registry.register("java.get", |_| Err(HostError::new("network unavailable")));
+        let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
+
+        let error = sandbox
+            .evaluate(r#"java.get("https://example.test")"#)
+            .unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::HostCallback);
+        assert!(error.message.contains("network unavailable"));
+    }
+
+    #[test]
+    fn rejects_unknown_host_method() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox
+            .evaluate(r#"java.call("java.delete", "https://example.test")"#)
+            .unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::HostCallback);
+        assert!(error.message.contains("unknown host method"));
     }
 }
