@@ -686,6 +686,65 @@ napi_value HostSmoke(napi_env env, napi_callback_info /*info*/) {
   return StringResult(env, result, "failed to create host smoke result value");
 }
 
+napi_value LifecycleSmoke(napi_env env, napi_callback_info info) {
+  size_t argc = 1;
+  napi_value args[1] = {nullptr};
+  if (napi_get_cb_info(env, info, &argc, args, nullptr, nullptr) != napi_ok) {
+    return ThrowError(env, "failed to read lifecycleSmoke arguments");
+  }
+
+  int64_t iterations_signed = 8;
+  if (!GetOptionalInt64(env, argc, args, 0, 8, &iterations_signed)) {
+    return nullptr;
+  }
+  if (iterations_signed <= 0 || iterations_signed > 1000) {
+    return ThrowError(env, "iterations must be between 1 and 1000");
+  }
+
+  std::string last_event;
+  const char *config = "{}";
+  for (int64_t index = 0; index < iterations_signed; ++index) {
+    RuntimeState state;
+    int32_t code = rc_runtime_create(
+        reinterpret_cast<const uint8_t *>(config), std::strlen(config),
+        RuntimeEventCallback, &state, &state.runtime);
+    if (code != 0 || state.runtime == nullptr) {
+      DestroyRuntimeState(&state);
+      return ThrowError(env, "rc_runtime_create failed during lifecycle smoke");
+    }
+
+    uint64_t request_id = static_cast<uint64_t>(index + 1);
+    std::string command =
+        "{\"protocolVersion\":1,\"requestId\":" + std::to_string(request_id) +
+        ",\"method\":\"runtime.ping\",\"params\":{}}";
+    code = rc_runtime_send(state.runtime,
+                           reinterpret_cast<const uint8_t *>(command.data()),
+                           command.size());
+    if (code != 0) {
+      DestroyRuntimeState(&state);
+      return ThrowError(env, "rc_runtime_send failed during lifecycle smoke");
+    }
+
+    if (!WaitForEvent(&state, 1000, &last_event)) {
+      DestroyRuntimeState(&state);
+      return ThrowError(env, "no ping event captured during lifecycle smoke");
+    }
+    if (last_event.find("\"type\":\"result\"") == std::string::npos ||
+        last_event.find("\"requestId\":" + std::to_string(request_id)) ==
+            std::string::npos) {
+      DestroyRuntimeState(&state);
+      return ThrowError(env, "unexpected ping event during lifecycle smoke");
+    }
+
+    DestroyRuntimeState(&state);
+  }
+
+  std::string result = "{\"iterations\":" +
+                       std::to_string(iterations_signed) +
+                       ",\"lastEvent\":" + last_event + "}";
+  return StringResult(env, result, "failed to create lifecycle smoke result");
+}
+
 napi_value Init(napi_env env, napi_value exports) {
   napi_property_descriptor properties[] = {
       {"abiVersion", nullptr, AbiVersion, nullptr, nullptr, nullptr, napi_default,
@@ -710,6 +769,8 @@ napi_value Init(napi_env env, napi_value exports) {
        nullptr},
       {"hostSmoke", nullptr, HostSmoke, nullptr, nullptr, nullptr, napi_default,
        nullptr},
+      {"lifecycleSmoke", nullptr, LifecycleSmoke, nullptr, nullptr, nullptr,
+       napi_default, nullptr},
   };
   napi_status status = napi_define_properties(
       env, exports, sizeof(properties) / sizeof(properties[0]), properties);

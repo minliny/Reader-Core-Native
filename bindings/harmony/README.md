@@ -35,6 +35,6 @@ import { runHarmonyNapiSmoke } from '@reader/core-harmony';
 const result = await runHarmonyNapiSmoke();
 ```
 
-The smoke creates a runtime, calls `core.info`, calls `runtime.ping`, exercises
-`runtime.hostSmoke` through `host.request` and `host.complete`, then releases
-the runtime.
+The smoke creates a runtime, runs native `lifecycleSmoke`, calls `core.info`,
+calls `runtime.ping`, exercises `runtime.hostSmoke` through `host.request` and
+`host.complete`, then releases the runtime.

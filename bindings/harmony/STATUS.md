@@ -9,6 +9,9 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
 ## Closed In This Line
 
 - Runtime lifecycle: NAPI can create and release a Reader-Core runtime handle.
+- Lifecycle smoke: NAPI exposes `lifecycleSmoke(iterations)` to repeatedly
+  create a runtime, send `runtime.ping`, read a result event, and destroy the
+  runtime.
 - Command/event path: NAPI can send JSON commands and read copied Core events
   from a thread-safe queue.
 - Cancellation: NAPI exposes `cancelRequest`, backed by `rc_runtime_cancel`.
@@ -32,7 +35,8 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
 
 - Native NAPI exports: `abiVersion`, `createRuntime`, `releaseRuntime`,
   `sendCommand`, `cancelRequest`, `readEvent`, `pendingEventCount`,
-  `completeHostRequest`, `failHostRequest`, `pingSmoke`, and `hostSmoke`.
+  `completeHostRequest`, `failHostRequest`, `pingSmoke`, `hostSmoke`, and
+  `lifecycleSmoke`.
 - TypeScript/ArkTS wrapper: `bindings/harmony/sdk/reader_core.ts` wraps native
   exports into `ReaderCoreRuntime`, including `coreInfo`, `ping`, `hostSmoke`,
   generic `request`, explicit `readEvent`, explicit `completeHostRequest`, and

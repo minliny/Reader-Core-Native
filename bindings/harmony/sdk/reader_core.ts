@@ -24,6 +24,7 @@ export type NativeReaderCoreModule = {
   ): void;
   pingSmoke(): string;
   hostSmoke(): string;
+  lifecycleSmoke(iterations?: number): string;
 };
 
 export type ReaderCoreCommand = {

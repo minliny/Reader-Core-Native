@@ -26,6 +26,7 @@ export {
 
 export type HarmonyNapiSmokeResult = {
   abiVersion: number;
+  nativeLifecycle: JsonObject;
   coreInfo: ReaderCoreResultEvent;
   ping: ReaderCoreResultEvent;
   hostSmoke: ReaderCoreResultEvent;
@@ -42,11 +43,13 @@ export async function runHarmonyNapiSmoke(
 ): Promise<HarmonyNapiSmokeResult> {
   const runtime = createReaderCoreRuntime(config);
   try {
+    const nativeLifecycle = JSON.parse(nativeReaderCore.lifecycleSmoke(8)) as JsonObject;
     const coreInfo = await runtime.coreInfo();
     const ping = await runtime.ping();
     const hostSmoke = await runtime.hostSmoke();
     return {
       abiVersion: runtime.abiVersion,
+      nativeLifecycle,
       coreInfo,
       ping,
       hostSmoke,

@@ -151,6 +151,18 @@ class FakeNativeReaderCore implements NativeReaderCoreModule {
     });
   }
 
+  lifecycleSmoke(iterations = 8): string {
+    return JSON.stringify({
+      iterations,
+      lastEvent: {
+        protocolVersion: 1,
+        requestId: iterations,
+        type: "result",
+        data: { pong: true },
+      },
+    });
+  }
+
   private pushEvent(runtime: FakeRuntime, event: ReaderCoreEvent): void {
     runtime.events.push(JSON.stringify(event));
   }
@@ -224,5 +236,15 @@ describe("ReaderCoreRuntime", () => {
     runtime.cancel(42);
 
     expect(native.cancelled).toEqual([42]);
+  });
+
+  test("exposes native lifecycle smoke result shape", () => {
+    const native = new FakeNativeReaderCore();
+
+    const result = JSON.parse(native.lifecycleSmoke(3));
+
+    expect(result.iterations).toBe(3);
+    expect(result.lastEvent.type).toBe("result");
+    expect(result.lastEvent.requestId).toBe(3);
   });
 });
