@@ -18,6 +18,11 @@ Output:
 target/ios/ReaderCore.xcframework
 ```
 
+Current status: this is a Core-side artifact smoke. The XCFramework/header
+packaging and Swift wrapper typecheck gate are covered in this repository; iOS
+App runtime loading, URLSession host transport, WebView login, and UI
+integration remain host-repository work.
+
 Each XCFramework slice includes:
 
 - `Headers/reader_core.h`
@@ -44,7 +49,8 @@ Validate it with:
 ./scripts/check-ios-swift-wrapper.sh
 ```
 
-The smoke target is `arm64-apple-ios13.0-simulator`.
+The smoke target is `arm64-apple-ios13.0-simulator`. This gate type-checks the
+wrapper against the Core ABI; it is not an App/device runtime smoke.
 
 The XCFramework exposes the ABI v1 functions declared in
 `include/reader_core.h`:

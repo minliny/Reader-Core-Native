@@ -32,17 +32,29 @@ rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 
 # 滚动集成：把已完成 agent 分支接入独立 integration worktree
 scripts/integration-queue.sh \
-  codex/core-product-integration \
-  origin/codex/core-foundation-integration \
-  origin/codex/remote-reading-vertical
+  codex/android-integration \
+  origin/codex/core-product-integration \
+  origin/codex/<android-jni-branch>
 ```
 
 `build-local.sh` 会同时运行 C 和 C++ host ABI smoke。C++ smoke 是
 JNI、NAPI、Objective-C++ shim 的头文件/链接基线。
 
+## 当前 Core-side 状态
+
+`origin/codex/core-product-integration` 已接入 Core-side
+`remote.reading.v1` 纵切 smoke：`source.import`、`book.search`、
+`book.detail`、`book.toc`、`chapter.content`、`reading.progress.update` 可在
+fixture/inline response 下跑通，并覆盖 content pipeline、in-memory cache
+和 progress 写入。V1 不执行真实网络 I/O；HTTP/TLS/WebView 等仍由平台
+adapter 提供。
+
 OHOS、Android、iOS 平台产物脚本会按 [ARCHITECTURE.md](./ARCHITECTURE.md)
 阶段 1/2 补齐；当前 `build-harmony-napi.sh` 验证 Rust staticlib 能链接为
 HarmonyOS NAPI `.so`，HAP 集成和真机加载仍需在 HarmonyOS App 仓库完成。
+当前 iOS 证据仅覆盖 Core-side XCFramework / Swift wrapper typecheck smoke；
+wrapper runtime smoke 和 App 侧接入仍是后续滚动接入项。Android JNI 仍未在
+远端集成分支中完成。
 
 ## 目录
 

@@ -11,11 +11,18 @@
 | 1 | HarmonyOS Rust 地基 | 🟡 | 2026-06-24 | |
 | 2 | 统一 C ABI 和三端空壳接入 | 🟡 | 2026-06-24 | |
 | 3 | 规则内核和 QuickJS | 🟡 | 2026-06-24 | |
-| 4 | 远程阅读完整纵切 | ⬜ | | |
-| 5 | 统一数据库、缓存和进度 | ⬜ | | |
+| 4 | 远程阅读 Core-side 纵切 | ✅ | 2026-06-24 | 2026-06-24 |
+| 5 | 统一数据库、缓存和进度 | 🟡 | 2026-06-24 | |
 | 6 | 补齐规则兼容面 | ⬜ | | |
 | 7 | 本地书和扩展能力 | ⬜ | | |
 | 8 | 退役重复后端和发布 | ⬜ | | |
+
+阶段 4 的完成范围仅限 Core-side smoke：`remote.reading.v1` 覆盖
+`source.import` → `book.search` → `book.detail` → `book.toc` →
+`chapter.content` → `reading.progress.update`，输入为 host 预取的
+fixture/inline response。它不代表任何平台 App 已完成真实网络、WebView 或
+真机阅读链路。阶段 5 当前只有 in-memory cache/progress smoke，SQLite 持久化
+和平台迁移仍在后续阶段。
 
 ## 平台迁移进度
 
@@ -23,8 +30,8 @@
 
 | 模块 | 状态 | 备注 |
 |------|:----:|------|
-| NAPI C++ Shim | 🟡 | Core-side `.so` smoke passes; App-side HAP integration is on `codex/harmony-napi-runtime` |
-| ArkTS Wrapper | 🟡 | App-side bridge is being validated separately |
+| NAPI C++ Shim | 🟡 | Core-side `.so` smoke passes; App-side HAP integration is on `codex/harmony-napi-runtime` and is not claimed complete here |
+| ArkTS Wrapper | 🟡 | App-side bridge is being validated separately; no device/runtime completion claimed |
 | HTTP Host Adapter | ⬜ | |
 | WebView Host Adapter | ⬜ | |
 | TTS Host Adapter | ⬜ | |
@@ -33,11 +40,11 @@
 
 | 模块 | 状态 | 备注 |
 |------|:----:|------|
-| NativeCoreBridge (JNI) | ⬜ | |
+| NativeCoreBridge (JNI) | ⬜ | Pending; no completed remote Android JNI integration branch is present on origin |
 | HTTP Transport (OkHttp) | ⬜ | 保留为 transport |
 | WebView Adapter | ⬜ | 保留 |
 | TTS Adapter | ⬜ | 保留 |
-| Room → Rust DB | ⬜ | |
+| Room → Rust DB | ⬜ | Core V1 has in-memory smoke only; durable SQLite/platform migration pending |
 | Parser → Rust | ⬜ | |
 | RSS → Rust | ⬜ | |
 | WebDAV/Sync → Rust | ⬜ | |
@@ -46,8 +53,8 @@
 
 | 模块 | 状态 | 备注 |
 |------|:----:|------|
-| XCFramework | 🟡 | Core-side staticlib + header smoke; Swift host wrapper still pending |
-| ReaderCoreClient.swift | ⬜ | |
+| XCFramework | 🟡 | Core-side staticlib + header smoke passes; App runtime integration not claimed |
+| ReaderCoreClient.swift | 🟡 | Core-side Swift wrapper typecheck smoke passes; runtime smoke and App integration pending |
 | HTTP Transport (URLSession) | ⬜ | 保留为 transport |
 | WebView Login Adapter | ⬜ | 保留 |
 | TTS Adapter | ⬜ | 保留 |

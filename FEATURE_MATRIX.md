@@ -62,17 +62,22 @@
 
 ## V1 功能边界
 
-V1 交付物（搜索→详情→目录→正文 完整链）：
+V1 交付物（Core-side smoke，host 提供预取 response）：
 
-- [ ] 书源导入
-- [ ] 搜索
-- [ ] 书籍详情
-- [ ] 目录
-- [ ] 正文阅读
-- [ ] 章节缓存
-- [ ] 阅读进度
+- [x] `remote.reading.v1` 命令集合
+- [x] 书源导入（`source.import`）
+- [x] 搜索（`book.search`）
+- [x] 书籍详情（`book.detail`）
+- [x] 目录（`book.toc`）
+- [x] 正文阅读抽取（`chapter.content`）
+- [x] 章节缓存 smoke（V1 in-memory）
+- [x] 阅读进度 smoke（V1 in-memory）
 - [ ] TXT 基础支持
 - [ ] EPUB 基础支持
+
+已完成项只覆盖 Core 内部 fixture/inline response 路径，不执行真实网络 I/O。
+HTTP/TLS/WebView 登录、平台缓存持久化和 App 侧阅读 UI 仍属于 platform
+adapter 或后续 runtime integration。
 
 ## 退役清单
 
@@ -83,9 +88,9 @@ V1 交付物（搜索→详情→目录→正文 完整链）：
 - [ ] Android: RSS parser → Rust RSS
 - [ ] Android: TXT/EPUB parser → Rust local-book
 - [ ] Android: WebDAV/sync 逻辑 → Rust sync
-- [ ] Android: remote cache/offline → Rust storage
-- [ ] iOS: Swift Reader-Core 运行依赖 → Rust Core
-- [ ] HarmonyOS: 独立非 UI 实现 → Rust Core
+- [ ] Android: remote cache/offline → Rust storage（Core V1 仅 in-memory smoke；JNI pending）
+- [ ] iOS: Swift Reader-Core 运行依赖 → Rust Core（Core-side wrapper typecheck smoke 已有；runtime/App 接入 pending）
+- [ ] HarmonyOS: 独立非 UI 实现 → Rust Core（Core-side NAPI `.so` smoke 已有；HAP/真机 pending）
 
 ---
 
