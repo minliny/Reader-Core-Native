@@ -195,11 +195,21 @@ mod tests {
         let code =
             unsafe { create_runtime(b"{}".as_ptr(), 2, Some(capture), ctx_ptr, ptr::null_mut()) };
         assert_eq!(code, 2);
+        assert_eq!(
+            last_error_code(),
+            last_error::code_of(ErrorCode::InvalidMessage)
+        );
+        assert!(last_error_message().contains("out_runtime"));
 
         let mut handle: *mut RuntimeHandle = ptr::null_mut();
         let code = unsafe { create_runtime(b"{}".as_ptr(), 2, None, ctx_ptr, &mut handle) };
         assert_eq!(code, 3);
         assert!(handle.is_null());
+        assert_eq!(
+            last_error_code(),
+            last_error::code_of(ErrorCode::InvalidMessage)
+        );
+        assert!(last_error_message().contains("event callback"));
 
         let mut stale = ptr::dangling_mut::<RuntimeHandle>();
         let code = unsafe { create_runtime(b"{}".as_ptr(), 2, None, ctx_ptr, &mut stale) };
@@ -258,6 +268,7 @@ mod tests {
             last_error_code(),
             last_error::code_of(ErrorCode::InvalidMessage)
         );
+        assert!(last_error_message().contains("runtime handle"));
         assert_eq!(unsafe { destroy(ptr::null_mut()) }, 0);
         assert_eq!(last_error_code(), 0);
     }

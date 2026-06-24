@@ -39,6 +39,12 @@ _Static_assert(RC_CANCEL_OK == 0, "RC_CANCEL_OK changed");
 _Static_assert(RC_CANCEL_NULL_RUNTIME == 1,
                "RC_CANCEL_NULL_RUNTIME changed");
 _Static_assert(RC_OK == 0, "RC_OK changed");
+_Static_assert(RC_ERR_UNKNOWN_METHOD == 1, "RC_ERR_UNKNOWN_METHOD changed");
+_Static_assert(RC_ERR_INVALID_PARAMS == 2, "RC_ERR_INVALID_PARAMS changed");
+_Static_assert(RC_ERR_INVALID_PROTOCOL_VERSION == 3,
+               "RC_ERR_INVALID_PROTOCOL_VERSION changed");
+_Static_assert(RC_ERR_CANCELLED == 4, "RC_ERR_CANCELLED changed");
+_Static_assert(RC_ERR_INVALID_MESSAGE == 5, "RC_ERR_INVALID_MESSAGE changed");
 _Static_assert(RC_ERR_INTERNAL == 6, "RC_ERR_INTERNAL changed");
 
 struct captured_event {
@@ -150,6 +156,11 @@ int main(void) {
   if (rc_runtime_cancel(NULL, 42) != RC_CANCEL_NULL_RUNTIME) {
     return fail("null runtime cancel did not return RC_CANCEL_NULL_RUNTIME");
   }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "runtime handle")) {
+    fprintf(stderr, "null cancel last_error: code=%d msg=%s\n", code, msg);
+    return fail("null runtime cancel did not record INVALID_MESSAGE");
+  }
   rc_runtime_destroy(NULL); // no-op contract
   strcpy(msg, "stale");
   if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
@@ -161,12 +172,22 @@ int main(void) {
       RC_CREATE_NULL_OUT_RUNTIME) {
     return fail("null out_runtime did not return RC_CREATE_NULL_OUT_RUNTIME");
   }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "out_runtime")) {
+    fprintf(stderr, "null out_runtime last_error: code=%d msg=%s\n", code, msg);
+    return fail("null out_runtime did not record INVALID_MESSAGE");
+  }
   rc_runtime_t *no_runtime = NULL;
   rc_runtime_t *sentinel = (rc_runtime_t *)(uintptr_t)1;
   if (rc_runtime_create(NULL, 0, NULL, NULL, &no_runtime) !=
           RC_CREATE_NULL_CALLBACK ||
       no_runtime != NULL) {
     return fail("null callback did not return RC_CREATE_NULL_CALLBACK");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "event callback")) {
+    fprintf(stderr, "null callback last_error: code=%d msg=%s\n", code, msg);
+    return fail("null callback did not record INVALID_MESSAGE");
   }
   if (rc_runtime_create(NULL, 0, NULL, NULL, &sentinel) !=
           RC_CREATE_NULL_CALLBACK ||

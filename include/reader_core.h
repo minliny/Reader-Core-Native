@@ -102,9 +102,9 @@ typedef enum rc_runtime_cancel_status {
 ///   `RC_CREATE_NULL_OUT_RUNTIME` = `out_runtime` is NULL
 ///   `RC_CREATE_NULL_CALLBACK` = `callback` is NULL
 ///   `RC_CREATE_INVALID_CONFIG` = `config_json` is invalid (malformed JSON,
-///       unknown field, or invalid value). The structured error is available
-///       via `rc_last_error`.
+///       unknown field, or invalid value).
 ///   `RC_CREATE_PANIC` = an internal Rust panic was caught by the ABI guard.
+/// Every non-panic failure records a structured error via `rc_last_error`.
 /// `config_json` may be NULL when `config_length` is 0 (defaults applied).
 int32_t rc_runtime_create(
     const uint8_t *config_json,
@@ -128,9 +128,9 @@ int32_t rc_runtime_create(
 ///   `RC_SEND_NULL_COMMAND` = `command_json` is NULL with non-zero length
 ///   `RC_SEND_INVALID_COMMAND` = malformed command JSON / message structure
 ///   `RC_SEND_PROTOCOL_ERROR` = protocol-version mismatch, duplicate active
-///       requestId, or runtime shutting down. The structured error is
-///       available via `rc_last_error`.
+///       requestId, or runtime shutting down.
 ///   `RC_SEND_PANIC` = an internal Rust panic was caught by the ABI guard.
+/// Every non-panic failure records a structured error via `rc_last_error`.
 int32_t rc_runtime_send(
     rc_runtime_t *runtime,
     const uint8_t *command_json,
@@ -145,6 +145,7 @@ int32_t rc_runtime_send(
 /// Returns `RC_CANCEL_OK` on success (including when request is not found),
 /// `RC_CANCEL_NULL_RUNTIME` when `runtime` is NULL, or `RC_CANCEL_PANIC` if an
 /// internal Rust panic was caught by the ABI guard.
+/// Every non-panic failure records a structured error via `rc_last_error`.
 int32_t rc_runtime_cancel(
     rc_runtime_t *runtime,
     uint64_t request_id
@@ -167,10 +168,10 @@ void rc_runtime_destroy(rc_runtime_t *runtime);
 //
 // Runtime entry points return a coarse status or no-op completion (0 = success
 // for status-returning functions, non-zero = failure category, documented per
-// function). When a failure originates from the JSON protocol layer — config
-// parsing, command parsing, protocol version mismatch, duplicate requestId,
-// shutdown — Core also records a structured error on the calling thread,
-// retrievable via `rc_last_error`.
+// function). When a failure originates from argument validation or the JSON
+// protocol layer — config parsing, command parsing, protocol version mismatch,
+// duplicate requestId, shutdown — Core also records a structured error on the
+// calling thread, retrievable via `rc_last_error`.
 //
 // This mirrors the `error.code` strings of `reader-event.schema.json` so a C
 // host can branch on the same machine-readable codes the async `error` events

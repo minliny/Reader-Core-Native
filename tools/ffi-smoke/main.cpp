@@ -34,6 +34,12 @@ static_assert(RC_CANCEL_PANIC == -1, "RC_CANCEL_PANIC changed");
 static_assert(RC_CANCEL_OK == 0, "RC_CANCEL_OK changed");
 static_assert(RC_CANCEL_NULL_RUNTIME == 1, "RC_CANCEL_NULL_RUNTIME changed");
 static_assert(RC_OK == 0, "RC_OK changed");
+static_assert(RC_ERR_UNKNOWN_METHOD == 1, "RC_ERR_UNKNOWN_METHOD changed");
+static_assert(RC_ERR_INVALID_PARAMS == 2, "RC_ERR_INVALID_PARAMS changed");
+static_assert(RC_ERR_INVALID_PROTOCOL_VERSION == 3,
+              "RC_ERR_INVALID_PROTOCOL_VERSION changed");
+static_assert(RC_ERR_CANCELLED == 4, "RC_ERR_CANCELLED changed");
+static_assert(RC_ERR_INVALID_MESSAGE == 5, "RC_ERR_INVALID_MESSAGE changed");
 static_assert(RC_ERR_INTERNAL == 6, "RC_ERR_INTERNAL changed");
 
 namespace {
@@ -144,6 +150,10 @@ int main() {
   if (rc_runtime_cancel(nullptr, 42) != RC_CANCEL_NULL_RUNTIME) {
     return fail("null runtime cancel did not return RC_CANCEL_NULL_RUNTIME");
   }
+  msg = last_error_message(&code);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "runtime handle")) {
+    return fail("null runtime cancel did not record INVALID_MESSAGE");
+  }
   rc_runtime_destroy(nullptr);
   if (!last_error_clears_message_when_ok()) {
     return fail("null destroy did not clear last_error");
@@ -154,12 +164,20 @@ int main() {
       RC_CREATE_NULL_OUT_RUNTIME) {
     return fail("null out_runtime did not return RC_CREATE_NULL_OUT_RUNTIME");
   }
+  msg = last_error_message(&code);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "out_runtime")) {
+    return fail("null out_runtime did not record INVALID_MESSAGE");
+  }
   rc_runtime_t *no_runtime = nullptr;
   auto *sentinel = reinterpret_cast<rc_runtime_t *>(static_cast<uintptr_t>(1));
   if (rc_runtime_create(nullptr, 0, nullptr, nullptr, &no_runtime) !=
           RC_CREATE_NULL_CALLBACK ||
       no_runtime != nullptr) {
     return fail("null callback did not return RC_CREATE_NULL_CALLBACK");
+  }
+  msg = last_error_message(&code);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "event callback")) {
+    return fail("null callback did not record INVALID_MESSAGE");
   }
   if (rc_runtime_create(nullptr, 0, nullptr, nullptr, &sentinel) !=
           RC_CREATE_NULL_CALLBACK ||
