@@ -5,6 +5,14 @@ cd "$(dirname "$0")/.."
 
 target="${TARGET:-aarch64-unknown-linux-ohos}"
 
+artifact_sha256() {
+  shasum -a 256 "$1" | awk '{print $1}'
+}
+
+artifact_bytes() {
+  wc -c < "$1" | tr -d '[:space:]'
+}
+
 if ! rustup target list --installed | grep -qx "$target"; then
   echo "missing Rust target: $target" >&2
   echo "install it with: rustup target add $target" >&2
@@ -48,3 +56,29 @@ cargo rustc -p reader-ffi --release --target "$target" --lib --crate-type static
 output="target/$target/release/libreader_core.a"
 test -f "$output"
 echo "built $output"
+
+target_env="${target//-/_}"
+cc_var="CC_$target_env"
+cxx_var="CXX_$target_env"
+ar_var="AR_$target_env"
+ranlib_var="RANLIB_$target_env"
+linker_var="CARGO_TARGET_$(echo "$target" | tr 'a-z-' 'A-Z_')_LINKER"
+evidence="target/$target/release/ohos-build-evidence.txt"
+{
+  echo "name=reader-core-native-ohos"
+  echo "target=$target"
+  echo "artifact=$output"
+  echo "artifact_sha256=$(artifact_sha256 "$output")"
+  echo "artifact_bytes=$(artifact_bytes "$output")"
+  echo "rustc=$(rustc --version)"
+  echo "cargo=$(cargo --version)"
+  echo "ohos_sdk_home=${OHOS_SDK_HOME:-<unset>}"
+  echo "$cc_var=${!cc_var:-<unset>}"
+  echo "$cxx_var=${!cxx_var:-<unset>}"
+  echo "$ar_var=${!ar_var:-<unset>}"
+  echo "$ranlib_var=${!ranlib_var:-<unset>}"
+  echo "$linker_var=${!linker_var:-<unset>}"
+  echo "libclang_path=${LIBCLANG_PATH:-<unset>}"
+} > "$evidence"
+echo "evidence $evidence"
+cat "$evidence"
