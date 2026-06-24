@@ -11,7 +11,8 @@ This package is the Harmony-side wrapper for `libreader_core_napi.so`.
 - `sdk/reader_core.test.ts`: fake-native SDK smoke tests runnable with Bun.
 - `Index.ets`: ArkTS entry point that imports `libreader_core_napi.so` and
   exposes `createReaderCoreRuntime`, `runHarmonyNapiSmoke`,
-  `captureHarmonyNapiSmokeReport`, and `runHarmonyNapiSmokeReport`.
+  `captureHarmonyNapiSmokeReport`, `runHarmonyNapiSmokeReport`, and smoke
+  artifact helpers.
 - `STATUS.md`: current integration status and ABI constraints.
 
 ## Build Output
@@ -34,12 +35,12 @@ After packaging `libreader_core_napi.so` with the Harmony app, call:
 
 ```ts
 import {
-  captureHarmonyNapiSmokeReport,
-  formatHarmonyNapiSmokeReport,
+  captureHarmonyNapiSmokeArtifact,
+  formatHarmonyNapiSmokeArtifact,
 } from '@reader/core-harmony';
 
-const report = await captureHarmonyNapiSmokeReport();
-const output = formatHarmonyNapiSmokeReport(report);
+const artifact = await captureHarmonyNapiSmokeArtifact();
+const output = formatHarmonyNapiSmokeArtifact(artifact);
 ```
 
 The smoke creates a runtime, runs native `lifecycleSmoke`, calls `core.info`,
@@ -47,6 +48,8 @@ calls `runtime.ping`, exercises `runtime.hostSmoke` through `host.request` and
 `host.complete`, validates the result shape, then releases the runtime.
 `captureHarmonyNapiSmokeReport` returns a structured failure report if native
 loading or runtime execution throws, so device logs can still archive a JSON
-result. Use `runHarmonyNapiSmokeReport` when the caller should throw on any
-failed smoke check. Archive the formatted report output next to the local build
-evidence when the signed HAP is run on device.
+result. `captureHarmonyNapiSmokeArtifact` wraps that report with a stable
+artifact name, status, and pass/fail counts for device-log archival. Use
+`runHarmonyNapiSmokeReport` or `runHarmonyNapiSmokeArtifact` when the caller
+should throw on any failed smoke check. Archive the formatted artifact output
+next to the local build evidence when the signed HAP is run on device.

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  parseReaderCoreEvent,
   ReaderCoreRequestError,
   ReaderCoreRuntime,
   type JsonObject,
@@ -223,6 +224,42 @@ describe("ReaderCoreRuntime", () => {
     });
   });
 
+  test("rejects invalid command inputs before native dispatch", () => {
+    const native = new FakeNativeReaderCore();
+    const runtime = new ReaderCoreRuntime(native);
+
+    expect(() => runtime.send("", {})).toThrow("method must be a non-empty string");
+    expect(() =>
+      runtime.send("runtime.ping", [] as unknown as JsonObject)
+    ).toThrow("params must be a JSON object");
+  });
+
+  test("rejects invalid host.complete results before native dispatch", () => {
+    const native = new FakeNativeReaderCore();
+    const runtime = new ReaderCoreRuntime(native);
+
+    expect(() =>
+      runtime.completeHostRequest(1, [] as unknown as JsonObject)
+    ).toThrow("host.complete result must be a JSON object");
+  });
+
+  test("rejects invalid timeout options before native polling", async () => {
+    const native = new FakeNativeReaderCore();
+    const runtime = new ReaderCoreRuntime(native);
+
+    expect(() => runtime.readEvent(-1)).toThrow(
+      "timeoutMs must be a non-negative safe integer"
+    );
+
+    await expect(
+      runtime.waitForResult(1, { timeoutMs: -1 })
+    ).rejects.toThrow("timeoutMs must be a non-negative safe integer");
+
+    await expect(
+      runtime.waitForResult(1, { pollMs: 0 })
+    ).rejects.toThrow("pollMs must be a positive safe integer");
+  });
+
   test("turns host handler failures into host.error and surfaces core error", async () => {
     const native = new FakeNativeReaderCore();
     const runtime = new ReaderCoreRuntime(native);
@@ -266,5 +303,41 @@ describe("ReaderCoreRuntime", () => {
     expect(result.iterations).toBe(3);
     expect(result.lastEvent.type).toBe("result");
     expect(result.lastEvent.requestId).toBe(3);
+  });
+
+  test("rejects malformed native event payloads at the SDK boundary", () => {
+    expect(() =>
+      parseReaderCoreEvent(
+        JSON.stringify({
+          protocolVersion: 1,
+          requestId: 1,
+          type: "result",
+        })
+      )
+    ).toThrow("invalid Reader-Core result event");
+
+    expect(() =>
+      parseReaderCoreEvent(
+        JSON.stringify({
+          protocolVersion: 1,
+          requestId: 1,
+          type: "error",
+          error: { code: "INTERNAL", message: "failed" },
+        })
+      )
+    ).toThrow("invalid Reader-Core error event");
+
+    expect(() =>
+      parseReaderCoreEvent(
+        JSON.stringify({
+          protocolVersion: 1,
+          requestId: 1,
+          type: "host.request",
+          operationId: 1,
+          capability: "",
+          params: {},
+        })
+      )
+    ).toThrow("invalid Reader-Core host.request event");
   });
 });

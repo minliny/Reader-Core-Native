@@ -35,6 +35,18 @@ export type HarmonyNapiSmokeReport = {
   error?: HarmonyNapiSmokeError;
 };
 
+export type HarmonyNapiSmokeArtifact = {
+  schemaVersion: 1;
+  name: "reader-core-native-harmony-napi-device-smoke";
+  status: "pass" | "fail";
+  checkSummary: {
+    total: number;
+    pass: number;
+    fail: number;
+  };
+  report: HarmonyNapiSmokeReport;
+};
+
 export function buildHarmonyNapiSmokeReport(
   result: HarmonyNapiSmokeResult
 ): HarmonyNapiSmokeReport {
@@ -102,6 +114,28 @@ export function assertHarmonyNapiSmokeReport(report: HarmonyNapiSmokeReport): vo
 
 export function formatHarmonyNapiSmokeReport(report: HarmonyNapiSmokeReport): string {
   return JSON.stringify(report, null, 2);
+}
+
+export function buildHarmonyNapiSmokeArtifact(
+  report: HarmonyNapiSmokeReport
+): HarmonyNapiSmokeArtifact {
+  const pass = report.checks.filter((item) => item.pass).length;
+  const fail = report.checks.length - pass;
+  return {
+    schemaVersion: 1,
+    name: "reader-core-native-harmony-napi-device-smoke",
+    status: report.status,
+    checkSummary: {
+      total: report.checks.length,
+      pass,
+      fail,
+    },
+    report,
+  };
+}
+
+export function formatHarmonyNapiSmokeArtifact(artifact: HarmonyNapiSmokeArtifact): string {
+  return JSON.stringify(artifact, null, 2);
 }
 
 function buildNativeLifecycleCheck(nativeLifecycle: JsonObject): HarmonyNapiSmokeCheck {

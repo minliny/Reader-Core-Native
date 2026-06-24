@@ -2,8 +2,10 @@ import { describe, expect, test } from "bun:test";
 
 import {
   assertHarmonyNapiSmokeReport,
+  buildHarmonyNapiSmokeArtifact,
   buildHarmonyNapiSmokeErrorReport,
   buildHarmonyNapiSmokeReport,
+  formatHarmonyNapiSmokeArtifact,
   formatHarmonyNapiSmokeReport,
   type HarmonyNapiSmokeResult,
 } from "./smoke_report";
@@ -87,5 +89,44 @@ describe("Harmony NAPI smoke report", () => {
       },
     });
     expect(() => assertHarmonyNapiSmokeReport(report)).toThrow("execution");
+  });
+
+  test("builds a device-archivable smoke artifact summary", () => {
+    const report = buildHarmonyNapiSmokeReport(passingSmokeResult());
+    const artifact = buildHarmonyNapiSmokeArtifact(report);
+
+    expect(artifact).toMatchObject({
+      schemaVersion: 1,
+      name: "reader-core-native-harmony-napi-device-smoke",
+      status: "pass",
+      checkSummary: {
+        total: 5,
+        pass: 5,
+        fail: 0,
+      },
+    });
+    expect(JSON.parse(formatHarmonyNapiSmokeArtifact(artifact))).toMatchObject({
+      name: "reader-core-native-harmony-napi-device-smoke",
+      status: "pass",
+    });
+  });
+
+  test("preserves execution failures in smoke artifacts", () => {
+    const report = buildHarmonyNapiSmokeErrorReport(new Error("native module unavailable"));
+    const artifact = buildHarmonyNapiSmokeArtifact(report);
+
+    expect(artifact).toMatchObject({
+      status: "fail",
+      checkSummary: {
+        total: 1,
+        pass: 0,
+        fail: 1,
+      },
+      report: {
+        error: {
+          message: "native module unavailable",
+        },
+      },
+    });
   });
 });

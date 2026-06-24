@@ -112,6 +112,8 @@ export class ReaderCoreRuntime {
 
   send(method: string, params: JsonObject = {}, requestId = this.allocateRequestId()): number {
     this.ensureOpen();
+    assertCommandMethod(method);
+    assertJsonObjectValue(params, "params");
     assertNonNegativeSafeInteger(requestId, "requestId");
     const command: ReaderCoreCommand = {
       protocolVersion: ReaderCoreRuntime.protocolVersion,
@@ -131,6 +133,7 @@ export class ReaderCoreRuntime {
 
   readEvent(timeoutMs = 0): ReaderCoreEvent | null {
     this.ensureOpen();
+    assertNonNegativeSafeInteger(timeoutMs, "timeoutMs");
     const queued = this.pendingEvents.shift();
     if (queued !== undefined) {
       return queued;
@@ -153,6 +156,7 @@ export class ReaderCoreRuntime {
     if (requestId !== undefined) {
       assertNonNegativeSafeInteger(requestId, "requestId");
     }
+    assertJsonObjectValue(result, "host.complete result");
     this.native.completeHostRequest(this.runtime, operationId, result, requestId);
   }
 
@@ -187,8 +191,8 @@ export class ReaderCoreRuntime {
     options: RequestOptions = {}
   ): Promise<ReaderCoreResultEvent> {
     this.ensureOpen();
-    const timeoutMs = options.timeoutMs ?? 2000;
-    const pollMs = Math.max(1, options.pollMs ?? 10);
+    const timeoutMs = readTimeoutMs(options.timeoutMs);
+    const pollMs = readPollMs(options.pollMs);
     const deadline = Date.now() + timeoutMs;
 
     while (Date.now() <= deadline) {
@@ -297,20 +301,79 @@ export class ReaderCoreRequestError extends Error {
 }
 
 export function parseReaderCoreEvent(raw: string): ReaderCoreEvent {
-  const value = JSON.parse(raw) as Partial<ReaderCoreEvent>;
-  if (value.protocolVersion !== 1 || typeof value.requestId !== "number") {
+  const value = JSON.parse(raw) as unknown;
+  if (!isJsonObject(value)) {
     throw new Error("invalid Reader-Core event envelope");
   }
-  if (value.type === "result" || value.type === "error" || value.type === "host.request") {
-    return value as ReaderCoreEvent;
+
+  const requestId = value.requestId;
+  if (value.protocolVersion !== 1 || !isNonNegativeSafeInteger(requestId)) {
+    throw new Error("invalid Reader-Core event envelope");
   }
+
+  if (value.type === "result") {
+    if (!isJsonObject(value.data)) {
+      throw new Error("invalid Reader-Core result event");
+    }
+    return value as ReaderCoreResultEvent;
+  }
+
+  if (value.type === "error") {
+    if (!isReaderCoreError(value.error)) {
+      throw new Error("invalid Reader-Core error event");
+    }
+    return value as ReaderCoreErrorEvent;
+  }
+
+  if (value.type === "host.request") {
+    if (
+      !isNonNegativeSafeInteger(value.operationId) ||
+      typeof value.capability !== "string" ||
+      value.capability.length === 0 ||
+      !isJsonObject(value.params)
+    ) {
+      throw new Error("invalid Reader-Core host.request event");
+    }
+    return value as ReaderCoreHostRequestEvent;
+  }
+
   throw new Error(`unknown Reader-Core event type: ${String(value.type)}`);
 }
 
 function assertNonNegativeSafeInteger(value: number, name: string): void {
-  if (!Number.isSafeInteger(value) || value < 0) {
+  if (!isNonNegativeSafeInteger(value)) {
     throw new Error(`${name} must be a non-negative safe integer`);
   }
+}
+
+function assertCommandMethod(value: unknown): asserts value is string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error("method must be a non-empty string");
+  }
+}
+
+function assertJsonObjectValue(value: unknown, name: string): asserts value is JsonObject {
+  if (!isJsonObject(value)) {
+    throw new Error(`${name} must be a JSON object`);
+  }
+}
+
+function readTimeoutMs(value: number | undefined): number {
+  const timeoutMs = value ?? 2000;
+  assertNonNegativeSafeInteger(timeoutMs, "timeoutMs");
+  return timeoutMs;
+}
+
+function readPollMs(value: number | undefined): number {
+  const pollMs = value ?? 10;
+  if (!isNonNegativeSafeInteger(pollMs) || pollMs === 0) {
+    throw new Error("pollMs must be a positive safe integer");
+  }
+  return pollMs;
+}
+
+function isNonNegativeSafeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
 function normalizeHostError(error: unknown): ReaderCoreError {
@@ -346,8 +409,13 @@ function isReaderCoreError(value: unknown): value is ReaderCoreError {
   return (
     typeof candidate.code === "string" &&
     typeof candidate.message === "string" &&
-    typeof candidate.retryable === "boolean"
+    typeof candidate.retryable === "boolean" &&
+    (candidate.details === undefined || isJsonObject(candidate.details))
   );
+}
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function delay(ms: number): Promise<void> {
