@@ -201,16 +201,20 @@ export class ReaderCoreRuntime {
       }
 
       if (event.type === "host.request") {
-        if (event.requestId === requestId && options.hostRequest !== undefined) {
-          try {
-            const result = await options.hostRequest(event);
-            this.completeHostRequest(event, result);
-          } catch (error) {
-            this.failHostRequest(event, normalizeHostError(error));
-          }
-        } else {
+        if (event.requestId !== requestId) {
+          this.pendingEvents.push(event);
+          await delay(0);
+          continue;
+        }
+        if (options.hostRequest === undefined) {
           this.pendingEvents.push(event);
           throw new Error(`Reader-Core host.request requires a handler: ${event.operationId}`);
+        }
+        try {
+          const result = await options.hostRequest(event);
+          this.completeHostRequest(event, result);
+        } catch (error) {
+          this.failHostRequest(event, normalizeHostError(error));
         }
         continue;
       }

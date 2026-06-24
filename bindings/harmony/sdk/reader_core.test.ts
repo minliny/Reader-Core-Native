@@ -203,6 +203,26 @@ describe("ReaderCoreRuntime", () => {
     expect(event.data.capability).toBe("host.smoke.echo");
   });
 
+  test("keeps unrelated host.request queued while waiting for a result", async () => {
+    const native = new FakeNativeReaderCore();
+    const runtime = new ReaderCoreRuntime(native);
+
+    const hostRequestId = runtime.send("runtime.hostSmoke");
+    const pingRequestId = runtime.send("runtime.ping");
+
+    const event = await runtime.waitForResult(pingRequestId);
+
+    expect(event.type).toBe("result");
+    expect(event.data.pong).toBe(true);
+
+    const queued = runtime.readEvent();
+    expect(queued).toMatchObject({
+      type: "host.request",
+      requestId: hostRequestId,
+      capability: "host.smoke.echo",
+    });
+  });
+
   test("turns host handler failures into host.error and surfaces core error", async () => {
     const native = new FakeNativeReaderCore();
     const runtime = new ReaderCoreRuntime(native);

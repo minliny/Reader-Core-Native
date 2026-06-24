@@ -18,12 +18,15 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
 - Host bus minimum loop: `host.request` can be read and answered with
   `host.complete`; the SDK helper can auto-complete host requests while waiting
   for the original request result.
+- Interleaved event handling: the SDK keeps unrelated events queued while
+  waiting for a specific request result, so a pending `host.request` from
+  another request does not break the current command/result flow.
 - Host error path: NAPI exposes `failHostRequest`, backed by the `host.error`
   JSON command path; the SDK sends `host.error` automatically if a host request
   handler throws.
 - SDK behavior smoke: `bindings/harmony/sdk/reader_core.test.ts` uses a fake
   native module to verify `runtime.ping`, `host.complete`, handler failure to
-  `host.error`, and `cancelRequest` dispatch.
+  `host.error`, unrelated event queuing, and `cancelRequest` dispatch.
 - ArkTS package entry: `bindings/harmony/Index.ets` imports
   `libreader_core_napi.so` and exposes `createReaderCoreRuntime` plus
   `runHarmonyNapiSmoke`.
