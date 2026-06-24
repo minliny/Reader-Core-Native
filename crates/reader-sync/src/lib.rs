@@ -11,6 +11,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Current sync package schema version.
 pub const SYNC_PACKAGE_SCHEMA_VERSION: u32 = 1;
+/// Current local sync journal snapshot schema version.
+pub const SYNC_JOURNAL_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
 
 /// Data bucket represented by a sync record.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -341,10 +343,104 @@ pub struct SyncPackageMergeResult {
     pub conflicts: Vec<SyncConflict>,
 }
 
+/// Local pending state for one record in a sync journal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SyncJournalEntry {
+    pub sequence: u64,
+    pub record: SyncRecord,
+    pub status: SyncJournalEntryStatus,
+    pub queued_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acknowledged_at: Option<i64>,
+}
+
+impl SyncJournalEntry {
+    pub fn key(&self) -> SyncRecordKey {
+        self.record.key()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SyncJournalEntryStatus {
+    Pending,
+    Acknowledged,
+}
+
+/// Persistable sync journal state for one local device.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SyncJournalSnapshot {
+    pub schema_version: u32,
+    pub device_id: String,
+    pub next_sequence: u64,
+    pub next_revision: u64,
+    #[serde(default)]
+    pub entries: Vec<SyncJournalEntry>,
+}
+
+impl SyncJournalSnapshot {
+    pub fn validate(&self) -> Result<(), SyncError> {
+        if self.schema_version != SYNC_JOURNAL_SNAPSHOT_SCHEMA_VERSION {
+            return Err(SyncError::InvalidJournal {
+                field: "schema_version".into(),
+            });
+        }
+        let device_id = normalize_required(self.device_id.clone(), "device_id")?;
+        if self.next_sequence == 0 {
+            return Err(SyncError::InvalidJournal {
+                field: "next_sequence".into(),
+            });
+        }
+        if self.next_revision == 0 {
+            return Err(SyncError::InvalidJournal {
+                field: "next_revision".into(),
+            });
+        }
+
+        let mut keys = BTreeSet::<SyncRecordKey>::new();
+        let mut max_sequence = 0u64;
+        let mut max_revision = 0u64;
+        for entry in &self.entries {
+            validate_journal_entry(entry, &device_id)?;
+            if !keys.insert(entry.key()) {
+                return Err(SyncError::InvalidJournal {
+                    field: "entries".into(),
+                });
+            }
+            max_sequence = max_sequence.max(entry.sequence);
+            max_revision = max_revision.max(entry.record.revision);
+        }
+
+        if self.next_sequence <= max_sequence {
+            return Err(SyncError::InvalidJournal {
+                field: "next_sequence".into(),
+            });
+        }
+        if self.next_revision <= max_revision {
+            return Err(SyncError::InvalidJournal {
+                field: "next_revision".into(),
+            });
+        }
+        Ok(())
+    }
+}
+
+/// In-memory local journal for pending sync records.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SyncJournal {
+    device_id: String,
+    next_sequence: u64,
+    next_revision: u64,
+    entries: BTreeMap<SyncRecordKey, SyncJournalEntry>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SyncError {
     InvalidRecord { field: String },
     InvalidPackage { field: String },
+    InvalidJournal { field: String },
     Codec { message: String },
 }
 
@@ -363,12 +459,172 @@ impl std::fmt::Display for SyncError {
             SyncError::InvalidPackage { field } => {
                 write!(f, "invalid sync package field: {field}")
             }
+            SyncError::InvalidJournal { field } => {
+                write!(f, "invalid sync journal field: {field}")
+            }
             SyncError::Codec { message } => write!(f, "sync codec error: {message}"),
         }
     }
 }
 
 impl std::error::Error for SyncError {}
+
+impl SyncJournal {
+    pub fn new(device_id: impl Into<String>) -> Result<Self, SyncError> {
+        Ok(Self {
+            device_id: normalize_required(device_id.into(), "device_id")?,
+            next_sequence: 1,
+            next_revision: 1,
+            entries: BTreeMap::new(),
+        })
+    }
+
+    pub fn from_snapshot(snapshot: SyncJournalSnapshot) -> Result<Self, SyncError> {
+        snapshot.validate()?;
+        let mut entries = BTreeMap::new();
+        for entry in snapshot.entries {
+            entries.insert(entry.key(), entry);
+        }
+        Ok(Self {
+            device_id: snapshot.device_id,
+            next_sequence: snapshot.next_sequence,
+            next_revision: snapshot.next_revision,
+            entries,
+        })
+    }
+
+    pub fn export_snapshot(&self) -> Result<SyncJournalSnapshot, SyncError> {
+        let snapshot = SyncJournalSnapshot {
+            schema_version: SYNC_JOURNAL_SNAPSHOT_SCHEMA_VERSION,
+            device_id: self.device_id.clone(),
+            next_sequence: self.next_sequence,
+            next_revision: self.next_revision,
+            entries: self.entries.values().cloned().collect(),
+        };
+        snapshot.validate()?;
+        Ok(snapshot)
+    }
+
+    pub fn record_upsert(
+        &mut self,
+        collection: SyncCollection,
+        record_id: impl Into<String>,
+        payload: impl Into<String>,
+        updated_at: i64,
+        queued_at: i64,
+    ) -> Result<SyncJournalEntry, SyncError> {
+        let revision = self.next_revision;
+        let record = SyncRecord::upsert(
+            collection,
+            record_id,
+            payload,
+            updated_at,
+            self.device_id.clone(),
+            revision,
+        )?;
+        self.next_revision += 1;
+        self.record_change(record, queued_at)
+    }
+
+    pub fn record_tombstone(
+        &mut self,
+        collection: SyncCollection,
+        record_id: impl Into<String>,
+        updated_at: i64,
+        queued_at: i64,
+    ) -> Result<SyncJournalEntry, SyncError> {
+        let revision = self.next_revision;
+        let record = SyncRecord::tombstone(
+            collection,
+            record_id,
+            updated_at,
+            self.device_id.clone(),
+            revision,
+        )?;
+        self.next_revision += 1;
+        self.record_change(record, queued_at)
+    }
+
+    pub fn pending_records(&self) -> Vec<SyncRecord> {
+        self.entries
+            .values()
+            .filter(|entry| entry.status == SyncJournalEntryStatus::Pending)
+            .map(|entry| entry.record.clone())
+            .collect()
+    }
+
+    pub fn pending_package(
+        &self,
+        snapshot_id: impl Into<String>,
+        created_at: i64,
+    ) -> Result<SyncPackage, SyncError> {
+        SyncPackage::new(SyncSnapshot::new(
+            snapshot_id,
+            self.device_id.clone(),
+            created_at,
+            self.pending_records(),
+        )?)
+    }
+
+    /// Mark matching pending records as acknowledged.
+    ///
+    /// Acknowledgement is exact: if a newer local change has replaced a record
+    /// after an older package was sent, acknowledging the old package will not
+    /// clear the newer pending entry.
+    pub fn acknowledge_package(
+        &mut self,
+        package: &SyncPackage,
+        acknowledged_at: i64,
+    ) -> Result<usize, SyncError> {
+        package.validate()?;
+        let records = package.snapshot.normalized_records()?;
+        let mut acknowledged = 0usize;
+        for record in records {
+            let key = record.key();
+            let Some(entry) = self.entries.get_mut(&key) else {
+                continue;
+            };
+            if entry.status == SyncJournalEntryStatus::Pending && entry.record == record {
+                entry.status = SyncJournalEntryStatus::Acknowledged;
+                entry.acknowledged_at = Some(acknowledged_at);
+                acknowledged += 1;
+            }
+        }
+        Ok(acknowledged)
+    }
+
+    pub fn entries(&self) -> Vec<SyncJournalEntry> {
+        self.entries.values().cloned().collect()
+    }
+
+    fn record_change(
+        &mut self,
+        record: SyncRecord,
+        queued_at: i64,
+    ) -> Result<SyncJournalEntry, SyncError> {
+        if record.device_id != self.device_id {
+            return Err(SyncError::InvalidJournal {
+                field: "record.device_id".into(),
+            });
+        }
+        let entry = SyncJournalEntry {
+            sequence: self.take_sequence(),
+            record,
+            status: SyncJournalEntryStatus::Pending,
+            queued_at,
+            acknowledged_at: None,
+        };
+        validate_journal_entry(&entry, &self.device_id)?;
+        self.entries.insert(entry.key(), entry.clone());
+        Ok(entry)
+    }
+
+    fn take_sequence(&mut self) -> u64 {
+        let sequence = self.next_sequence;
+        self.next_sequence += 1;
+        sequence
+    }
+}
 
 /// Merge two snapshots with deterministic last-write-wins semantics.
 ///
@@ -524,6 +780,33 @@ fn records_equivalent(left: &SyncRecord, right: &SyncRecord) -> bool {
         && left.updated_at == right.updated_at
         && left.revision == right.revision
         && left.payload == right.payload
+}
+
+fn validate_journal_entry(entry: &SyncJournalEntry, device_id: &str) -> Result<(), SyncError> {
+    if entry.sequence == 0 {
+        return Err(SyncError::InvalidJournal {
+            field: "entries.sequence".into(),
+        });
+    }
+    entry.record.validate()?;
+    if entry.record.device_id != device_id {
+        return Err(SyncError::InvalidJournal {
+            field: "entries.record.device_id".into(),
+        });
+    }
+    match entry.status {
+        SyncJournalEntryStatus::Pending if entry.acknowledged_at.is_some() => {
+            Err(SyncError::InvalidJournal {
+                field: "entries.acknowledged_at".into(),
+            })
+        }
+        SyncJournalEntryStatus::Acknowledged if entry.acknowledged_at.is_none() => {
+            Err(SyncError::InvalidJournal {
+                field: "entries.acknowledged_at".into(),
+            })
+        }
+        _ => Ok(()),
+    }
 }
 
 fn normalize_required(value: String, field: &str) -> Result<String, SyncError> {
@@ -710,6 +993,222 @@ mod tests {
             SyncPackage::from_json(&result.package.to_json().unwrap()).unwrap(),
             result.package
         );
+    }
+
+    #[test]
+    fn sync_journal_records_pending_changes_and_builds_package() {
+        let mut journal = SyncJournal::new("device-a").unwrap();
+
+        let first = journal
+            .record_upsert(SyncCollection::Bookshelf, "b2", r#"{"title":"B"}"#, 10, 100)
+            .unwrap();
+        let second = journal
+            .record_upsert(SyncCollection::Bookshelf, "b1", r#"{"title":"A"}"#, 11, 101)
+            .unwrap();
+        let deleted = journal
+            .record_tombstone(SyncCollection::RssEntry, "entry-1", 12, 102)
+            .unwrap();
+
+        assert_eq!(first.sequence, 1);
+        assert_eq!(first.record.revision, 1);
+        assert_eq!(second.sequence, 2);
+        assert_eq!(second.record.revision, 2);
+        assert_eq!(deleted.sequence, 3);
+        assert_eq!(deleted.record.revision, 3);
+
+        let pending = journal.pending_records();
+        assert_eq!(
+            pending
+                .iter()
+                .map(|record| (record.collection.as_str(), record.record_id.as_str()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("bookshelf", "b1"),
+                ("bookshelf", "b2"),
+                ("rssEntry", "entry-1")
+            ]
+        );
+
+        let package = journal.pending_package("pending-1", 200).unwrap();
+        assert_eq!(package.snapshot.snapshot_id, "pending-1");
+        assert_eq!(package.snapshot.device_id, "device-a");
+        assert_eq!(package.snapshot.created_at, 200);
+        assert_eq!(package.snapshot.records, pending);
+        assert_eq!(
+            SyncPackage::from_json(&package.to_json().unwrap()).unwrap(),
+            package
+        );
+    }
+
+    #[test]
+    fn sync_journal_acknowledges_only_exact_pending_records() {
+        let mut journal = SyncJournal::new("device-a").unwrap();
+        journal
+            .record_upsert(
+                SyncCollection::ReadingProgress,
+                "book",
+                r#"{"chapter":1}"#,
+                10,
+                100,
+            )
+            .unwrap();
+        let stale_package = journal.pending_package("stale", 101).unwrap();
+
+        journal
+            .record_upsert(
+                SyncCollection::ReadingProgress,
+                "book",
+                r#"{"chapter":2}"#,
+                11,
+                102,
+            )
+            .unwrap();
+
+        assert_eq!(
+            journal.acknowledge_package(&stale_package, 200).unwrap(),
+            0,
+            "acknowledging an older sent package must not clear a newer pending change"
+        );
+        let pending = journal.pending_records();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].revision, 2);
+        assert_eq!(pending[0].payload, r#"{"chapter":2}"#);
+
+        let current_package = journal.pending_package("current", 201).unwrap();
+        assert_eq!(
+            journal.acknowledge_package(&current_package, 202).unwrap(),
+            1
+        );
+        assert!(journal.pending_records().is_empty());
+        let entries = journal.entries();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].status, SyncJournalEntryStatus::Acknowledged);
+        assert_eq!(entries[0].acknowledged_at, Some(202));
+    }
+
+    #[test]
+    fn sync_journal_snapshot_round_trips_and_json_denies_unknown_fields() {
+        let mut journal = SyncJournal::new("device-a").unwrap();
+        journal
+            .record_upsert(
+                SyncCollection::LocalBook,
+                "local-1",
+                r#"{"title":"Local"}"#,
+                10,
+                100,
+            )
+            .unwrap();
+        let package = journal.pending_package("pending", 101).unwrap();
+        journal.acknowledge_package(&package, 102).unwrap();
+
+        let snapshot = journal.export_snapshot().unwrap();
+
+        assert_eq!(
+            snapshot.schema_version,
+            SYNC_JOURNAL_SNAPSHOT_SCHEMA_VERSION
+        );
+        assert_eq!(snapshot.device_id, "device-a");
+        assert_eq!(snapshot.next_sequence, 2);
+        assert_eq!(snapshot.next_revision, 2);
+        assert_eq!(
+            snapshot.entries[0].status,
+            SyncJournalEntryStatus::Acknowledged
+        );
+
+        let json = serde_json::to_string(&snapshot).unwrap();
+        let back: SyncJournalSnapshot = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, snapshot);
+        assert_eq!(
+            SyncJournal::from_snapshot(back)
+                .unwrap()
+                .export_snapshot()
+                .unwrap(),
+            snapshot
+        );
+
+        let unknown = r#"{"schemaVersion":1,"deviceId":"device-a","nextSequence":1,"nextRevision":1,"entries":[],"bogus":true}"#;
+        assert!(serde_json::from_str::<SyncJournalSnapshot>(unknown).is_err());
+    }
+
+    #[test]
+    fn sync_journal_snapshot_rejects_schema_duplicates_and_invalid_status() {
+        let mut journal = SyncJournal::new("device-a").unwrap();
+        let entry = journal
+            .record_upsert(
+                SyncCollection::Bookshelf,
+                "book",
+                r#"{"title":"A"}"#,
+                10,
+                100,
+            )
+            .unwrap();
+
+        let mut wrong_schema = journal.export_snapshot().unwrap();
+        wrong_schema.schema_version = 2;
+        assert_eq!(
+            wrong_schema.validate().unwrap_err(),
+            SyncError::InvalidJournal {
+                field: "schema_version".into()
+            }
+        );
+
+        let mut duplicate = journal.export_snapshot().unwrap();
+        duplicate.next_sequence = 3;
+        duplicate.next_revision = 3;
+        duplicate.entries.push(entry.clone());
+        assert_eq!(
+            duplicate.validate().unwrap_err(),
+            SyncError::InvalidJournal {
+                field: "entries".into()
+            }
+        );
+
+        let mut invalid_status = journal.export_snapshot().unwrap();
+        invalid_status.entries[0].acknowledged_at = Some(200);
+        assert_eq!(
+            invalid_status.validate().unwrap_err(),
+            SyncError::InvalidJournal {
+                field: "entries.acknowledged_at".into()
+            }
+        );
+
+        let mut device_mismatch = journal.export_snapshot().unwrap();
+        device_mismatch.entries[0].record.device_id = "other-device".into();
+        assert_eq!(
+            device_mismatch.validate().unwrap_err(),
+            SyncError::InvalidJournal {
+                field: "entries.record.device_id".into()
+            }
+        );
+    }
+
+    #[test]
+    fn sync_journal_invalid_update_does_not_consume_revision_or_sequence() {
+        let mut journal = SyncJournal::new("device-a").unwrap();
+
+        assert_eq!(
+            journal
+                .record_upsert(SyncCollection::Bookshelf, "book", "   ", 10, 100)
+                .unwrap_err(),
+            SyncError::InvalidRecord {
+                field: "payload".into()
+            }
+        );
+
+        let entry = journal
+            .record_upsert(
+                SyncCollection::Bookshelf,
+                "book",
+                r#"{"title":"A"}"#,
+                11,
+                101,
+            )
+            .unwrap();
+        assert_eq!(entry.sequence, 1);
+        assert_eq!(entry.record.revision, 1);
+        let snapshot = journal.export_snapshot().unwrap();
+        assert_eq!(snapshot.next_sequence, 2);
+        assert_eq!(snapshot.next_revision, 2);
     }
 
     #[test]
