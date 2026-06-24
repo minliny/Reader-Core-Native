@@ -33,7 +33,7 @@
 
 | 模块 | 状态 | 备注 |
 |------|:----:|------|
-| NativeCoreBridge (JNI) | ⬜ | |
+| NativeCoreBridge (JNI) | 🟡 | Core-side JNI `.so` smoke script added; App-side Java/Kotlin loading pending |
 | HTTP Transport (OkHttp) | ⬜ | 保留为 transport |
 | WebView Adapter | ⬜ | 保留 |
 | TTS Adapter | ⬜ | 保留 |
