@@ -26,6 +26,26 @@ Each XCFramework slice includes:
 The build script also type-checks a Swift smoke file with `import ReaderCore`
 against the simulator slice.
 
+## Swift wrapper smoke
+
+`bindings/ios/Sources/ReaderCoreClient/ReaderCoreClient.swift` contains a
+minimal Swift wrapper around the ABI v1 runtime handle:
+
+- `ReaderCoreRuntime.abiVersion`
+- `ReaderCoreRuntime(configJSON:onEvent:)`
+- `send(json:)`
+- `send(jsonString:)`
+- `cancel(requestId:)`
+- `destroy()`
+
+Validate it with:
+
+```bash
+./scripts/check-ios-swift-wrapper.sh
+```
+
+The smoke target is `arm64-apple-ios13.0-simulator`.
+
 The XCFramework exposes the ABI v1 functions declared in
 `include/reader_core.h`:
 
