@@ -118,7 +118,8 @@ int32_t rc_runtime_create(
 /// command_json: borrowed only for this call. Core parses/copies what it needs
 ///   before `rc_runtime_send` returns and never retains the pointer.
 /// command_length: byte length of `command_json`; `command_json` may be NULL
-///   only when `command_length == 0`.
+///   only when `command_length == 0`. A zero-length command is still malformed
+///   JSON and returns `RC_SEND_INVALID_COMMAND`.
 ///
 /// Threading: may be called from any host thread while `runtime` is alive.
 /// The host must serialize all send/cancel calls with `rc_runtime_destroy`.

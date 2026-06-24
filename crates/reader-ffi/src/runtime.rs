@@ -248,6 +248,10 @@ mod tests {
         let code = unsafe { send(handle, ptr::null(), 0) };
         assert_eq!(code, 3);
 
+        let empty = b"";
+        let code = unsafe { send(handle, empty.as_ptr(), 0) };
+        assert_eq!(code, 3);
+
         let malformed = b"{";
         let code = unsafe { send(handle, malformed.as_ptr(), malformed.len()) };
         assert_eq!(code, 3);
@@ -342,6 +346,14 @@ mod tests {
 
         // Malformed JSON → status 3, INVALID_MESSAGE.
         assert_eq!(unsafe { send(handle, b"{".as_ptr(), 1) }, 3);
+        assert_eq!(
+            last_error_code(),
+            last_error::code_of(ErrorCode::InvalidMessage)
+        );
+
+        // Empty JSON payload → status 3, INVALID_MESSAGE.
+        let empty = b"";
+        assert_eq!(unsafe { send(handle, empty.as_ptr(), 0) }, 3);
         assert_eq!(
             last_error_code(),
             last_error::code_of(ErrorCode::InvalidMessage)

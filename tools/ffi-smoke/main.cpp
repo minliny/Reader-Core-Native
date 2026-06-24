@@ -266,6 +266,15 @@ int main() {
     return fail("zero-length command did not record INVALID_MESSAGE");
   }
 
+  if (rc_runtime_send(rt, reinterpret_cast<const uint8_t *>(""), 0) !=
+      RC_SEND_INVALID_COMMAND) {
+    return fail("empty command did not return RC_SEND_INVALID_COMMAND");
+  }
+  msg = last_error_message(&code);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "command JSON")) {
+    return fail("empty command did not record INVALID_MESSAGE");
+  }
+
   if (send_str(rt, "{") != RC_SEND_INVALID_COMMAND) {
     return fail("malformed send did not return RC_SEND_INVALID_COMMAND");
   }
