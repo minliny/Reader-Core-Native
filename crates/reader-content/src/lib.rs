@@ -20,6 +20,9 @@ use reader_js::{JsError, JsErrorKind, JsEvaluation, JsSandbox as JsSandboxTrait,
 use reader_rule::{CaptureGroup, RuleEngine, RuleError, RuleOutput, RuleStep};
 use serde::{Deserialize, Serialize};
 
+/// Current content library snapshot schema version.
+pub const CONTENT_LIBRARY_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
+
 /// A JSON-serializable rule-step specification that mirrors the constructors on
 /// [`RuleStep`]. `reader-rule` deliberately does not derive Serialize/Deserialize
 /// (its public API is programmatic), so this adapter is the bridge between
@@ -139,6 +142,8 @@ pub enum ContentError {
     Js(JsError),
     /// Content normalization or remapping received invalid chapter data.
     InvalidChapter { field: String },
+    /// A persisted content document or library snapshot was invalid.
+    InvalidDocument { field: String },
 }
 
 impl std::fmt::Display for ContentError {
@@ -154,6 +159,9 @@ impl std::fmt::Display for ContentError {
             ContentError::Js(e) => write!(f, "JS rule error: {e}"),
             ContentError::InvalidChapter { field } => {
                 write!(f, "invalid chapter field: {field}")
+            }
+            ContentError::InvalidDocument { field } => {
+                write!(f, "invalid content document field: {field}")
             }
         }
     }
@@ -254,6 +262,186 @@ pub enum ProgressRemapStatus {
 pub struct RemappedReadingProgress {
     pub progress: ReadingProgress,
     pub status: ProgressRemapStatus,
+}
+
+/// Persistable content package for one source/book pair.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ContentDocument {
+    pub source_id: String,
+    pub book: Book,
+    #[serde(default)]
+    pub toc: Vec<TocEntry>,
+    #[serde(default)]
+    pub chapters: Vec<NormalizedChapter>,
+    pub updated_at: i64,
+    /// Stable fingerprint across TOC and chapter content.
+    pub content_fingerprint: String,
+}
+
+impl ContentDocument {
+    pub fn new(
+        source_id: impl Into<String>,
+        book: Book,
+        toc: Vec<TocEntry>,
+        chapters: Vec<NormalizedChapter>,
+        updated_at: i64,
+    ) -> Result<Self, ContentError> {
+        let mut document = Self {
+            source_id: source_id.into().trim().to_string(),
+            book,
+            toc,
+            chapters,
+            updated_at,
+            content_fingerprint: String::new(),
+        };
+        document.content_fingerprint = content_document_fingerprint(&document);
+        validate_content_document(&document)?;
+        Ok(document)
+    }
+}
+
+/// Complete export/import unit for content documents.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ContentLibrarySnapshot {
+    pub schema_version: u32,
+    pub exported_at: i64,
+    #[serde(default)]
+    pub documents: Vec<ContentDocument>,
+}
+
+impl ContentLibrarySnapshot {
+    pub fn empty(exported_at: i64) -> Self {
+        Self {
+            schema_version: CONTENT_LIBRARY_SNAPSHOT_SCHEMA_VERSION,
+            exported_at,
+            documents: Vec::new(),
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), ContentError> {
+        if self.schema_version != CONTENT_LIBRARY_SNAPSHOT_SCHEMA_VERSION {
+            return Err(ContentError::InvalidDocument {
+                field: "schema_version".into(),
+            });
+        }
+
+        let mut keys = HashMap::<ContentDocumentKey, ()>::new();
+        for document in &self.documents {
+            validate_content_document(document)?;
+            if keys.insert(document.document_key(), ()).is_some() {
+                return Err(ContentError::InvalidDocument {
+                    field: "documents".into(),
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
+/// In-memory content document library.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct ContentDocumentLibrary {
+    documents: HashMap<ContentDocumentKey, ContentDocument>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct ContentDocumentKey {
+    source_id: String,
+    book_id: String,
+}
+
+impl ContentDocument {
+    fn document_key(&self) -> ContentDocumentKey {
+        ContentDocumentKey {
+            source_id: self.source_id.clone(),
+            book_id: self.book.book_id.clone(),
+        }
+    }
+}
+
+impl ContentDocumentLibrary {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn upsert_document(
+        &mut self,
+        document: ContentDocument,
+    ) -> Result<ContentDocument, ContentError> {
+        validate_content_document(&document)?;
+        self.documents
+            .insert(document.document_key(), document.clone());
+        Ok(document)
+    }
+
+    pub fn get_document(
+        &self,
+        source_id: &str,
+        book_id: &str,
+    ) -> Result<Option<ContentDocument>, ContentError> {
+        let key = content_document_key(source_id, book_id)?;
+        Ok(self.documents.get(&key).cloned())
+    }
+
+    pub fn list_documents(&self) -> Vec<ContentDocument> {
+        let mut documents = self.documents.values().cloned().collect::<Vec<_>>();
+        documents.sort_by(compare_content_document_key);
+        documents
+    }
+
+    pub fn get_chapter(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        chapter_index: u32,
+    ) -> Result<Option<NormalizedChapter>, ContentError> {
+        let Some(document) = self.get_document(source_id, book_id)? else {
+            return Ok(None);
+        };
+        Ok(document
+            .chapters
+            .iter()
+            .find(|chapter| chapter.chapter_index == chapter_index)
+            .cloned())
+    }
+
+    pub fn remove_document(
+        &mut self,
+        source_id: &str,
+        book_id: &str,
+    ) -> Result<bool, ContentError> {
+        let key = content_document_key(source_id, book_id)?;
+        Ok(self.documents.remove(&key).is_some())
+    }
+
+    pub fn export_snapshot(
+        &self,
+        exported_at: i64,
+    ) -> Result<ContentLibrarySnapshot, ContentError> {
+        let mut snapshot = ContentLibrarySnapshot {
+            schema_version: CONTENT_LIBRARY_SNAPSHOT_SCHEMA_VERSION,
+            exported_at,
+            documents: self.documents.values().cloned().collect(),
+        };
+        sort_content_snapshot(&mut snapshot);
+        snapshot.validate()?;
+        Ok(snapshot)
+    }
+
+    pub fn replace_with_snapshot(
+        &mut self,
+        snapshot: ContentLibrarySnapshot,
+    ) -> Result<(), ContentError> {
+        snapshot.validate()?;
+        let mut documents = HashMap::new();
+        for document in snapshot.documents {
+            documents.insert(document.document_key(), document);
+        }
+        self.documents = documents;
+        Ok(())
+    }
 }
 
 /// The remote-reading content pipeline.
@@ -635,6 +823,147 @@ fn validate_non_empty(field: &str, value: &str) -> Result<(), ContentError> {
     Ok(())
 }
 
+fn validate_document_non_empty(field: &str, value: &str) -> Result<(), ContentError> {
+    if value.trim().is_empty() {
+        return Err(ContentError::InvalidDocument {
+            field: field.into(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_content_document(document: &ContentDocument) -> Result<(), ContentError> {
+    validate_document_non_empty("source_id", &document.source_id)?;
+    validate_document_non_empty("book.book_id", &document.book.book_id)?;
+    if document.toc.is_empty() || document.chapters.is_empty() {
+        return Err(ContentError::InvalidDocument {
+            field: "chapters".into(),
+        });
+    }
+    if document.toc.len() != document.chapters.len() {
+        return Err(ContentError::InvalidDocument {
+            field: "toc".into(),
+        });
+    }
+
+    for (expected_index, (toc, chapter)) in document
+        .toc
+        .iter()
+        .zip(document.chapters.iter())
+        .enumerate()
+    {
+        let expected_index = expected_index as u32;
+        if toc.index != expected_index {
+            return Err(ContentError::InvalidDocument {
+                field: "toc.index".into(),
+            });
+        }
+        if chapter.chapter_index != expected_index {
+            return Err(ContentError::InvalidDocument {
+                field: "chapters.index".into(),
+            });
+        }
+        validate_normalized_chapter_for_document(document, toc, chapter)?;
+    }
+
+    let expected_fingerprint = content_document_fingerprint(document);
+    if document.content_fingerprint != expected_fingerprint {
+        return Err(ContentError::InvalidDocument {
+            field: "content_fingerprint".into(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_normalized_chapter_for_document(
+    document: &ContentDocument,
+    toc: &TocEntry,
+    chapter: &NormalizedChapter,
+) -> Result<(), ContentError> {
+    if chapter.source_id != document.source_id {
+        return Err(ContentError::InvalidDocument {
+            field: "chapters.source_id".into(),
+        });
+    }
+    if chapter.book_id != document.book.book_id {
+        return Err(ContentError::InvalidDocument {
+            field: "chapters.book_id".into(),
+        });
+    }
+    if chapter.title != toc.title {
+        return Err(ContentError::InvalidDocument {
+            field: "chapters.title".into(),
+        });
+    }
+    if chapter.url != toc.url {
+        return Err(ContentError::InvalidDocument {
+            field: "chapters.url".into(),
+        });
+    }
+    if chapter.content.trim().is_empty() {
+        return Err(ContentError::InvalidDocument {
+            field: "chapters.content".into(),
+        });
+    }
+    if chapter.char_len != chapter.content.chars().count() {
+        return Err(ContentError::InvalidDocument {
+            field: "chapters.char_len".into(),
+        });
+    }
+    let expected_fingerprint = stable_fingerprint(&chapter.content);
+    if chapter.content_fingerprint != expected_fingerprint {
+        return Err(ContentError::InvalidDocument {
+            field: "chapters.content_fingerprint".into(),
+        });
+    }
+    let expected_cache_key = format!(
+        "{}:{}:{}:{}",
+        chapter.source_id, chapter.book_id, chapter.chapter_index, chapter.content_fingerprint
+    );
+    if chapter.cache_key != expected_cache_key {
+        return Err(ContentError::InvalidDocument {
+            field: "chapters.cache_key".into(),
+        });
+    }
+    Ok(())
+}
+
+fn content_document_key(
+    source_id: &str,
+    book_id: &str,
+) -> Result<ContentDocumentKey, ContentError> {
+    validate_document_non_empty("source_id", source_id)?;
+    validate_document_non_empty("book_id", book_id)?;
+    Ok(ContentDocumentKey {
+        source_id: source_id.trim().to_string(),
+        book_id: book_id.trim().to_string(),
+    })
+}
+
+fn sort_content_snapshot(snapshot: &mut ContentLibrarySnapshot) {
+    snapshot.documents.sort_by(compare_content_document_key);
+}
+
+fn compare_content_document_key(a: &ContentDocument, b: &ContentDocument) -> std::cmp::Ordering {
+    a.source_id
+        .cmp(&b.source_id)
+        .then_with(|| a.book.book_id.cmp(&b.book.book_id))
+}
+
+fn content_document_fingerprint(document: &ContentDocument) -> String {
+    let mut parts = Vec::new();
+    parts.push(document.source_id.as_str());
+    parts.push(document.book.book_id.as_str());
+    for toc in &document.toc {
+        parts.push(&toc.title);
+        parts.push(&toc.url);
+    }
+    for chapter in &document.chapters {
+        parts.push(&chapter.content_fingerprint);
+    }
+    stable_fingerprint(&parts.join("\u{1f}"))
+}
+
 fn normalize_chapter_content(raw: &str) -> String {
     let normalized = raw
         .trim_start_matches('\u{feff}')
@@ -996,6 +1325,205 @@ mod tests {
             title: title.into(),
             url: url.into(),
         }
+    }
+
+    fn content_document(source_id: &str, book_id: &str, updated_at: i64) -> ContentDocument {
+        let mut source = sample_source();
+        source.source_id = source_id.into();
+        let mut book = sample_book();
+        book.book_id = book_id.into();
+        book.title = format!("Book {book_id}");
+        let toc = vec![toc_entry(0, "A", "/a"), toc_entry(1, "B", "/b")];
+        let chapters = vec![
+            normalize_chapter(&source, &book, &toc[0], "Alpha body").unwrap(),
+            normalize_chapter(&source, &book, &toc[1], "Beta body").unwrap(),
+        ];
+        ContentDocument::new(source.source_id, book, toc, chapters, updated_at).unwrap()
+    }
+
+    #[test]
+    fn content_document_library_upserts_lists_and_reads_chapters() {
+        let mut library = ContentDocumentLibrary::new();
+        library
+            .upsert_document(content_document("src2", "book-1", 2000))
+            .unwrap();
+        library
+            .upsert_document(content_document("src1", "book-1", 1000))
+            .unwrap();
+
+        let keys = library
+            .list_documents()
+            .into_iter()
+            .map(|document| (document.source_id, document.book.book_id))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            keys,
+            vec![
+                ("src1".to_string(), "book-1".to_string()),
+                ("src2".to_string(), "book-1".to_string())
+            ]
+        );
+
+        let chapter = library.get_chapter("src1", "book-1", 1).unwrap().unwrap();
+        assert_eq!(chapter.title, "B");
+        assert_eq!(chapter.content, "Beta body");
+        assert!(library.get_chapter("src1", "book-1", 99).unwrap().is_none());
+        assert!(library.get_document("src2", "book-1").unwrap().is_some());
+        assert!(library.remove_document("src2", "book-1").unwrap());
+        assert!(!library.remove_document("src2", "book-1").unwrap());
+    }
+
+    #[test]
+    fn content_document_upsert_replaces_same_source_book() {
+        let mut library = ContentDocumentLibrary::new();
+        library
+            .upsert_document(content_document("src1", "book-1", 1000))
+            .unwrap();
+        library
+            .upsert_document(content_document("src1", "book-1", 2000))
+            .unwrap();
+
+        assert_eq!(library.list_documents().len(), 1);
+        assert_eq!(
+            library
+                .get_document("src1", "book-1")
+                .unwrap()
+                .unwrap()
+                .updated_at,
+            2000
+        );
+        assert!(matches!(
+            library.get_document("", "book-1"),
+            Err(ContentError::InvalidDocument { .. })
+        ));
+    }
+
+    #[test]
+    fn content_library_snapshot_export_is_stable_and_json_round_trips() {
+        let mut library = ContentDocumentLibrary::new();
+        library
+            .upsert_document(content_document("src2", "book-2", 2000))
+            .unwrap();
+        library
+            .upsert_document(content_document("src1", "book-1", 1000))
+            .unwrap();
+
+        let snapshot = library.export_snapshot(42).unwrap();
+
+        assert_eq!(
+            snapshot.schema_version,
+            CONTENT_LIBRARY_SNAPSHOT_SCHEMA_VERSION
+        );
+        assert_eq!(snapshot.exported_at, 42);
+        assert_eq!(
+            snapshot
+                .documents
+                .iter()
+                .map(|document| (document.source_id.as_str(), document.book.book_id.as_str()))
+                .collect::<Vec<_>>(),
+            vec![("src1", "book-1"), ("src2", "book-2")]
+        );
+        assert_eq!(snapshot.documents[0].toc.len(), 2);
+        assert_eq!(
+            snapshot.documents[0].chapters[0]
+                .cache_key
+                .split(':')
+                .count(),
+            4
+        );
+
+        let json = serde_json::to_string(&snapshot).unwrap();
+        assert!(json.contains(r#""schemaVersion":1"#));
+        let back: ContentLibrarySnapshot = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, snapshot);
+    }
+
+    #[test]
+    fn content_library_snapshot_replace_round_trips_and_empty_clears() {
+        let mut source = ContentDocumentLibrary::new();
+        source
+            .upsert_document(content_document("src1", "book-1", 1000))
+            .unwrap();
+        let snapshot = source.export_snapshot(77).unwrap();
+
+        let mut restored = ContentDocumentLibrary::new();
+        restored.replace_with_snapshot(snapshot.clone()).unwrap();
+
+        assert_eq!(restored.export_snapshot(77).unwrap(), snapshot);
+        assert_eq!(
+            restored
+                .get_chapter("src1", "book-1", 0)
+                .unwrap()
+                .unwrap()
+                .content,
+            "Alpha body"
+        );
+
+        restored
+            .replace_with_snapshot(ContentLibrarySnapshot::empty(100))
+            .unwrap();
+        assert!(restored.list_documents().is_empty());
+        assert!(restored.get_document("src1", "book-1").unwrap().is_none());
+    }
+
+    #[test]
+    fn content_library_snapshot_rejects_schema_duplicates_invalid_documents_and_unknown_fields() {
+        let mut wrong_schema = ContentLibrarySnapshot::empty(1);
+        wrong_schema.schema_version = 2;
+        assert_eq!(
+            wrong_schema.validate().unwrap_err(),
+            ContentError::InvalidDocument {
+                field: "schema_version".into()
+            }
+        );
+
+        let mut duplicate = ContentLibrarySnapshot::empty(1);
+        duplicate
+            .documents
+            .push(content_document("src1", "book-1", 1000));
+        duplicate
+            .documents
+            .push(content_document("src1", "book-1", 2000));
+        assert_eq!(
+            duplicate.validate().unwrap_err(),
+            ContentError::InvalidDocument {
+                field: "documents".into()
+            }
+        );
+
+        let mut invalid = ContentLibrarySnapshot::empty(1);
+        let mut broken = content_document("src1", "book-1", 1000);
+        broken.chapters[0].content_fingerprint = "wrong".into();
+        invalid.documents.push(broken);
+        assert_eq!(
+            invalid.validate().unwrap_err(),
+            ContentError::InvalidDocument {
+                field: "chapters.content_fingerprint".into()
+            }
+        );
+
+        let unknown = r#"{"schemaVersion":1,"exportedAt":1,"documents":[],"bogus":true}"#;
+        assert!(serde_json::from_str::<ContentLibrarySnapshot>(unknown).is_err());
+    }
+
+    #[test]
+    fn content_library_snapshot_replace_is_atomic_on_validation_failure() {
+        let mut library = ContentDocumentLibrary::new();
+        library
+            .upsert_document(content_document("src1", "book-1", 1000))
+            .unwrap();
+        let before = library.export_snapshot(1).unwrap();
+
+        let mut invalid = ContentLibrarySnapshot::empty(2);
+        let mut broken = content_document("src2", "book-2", 2000);
+        broken.toc.pop();
+        invalid.documents.push(broken);
+
+        assert!(matches!(
+            library.replace_with_snapshot(invalid),
+            Err(ContentError::InvalidDocument { .. })
+        ));
+        assert_eq!(library.export_snapshot(1).unwrap(), before);
     }
 
     #[test]
