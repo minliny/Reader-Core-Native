@@ -1,0 +1,9 @@
+{
+  "command": {
+    "protocolVersion": 1,
+    "requestId": 401,
+    "method": "runtime.ping",
+    "params": {}
+  },
+  "cancelRequestId": 401
+}

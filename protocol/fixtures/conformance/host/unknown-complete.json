@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "requestId": 304,
+  "method": "host.complete",
+  "params": {
+    "operationId": 404,
+    "result": {
+      "status": "unexpected"
+    }
+  }
+}

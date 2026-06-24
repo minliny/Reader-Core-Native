@@ -90,4 +90,65 @@ mod tests {
         assert_eq!(command.method, methods::RUNTIME_PING);
         assert_eq!(command.params, serde_json::json!({}));
     }
+
+    #[test]
+    fn conformance_valid_command_fixtures_parse() {
+        for (name, json) in [
+            (
+                "valid-runtime-ping",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/valid-runtime-ping.json"
+                ),
+            ),
+            (
+                "valid-core-info",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/valid-core-info.json"
+                ),
+            ),
+        ] {
+            Command::from_json_bytes(json.as_bytes())
+                .unwrap_or_else(|err| panic!("{name} should parse, got {err:?}"));
+        }
+    }
+
+    #[test]
+    fn conformance_invalid_command_fixtures_return_expected_codes() {
+        for (name, json, expected) in [
+            (
+                "invalid-malformed-json",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-malformed-json.json"
+                ),
+                crate::ErrorCode::InvalidMessage,
+            ),
+            (
+                "invalid-unsupported-protocol",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-unsupported-protocol.json"
+                ),
+                crate::ErrorCode::InvalidProtocolVersion,
+            ),
+            (
+                "invalid-missing-request-id",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-missing-request-id.json"
+                ),
+                crate::ErrorCode::InvalidMessage,
+            ),
+            (
+                "invalid-params-not-object",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-params-not-object.json"
+                ),
+                crate::ErrorCode::InvalidParams,
+            ),
+        ] {
+            let err = match Command::from_json_bytes(json.as_bytes()) {
+                Ok(_) => panic!("{name} should be rejected"),
+                Err(err) => err,
+            };
+            assert_eq!(err.code, expected, "{name} returned {err:?}");
+        }
+    }
 }

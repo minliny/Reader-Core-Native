@@ -4,6 +4,8 @@
 //! `--info`, `--ping`, `--host-smoke`, `--json`, and `--stdin` all enqueue a
 //! command and print emitted events as one JSON object per line.
 
+mod conformance;
+
 use std::io::{self, Read};
 use std::sync::mpsc::{self, Receiver};
 use std::sync::Arc;
@@ -28,6 +30,7 @@ enum Mode {
     Info,
     Ping,
     HostSmoke,
+    Conformance,
     Json(String),
     Stdin,
 }
@@ -73,6 +76,18 @@ fn run() -> Result<(), CoreError> {
             print_next_event(&rx)
         }
         Mode::HostSmoke => run_host_smoke(&runtime, &rx),
+        Mode::Conformance => {
+            let report = conformance::run_conformance();
+            println!("{}", report.to_json());
+            if report.failed_count() == 0 {
+                Ok(())
+            } else {
+                Err(CoreError::internal(format!(
+                    "{} conformance case(s) failed",
+                    report.failed_count()
+                )))
+            }
+        }
     }
 }
 
@@ -89,6 +104,7 @@ where
             "--info" => set_mode(&mut mode, Mode::Info)?,
             "--ping" => set_mode(&mut mode, Mode::Ping)?,
             "--host-smoke" => set_mode(&mut mode, Mode::HostSmoke)?,
+            "--conformance" => set_mode(&mut mode, Mode::Conformance)?,
             "--stdin" => set_mode(&mut mode, Mode::Stdin)?,
             "--json" => {
                 let Some(json) = iter.next() else {
@@ -124,7 +140,7 @@ where
 fn set_mode(slot: &mut Option<Mode>, mode: Mode) -> Result<(), CoreError> {
     if slot.is_some() {
         return Err(CoreError::invalid_message(
-            "only one of --info, --ping, --host-smoke, --json, or --stdin may be used",
+            "only one of --info, --ping, --host-smoke, --conformance, --json, or --stdin may be used",
         ));
     }
     *slot = Some(mode);
@@ -187,6 +203,6 @@ fn print_event(event: &Event) {
 
 fn print_usage() {
     eprintln!(
-        "usage: reader-cli [--info|--ping|--host-smoke|--json '<command>'|--stdin] [--config-json '<config>']"
+        "usage: reader-cli [--info|--ping|--host-smoke|--conformance|--json '<command>'|--stdin] [--config-json '<config>']"
     );
 }

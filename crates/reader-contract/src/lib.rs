@@ -54,3 +54,98 @@ pub const V1_CAPABILITIES: &[&str] = &[
     capabilities::HOST_BUS_V1,
     capabilities::RUNTIME_CONFIG_V1,
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::Value;
+
+    #[test]
+    fn command_schema_capability_extension_matches_core_info() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+        let schema_capabilities = strings_at(&schema, "x-reader-core-v1-capabilities");
+        assert_eq!(schema_capabilities, V1_CAPABILITIES);
+
+        let info = core_info(1, "test-build");
+        let info_capabilities = info["capabilities"]
+            .as_array()
+            .expect("core.info capabilities must be an array")
+            .iter()
+            .map(|value| value.as_str().expect("capability must be a string"))
+            .collect::<Vec<_>>();
+        assert_eq!(info_capabilities, schema_capabilities);
+    }
+
+    #[test]
+    fn command_schema_method_examples_are_current_v1_methods() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+        let schema_examples = schema["properties"]["method"]["examples"]
+            .as_array()
+            .expect("method examples must be an array")
+            .iter()
+            .map(|value| value.as_str().expect("method example must be a string"))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            schema_examples,
+            vec![
+                methods::CORE_INFO,
+                methods::RUNTIME_PING,
+                methods::RUNTIME_HOST_SMOKE,
+                methods::HOST_COMPLETE,
+                methods::HOST_ERROR,
+            ]
+        );
+        assert!(!schema_examples.contains(&methods::LEGACY_CORE_PING));
+    }
+
+    #[test]
+    fn event_schema_error_codes_match_error_code_enum() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+        let schema_codes = schema["$defs"]["CoreError"]["properties"]["code"]["enum"]
+            .as_array()
+            .expect("error code enum must be an array")
+            .iter()
+            .map(|value| value.as_str().expect("error code must be a string"))
+            .collect::<Vec<_>>();
+
+        let rust_codes = [
+            ErrorCode::UnknownMethod,
+            ErrorCode::InvalidParams,
+            ErrorCode::InvalidProtocolVersion,
+            ErrorCode::Cancelled,
+            ErrorCode::InvalidMessage,
+            ErrorCode::Internal,
+        ]
+        .into_iter()
+        .map(|code| {
+            serde_json::to_value(code)
+                .expect("error code must serialize")
+                .as_str()
+                .expect("error code must serialize as string")
+                .to_string()
+        })
+        .collect::<Vec<_>>();
+
+        assert_eq!(schema_codes, rust_codes);
+    }
+
+    fn strings_at<'a>(value: &'a Value, key: &str) -> Vec<&'a str> {
+        value[key]
+            .as_array()
+            .unwrap_or_else(|| panic!("{key} must be an array"))
+            .iter()
+            .map(|value| {
+                value
+                    .as_str()
+                    .unwrap_or_else(|| panic!("{key} item must be a string"))
+            })
+            .collect()
+    }
+}
