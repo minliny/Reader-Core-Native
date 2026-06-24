@@ -224,6 +224,25 @@ describe("ReaderCoreRuntime", () => {
     });
   });
 
+  test("rejects invalid command inputs before native dispatch", () => {
+    const native = new FakeNativeReaderCore();
+    const runtime = new ReaderCoreRuntime(native);
+
+    expect(() => runtime.send("", {})).toThrow("method must be a non-empty string");
+    expect(() =>
+      runtime.send("runtime.ping", [] as unknown as JsonObject)
+    ).toThrow("params must be a JSON object");
+  });
+
+  test("rejects invalid host.complete results before native dispatch", () => {
+    const native = new FakeNativeReaderCore();
+    const runtime = new ReaderCoreRuntime(native);
+
+    expect(() =>
+      runtime.completeHostRequest(1, [] as unknown as JsonObject)
+    ).toThrow("host.complete result must be a JSON object");
+  });
+
   test("turns host handler failures into host.error and surfaces core error", async () => {
     const native = new FakeNativeReaderCore();
     const runtime = new ReaderCoreRuntime(native);

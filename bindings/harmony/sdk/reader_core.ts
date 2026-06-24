@@ -112,6 +112,8 @@ export class ReaderCoreRuntime {
 
   send(method: string, params: JsonObject = {}, requestId = this.allocateRequestId()): number {
     this.ensureOpen();
+    assertCommandMethod(method);
+    assertJsonObjectValue(params, "params");
     assertNonNegativeSafeInteger(requestId, "requestId");
     const command: ReaderCoreCommand = {
       protocolVersion: ReaderCoreRuntime.protocolVersion,
@@ -153,6 +155,7 @@ export class ReaderCoreRuntime {
     if (requestId !== undefined) {
       assertNonNegativeSafeInteger(requestId, "requestId");
     }
+    assertJsonObjectValue(result, "host.complete result");
     this.native.completeHostRequest(this.runtime, operationId, result, requestId);
   }
 
@@ -339,6 +342,18 @@ export function parseReaderCoreEvent(raw: string): ReaderCoreEvent {
 function assertNonNegativeSafeInteger(value: number, name: string): void {
   if (!isNonNegativeSafeInteger(value)) {
     throw new Error(`${name} must be a non-negative safe integer`);
+  }
+}
+
+function assertCommandMethod(value: unknown): asserts value is string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error("method must be a non-empty string");
+  }
+}
+
+function assertJsonObjectValue(value: unknown, name: string): asserts value is JsonObject {
+  if (!isJsonObject(value)) {
+    throw new Error(`${name} must be a JSON object`);
   }
 }
 
