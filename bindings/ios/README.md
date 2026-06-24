@@ -1,9 +1,10 @@
 # ReaderCore iOS Binding
 
 This binding lane packages the C ABI static library and `reader_core.h` into an
-XCFramework. It is intentionally a smoke-level platform artifact: Swift wrapper,
-Swift concurrency adapters, URLSession host transport, WebView login, and app UI
-live in the iOS host repository.
+XCFramework. It is intentionally a smoke-level platform artifact: the checked-in
+Swift wrapper covers ABI lifecycle, `core.info`, and `runtime.ping`; Swift
+concurrency adapters, URLSession host transport, WebView login, and app UI live
+in the iOS host repository.
 
 ## Build
 
@@ -37,6 +38,8 @@ minimal Swift wrapper around the ABI v1 runtime handle:
 - `send(jsonString:)`
 - `cancel(requestId:)`
 - `destroy()`
+- `ReaderCoreClient.coreInfo(requestId:timeout:)`
+- `ReaderCoreClient.ping(requestId:timeout:)`
 
 Validate it with:
 
@@ -44,7 +47,11 @@ Validate it with:
 ./scripts/check-ios-swift-wrapper.sh
 ```
 
-The smoke target is `arm64-apple-ios13.0-simulator`.
+The gate first type-checks the wrapper against the `arm64-apple-ios13.0-simulator`
+XCFramework slice, then builds the host `reader-ffi` static library and runs a
+macOS Swift executable that calls `core.info` and `runtime.ping` through
+`ReaderCoreClient`. This keeps the checked-in smoke free of a full iOS app
+project while still proving wrapper compile/link/runtime behavior.
 
 The XCFramework exposes the ABI v1 functions declared in
 `include/reader_core.h`:
