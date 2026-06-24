@@ -27,6 +27,10 @@ struct StorageInner {
     cache: HashMap<String, CachedEntry>,
     progress: HashMap<String, ReadingProgress>,
     shelf: HashMap<ShelfKey, BookshelfEntry>,
+    chapter_cache: HashMap<ChapterCacheKey, ChapterCacheEntry>,
+    reading_progress: HashMap<ReadingProgressKey, ReadingProgressEntry>,
+    reading_progress_history: HashMap<ReadingProgressKey, Vec<ReadingProgressEntry>>,
+    chapter_download_queue: HashMap<ChapterDownloadKey, ChapterDownloadTask>,
 }
 
 /// A minimal cached entry: an opaque JSON payload keyed by a string cache key.
@@ -88,6 +92,224 @@ struct ShelfKey {
     book_id: String,
 }
 
+/// A cached chapter body for a specific source/book/chapter index.
+///
+/// The cache key is `(source_id, book_id, chapter_index)`. The URL and title are
+/// stored as metadata because source TOCs can be revalidated later without
+/// reparsing the body.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChapterCacheEntry {
+    /// Source the book came from. `"local"` for local books.
+    pub source_id: String,
+    /// Source-relative book identifier.
+    pub book_id: String,
+    /// 0-based chapter index within the current TOC.
+    pub chapter_index: u32,
+    #[serde(default)]
+    pub title: String,
+    /// Source-relative chapter URL/path. Local books may leave this empty.
+    #[serde(default)]
+    pub url: String,
+    /// Normalized chapter body text.
+    #[serde(default)]
+    pub content: String,
+    /// Unix timestamp (seconds) when this body was cached.
+    pub cached_at: i64,
+    /// Optional source revision marker such as an ETag, hash, or upstream id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<String>,
+}
+
+impl ChapterCacheEntry {
+    fn chapter_cache_key(&self) -> ChapterCacheKey {
+        ChapterCacheKey {
+            source_id: self.source_id.clone(),
+            book_id: self.book_id.clone(),
+            chapter_index: self.chapter_index,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct ChapterCacheKey {
+    source_id: String,
+    book_id: String,
+    chapter_index: u32,
+}
+
+/// Aggregate size/age view of the chapter cache.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChapterCacheStats {
+    pub entry_count: usize,
+    pub total_content_bytes: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oldest_cached_at: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub newest_cached_at: Option<i64>,
+}
+
+/// Retention limits for chapter cache pruning.
+///
+/// Limits are applied in this order: `min_cached_at`, `max_entries`, then
+/// `max_total_content_bytes`. Within each limit, older cache entries are
+/// evicted before newer entries.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChapterCacheRetentionPolicy {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_entries: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_total_content_bytes: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_cached_at: Option<i64>,
+}
+
+/// Result of applying a chapter cache retention policy.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChapterCacheEvictionReport {
+    #[serde(default)]
+    pub removed: Vec<ChapterCacheEntry>,
+    pub remaining: ChapterCacheStats,
+}
+
+/// Current reading position for a source/book pair.
+///
+/// This is intentionally separate from [`reader_domain::ReadingProgress`],
+/// whose V1 shape is keyed only by `book_id`. Storage needs the composite
+/// `(source_id, book_id)` key so two sources can expose the same book id without
+/// overwriting each other's progress.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReadingProgressEntry {
+    /// Source the book came from. `"local"` for local books.
+    pub source_id: String,
+    /// Source-relative book identifier.
+    pub book_id: String,
+    /// Index of the chapter the reader is currently on.
+    #[serde(default)]
+    pub chapter_index: u32,
+    /// Scroll/char offset within the current chapter.
+    #[serde(default)]
+    pub chapter_offset: u64,
+    /// Fraction read in the current chapter, constrained to 0.0..=1.0.
+    #[serde(default)]
+    pub chapter_progress: f64,
+    /// Unix timestamp (seconds) for this progress update.
+    pub updated_at: i64,
+    /// Optional device id that produced the update.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_id: Option<String>,
+}
+
+impl ReadingProgressEntry {
+    fn progress_key(&self) -> ReadingProgressKey {
+        ReadingProgressKey {
+            source_id: self.source_id.clone(),
+            book_id: self.book_id.clone(),
+        }
+    }
+
+    pub fn as_domain_progress(&self) -> ReadingProgress {
+        ReadingProgress {
+            book_id: self.book_id.clone(),
+            chapter_index: self.chapter_index,
+            chapter_offset: self.chapter_offset,
+            chapter_progress: self.chapter_progress,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct ReadingProgressKey {
+    source_id: String,
+    book_id: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ChapterDownloadStatus {
+    Pending,
+    InProgress,
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+/// One queued chapter download/prefetch task.
+///
+/// This is transport-agnostic storage state. Runtime or host layers can claim a
+/// task, perform the fetch, and then write the fetched body through
+/// [`ChapterCacheStore`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChapterDownloadTask {
+    pub source_id: String,
+    pub book_id: String,
+    pub chapter_index: u32,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub url: String,
+    #[serde(default)]
+    pub priority: i32,
+    pub status: ChapterDownloadStatus,
+    pub created_at: i64,
+    pub updated_at: i64,
+    #[serde(default)]
+    pub attempts: u32,
+    #[serde(default = "default_max_attempts")]
+    pub max_attempts: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_error: Option<String>,
+}
+
+impl ChapterDownloadTask {
+    pub fn pending(
+        source_id: impl Into<String>,
+        book_id: impl Into<String>,
+        chapter_index: u32,
+        title: impl Into<String>,
+        url: impl Into<String>,
+        priority: i32,
+        created_at: i64,
+    ) -> Result<Self, StorageError> {
+        let task = Self {
+            source_id: source_id.into(),
+            book_id: book_id.into(),
+            chapter_index,
+            title: title.into(),
+            url: url.into(),
+            priority,
+            status: ChapterDownloadStatus::Pending,
+            created_at,
+            updated_at: created_at,
+            attempts: 0,
+            max_attempts: default_max_attempts(),
+            last_error: None,
+        };
+        validate_chapter_download_task(&task)?;
+        Ok(task)
+    }
+
+    fn download_key(&self) -> ChapterDownloadKey {
+        ChapterDownloadKey {
+            source_id: self.source_id.clone(),
+            book_id: self.book_id.clone(),
+            chapter_index: self.chapter_index,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct ChapterDownloadKey {
+    source_id: String,
+    book_id: String,
+    chapter_index: u32,
+}
+
 /// Storage operations for the bookshelf.
 ///
 /// The trait is defined so a future SQLite-backed store can implement the same
@@ -102,11 +324,7 @@ pub trait BookshelfStore {
 
     /// Remove a book from the shelf. Idempotent — removing a missing entry is
     /// not an error.
-    fn remove_from_shelf(
-        &self,
-        source_id: &str,
-        book_id: &str,
-    ) -> Result<(), StorageError>;
+    fn remove_from_shelf(&self, source_id: &str, book_id: &str) -> Result<(), StorageError>;
 
     /// Look up a single shelf entry by composite key.
     fn get_shelf_entry(
@@ -133,6 +351,148 @@ pub trait BookshelfStore {
 
     /// Number of entries on the shelf.
     fn shelf_count(&self) -> Result<usize, StorageError>;
+}
+
+/// Storage operations for normalized chapter bodies.
+pub trait ChapterCacheStore {
+    /// Insert or replace a cached chapter body.
+    fn put_chapter_cache(
+        &self,
+        entry: ChapterCacheEntry,
+    ) -> Result<ChapterCacheEntry, StorageError>;
+
+    /// Read a cached chapter body by source/book/index.
+    fn get_chapter_cache(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        chapter_index: u32,
+    ) -> Result<Option<ChapterCacheEntry>, StorageError>;
+
+    /// Remove a single cached chapter body. Idempotent for missing entries.
+    fn remove_chapter_cache(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        chapter_index: u32,
+    ) -> Result<(), StorageError>;
+
+    /// List cached chapters for a book, sorted by chapter index ascending.
+    fn list_chapter_cache(
+        &self,
+        source_id: &str,
+        book_id: &str,
+    ) -> Result<Vec<ChapterCacheEntry>, StorageError>;
+
+    /// Clear all cached chapters for a book and return the number removed.
+    fn clear_chapter_cache(&self, source_id: &str, book_id: &str) -> Result<usize, StorageError>;
+
+    /// Return aggregate chapter cache stats across all books.
+    fn chapter_cache_stats(&self) -> Result<ChapterCacheStats, StorageError>;
+
+    /// Apply retention limits and evict old cache entries.
+    fn prune_chapter_cache(
+        &self,
+        policy: ChapterCacheRetentionPolicy,
+    ) -> Result<ChapterCacheEvictionReport, StorageError>;
+}
+
+/// Storage operations for source-scoped reading progress.
+pub trait ReadingProgressStore {
+    /// Save a reading progress update.
+    ///
+    /// Updates are appended to history. The current pointer only advances when
+    /// `updated_at` is newer than or equal to the stored current update.
+    fn save_reading_progress(
+        &self,
+        entry: ReadingProgressEntry,
+    ) -> Result<ReadingProgressEntry, StorageError>;
+
+    /// Read current progress by source/book key.
+    fn get_reading_progress(
+        &self,
+        source_id: &str,
+        book_id: &str,
+    ) -> Result<Option<ReadingProgressEntry>, StorageError>;
+
+    /// List current progress for one source, newest first.
+    fn list_reading_progress(
+        &self,
+        source_id: &str,
+    ) -> Result<Vec<ReadingProgressEntry>, StorageError>;
+
+    /// Return saved progress events for one book, oldest first.
+    fn reading_progress_history(
+        &self,
+        source_id: &str,
+        book_id: &str,
+    ) -> Result<Vec<ReadingProgressEntry>, StorageError>;
+
+    /// Clear current progress and history for one book. Idempotent.
+    fn clear_reading_progress(&self, source_id: &str, book_id: &str) -> Result<(), StorageError>;
+}
+
+/// Storage operations for bounded chapter prefetch/download work.
+pub trait ChapterDownloadQueueStore {
+    /// Add a chapter to the queue, or requeue it if the key already exists.
+    ///
+    /// Requeue semantics preserve the original `created_at`, refresh metadata,
+    /// reset attempts/error, and put the task back into `Pending`.
+    fn enqueue_chapter_download(
+        &self,
+        task: ChapterDownloadTask,
+    ) -> Result<ChapterDownloadTask, StorageError>;
+
+    fn get_chapter_download(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        chapter_index: u32,
+    ) -> Result<Option<ChapterDownloadTask>, StorageError>;
+
+    fn list_chapter_downloads(
+        &self,
+        source_id: &str,
+        book_id: &str,
+    ) -> Result<Vec<ChapterDownloadTask>, StorageError>;
+
+    /// Claim the next pending/retryable task and mark it `InProgress`.
+    fn claim_next_chapter_download(
+        &self,
+        now: i64,
+    ) -> Result<Option<ChapterDownloadTask>, StorageError>;
+
+    fn mark_chapter_download_completed(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        chapter_index: u32,
+        now: i64,
+    ) -> Result<ChapterDownloadTask, StorageError>;
+
+    fn mark_chapter_download_failed(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        chapter_index: u32,
+        error: impl Into<String>,
+        now: i64,
+    ) -> Result<ChapterDownloadTask, StorageError>;
+
+    fn cancel_chapter_download(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        chapter_index: u32,
+        now: i64,
+    ) -> Result<ChapterDownloadTask, StorageError>;
+
+    /// Remove completed/cancelled tasks for one book and return the removed count.
+    fn clear_finished_chapter_downloads(
+        &self,
+        source_id: &str,
+        book_id: &str,
+    ) -> Result<usize, StorageError>;
 }
 
 impl InMemoryStorage {
@@ -204,7 +564,7 @@ impl InMemoryStorage {
     }
 }
 
-fn validate_shelf_key(source_id: &str, book_id: &str) -> Result<(), StorageError> {
+fn validate_book_key(source_id: &str, book_id: &str) -> Result<(), StorageError> {
     if source_id.trim().is_empty() {
         return Err(StorageError::InvalidKey {
             field: "source_id".into(),
@@ -218,6 +578,84 @@ fn validate_shelf_key(source_id: &str, book_id: &str) -> Result<(), StorageError
     Ok(())
 }
 
+fn validate_source_id(source_id: &str) -> Result<(), StorageError> {
+    if source_id.trim().is_empty() {
+        return Err(StorageError::InvalidKey {
+            field: "source_id".into(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_reading_progress(entry: &ReadingProgressEntry) -> Result<(), StorageError> {
+    validate_book_key(&entry.source_id, &entry.book_id)?;
+    if !entry.chapter_progress.is_finite()
+        || entry.chapter_progress < 0.0
+        || entry.chapter_progress > 1.0
+    {
+        return Err(StorageError::InvalidProgress {
+            field: "chapter_progress".into(),
+        });
+    }
+    if entry
+        .device_id
+        .as_deref()
+        .map(str::trim)
+        .is_some_and(str::is_empty)
+    {
+        return Err(StorageError::InvalidProgress {
+            field: "device_id".into(),
+        });
+    }
+    Ok(())
+}
+
+fn default_max_attempts() -> u32 {
+    3
+}
+
+fn validate_chapter_download_task(task: &ChapterDownloadTask) -> Result<(), StorageError> {
+    validate_book_key(&task.source_id, &task.book_id)?;
+    if task.max_attempts == 0 {
+        return Err(StorageError::InvalidDownloadTask {
+            field: "max_attempts".into(),
+        });
+    }
+    if task.attempts > task.max_attempts {
+        return Err(StorageError::InvalidDownloadTask {
+            field: "attempts".into(),
+        });
+    }
+    if task
+        .last_error
+        .as_deref()
+        .map(str::trim)
+        .is_some_and(str::is_empty)
+    {
+        return Err(StorageError::InvalidDownloadTask {
+            field: "last_error".into(),
+        });
+    }
+    Ok(())
+}
+
+fn chapter_download_key(
+    source_id: &str,
+    book_id: &str,
+    chapter_index: u32,
+) -> Result<ChapterDownloadKey, StorageError> {
+    validate_book_key(source_id, book_id)?;
+    Ok(ChapterDownloadKey {
+        source_id: source_id.to_string(),
+        book_id: book_id.to_string(),
+        chapter_index,
+    })
+}
+
+fn validate_shelf_key(source_id: &str, book_id: &str) -> Result<(), StorageError> {
+    validate_book_key(source_id, book_id)
+}
+
 fn sort_shelf(entries: &mut Vec<BookshelfEntry>) {
     // sort_index ascending; ties broken by added_at descending (newer first).
     entries.sort_by(|a, b| {
@@ -225,6 +663,58 @@ fn sort_shelf(entries: &mut Vec<BookshelfEntry>) {
             .cmp(&b.sort_index)
             .then_with(|| b.added_at.cmp(&a.added_at))
     });
+}
+
+fn chapter_cache_content_bytes(entry: &ChapterCacheEntry) -> usize {
+    entry.content.as_bytes().len()
+}
+
+fn chapter_cache_stats_from_entries<'a>(
+    entries: impl Iterator<Item = &'a ChapterCacheEntry>,
+) -> ChapterCacheStats {
+    let mut entry_count = 0usize;
+    let mut total_content_bytes = 0usize;
+    let mut oldest_cached_at = None::<i64>;
+    let mut newest_cached_at = None::<i64>;
+
+    for entry in entries {
+        entry_count += 1;
+        total_content_bytes += chapter_cache_content_bytes(entry);
+        oldest_cached_at = Some(
+            oldest_cached_at
+                .map(|oldest| oldest.min(entry.cached_at))
+                .unwrap_or(entry.cached_at),
+        );
+        newest_cached_at = Some(
+            newest_cached_at
+                .map(|newest| newest.max(entry.cached_at))
+                .unwrap_or(entry.cached_at),
+        );
+    }
+
+    ChapterCacheStats {
+        entry_count,
+        total_content_bytes,
+        oldest_cached_at,
+        newest_cached_at,
+    }
+}
+
+fn sort_chapter_cache_for_eviction(entries: &mut [(ChapterCacheKey, ChapterCacheEntry)]) {
+    entries.sort_by(|(key_a, entry_a), (key_b, entry_b)| {
+        entry_a
+            .cached_at
+            .cmp(&entry_b.cached_at)
+            .then_with(|| key_a.source_id.cmp(&key_b.source_id))
+            .then_with(|| key_a.book_id.cmp(&key_b.book_id))
+            .then_with(|| key_a.chapter_index.cmp(&key_b.chapter_index))
+    });
+}
+
+fn mark_chapter_cache_key_once(keys: &mut Vec<ChapterCacheKey>, key: ChapterCacheKey) {
+    if !keys.contains(&key) {
+        keys.push(key);
+    }
 }
 
 impl BookshelfStore for InMemoryStorage {
@@ -244,11 +734,7 @@ impl BookshelfStore for InMemoryStorage {
         Ok(stored)
     }
 
-    fn remove_from_shelf(
-        &self,
-        source_id: &str,
-        book_id: &str,
-    ) -> Result<(), StorageError> {
+    fn remove_from_shelf(&self, source_id: &str, book_id: &str) -> Result<(), StorageError> {
         validate_shelf_key(source_id, book_id)?;
         let mut inner = self.lock()?;
         let key = ShelfKey {
@@ -323,6 +809,467 @@ impl BookshelfStore for InMemoryStorage {
     }
 }
 
+impl ChapterCacheStore for InMemoryStorage {
+    fn put_chapter_cache(
+        &self,
+        entry: ChapterCacheEntry,
+    ) -> Result<ChapterCacheEntry, StorageError> {
+        validate_book_key(&entry.source_id, &entry.book_id)?;
+        let mut inner = self.lock()?;
+        inner
+            .chapter_cache
+            .insert(entry.chapter_cache_key(), entry.clone());
+        Ok(entry)
+    }
+
+    fn get_chapter_cache(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        chapter_index: u32,
+    ) -> Result<Option<ChapterCacheEntry>, StorageError> {
+        validate_book_key(source_id, book_id)?;
+        let inner = self.lock()?;
+        Ok(inner
+            .chapter_cache
+            .get(&ChapterCacheKey {
+                source_id: source_id.to_string(),
+                book_id: book_id.to_string(),
+                chapter_index,
+            })
+            .cloned())
+    }
+
+    fn remove_chapter_cache(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        chapter_index: u32,
+    ) -> Result<(), StorageError> {
+        validate_book_key(source_id, book_id)?;
+        let mut inner = self.lock()?;
+        inner.chapter_cache.remove(&ChapterCacheKey {
+            source_id: source_id.to_string(),
+            book_id: book_id.to_string(),
+            chapter_index,
+        });
+        Ok(())
+    }
+
+    fn list_chapter_cache(
+        &self,
+        source_id: &str,
+        book_id: &str,
+    ) -> Result<Vec<ChapterCacheEntry>, StorageError> {
+        validate_book_key(source_id, book_id)?;
+        let inner = self.lock()?;
+        let mut entries: Vec<ChapterCacheEntry> = inner
+            .chapter_cache
+            .iter()
+            .filter(|(key, _)| key.source_id == source_id && key.book_id == book_id)
+            .map(|(_, entry)| entry.clone())
+            .collect();
+        entries.sort_by_key(|entry| entry.chapter_index);
+        Ok(entries)
+    }
+
+    fn clear_chapter_cache(&self, source_id: &str, book_id: &str) -> Result<usize, StorageError> {
+        validate_book_key(source_id, book_id)?;
+        let mut inner = self.lock()?;
+        let before = inner.chapter_cache.len();
+        inner
+            .chapter_cache
+            .retain(|key, _| !(key.source_id == source_id && key.book_id == book_id));
+        Ok(before - inner.chapter_cache.len())
+    }
+
+    fn chapter_cache_stats(&self) -> Result<ChapterCacheStats, StorageError> {
+        let inner = self.lock()?;
+        Ok(chapter_cache_stats_from_entries(
+            inner.chapter_cache.values(),
+        ))
+    }
+
+    fn prune_chapter_cache(
+        &self,
+        policy: ChapterCacheRetentionPolicy,
+    ) -> Result<ChapterCacheEvictionReport, StorageError> {
+        let mut inner = self.lock()?;
+        let mut candidates = inner
+            .chapter_cache
+            .iter()
+            .map(|(key, entry)| (key.clone(), entry.clone()))
+            .collect::<Vec<_>>();
+        sort_chapter_cache_for_eviction(&mut candidates);
+
+        let mut remove_keys = Vec::<ChapterCacheKey>::new();
+
+        if let Some(min_cached_at) = policy.min_cached_at {
+            for (key, entry) in &candidates {
+                if entry.cached_at < min_cached_at {
+                    mark_chapter_cache_key_once(&mut remove_keys, key.clone());
+                }
+            }
+        }
+
+        if let Some(max_entries) = policy.max_entries {
+            let mut remaining = candidates
+                .iter()
+                .filter(|(key, _)| !remove_keys.contains(key))
+                .cloned()
+                .collect::<Vec<_>>();
+            sort_chapter_cache_for_eviction(&mut remaining);
+            if remaining.len() > max_entries {
+                let remove_count = remaining.len() - max_entries;
+                for (key, _) in remaining.into_iter().take(remove_count) {
+                    mark_chapter_cache_key_once(&mut remove_keys, key);
+                }
+            }
+        }
+
+        if let Some(max_total_content_bytes) = policy.max_total_content_bytes {
+            let mut remaining = candidates
+                .iter()
+                .filter(|(key, _)| !remove_keys.contains(key))
+                .cloned()
+                .collect::<Vec<_>>();
+            sort_chapter_cache_for_eviction(&mut remaining);
+            let mut total_bytes = remaining
+                .iter()
+                .map(|(_, entry)| chapter_cache_content_bytes(entry))
+                .sum::<usize>();
+            for (key, entry) in remaining {
+                if total_bytes <= max_total_content_bytes {
+                    break;
+                }
+                total_bytes = total_bytes.saturating_sub(chapter_cache_content_bytes(&entry));
+                mark_chapter_cache_key_once(&mut remove_keys, key);
+            }
+        }
+
+        let mut removed = Vec::new();
+        for key in remove_keys {
+            if let Some(entry) = inner.chapter_cache.remove(&key) {
+                removed.push(entry);
+            }
+        }
+        removed.sort_by(|a, b| {
+            a.cached_at
+                .cmp(&b.cached_at)
+                .then_with(|| a.source_id.cmp(&b.source_id))
+                .then_with(|| a.book_id.cmp(&b.book_id))
+                .then_with(|| a.chapter_index.cmp(&b.chapter_index))
+        });
+
+        let remaining = chapter_cache_stats_from_entries(inner.chapter_cache.values());
+        Ok(ChapterCacheEvictionReport { removed, remaining })
+    }
+}
+
+impl ReadingProgressStore for InMemoryStorage {
+    fn save_reading_progress(
+        &self,
+        entry: ReadingProgressEntry,
+    ) -> Result<ReadingProgressEntry, StorageError> {
+        validate_reading_progress(&entry)?;
+        let mut inner = self.lock()?;
+        let key = entry.progress_key();
+        inner
+            .reading_progress_history
+            .entry(key.clone())
+            .or_default()
+            .push(entry.clone());
+
+        let should_advance = inner
+            .reading_progress
+            .get(&key)
+            .map(|current| entry.updated_at >= current.updated_at)
+            .unwrap_or(true);
+
+        if should_advance {
+            inner.reading_progress.insert(key.clone(), entry.clone());
+            if let Some(shelf_entry) = inner.shelf.get_mut(&ShelfKey {
+                source_id: key.source_id,
+                book_id: key.book_id,
+            }) {
+                shelf_entry.last_read_at = Some(entry.updated_at);
+            }
+            Ok(entry)
+        } else {
+            Ok(inner
+                .reading_progress
+                .get(&key)
+                .expect("current progress exists when stale update is ignored")
+                .clone())
+        }
+    }
+
+    fn get_reading_progress(
+        &self,
+        source_id: &str,
+        book_id: &str,
+    ) -> Result<Option<ReadingProgressEntry>, StorageError> {
+        validate_book_key(source_id, book_id)?;
+        let inner = self.lock()?;
+        Ok(inner
+            .reading_progress
+            .get(&ReadingProgressKey {
+                source_id: source_id.to_string(),
+                book_id: book_id.to_string(),
+            })
+            .cloned())
+    }
+
+    fn list_reading_progress(
+        &self,
+        source_id: &str,
+    ) -> Result<Vec<ReadingProgressEntry>, StorageError> {
+        validate_source_id(source_id)?;
+        let inner = self.lock()?;
+        let mut entries = inner
+            .reading_progress
+            .iter()
+            .filter(|(key, _)| key.source_id == source_id)
+            .map(|(_, entry)| entry.clone())
+            .collect::<Vec<_>>();
+        entries.sort_by(|a, b| {
+            b.updated_at
+                .cmp(&a.updated_at)
+                .then_with(|| a.book_id.cmp(&b.book_id))
+        });
+        Ok(entries)
+    }
+
+    fn reading_progress_history(
+        &self,
+        source_id: &str,
+        book_id: &str,
+    ) -> Result<Vec<ReadingProgressEntry>, StorageError> {
+        validate_book_key(source_id, book_id)?;
+        let inner = self.lock()?;
+        let mut history = inner
+            .reading_progress_history
+            .get(&ReadingProgressKey {
+                source_id: source_id.to_string(),
+                book_id: book_id.to_string(),
+            })
+            .cloned()
+            .unwrap_or_default();
+        history.sort_by(|a, b| {
+            a.updated_at
+                .cmp(&b.updated_at)
+                .then_with(|| a.device_id.cmp(&b.device_id))
+        });
+        Ok(history)
+    }
+
+    fn clear_reading_progress(&self, source_id: &str, book_id: &str) -> Result<(), StorageError> {
+        validate_book_key(source_id, book_id)?;
+        let mut inner = self.lock()?;
+        let key = ReadingProgressKey {
+            source_id: source_id.to_string(),
+            book_id: book_id.to_string(),
+        };
+        inner.reading_progress.remove(&key);
+        inner.reading_progress_history.remove(&key);
+        if let Some(shelf_entry) = inner.shelf.get_mut(&ShelfKey {
+            source_id: source_id.to_string(),
+            book_id: book_id.to_string(),
+        }) {
+            shelf_entry.last_read_at = None;
+        }
+        Ok(())
+    }
+}
+
+impl ChapterDownloadQueueStore for InMemoryStorage {
+    fn enqueue_chapter_download(
+        &self,
+        mut task: ChapterDownloadTask,
+    ) -> Result<ChapterDownloadTask, StorageError> {
+        validate_chapter_download_task(&task)?;
+        let mut inner = self.lock()?;
+        let key = task.download_key();
+        let created_at = inner
+            .chapter_download_queue
+            .get(&key)
+            .map(|existing| existing.created_at)
+            .unwrap_or(task.created_at);
+        task.created_at = created_at;
+        task.status = ChapterDownloadStatus::Pending;
+        task.attempts = 0;
+        task.last_error = None;
+        validate_chapter_download_task(&task)?;
+        inner.chapter_download_queue.insert(key, task.clone());
+        Ok(task)
+    }
+
+    fn get_chapter_download(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        chapter_index: u32,
+    ) -> Result<Option<ChapterDownloadTask>, StorageError> {
+        let key = chapter_download_key(source_id, book_id, chapter_index)?;
+        Ok(self.lock()?.chapter_download_queue.get(&key).cloned())
+    }
+
+    fn list_chapter_downloads(
+        &self,
+        source_id: &str,
+        book_id: &str,
+    ) -> Result<Vec<ChapterDownloadTask>, StorageError> {
+        validate_book_key(source_id, book_id)?;
+        let inner = self.lock()?;
+        let mut tasks = inner
+            .chapter_download_queue
+            .iter()
+            .filter(|(key, _)| key.source_id == source_id && key.book_id == book_id)
+            .map(|(_, task)| task.clone())
+            .collect::<Vec<_>>();
+        tasks.sort_by_key(|task| task.chapter_index);
+        Ok(tasks)
+    }
+
+    fn claim_next_chapter_download(
+        &self,
+        now: i64,
+    ) -> Result<Option<ChapterDownloadTask>, StorageError> {
+        let mut inner = self.lock()?;
+        let next_key = inner
+            .chapter_download_queue
+            .iter()
+            .filter(|(_, task)| is_claimable_download(task))
+            .min_by(|(_, a), (_, b)| compare_download_claim_order(a, b))
+            .map(|(key, _)| key.clone());
+
+        let Some(next_key) = next_key else {
+            return Ok(None);
+        };
+
+        let task = inner
+            .chapter_download_queue
+            .get_mut(&next_key)
+            .expect("claimed key must exist");
+        task.status = ChapterDownloadStatus::InProgress;
+        task.attempts += 1;
+        task.updated_at = now;
+        task.last_error = None;
+        Ok(Some(task.clone()))
+    }
+
+    fn mark_chapter_download_completed(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        chapter_index: u32,
+        now: i64,
+    ) -> Result<ChapterDownloadTask, StorageError> {
+        self.update_download_task(source_id, book_id, chapter_index, |task| {
+            task.status = ChapterDownloadStatus::Completed;
+            task.updated_at = now;
+            task.last_error = None;
+        })
+    }
+
+    fn mark_chapter_download_failed(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        chapter_index: u32,
+        error: impl Into<String>,
+        now: i64,
+    ) -> Result<ChapterDownloadTask, StorageError> {
+        let error = error.into().trim().to_string();
+        if error.is_empty() {
+            return Err(StorageError::InvalidDownloadTask {
+                field: "last_error".into(),
+            });
+        }
+        self.update_download_task(source_id, book_id, chapter_index, |task| {
+            task.status = ChapterDownloadStatus::Failed;
+            task.updated_at = now;
+            task.last_error = Some(error);
+        })
+    }
+
+    fn cancel_chapter_download(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        chapter_index: u32,
+        now: i64,
+    ) -> Result<ChapterDownloadTask, StorageError> {
+        self.update_download_task(source_id, book_id, chapter_index, |task| {
+            task.status = ChapterDownloadStatus::Cancelled;
+            task.updated_at = now;
+            task.last_error = None;
+        })
+    }
+
+    fn clear_finished_chapter_downloads(
+        &self,
+        source_id: &str,
+        book_id: &str,
+    ) -> Result<usize, StorageError> {
+        validate_book_key(source_id, book_id)?;
+        let mut inner = self.lock()?;
+        let before = inner.chapter_download_queue.len();
+        inner.chapter_download_queue.retain(|key, task| {
+            !(key.source_id == source_id
+                && key.book_id == book_id
+                && matches!(
+                    task.status,
+                    ChapterDownloadStatus::Completed | ChapterDownloadStatus::Cancelled
+                ))
+        });
+        Ok(before - inner.chapter_download_queue.len())
+    }
+}
+
+impl InMemoryStorage {
+    fn update_download_task(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        chapter_index: u32,
+        update: impl FnOnce(&mut ChapterDownloadTask),
+    ) -> Result<ChapterDownloadTask, StorageError> {
+        let key = chapter_download_key(source_id, book_id, chapter_index)?;
+        let mut inner = self.lock()?;
+        let task = inner.chapter_download_queue.get_mut(&key).ok_or_else(|| {
+            StorageError::DownloadTaskNotFound {
+                source_id: source_id.to_string(),
+                book_id: book_id.to_string(),
+                chapter_index,
+            }
+        })?;
+        update(task);
+        validate_chapter_download_task(task)?;
+        Ok(task.clone())
+    }
+}
+
+fn is_claimable_download(task: &ChapterDownloadTask) -> bool {
+    matches!(
+        task.status,
+        ChapterDownloadStatus::Pending | ChapterDownloadStatus::Failed
+    ) && task.attempts < task.max_attempts
+}
+
+fn compare_download_claim_order(
+    a: &ChapterDownloadTask,
+    b: &ChapterDownloadTask,
+) -> std::cmp::Ordering {
+    b.priority
+        .cmp(&a.priority)
+        .then_with(|| a.updated_at.cmp(&b.updated_at))
+        .then_with(|| a.created_at.cmp(&b.created_at))
+        .then_with(|| a.source_id.cmp(&b.source_id))
+        .then_with(|| a.book_id.cmp(&b.book_id))
+        .then_with(|| a.chapter_index.cmp(&b.chapter_index))
+}
+
 /// Storage errors. V1 is in-memory so the only realistic failure is a poisoned
 /// lock; the variant exists so the runtime can surface a structured `INTERNAL`
 /// error instead of panicking.
@@ -330,9 +1277,28 @@ impl BookshelfStore for InMemoryStorage {
 pub enum StorageError {
     Poisoned,
     /// A key field (source_id or book_id) was empty or invalid.
-    InvalidKey { field: String },
+    InvalidKey {
+        field: String,
+    },
+    /// A progress field was outside its accepted range.
+    InvalidProgress {
+        field: String,
+    },
+    /// A chapter download queue field was invalid.
+    InvalidDownloadTask {
+        field: String,
+    },
     /// An entry referenced by the operation does not exist.
-    NotFound { source_id: String, book_id: String },
+    NotFound {
+        source_id: String,
+        book_id: String,
+    },
+    /// A queued chapter download task does not exist.
+    DownloadTaskNotFound {
+        source_id: String,
+        book_id: String,
+        chapter_index: u32,
+    },
 }
 
 impl std::fmt::Display for StorageError {
@@ -340,9 +1306,26 @@ impl std::fmt::Display for StorageError {
         match self {
             StorageError::Poisoned => write!(f, "storage lock poisoned"),
             StorageError::InvalidKey { field } => write!(f, "invalid key field: {field}"),
-            StorageError::NotFound { source_id, book_id } => {
-                write!(f, "shelf entry not found: source={source_id} book={book_id}")
+            StorageError::InvalidProgress { field } => {
+                write!(f, "invalid progress field: {field}")
             }
+            StorageError::InvalidDownloadTask { field } => {
+                write!(f, "invalid download task field: {field}")
+            }
+            StorageError::NotFound { source_id, book_id } => {
+                write!(
+                    f,
+                    "shelf entry not found: source={source_id} book={book_id}"
+                )
+            }
+            StorageError::DownloadTaskNotFound {
+                source_id,
+                book_id,
+                chapter_index,
+            } => write!(
+                f,
+                "chapter download task not found: source={source_id} book={book_id} chapter={chapter_index}"
+            ),
         }
     }
 }
@@ -394,6 +1377,225 @@ mod tests {
         store.put_progress(p.clone()).unwrap();
         let got = store.get_progress("b1").unwrap().unwrap();
         assert_eq!(got, p);
+    }
+
+    // ---- Source-scoped reading progress boundary tests ----
+
+    fn progress_entry(
+        source: &str,
+        book: &str,
+        chapter_index: u32,
+        chapter_offset: u64,
+        chapter_progress: f64,
+        updated_at: i64,
+    ) -> ReadingProgressEntry {
+        ReadingProgressEntry {
+            source_id: source.into(),
+            book_id: book.into(),
+            chapter_index,
+            chapter_offset,
+            chapter_progress,
+            updated_at,
+            device_id: None,
+        }
+    }
+
+    #[test]
+    fn scoped_progress_put_then_get_round_trips() {
+        let store = InMemoryStorage::new();
+        let entry = progress_entry("s1", "b1", 3, 1024, 0.5, 1700000000);
+
+        let saved = store.save_reading_progress(entry.clone()).unwrap();
+
+        assert_eq!(saved, entry);
+        assert_eq!(
+            store.get_reading_progress("s1", "b1").unwrap(),
+            Some(entry.clone())
+        );
+        assert_eq!(entry.as_domain_progress().book_id, "b1");
+        assert_eq!(entry.as_domain_progress().chapter_progress, 0.5);
+    }
+
+    #[test]
+    fn scoped_progress_same_book_id_different_source_no_collision() {
+        let store = InMemoryStorage::new();
+        store
+            .save_reading_progress(progress_entry("s1", "b1", 1, 100, 0.25, 1000))
+            .unwrap();
+        store
+            .save_reading_progress(progress_entry("s2", "b1", 8, 900, 0.9, 2000))
+            .unwrap();
+
+        assert_eq!(
+            store
+                .get_reading_progress("s1", "b1")
+                .unwrap()
+                .unwrap()
+                .chapter_index,
+            1
+        );
+        assert_eq!(
+            store
+                .get_reading_progress("s2", "b1")
+                .unwrap()
+                .unwrap()
+                .chapter_index,
+            8
+        );
+        assert_eq!(store.list_reading_progress("s1").unwrap().len(), 1);
+        assert_eq!(store.list_reading_progress("s2").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn scoped_progress_list_sorted_newest_first() {
+        let store = InMemoryStorage::new();
+        store
+            .save_reading_progress(progress_entry("s1", "b1", 1, 0, 0.1, 1000))
+            .unwrap();
+        store
+            .save_reading_progress(progress_entry("s1", "b2", 2, 0, 0.2, 3000))
+            .unwrap();
+        store
+            .save_reading_progress(progress_entry("s1", "b3", 3, 0, 0.3, 2000))
+            .unwrap();
+
+        let ids = store
+            .list_reading_progress("s1")
+            .unwrap()
+            .into_iter()
+            .map(|entry| entry.book_id)
+            .collect::<Vec<_>>();
+        assert_eq!(ids, vec!["b2", "b3", "b1"]);
+    }
+
+    #[test]
+    fn scoped_progress_stale_update_does_not_replace_current_but_keeps_history() {
+        let store = InMemoryStorage::new();
+        let current = progress_entry("s1", "b1", 5, 500, 0.5, 5000);
+        let stale = progress_entry("s1", "b1", 1, 100, 0.1, 1000);
+        store.save_reading_progress(current.clone()).unwrap();
+
+        let returned = store.save_reading_progress(stale.clone()).unwrap();
+
+        assert_eq!(returned, current);
+        assert_eq!(
+            store
+                .get_reading_progress("s1", "b1")
+                .unwrap()
+                .unwrap()
+                .chapter_index,
+            5
+        );
+        let history = store.reading_progress_history("s1", "b1").unwrap();
+        assert_eq!(history, vec![stale, current]);
+    }
+
+    #[test]
+    fn scoped_progress_equal_timestamp_allows_latest_write() {
+        let store = InMemoryStorage::new();
+        store
+            .save_reading_progress(progress_entry("s1", "b1", 1, 100, 0.1, 1000))
+            .unwrap();
+        store
+            .save_reading_progress(progress_entry("s1", "b1", 2, 200, 0.2, 1000))
+            .unwrap();
+
+        let current = store.get_reading_progress("s1", "b1").unwrap().unwrap();
+        assert_eq!(current.chapter_index, 2);
+        assert_eq!(current.chapter_offset, 200);
+        assert_eq!(store.reading_progress_history("s1", "b1").unwrap().len(), 2);
+    }
+
+    #[test]
+    fn scoped_progress_updates_and_clears_shelf_last_read() {
+        let store = InMemoryStorage::new();
+        store
+            .add_to_shelf(shelf_entry("s1", "b1", "Dune", 1000))
+            .unwrap();
+
+        store
+            .save_reading_progress(progress_entry("s1", "b1", 3, 0, 0.3, 3000))
+            .unwrap();
+        assert_eq!(
+            store
+                .get_shelf_entry("s1", "b1")
+                .unwrap()
+                .unwrap()
+                .last_read_at,
+            Some(3000)
+        );
+
+        store.clear_reading_progress("s1", "b1").unwrap();
+        assert!(store.get_reading_progress("s1", "b1").unwrap().is_none());
+        assert!(store
+            .reading_progress_history("s1", "b1")
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            store
+                .get_shelf_entry("s1", "b1")
+                .unwrap()
+                .unwrap()
+                .last_read_at,
+            None
+        );
+        store.clear_reading_progress("s1", "b1").unwrap();
+    }
+
+    #[test]
+    fn scoped_progress_rejects_invalid_keys_and_fields() {
+        let store = InMemoryStorage::new();
+        let err = store
+            .save_reading_progress(progress_entry("", "b1", 1, 0, 0.1, 1000))
+            .unwrap_err();
+        assert_eq!(
+            err,
+            StorageError::InvalidKey {
+                field: "source_id".into()
+            }
+        );
+
+        let err = store
+            .save_reading_progress(progress_entry("s1", "b1", 1, 0, 1.1, 1000))
+            .unwrap_err();
+        assert_eq!(
+            err,
+            StorageError::InvalidProgress {
+                field: "chapter_progress".into()
+            }
+        );
+
+        let mut nan = progress_entry("s1", "b1", 1, 0, f64::NAN, 1000);
+        assert!(matches!(
+            store.save_reading_progress(nan.clone()),
+            Err(StorageError::InvalidProgress { .. })
+        ));
+        nan.chapter_progress = 0.5;
+        nan.device_id = Some("   ".into());
+        assert!(matches!(
+            store.save_reading_progress(nan),
+            Err(StorageError::InvalidProgress { .. })
+        ));
+        assert!(matches!(
+            store.list_reading_progress(""),
+            Err(StorageError::InvalidKey { .. })
+        ));
+    }
+
+    #[test]
+    fn scoped_progress_entry_json_round_trips() {
+        let mut entry = progress_entry("s1", "b1", 7, 2048, 0.75, 1700000000);
+        entry.device_id = Some("device-a".into());
+
+        let json = serde_json::to_string(&entry).unwrap();
+        let back: ReadingProgressEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, entry);
+    }
+
+    #[test]
+    fn scoped_progress_entry_denies_unknown_fields() {
+        let json = r#"{"sourceId":"s1","bookId":"b1","chapterIndex":1,"chapterOffset":10,"chapterProgress":0.1,"updatedAt":1,"bogus":true}"#;
+        assert!(serde_json::from_str::<ReadingProgressEntry>(json).is_err());
     }
 
     #[test]
@@ -482,7 +1684,9 @@ mod tests {
     #[test]
     fn shelf_remove_is_idempotent() {
         let store = InMemoryStorage::new();
-        store.add_to_shelf(shelf_entry("s1", "b1", "Dune", 1000)).unwrap();
+        store
+            .add_to_shelf(shelf_entry("s1", "b1", "Dune", 1000))
+            .unwrap();
         store.remove_from_shelf("s1", "b1").unwrap();
         assert!(store.get_shelf_entry("s1", "b1").unwrap().is_none());
         // Removing again is not an error.
@@ -493,7 +1697,9 @@ mod tests {
     #[test]
     fn shelf_get_missing_returns_none() {
         let store = InMemoryStorage::new();
-        store.add_to_shelf(shelf_entry("s1", "b1", "Dune", 1000)).unwrap();
+        store
+            .add_to_shelf(shelf_entry("s1", "b1", "Dune", 1000))
+            .unwrap();
         assert!(store.get_shelf_entry("s1", "missing").unwrap().is_none());
         assert!(store.get_shelf_entry("missing", "b1").unwrap().is_none());
     }
@@ -501,8 +1707,12 @@ mod tests {
     #[test]
     fn shelf_cross_source_same_book_id_no_collision() {
         let store = InMemoryStorage::new();
-        store.add_to_shelf(shelf_entry("s1", "b1", "From S1", 1000)).unwrap();
-        store.add_to_shelf(shelf_entry("s2", "b1", "From S2", 2000)).unwrap();
+        store
+            .add_to_shelf(shelf_entry("s1", "b1", "From S1", 1000))
+            .unwrap();
+        store
+            .add_to_shelf(shelf_entry("s2", "b1", "From S2", 2000))
+            .unwrap();
         assert_eq!(store.shelf_count().unwrap(), 2);
         let list = store.list_shelf().unwrap();
         assert_eq!(list.len(), 2);
@@ -516,9 +1726,13 @@ mod tests {
     fn shelf_list_sorted_by_sort_index_then_added_at_desc() {
         let store = InMemoryStorage::new();
         // sort_index 0, added_at 1000 (older)
-        store.add_to_shelf(shelf_entry("s1", "b1", "A", 1000)).unwrap();
+        store
+            .add_to_shelf(shelf_entry("s1", "b1", "A", 1000))
+            .unwrap();
         // sort_index 0, added_at 2000 (newer) — should come before A within index 0
-        store.add_to_shelf(shelf_entry("s1", "b2", "B", 2000)).unwrap();
+        store
+            .add_to_shelf(shelf_entry("s1", "b2", "B", 2000))
+            .unwrap();
         // sort_index 1 — should come after both index-0 entries
         let mut c = shelf_entry("s1", "b3", "C", 500);
         c.sort_index = 1;
@@ -526,7 +1740,11 @@ mod tests {
 
         let list = store.list_shelf().unwrap();
         let titles: Vec<&str> = list.iter().map(|e| e.title.as_str()).collect();
-        assert_eq!(titles, vec!["B", "A", "C"], "sorted by index asc, added_at desc");
+        assert_eq!(
+            titles,
+            vec!["B", "A", "C"],
+            "sorted by index asc, added_at desc"
+        );
     }
 
     #[test]
@@ -555,8 +1773,15 @@ mod tests {
     #[test]
     fn shelf_update_last_read_sets_timestamp() {
         let store = InMemoryStorage::new();
-        store.add_to_shelf(shelf_entry("s1", "b1", "Dune", 1000)).unwrap();
-        assert!(store.get_shelf_entry("s1", "b1").unwrap().unwrap().last_read_at.is_none());
+        store
+            .add_to_shelf(shelf_entry("s1", "b1", "Dune", 1000))
+            .unwrap();
+        assert!(store
+            .get_shelf_entry("s1", "b1")
+            .unwrap()
+            .unwrap()
+            .last_read_at
+            .is_none());
         store.update_last_read("s1", "b1", 5000).unwrap();
         let got = store.get_shelf_entry("s1", "b1").unwrap().unwrap();
         assert_eq!(got.last_read_at, Some(5000));
@@ -580,12 +1805,22 @@ mod tests {
         let store = InMemoryStorage::new();
         let mut entry = shelf_entry("", "b1", "Dune", 1000);
         let err = store.add_to_shelf(entry.clone()).unwrap_err();
-        assert_eq!(err, StorageError::InvalidKey { field: "source_id".into() });
+        assert_eq!(
+            err,
+            StorageError::InvalidKey {
+                field: "source_id".into()
+            }
+        );
 
         // Whitespace-only also rejected.
         entry.source_id = "   ".into();
         let err = store.add_to_shelf(entry).unwrap_err();
-        assert_eq!(err, StorageError::InvalidKey { field: "source_id".into() });
+        assert_eq!(
+            err,
+            StorageError::InvalidKey {
+                field: "source_id".into()
+            }
+        );
     }
 
     #[test]
@@ -593,7 +1828,12 @@ mod tests {
         let store = InMemoryStorage::new();
         let entry = shelf_entry("s1", "", "Dune", 1000);
         let err = store.add_to_shelf(entry).unwrap_err();
-        assert_eq!(err, StorageError::InvalidKey { field: "book_id".into() });
+        assert_eq!(
+            err,
+            StorageError::InvalidKey {
+                field: "book_id".into()
+            }
+        );
     }
 
     #[test]
@@ -639,5 +1879,625 @@ mod tests {
         // Unknown field must be rejected to keep the schema strict.
         let json = r#"{"sourceId":"s1","bookId":"b1","title":"Dune","addedAt":1,"bogus":true}"#;
         assert!(serde_json::from_str::<BookshelfEntry>(json).is_err());
+    }
+
+    // ---- Chapter cache boundary tests ----
+
+    fn chapter_entry(
+        source: &str,
+        book: &str,
+        index: u32,
+        title: &str,
+        content: &str,
+        cached_at: i64,
+    ) -> ChapterCacheEntry {
+        ChapterCacheEntry {
+            source_id: source.into(),
+            book_id: book.into(),
+            chapter_index: index,
+            title: title.into(),
+            url: format!("/book/{book}/chapter/{index}"),
+            content: content.into(),
+            cached_at,
+            revision: None,
+        }
+    }
+
+    #[test]
+    fn chapter_cache_empty_returns_none_and_empty_list() {
+        let store = InMemoryStorage::new();
+        assert!(store.get_chapter_cache("s1", "b1", 0).unwrap().is_none());
+        assert!(store.list_chapter_cache("s1", "b1").unwrap().is_empty());
+        assert_eq!(store.clear_chapter_cache("s1", "b1").unwrap(), 0);
+    }
+
+    #[test]
+    fn chapter_cache_put_then_get_round_trips() {
+        let store = InMemoryStorage::new();
+        let mut entry = chapter_entry("s1", "b1", 2, "Chapter 3", "Body", 1700000000);
+        entry.revision = Some("etag-1".into());
+        store.put_chapter_cache(entry.clone()).unwrap();
+
+        let got = store.get_chapter_cache("s1", "b1", 2).unwrap().unwrap();
+        assert_eq!(got, entry);
+    }
+
+    #[test]
+    fn chapter_cache_upsert_overwrites_existing_body() {
+        let store = InMemoryStorage::new();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 0, "Old", "old body", 1000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 0, "New", "new body", 2000))
+            .unwrap();
+
+        let chapters = store.list_chapter_cache("s1", "b1").unwrap();
+        assert_eq!(chapters.len(), 1);
+        assert_eq!(chapters[0].title, "New");
+        assert_eq!(chapters[0].content, "new body");
+        assert_eq!(chapters[0].cached_at, 2000);
+    }
+
+    #[test]
+    fn chapter_cache_cross_source_and_book_do_not_collide() {
+        let store = InMemoryStorage::new();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 0, "S1 B1", "a", 1000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s2", "b1", 0, "S2 B1", "b", 1000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b2", 0, "S1 B2", "c", 1000))
+            .unwrap();
+
+        assert_eq!(
+            store
+                .get_chapter_cache("s1", "b1", 0)
+                .unwrap()
+                .unwrap()
+                .title,
+            "S1 B1"
+        );
+        assert_eq!(
+            store
+                .get_chapter_cache("s2", "b1", 0)
+                .unwrap()
+                .unwrap()
+                .title,
+            "S2 B1"
+        );
+        assert_eq!(store.list_chapter_cache("s1", "b1").unwrap().len(), 1);
+        assert_eq!(store.list_chapter_cache("s1", "b2").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn chapter_cache_list_sorted_by_chapter_index() {
+        let store = InMemoryStorage::new();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 2, "C", "c", 1000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 0, "A", "a", 1000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 1, "B", "b", 1000))
+            .unwrap();
+
+        let titles: Vec<String> = store
+            .list_chapter_cache("s1", "b1")
+            .unwrap()
+            .into_iter()
+            .map(|entry| entry.title)
+            .collect();
+        assert_eq!(titles, vec!["A", "B", "C"]);
+    }
+
+    #[test]
+    fn chapter_cache_remove_is_idempotent() {
+        let store = InMemoryStorage::new();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 0, "A", "a", 1000))
+            .unwrap();
+
+        store.remove_chapter_cache("s1", "b1", 0).unwrap();
+        assert!(store.get_chapter_cache("s1", "b1", 0).unwrap().is_none());
+        store.remove_chapter_cache("s1", "b1", 0).unwrap();
+    }
+
+    #[test]
+    fn chapter_cache_clear_removes_only_requested_book() {
+        let store = InMemoryStorage::new();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 0, "A", "a", 1000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 1, "B", "b", 1000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b2", 0, "Other", "c", 1000))
+            .unwrap();
+
+        assert_eq!(store.clear_chapter_cache("s1", "b1").unwrap(), 2);
+        assert!(store.list_chapter_cache("s1", "b1").unwrap().is_empty());
+        assert_eq!(store.list_chapter_cache("s1", "b2").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn chapter_cache_rejects_empty_keys() {
+        let store = InMemoryStorage::new();
+        let err = store
+            .put_chapter_cache(chapter_entry("", "b1", 0, "A", "a", 1000))
+            .unwrap_err();
+        assert_eq!(
+            err,
+            StorageError::InvalidKey {
+                field: "source_id".into()
+            }
+        );
+
+        assert!(matches!(
+            store.get_chapter_cache("s1", "   ", 0),
+            Err(StorageError::InvalidKey { .. })
+        ));
+        assert!(matches!(
+            store.remove_chapter_cache("", "b1", 0),
+            Err(StorageError::InvalidKey { .. })
+        ));
+        assert!(matches!(
+            store.clear_chapter_cache("s1", ""),
+            Err(StorageError::InvalidKey { .. })
+        ));
+    }
+
+    #[test]
+    fn chapter_cache_entry_json_round_trips() {
+        let mut entry = chapter_entry("s1", "b1", 3, "Chapter 4", "", 1700000000);
+        entry.url = String::new();
+        entry.revision = Some("hash-1".into());
+
+        let json = serde_json::to_string(&entry).unwrap();
+        let back: ChapterCacheEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, entry);
+    }
+
+    #[test]
+    fn chapter_cache_entry_denies_unknown_fields() {
+        let json = r#"{"sourceId":"s1","bookId":"b1","chapterIndex":0,"content":"x","cachedAt":1,"bogus":true}"#;
+        assert!(serde_json::from_str::<ChapterCacheEntry>(json).is_err());
+    }
+
+    #[test]
+    fn chapter_cache_stats_reports_count_bytes_and_age_range() {
+        let store = InMemoryStorage::new();
+        assert_eq!(
+            store.chapter_cache_stats().unwrap(),
+            ChapterCacheStats {
+                entry_count: 0,
+                total_content_bytes: 0,
+                oldest_cached_at: None,
+                newest_cached_at: None,
+            }
+        );
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 0, "A", "abc", 3000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 1, "B", "abcdef", 1000))
+            .unwrap();
+
+        assert_eq!(
+            store.chapter_cache_stats().unwrap(),
+            ChapterCacheStats {
+                entry_count: 2,
+                total_content_bytes: 9,
+                oldest_cached_at: Some(1000),
+                newest_cached_at: Some(3000),
+            }
+        );
+    }
+
+    #[test]
+    fn chapter_cache_prune_default_policy_is_noop() {
+        let store = InMemoryStorage::new();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 0, "A", "abc", 1000))
+            .unwrap();
+
+        let report = store
+            .prune_chapter_cache(ChapterCacheRetentionPolicy::default())
+            .unwrap();
+
+        assert!(report.removed.is_empty());
+        assert_eq!(report.remaining.entry_count, 1);
+        assert_eq!(store.list_chapter_cache("s1", "b1").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn chapter_cache_prune_by_max_entries_evicts_oldest_first() {
+        let store = InMemoryStorage::new();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 0, "Old", "a", 1000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 1, "Middle", "b", 2000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 2, "New", "c", 3000))
+            .unwrap();
+
+        let report = store
+            .prune_chapter_cache(ChapterCacheRetentionPolicy {
+                max_entries: Some(2),
+                ..Default::default()
+            })
+            .unwrap();
+
+        assert_eq!(report.removed.len(), 1);
+        assert_eq!(report.removed[0].title, "Old");
+        assert_eq!(report.remaining.entry_count, 2);
+        let titles = store
+            .list_chapter_cache("s1", "b1")
+            .unwrap()
+            .into_iter()
+            .map(|entry| entry.title)
+            .collect::<Vec<_>>();
+        assert_eq!(titles, vec!["Middle", "New"]);
+    }
+
+    #[test]
+    fn chapter_cache_prune_by_total_bytes_evicts_until_under_limit() {
+        let store = InMemoryStorage::new();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 0, "A", "12345", 1000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 1, "B", "1234", 2000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 2, "C", "123", 3000))
+            .unwrap();
+
+        let report = store
+            .prune_chapter_cache(ChapterCacheRetentionPolicy {
+                max_total_content_bytes: Some(7),
+                ..Default::default()
+            })
+            .unwrap();
+
+        assert_eq!(
+            report
+                .removed
+                .iter()
+                .map(|entry| entry.title.as_str())
+                .collect::<Vec<_>>(),
+            vec!["A"]
+        );
+        assert_eq!(report.remaining.total_content_bytes, 7);
+        assert_eq!(report.remaining.entry_count, 2);
+    }
+
+    #[test]
+    fn chapter_cache_prune_by_min_cached_at_removes_expired_entries() {
+        let store = InMemoryStorage::new();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 0, "Expired", "a", 999))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 1, "Fresh", "b", 1000))
+            .unwrap();
+
+        let report = store
+            .prune_chapter_cache(ChapterCacheRetentionPolicy {
+                min_cached_at: Some(1000),
+                ..Default::default()
+            })
+            .unwrap();
+
+        assert_eq!(report.removed.len(), 1);
+        assert_eq!(report.removed[0].title, "Expired");
+        assert_eq!(report.remaining.oldest_cached_at, Some(1000));
+    }
+
+    #[test]
+    fn chapter_cache_prune_combined_policy_does_not_double_count_removed() {
+        let store = InMemoryStorage::new();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 0, "A", "12345", 1000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 1, "B", "12345", 2000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 2, "C", "12345", 3000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 3, "D", "1", 4000))
+            .unwrap();
+
+        let report = store
+            .prune_chapter_cache(ChapterCacheRetentionPolicy {
+                max_entries: Some(3),
+                max_total_content_bytes: Some(6),
+                min_cached_at: Some(2000),
+            })
+            .unwrap();
+
+        assert_eq!(
+            report
+                .removed
+                .iter()
+                .map(|entry| entry.title.as_str())
+                .collect::<Vec<_>>(),
+            vec!["A", "B"]
+        );
+        assert_eq!(report.remaining.entry_count, 2);
+        assert_eq!(report.remaining.total_content_bytes, 6);
+    }
+
+    #[test]
+    fn chapter_cache_retention_policy_json_round_trips_and_denies_unknown_fields() {
+        let policy = ChapterCacheRetentionPolicy {
+            max_entries: Some(20),
+            max_total_content_bytes: Some(1024),
+            min_cached_at: Some(1700000000),
+        };
+        let json = serde_json::to_string(&policy).unwrap();
+        let back: ChapterCacheRetentionPolicy = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, policy);
+
+        assert!(serde_json::from_str::<ChapterCacheRetentionPolicy>(
+            r#"{"maxEntries":1,"bogus":true}"#
+        )
+        .is_err());
+    }
+
+    // ---- Chapter download queue boundary tests ----
+
+    fn download_task(
+        source: &str,
+        book: &str,
+        index: u32,
+        priority: i32,
+        created_at: i64,
+    ) -> ChapterDownloadTask {
+        ChapterDownloadTask::pending(
+            source,
+            book,
+            index,
+            format!("Chapter {index}"),
+            format!("/book/{book}/chapter/{index}"),
+            priority,
+            created_at,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn download_queue_enqueue_get_and_list_round_trip() {
+        let store = InMemoryStorage::new();
+        let task = download_task("s1", "b1", 2, 10, 1000);
+
+        let stored = store.enqueue_chapter_download(task.clone()).unwrap();
+
+        assert_eq!(stored, task);
+        assert_eq!(
+            store.get_chapter_download("s1", "b1", 2).unwrap(),
+            Some(task.clone())
+        );
+        assert_eq!(
+            store.list_chapter_downloads("s1", "b1").unwrap(),
+            vec![task]
+        );
+    }
+
+    #[test]
+    fn download_queue_requeue_preserves_created_at_and_resets_retry_state() {
+        let store = InMemoryStorage::new();
+        store
+            .enqueue_chapter_download(download_task("s1", "b1", 0, 1, 1000))
+            .unwrap();
+        let claimed = store.claim_next_chapter_download(1100).unwrap().unwrap();
+        assert_eq!(claimed.status, ChapterDownloadStatus::InProgress);
+        store
+            .mark_chapter_download_failed("s1", "b1", 0, "timeout", 1200)
+            .unwrap();
+
+        let mut requeued = download_task("s1", "b1", 0, 9, 2000);
+        requeued.title = "Updated".into();
+        let stored = store.enqueue_chapter_download(requeued).unwrap();
+
+        assert_eq!(
+            stored.created_at, 1000,
+            "created_at is stable across requeue"
+        );
+        assert_eq!(stored.updated_at, 2000);
+        assert_eq!(stored.priority, 9);
+        assert_eq!(stored.title, "Updated");
+        assert_eq!(stored.status, ChapterDownloadStatus::Pending);
+        assert_eq!(stored.attempts, 0);
+        assert_eq!(stored.last_error, None);
+    }
+
+    #[test]
+    fn download_queue_cross_source_same_book_chapter_no_collision() {
+        let store = InMemoryStorage::new();
+        store
+            .enqueue_chapter_download(download_task("s1", "b1", 0, 1, 1000))
+            .unwrap();
+        store
+            .enqueue_chapter_download(download_task("s2", "b1", 0, 2, 1000))
+            .unwrap();
+
+        assert_eq!(
+            store
+                .get_chapter_download("s1", "b1", 0)
+                .unwrap()
+                .unwrap()
+                .source_id,
+            "s1"
+        );
+        assert_eq!(
+            store
+                .get_chapter_download("s2", "b1", 0)
+                .unwrap()
+                .unwrap()
+                .source_id,
+            "s2"
+        );
+        assert_eq!(store.list_chapter_downloads("s1", "b1").unwrap().len(), 1);
+        assert_eq!(store.list_chapter_downloads("s2", "b1").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn download_queue_claims_highest_priority_then_oldest_update() {
+        let store = InMemoryStorage::new();
+        store
+            .enqueue_chapter_download(download_task("s1", "b1", 0, 1, 1000))
+            .unwrap();
+        store
+            .enqueue_chapter_download(download_task("s1", "b1", 1, 10, 3000))
+            .unwrap();
+        store
+            .enqueue_chapter_download(download_task("s1", "b1", 2, 10, 2000))
+            .unwrap();
+
+        let first = store.claim_next_chapter_download(4000).unwrap().unwrap();
+        assert_eq!(first.chapter_index, 2);
+        assert_eq!(first.status, ChapterDownloadStatus::InProgress);
+        assert_eq!(first.attempts, 1);
+        assert_eq!(first.updated_at, 4000);
+
+        let second = store.claim_next_chapter_download(5000).unwrap().unwrap();
+        assert_eq!(second.chapter_index, 1);
+        let third = store.claim_next_chapter_download(6000).unwrap().unwrap();
+        assert_eq!(third.chapter_index, 0);
+        assert!(store.claim_next_chapter_download(7000).unwrap().is_none());
+    }
+
+    #[test]
+    fn download_queue_failed_task_retries_until_max_attempts() {
+        let store = InMemoryStorage::new();
+        let mut task = download_task("s1", "b1", 0, 1, 1000);
+        task.max_attempts = 2;
+        store.enqueue_chapter_download(task).unwrap();
+
+        let first = store.claim_next_chapter_download(1100).unwrap().unwrap();
+        assert_eq!(first.attempts, 1);
+        let failed = store
+            .mark_chapter_download_failed("s1", "b1", 0, "timeout", 1200)
+            .unwrap();
+        assert_eq!(failed.status, ChapterDownloadStatus::Failed);
+        assert_eq!(failed.last_error.as_deref(), Some("timeout"));
+
+        let second = store.claim_next_chapter_download(1300).unwrap().unwrap();
+        assert_eq!(second.attempts, 2);
+        store
+            .mark_chapter_download_failed("s1", "b1", 0, "still failing", 1400)
+            .unwrap();
+        assert!(
+            store.claim_next_chapter_download(1500).unwrap().is_none(),
+            "exhausted failed task must not be claimed again"
+        );
+    }
+
+    #[test]
+    fn download_queue_complete_cancel_and_clear_finished() {
+        let store = InMemoryStorage::new();
+        store
+            .enqueue_chapter_download(download_task("s1", "b1", 0, 1, 1000))
+            .unwrap();
+        store
+            .enqueue_chapter_download(download_task("s1", "b1", 1, 1, 1000))
+            .unwrap();
+        store
+            .enqueue_chapter_download(download_task("s1", "b1", 2, 1, 1000))
+            .unwrap();
+
+        store.claim_next_chapter_download(1100).unwrap();
+        let completed = store
+            .mark_chapter_download_completed("s1", "b1", 0, 1200)
+            .unwrap();
+        assert_eq!(completed.status, ChapterDownloadStatus::Completed);
+        let cancelled = store.cancel_chapter_download("s1", "b1", 1, 1300).unwrap();
+        assert_eq!(cancelled.status, ChapterDownloadStatus::Cancelled);
+
+        assert_eq!(
+            store.clear_finished_chapter_downloads("s1", "b1").unwrap(),
+            2
+        );
+        let remaining = store.list_chapter_downloads("s1", "b1").unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].chapter_index, 2);
+    }
+
+    #[test]
+    fn download_queue_mark_missing_returns_not_found() {
+        let store = InMemoryStorage::new();
+        let err = store
+            .mark_chapter_download_completed("s1", "b1", 7, 1000)
+            .unwrap_err();
+        assert_eq!(
+            err,
+            StorageError::DownloadTaskNotFound {
+                source_id: "s1".into(),
+                book_id: "b1".into(),
+                chapter_index: 7
+            }
+        );
+    }
+
+    #[test]
+    fn download_queue_rejects_invalid_keys_attempts_and_error() {
+        let store = InMemoryStorage::new();
+        assert!(matches!(
+            ChapterDownloadTask::pending("", "b1", 0, "A", "/a", 1, 1000),
+            Err(StorageError::InvalidKey { .. })
+        ));
+
+        let mut task = download_task("s1", "b1", 0, 1, 1000);
+        task.max_attempts = 0;
+        assert_eq!(
+            store.enqueue_chapter_download(task).unwrap_err(),
+            StorageError::InvalidDownloadTask {
+                field: "max_attempts".into()
+            }
+        );
+
+        let mut task = download_task("s1", "b1", 0, 1, 1000);
+        task.attempts = 4;
+        task.max_attempts = 3;
+        assert!(matches!(
+            store.enqueue_chapter_download(task),
+            Err(StorageError::InvalidDownloadTask { .. })
+        ));
+
+        store
+            .enqueue_chapter_download(download_task("s1", "b1", 0, 1, 1000))
+            .unwrap();
+        assert!(matches!(
+            store.mark_chapter_download_failed("s1", "b1", 0, "   ", 1100),
+            Err(StorageError::InvalidDownloadTask { .. })
+        ));
+        assert!(matches!(
+            store.get_chapter_download("", "b1", 0),
+            Err(StorageError::InvalidKey { .. })
+        ));
+    }
+
+    #[test]
+    fn download_task_json_round_trips_and_denies_unknown_fields() {
+        let mut task = download_task("s1", "b1", 3, 5, 1700000000);
+        task.status = ChapterDownloadStatus::Failed;
+        task.attempts = 2;
+        task.last_error = Some("timeout".into());
+
+        let json = serde_json::to_string(&task).unwrap();
+        let back: ChapterDownloadTask = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, task);
+
+        let err_json = r#"{"sourceId":"s1","bookId":"b1","chapterIndex":0,"status":"pending","createdAt":1,"updatedAt":1,"bogus":true}"#;
+        assert!(serde_json::from_str::<ChapterDownloadTask>(err_json).is_err());
     }
 }
