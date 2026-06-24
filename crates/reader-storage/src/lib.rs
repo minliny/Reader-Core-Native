@@ -6,10 +6,14 @@
 //! this crate.
 
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::sync::Mutex;
 
 use reader_domain::{Book, ReadingProgress, Source};
 use serde::{Deserialize, Serialize};
+
+/// Current storage snapshot schema version.
+pub const STORAGE_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
 
 /// In-memory cache + source registry + progress store.
 ///
@@ -34,10 +38,139 @@ struct StorageInner {
 }
 
 /// A minimal cached entry: an opaque JSON payload keyed by a string cache key.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CachedEntry {
     pub key: String,
     pub payload: String,
+}
+
+/// Complete export/import unit for storage-owned reader data.
+///
+/// The snapshot is intentionally transport-neutral: backup files, local DB
+/// migrations, and sync packaging can all use the same deterministic shape.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct StorageSnapshot {
+    pub schema_version: u32,
+    pub exported_at: i64,
+    #[serde(default)]
+    pub sources: Vec<Source>,
+    #[serde(default)]
+    pub books: Vec<Book>,
+    #[serde(default)]
+    pub cache: Vec<CachedEntry>,
+    #[serde(default)]
+    pub legacy_progress: Vec<ReadingProgress>,
+    #[serde(default)]
+    pub bookshelf: Vec<BookshelfEntry>,
+    #[serde(default)]
+    pub chapter_cache: Vec<ChapterCacheEntry>,
+    #[serde(default)]
+    pub reading_progress: Vec<ReadingProgressEntry>,
+    #[serde(default)]
+    pub reading_progress_history: Vec<ReadingProgressEntry>,
+    #[serde(default)]
+    pub chapter_download_queue: Vec<ChapterDownloadTask>,
+}
+
+impl StorageSnapshot {
+    pub fn empty(exported_at: i64) -> Self {
+        Self {
+            schema_version: STORAGE_SNAPSHOT_SCHEMA_VERSION,
+            exported_at,
+            sources: Vec::new(),
+            books: Vec::new(),
+            cache: Vec::new(),
+            legacy_progress: Vec::new(),
+            bookshelf: Vec::new(),
+            chapter_cache: Vec::new(),
+            reading_progress: Vec::new(),
+            reading_progress_history: Vec::new(),
+            chapter_download_queue: Vec::new(),
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), StorageError> {
+        if self.schema_version != STORAGE_SNAPSHOT_SCHEMA_VERSION {
+            return Err(StorageError::InvalidSnapshot {
+                field: "schema_version".into(),
+            });
+        }
+        let mut unique_source_ids = HashMap::<String, ()>::new();
+        for source in &self.sources {
+            validate_source(source)?;
+            ensure_unique_snapshot_key(
+                &mut unique_source_ids,
+                source.source_id.clone(),
+                "sources",
+            )?;
+        }
+
+        let mut unique_book_ids = HashMap::<String, ()>::new();
+        for book in &self.books {
+            validate_book(book)?;
+            ensure_unique_snapshot_key(&mut unique_book_ids, book.book_id.clone(), "books")?;
+        }
+
+        let mut unique_cache_keys = HashMap::<String, ()>::new();
+        for entry in &self.cache {
+            validate_cache_entry(entry)?;
+            ensure_unique_snapshot_key(&mut unique_cache_keys, entry.key.clone(), "cache")?;
+        }
+
+        let mut unique_legacy_progress_keys = HashMap::<String, ()>::new();
+        for progress in &self.legacy_progress {
+            validate_domain_progress(progress)?;
+            ensure_unique_snapshot_key(
+                &mut unique_legacy_progress_keys,
+                progress.book_id.clone(),
+                "legacy_progress",
+            )?;
+        }
+
+        let mut unique_shelf_keys = HashMap::<ShelfKey, ()>::new();
+        for entry in &self.bookshelf {
+            validate_shelf_key(&entry.source_id, &entry.book_id)?;
+            ensure_unique_snapshot_key(&mut unique_shelf_keys, entry.shelf_key(), "bookshelf")?;
+        }
+
+        let mut unique_chapter_cache_keys = HashMap::<ChapterCacheKey, ()>::new();
+        for entry in &self.chapter_cache {
+            validate_book_key(&entry.source_id, &entry.book_id)?;
+            ensure_unique_snapshot_key(
+                &mut unique_chapter_cache_keys,
+                entry.chapter_cache_key(),
+                "chapter_cache",
+            )?;
+        }
+
+        let mut unique_progress_keys = HashMap::<ReadingProgressKey, ()>::new();
+        for entry in &self.reading_progress {
+            validate_reading_progress(entry)?;
+            ensure_unique_snapshot_key(
+                &mut unique_progress_keys,
+                entry.progress_key(),
+                "reading_progress",
+            )?;
+        }
+
+        for entry in &self.reading_progress_history {
+            validate_reading_progress(entry)?;
+        }
+
+        let mut unique_download_keys = HashMap::<ChapterDownloadKey, ()>::new();
+        for task in &self.chapter_download_queue {
+            validate_chapter_download_task(task)?;
+            ensure_unique_snapshot_key(
+                &mut unique_download_keys,
+                task.download_key(),
+                "chapter_download_queue",
+            )?;
+        }
+
+        Ok(())
+    }
 }
 
 /// A book on the user's shelf.
@@ -495,6 +628,15 @@ pub trait ChapterDownloadQueueStore {
     ) -> Result<usize, StorageError>;
 }
 
+/// Export/import surface for storage-owned reader data.
+pub trait StorageSnapshotStore {
+    /// Export a complete deterministic snapshot of the storage state.
+    fn export_snapshot(&self, exported_at: i64) -> Result<StorageSnapshot, StorageError>;
+
+    /// Replace current storage state with a validated snapshot.
+    fn replace_with_snapshot(&self, snapshot: StorageSnapshot) -> Result<(), StorageError>;
+}
+
 impl InMemoryStorage {
     pub fn new() -> Self {
         Self::default()
@@ -562,6 +704,190 @@ impl InMemoryStorage {
     fn lock(&self) -> Result<std::sync::MutexGuard<'_, StorageInner>, StorageError> {
         self.inner.lock().map_err(|_| StorageError::Poisoned)
     }
+}
+
+impl StorageSnapshotStore for InMemoryStorage {
+    fn export_snapshot(&self, exported_at: i64) -> Result<StorageSnapshot, StorageError> {
+        let inner = self.lock()?;
+        let mut snapshot = StorageSnapshot {
+            schema_version: STORAGE_SNAPSHOT_SCHEMA_VERSION,
+            exported_at,
+            sources: inner.sources.values().cloned().collect(),
+            books: inner.books.values().cloned().collect(),
+            cache: inner.cache.values().cloned().collect(),
+            legacy_progress: inner.progress.values().cloned().collect(),
+            bookshelf: inner.shelf.values().cloned().collect(),
+            chapter_cache: inner.chapter_cache.values().cloned().collect(),
+            reading_progress: inner.reading_progress.values().cloned().collect(),
+            reading_progress_history: inner
+                .reading_progress_history
+                .values()
+                .flat_map(|entries| entries.iter().cloned())
+                .collect(),
+            chapter_download_queue: inner.chapter_download_queue.values().cloned().collect(),
+        };
+        sort_storage_snapshot(&mut snapshot);
+        snapshot.validate()?;
+        Ok(snapshot)
+    }
+
+    fn replace_with_snapshot(&self, snapshot: StorageSnapshot) -> Result<(), StorageError> {
+        snapshot.validate()?;
+        let replacement = storage_inner_from_snapshot(snapshot)?;
+        let mut inner = self.lock()?;
+        *inner = replacement;
+        Ok(())
+    }
+}
+
+fn sort_storage_snapshot(snapshot: &mut StorageSnapshot) {
+    snapshot
+        .sources
+        .sort_by(|a, b| a.source_id.cmp(&b.source_id));
+    snapshot.books.sort_by(|a, b| a.book_id.cmp(&b.book_id));
+    snapshot.cache.sort_by(|a, b| a.key.cmp(&b.key));
+    snapshot
+        .legacy_progress
+        .sort_by(|a, b| a.book_id.cmp(&b.book_id));
+    snapshot.bookshelf.sort_by(compare_bookshelf_key);
+    snapshot.chapter_cache.sort_by(compare_chapter_cache_key);
+    snapshot
+        .reading_progress
+        .sort_by(compare_reading_progress_key);
+    snapshot.reading_progress_history.sort_by(|a, b| {
+        compare_reading_progress_key(a, b)
+            .then_with(|| a.updated_at.cmp(&b.updated_at))
+            .then_with(|| a.device_id.cmp(&b.device_id))
+            .then_with(|| a.chapter_index.cmp(&b.chapter_index))
+            .then_with(|| a.chapter_offset.cmp(&b.chapter_offset))
+    });
+    snapshot
+        .chapter_download_queue
+        .sort_by(compare_download_key);
+}
+
+fn storage_inner_from_snapshot(snapshot: StorageSnapshot) -> Result<StorageInner, StorageError> {
+    let mut inner = StorageInner::default();
+
+    for source in snapshot.sources {
+        inner.sources.insert(source.source_id.clone(), source);
+    }
+    for book in snapshot.books {
+        inner.books.insert(book.book_id.clone(), book);
+    }
+    for entry in snapshot.cache {
+        inner.cache.insert(entry.key.clone(), entry);
+    }
+    for progress in snapshot.legacy_progress {
+        inner.progress.insert(progress.book_id.clone(), progress);
+    }
+    for entry in snapshot.bookshelf {
+        inner.shelf.insert(entry.shelf_key(), entry);
+    }
+    for entry in snapshot.chapter_cache {
+        inner.chapter_cache.insert(entry.chapter_cache_key(), entry);
+    }
+    for entry in snapshot.reading_progress {
+        inner.reading_progress.insert(entry.progress_key(), entry);
+    }
+    for entry in snapshot.reading_progress_history {
+        inner
+            .reading_progress_history
+            .entry(entry.progress_key())
+            .or_default()
+            .push(entry);
+    }
+    for task in snapshot.chapter_download_queue {
+        inner
+            .chapter_download_queue
+            .insert(task.download_key(), task);
+    }
+
+    Ok(inner)
+}
+
+fn ensure_unique_snapshot_key<K>(
+    seen: &mut HashMap<K, ()>,
+    key: K,
+    field: &'static str,
+) -> Result<(), StorageError>
+where
+    K: Eq + Hash,
+{
+    if seen.insert(key, ()).is_some() {
+        return Err(StorageError::InvalidSnapshot {
+            field: field.into(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_source(source: &Source) -> Result<(), StorageError> {
+    validate_source_id(&source.source_id)
+}
+
+fn validate_book(book: &Book) -> Result<(), StorageError> {
+    if book.book_id.trim().is_empty() {
+        return Err(StorageError::InvalidKey {
+            field: "book_id".into(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_cache_entry(entry: &CachedEntry) -> Result<(), StorageError> {
+    if entry.key.trim().is_empty() {
+        return Err(StorageError::InvalidKey {
+            field: "key".into(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_domain_progress(progress: &ReadingProgress) -> Result<(), StorageError> {
+    if progress.book_id.trim().is_empty() {
+        return Err(StorageError::InvalidKey {
+            field: "book_id".into(),
+        });
+    }
+    if !progress.chapter_progress.is_finite()
+        || progress.chapter_progress < 0.0
+        || progress.chapter_progress > 1.0
+    {
+        return Err(StorageError::InvalidProgress {
+            field: "chapter_progress".into(),
+        });
+    }
+    Ok(())
+}
+
+fn compare_bookshelf_key(a: &BookshelfEntry, b: &BookshelfEntry) -> std::cmp::Ordering {
+    a.source_id
+        .cmp(&b.source_id)
+        .then_with(|| a.book_id.cmp(&b.book_id))
+}
+
+fn compare_chapter_cache_key(a: &ChapterCacheEntry, b: &ChapterCacheEntry) -> std::cmp::Ordering {
+    a.source_id
+        .cmp(&b.source_id)
+        .then_with(|| a.book_id.cmp(&b.book_id))
+        .then_with(|| a.chapter_index.cmp(&b.chapter_index))
+}
+
+fn compare_reading_progress_key(
+    a: &ReadingProgressEntry,
+    b: &ReadingProgressEntry,
+) -> std::cmp::Ordering {
+    a.source_id
+        .cmp(&b.source_id)
+        .then_with(|| a.book_id.cmp(&b.book_id))
+}
+
+fn compare_download_key(a: &ChapterDownloadTask, b: &ChapterDownloadTask) -> std::cmp::Ordering {
+    a.source_id
+        .cmp(&b.source_id)
+        .then_with(|| a.book_id.cmp(&b.book_id))
+        .then_with(|| a.chapter_index.cmp(&b.chapter_index))
 }
 
 fn validate_book_key(source_id: &str, book_id: &str) -> Result<(), StorageError> {
@@ -1288,6 +1614,10 @@ pub enum StorageError {
     InvalidDownloadTask {
         field: String,
     },
+    /// A storage snapshot was invalid or incompatible.
+    InvalidSnapshot {
+        field: String,
+    },
     /// An entry referenced by the operation does not exist.
     NotFound {
         source_id: String,
@@ -1311,6 +1641,9 @@ impl std::fmt::Display for StorageError {
             }
             StorageError::InvalidDownloadTask { field } => {
                 write!(f, "invalid download task field: {field}")
+            }
+            StorageError::InvalidSnapshot { field } => {
+                write!(f, "invalid storage snapshot field: {field}")
             }
             StorageError::NotFound { source_id, book_id } => {
                 write!(
@@ -1377,6 +1710,249 @@ mod tests {
         store.put_progress(p.clone()).unwrap();
         let got = store.get_progress("b1").unwrap().unwrap();
         assert_eq!(got, p);
+    }
+
+    fn sample_book(id: &str, title: &str) -> Book {
+        Book {
+            book_id: id.into(),
+            title: title.into(),
+            author: String::new(),
+            cover_url: None,
+            intro: None,
+            kind: None,
+            last_chapter: None,
+        }
+    }
+
+    fn populate_snapshot_store(store: &InMemoryStorage) {
+        store.put_source(sample_source("s2")).unwrap();
+        store.put_source(sample_source("s1")).unwrap();
+        store.put_book(sample_book("b2", "Book 2")).unwrap();
+        store.put_book(sample_book("b1", "Book 1")).unwrap();
+        store.put_cache("z", "{\"z\":true}").unwrap();
+        store.put_cache("a", "{\"a\":true}").unwrap();
+        store
+            .put_progress(ReadingProgress {
+                book_id: "legacy-b".into(),
+                chapter_index: 1,
+                chapter_offset: 10,
+                chapter_progress: 0.25,
+            })
+            .unwrap();
+
+        store
+            .add_to_shelf(shelf_entry("s1", "b2", "Shelf B", 2000))
+            .unwrap();
+        store
+            .add_to_shelf(shelf_entry("s1", "b1", "Shelf A", 1000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 1, "Second", "two", 2000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 0, "First", "one", 1000))
+            .unwrap();
+        store
+            .save_reading_progress(progress_entry("s1", "b1", 2, 200, 0.2, 2000))
+            .unwrap();
+        store
+            .save_reading_progress(progress_entry("s1", "b1", 1, 100, 0.1, 1000))
+            .unwrap();
+        store
+            .enqueue_chapter_download(download_task("s1", "b1", 2, 5, 2000))
+            .unwrap();
+        store
+            .enqueue_chapter_download(download_task("s1", "b1", 0, 1, 1000))
+            .unwrap();
+    }
+
+    #[test]
+    fn storage_snapshot_export_is_stable_and_json_round_trips() {
+        let store = InMemoryStorage::new();
+        populate_snapshot_store(&store);
+
+        let snapshot = store.export_snapshot(42).unwrap();
+
+        assert_eq!(snapshot.schema_version, STORAGE_SNAPSHOT_SCHEMA_VERSION);
+        assert_eq!(snapshot.exported_at, 42);
+        assert_eq!(
+            snapshot
+                .sources
+                .iter()
+                .map(|source| source.source_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["s1", "s2"]
+        );
+        assert_eq!(
+            snapshot
+                .books
+                .iter()
+                .map(|book| book.book_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["b1", "b2"]
+        );
+        assert_eq!(
+            snapshot
+                .cache
+                .iter()
+                .map(|entry| entry.key.as_str())
+                .collect::<Vec<_>>(),
+            vec!["a", "z"]
+        );
+        assert_eq!(
+            snapshot
+                .bookshelf
+                .iter()
+                .map(|entry| entry.book_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["b1", "b2"]
+        );
+        assert_eq!(
+            snapshot
+                .chapter_cache
+                .iter()
+                .map(|entry| entry.chapter_index)
+                .collect::<Vec<_>>(),
+            vec![0, 1]
+        );
+        assert_eq!(
+            snapshot
+                .reading_progress_history
+                .iter()
+                .map(|entry| entry.updated_at)
+                .collect::<Vec<_>>(),
+            vec![1000, 2000]
+        );
+        assert_eq!(
+            snapshot
+                .chapter_download_queue
+                .iter()
+                .map(|task| task.chapter_index)
+                .collect::<Vec<_>>(),
+            vec![0, 2]
+        );
+
+        let json = serde_json::to_string(&snapshot).unwrap();
+        let back: StorageSnapshot = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, snapshot);
+    }
+
+    #[test]
+    fn storage_snapshot_replace_round_trips_all_state() {
+        let source = InMemoryStorage::new();
+        populate_snapshot_store(&source);
+        let snapshot = source.export_snapshot(77).unwrap();
+
+        let restored = InMemoryStorage::new();
+        restored.replace_with_snapshot(snapshot.clone()).unwrap();
+
+        assert_eq!(restored.export_snapshot(77).unwrap(), snapshot);
+        assert_eq!(
+            restored.get_shelf_entry("s1", "b1").unwrap().unwrap().title,
+            "Shelf A"
+        );
+        assert_eq!(
+            restored
+                .get_chapter_cache("s1", "b1", 0)
+                .unwrap()
+                .unwrap()
+                .content,
+            "one"
+        );
+        assert_eq!(
+            restored
+                .get_reading_progress("s1", "b1")
+                .unwrap()
+                .unwrap()
+                .chapter_index,
+            2
+        );
+        assert_eq!(
+            restored
+                .reading_progress_history("s1", "b1")
+                .unwrap()
+                .iter()
+                .map(|entry| entry.chapter_index)
+                .collect::<Vec<_>>(),
+            vec![1, 2]
+        );
+        assert_eq!(
+            restored
+                .list_chapter_downloads("s1", "b1")
+                .unwrap()
+                .into_iter()
+                .map(|task| task.chapter_index)
+                .collect::<Vec<_>>(),
+            vec![0, 2]
+        );
+    }
+
+    #[test]
+    fn storage_snapshot_empty_replace_clears_existing_state() {
+        let store = InMemoryStorage::new();
+        populate_snapshot_store(&store);
+
+        store
+            .replace_with_snapshot(StorageSnapshot::empty(100))
+            .unwrap();
+
+        assert!(store.get_source("s1").unwrap().is_none());
+        assert!(store.get_book("b1").unwrap().is_none());
+        assert!(store.get_cache("a").unwrap().is_none());
+        assert!(store.get_progress("legacy-b").unwrap().is_none());
+        assert!(store.list_shelf().unwrap().is_empty());
+        assert!(store.list_chapter_cache("s1", "b1").unwrap().is_empty());
+        assert!(store.get_reading_progress("s1", "b1").unwrap().is_none());
+        assert!(store
+            .reading_progress_history("s1", "b1")
+            .unwrap()
+            .is_empty());
+        assert!(store.list_chapter_downloads("s1", "b1").unwrap().is_empty());
+    }
+
+    #[test]
+    fn storage_snapshot_rejects_schema_duplicates_and_unknown_fields() {
+        let mut wrong_schema = StorageSnapshot::empty(1);
+        wrong_schema.schema_version = 2;
+        assert_eq!(
+            wrong_schema.validate().unwrap_err(),
+            StorageError::InvalidSnapshot {
+                field: "schema_version".into()
+            }
+        );
+
+        let mut duplicate = StorageSnapshot::empty(1);
+        duplicate
+            .bookshelf
+            .push(shelf_entry("s1", "b1", "First", 1000));
+        duplicate
+            .bookshelf
+            .push(shelf_entry("s1", "b1", "Duplicate", 2000));
+        assert_eq!(
+            duplicate.validate().unwrap_err(),
+            StorageError::InvalidSnapshot {
+                field: "bookshelf".into()
+            }
+        );
+
+        let unknown_field = r#"{"schemaVersion":1,"exportedAt":1,"bogus":true}"#;
+        assert!(serde_json::from_str::<StorageSnapshot>(unknown_field).is_err());
+    }
+
+    #[test]
+    fn storage_snapshot_replace_is_atomic_on_validation_failure() {
+        let store = InMemoryStorage::new();
+        populate_snapshot_store(&store);
+        let before = store.export_snapshot(1).unwrap();
+
+        let mut invalid = StorageSnapshot::empty(2);
+        invalid.bookshelf.push(shelf_entry("", "b1", "Invalid", 1));
+        assert!(matches!(
+            store.replace_with_snapshot(invalid),
+            Err(StorageError::InvalidKey { .. })
+        ));
+
+        assert_eq!(store.export_snapshot(1).unwrap(), before);
     }
 
     // ---- Source-scoped reading progress boundary tests ----
