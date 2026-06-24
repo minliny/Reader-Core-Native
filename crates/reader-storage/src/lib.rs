@@ -378,6 +378,41 @@ pub struct ChapterCacheEvictionReport {
     pub remaining: ChapterCacheStats,
 }
 
+/// Cache coverage for one book against its current TOC length.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChapterCacheCoverage {
+    pub source_id: String,
+    pub book_id: String,
+    pub chapter_count: u32,
+    #[serde(default)]
+    pub cached_indexes: Vec<u32>,
+    #[serde(default)]
+    pub missing_indexes: Vec<u32>,
+    pub cached_count: usize,
+    pub missing_count: usize,
+    pub total_content_bytes: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oldest_cached_at: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub newest_cached_at: Option<i64>,
+    pub complete: bool,
+}
+
+/// Bounded missing-chapter plan around a reader anchor.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChapterCachePrefetchPlan {
+    pub source_id: String,
+    pub book_id: String,
+    pub chapter_count: u32,
+    pub anchor_index: u32,
+    pub window_start: u32,
+    pub window_end_exclusive: u32,
+    #[serde(default)]
+    pub missing_indexes: Vec<u32>,
+}
+
 /// Current reading position for a source/book pair.
 ///
 /// This is intentionally separate from [`reader_domain::ReadingProgress`],
@@ -602,6 +637,26 @@ pub trait ChapterCacheStore {
 
     /// Clear all cached chapters for a book and return the number removed.
     fn clear_chapter_cache(&self, source_id: &str, book_id: &str) -> Result<usize, StorageError>;
+
+    /// Compute cache coverage for a book against the current TOC length.
+    fn chapter_cache_coverage(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        chapter_count: u32,
+    ) -> Result<ChapterCacheCoverage, StorageError>;
+
+    /// Plan missing chapter indexes in a bounded window around an anchor.
+    fn plan_chapter_cache_prefetch(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        chapter_count: u32,
+        anchor_index: u32,
+        before: u32,
+        after: u32,
+        max_count: usize,
+    ) -> Result<ChapterCachePrefetchPlan, StorageError>;
 
     /// Return aggregate chapter cache stats across all books.
     fn chapter_cache_stats(&self) -> Result<ChapterCacheStats, StorageError>;
@@ -1165,6 +1220,34 @@ fn chapter_cache_content_bytes(entry: &ChapterCacheEntry) -> usize {
     entry.content.as_bytes().len()
 }
 
+fn validate_chapter_count(chapter_count: u32) -> Result<(), StorageError> {
+    if chapter_count == 0 {
+        return Err(StorageError::InvalidChapterCache {
+            field: "chapter_count".into(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_chapter_anchor(chapter_count: u32, anchor_index: u32) -> Result<(), StorageError> {
+    validate_chapter_count(chapter_count)?;
+    if anchor_index >= chapter_count {
+        return Err(StorageError::InvalidChapterCache {
+            field: "anchor_index".into(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_prefetch_limit(max_count: usize) -> Result<(), StorageError> {
+    if max_count == 0 {
+        return Err(StorageError::InvalidChapterCache {
+            field: "max_count".into(),
+        });
+    }
+    Ok(())
+}
+
 fn chapter_cache_stats_from_entries<'a>(
     entries: impl Iterator<Item = &'a ChapterCacheEntry>,
 ) -> ChapterCacheStats {
@@ -1193,6 +1276,42 @@ fn chapter_cache_stats_from_entries<'a>(
         total_content_bytes,
         oldest_cached_at,
         newest_cached_at,
+    }
+}
+
+fn chapter_cache_coverage_from_entries(
+    source_id: &str,
+    book_id: &str,
+    chapter_count: u32,
+    entries: impl Iterator<Item = ChapterCacheEntry>,
+) -> ChapterCacheCoverage {
+    let mut cached_entries = entries
+        .filter(|entry| entry.chapter_index < chapter_count)
+        .collect::<Vec<_>>();
+    cached_entries.sort_by_key(|entry| entry.chapter_index);
+    cached_entries.dedup_by_key(|entry| entry.chapter_index);
+
+    let cached_indexes = cached_entries
+        .iter()
+        .map(|entry| entry.chapter_index)
+        .collect::<Vec<_>>();
+    let missing_indexes = (0..chapter_count)
+        .filter(|index| !cached_indexes.contains(index))
+        .collect::<Vec<_>>();
+    let stats = chapter_cache_stats_from_entries(cached_entries.iter());
+
+    ChapterCacheCoverage {
+        source_id: source_id.to_string(),
+        book_id: book_id.to_string(),
+        chapter_count,
+        cached_count: cached_indexes.len(),
+        missing_count: missing_indexes.len(),
+        complete: missing_indexes.is_empty(),
+        cached_indexes,
+        missing_indexes,
+        total_content_bytes: stats.total_content_bytes,
+        oldest_cached_at: stats.oldest_cached_at,
+        newest_cached_at: stats.newest_cached_at,
     }
 }
 
@@ -1443,6 +1562,65 @@ impl ChapterCacheStore for InMemoryStorage {
             .chapter_cache
             .retain(|key, _| !(key.source_id == source_id && key.book_id == book_id));
         Ok(before - inner.chapter_cache.len())
+    }
+
+    fn chapter_cache_coverage(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        chapter_count: u32,
+    ) -> Result<ChapterCacheCoverage, StorageError> {
+        validate_book_key(source_id, book_id)?;
+        validate_chapter_count(chapter_count)?;
+        let inner = self.lock()?;
+        Ok(chapter_cache_coverage_from_entries(
+            source_id,
+            book_id,
+            chapter_count,
+            inner
+                .chapter_cache
+                .iter()
+                .filter(|(key, _)| key.source_id == source_id && key.book_id == book_id)
+                .map(|(_, entry)| entry.clone()),
+        ))
+    }
+
+    fn plan_chapter_cache_prefetch(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        chapter_count: u32,
+        anchor_index: u32,
+        before: u32,
+        after: u32,
+        max_count: usize,
+    ) -> Result<ChapterCachePrefetchPlan, StorageError> {
+        validate_book_key(source_id, book_id)?;
+        validate_chapter_anchor(chapter_count, anchor_index)?;
+        validate_prefetch_limit(max_count)?;
+
+        let window_start = anchor_index.saturating_sub(before);
+        let window_end_exclusive = anchor_index
+            .saturating_add(after)
+            .saturating_add(1)
+            .min(chapter_count);
+        let coverage = self.chapter_cache_coverage(source_id, book_id, chapter_count)?;
+        let missing_indexes = coverage
+            .missing_indexes
+            .into_iter()
+            .filter(|index| *index >= window_start && *index < window_end_exclusive)
+            .take(max_count)
+            .collect::<Vec<_>>();
+
+        Ok(ChapterCachePrefetchPlan {
+            source_id: source_id.to_string(),
+            book_id: book_id.to_string(),
+            chapter_count,
+            anchor_index,
+            window_start,
+            window_end_exclusive,
+            missing_indexes,
+        })
     }
 
     fn chapter_cache_stats(&self) -> Result<ChapterCacheStats, StorageError> {
@@ -1850,6 +2028,10 @@ pub enum StorageError {
     InvalidDownloadTask {
         field: String,
     },
+    /// A chapter cache query/planning field was invalid.
+    InvalidChapterCache {
+        field: String,
+    },
     /// A storage snapshot was invalid or incompatible.
     InvalidSnapshot {
         field: String,
@@ -1877,6 +2059,9 @@ impl std::fmt::Display for StorageError {
             }
             StorageError::InvalidDownloadTask { field } => {
                 write!(f, "invalid download task field: {field}")
+            }
+            StorageError::InvalidChapterCache { field } => {
+                write!(f, "invalid chapter cache field: {field}")
             }
             StorageError::InvalidSnapshot { field } => {
                 write!(f, "invalid storage snapshot field: {field}")
@@ -3102,6 +3287,171 @@ mod tests {
                 newest_cached_at: Some(3000),
             }
         );
+    }
+
+    #[test]
+    fn chapter_cache_coverage_reports_cached_missing_bytes_and_age() {
+        let store = InMemoryStorage::new();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 0, "A", "abc", 3000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 2, "C", "de", 1000))
+            .unwrap();
+        // Outside current TOC length; should not count as coverage.
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 8, "Old", "ignored", 500))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s2", "b1", 1, "Other", "x", 100))
+            .unwrap();
+
+        let coverage = store.chapter_cache_coverage("s1", "b1", 4).unwrap();
+
+        assert_eq!(coverage.source_id, "s1");
+        assert_eq!(coverage.book_id, "b1");
+        assert_eq!(coverage.chapter_count, 4);
+        assert_eq!(coverage.cached_indexes, vec![0, 2]);
+        assert_eq!(coverage.missing_indexes, vec![1, 3]);
+        assert_eq!(coverage.cached_count, 2);
+        assert_eq!(coverage.missing_count, 2);
+        assert_eq!(coverage.total_content_bytes, 5);
+        assert_eq!(coverage.oldest_cached_at, Some(1000));
+        assert_eq!(coverage.newest_cached_at, Some(3000));
+        assert!(!coverage.complete);
+    }
+
+    #[test]
+    fn chapter_cache_coverage_marks_complete_books() {
+        let store = InMemoryStorage::new();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 0, "A", "a", 1000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 1, "B", "b", 2000))
+            .unwrap();
+
+        let coverage = store.chapter_cache_coverage("s1", "b1", 2).unwrap();
+
+        assert!(coverage.complete);
+        assert!(coverage.missing_indexes.is_empty());
+        assert_eq!(coverage.cached_indexes, vec![0, 1]);
+    }
+
+    #[test]
+    fn chapter_cache_prefetch_plan_returns_missing_indexes_in_anchor_window() {
+        let store = InMemoryStorage::new();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 0, "A", "a", 1000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 2, "C", "c", 1000))
+            .unwrap();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 5, "F", "f", 1000))
+            .unwrap();
+
+        let plan = store
+            .plan_chapter_cache_prefetch("s1", "b1", 6, 2, 2, 3, 2)
+            .unwrap();
+
+        assert_eq!(plan.source_id, "s1");
+        assert_eq!(plan.book_id, "b1");
+        assert_eq!(plan.chapter_count, 6);
+        assert_eq!(plan.anchor_index, 2);
+        assert_eq!(plan.window_start, 0);
+        assert_eq!(plan.window_end_exclusive, 6);
+        assert_eq!(plan.missing_indexes, vec![1, 3]);
+    }
+
+    #[test]
+    fn chapter_cache_prefetch_plan_clamps_window_edges() {
+        let store = InMemoryStorage::new();
+        store
+            .put_chapter_cache(chapter_entry("s1", "b1", 0, "A", "a", 1000))
+            .unwrap();
+
+        let plan = store
+            .plan_chapter_cache_prefetch("s1", "b1", 3, 0, 10, 10, 10)
+            .unwrap();
+        assert_eq!(plan.window_start, 0);
+        assert_eq!(plan.window_end_exclusive, 3);
+        assert_eq!(plan.missing_indexes, vec![1, 2]);
+
+        let plan = store
+            .plan_chapter_cache_prefetch("s1", "b1", 3, 2, 1, 10, 10)
+            .unwrap();
+        assert_eq!(plan.window_start, 1);
+        assert_eq!(plan.window_end_exclusive, 3);
+        assert_eq!(plan.missing_indexes, vec![1, 2]);
+    }
+
+    #[test]
+    fn chapter_cache_coverage_and_prefetch_reject_invalid_inputs() {
+        let store = InMemoryStorage::new();
+        assert_eq!(
+            store.chapter_cache_coverage("s1", "b1", 0).unwrap_err(),
+            StorageError::InvalidChapterCache {
+                field: "chapter_count".into()
+            }
+        );
+        assert_eq!(
+            store
+                .plan_chapter_cache_prefetch("s1", "b1", 3, 3, 1, 1, 1)
+                .unwrap_err(),
+            StorageError::InvalidChapterCache {
+                field: "anchor_index".into()
+            }
+        );
+        assert_eq!(
+            store
+                .plan_chapter_cache_prefetch("s1", "b1", 3, 1, 1, 1, 0)
+                .unwrap_err(),
+            StorageError::InvalidChapterCache {
+                field: "max_count".into()
+            }
+        );
+        assert!(matches!(
+            store.chapter_cache_coverage("", "b1", 1),
+            Err(StorageError::InvalidKey { .. })
+        ));
+    }
+
+    #[test]
+    fn chapter_cache_coverage_and_prefetch_json_round_trip() {
+        let coverage = ChapterCacheCoverage {
+            source_id: "s1".into(),
+            book_id: "b1".into(),
+            chapter_count: 3,
+            cached_indexes: vec![0, 2],
+            missing_indexes: vec![1],
+            cached_count: 2,
+            missing_count: 1,
+            total_content_bytes: 10,
+            oldest_cached_at: Some(100),
+            newest_cached_at: Some(200),
+            complete: false,
+        };
+        let json = serde_json::to_string(&coverage).unwrap();
+        let back: ChapterCacheCoverage = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, coverage);
+        assert!(serde_json::from_str::<ChapterCacheCoverage>(
+            r#"{"sourceId":"s","bookId":"b","chapterCount":1,"cachedCount":0,"missingCount":1,"totalContentBytes":0,"complete":false,"bogus":true}"#
+        )
+        .is_err());
+
+        let plan = ChapterCachePrefetchPlan {
+            source_id: "s1".into(),
+            book_id: "b1".into(),
+            chapter_count: 3,
+            anchor_index: 1,
+            window_start: 0,
+            window_end_exclusive: 3,
+            missing_indexes: vec![1, 2],
+        };
+        let json = serde_json::to_string(&plan).unwrap();
+        let back: ChapterCachePrefetchPlan = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, plan);
     }
 
     #[test]
