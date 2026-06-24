@@ -1,7 +1,7 @@
 //! End-to-end smoke for the remote-reading vertical: drives `reader-cli
-//! --fixture-vertical` through the full import → search → detail → toc →
-//! chapter → progress pipeline and the JS-unsupported path, asserting each
-//! emitted event shape.
+//! --fixture-vertical` through the full import → search → host-http search →
+//! detail → toc → chapter → progress pipeline and the JS-unsupported path,
+//! asserting each emitted event shape.
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -34,8 +34,9 @@ fn fixture_vertical_runs_full_pipeline() {
         .map(|line| serde_json::from_str(line).expect("each line is a JSON event"))
         .collect();
 
-    // 7 events: import, search, detail, toc, chapter(rule), progress, js(unsupported).
-    assert_eq!(events.len(), 7, "expected 7 events, got {events:?}");
+    // 9 events: import, search(inline), host.request(http), search(host body),
+    // detail, toc, chapter(rule), progress, js(unsupported).
+    assert_eq!(events.len(), 9, "expected 9 events, got {events:?}");
 
     assert_eq!(events[0]["data"]["imported"], true);
     assert_eq!(events[0]["data"]["sourceId"], "basic-src");
@@ -44,22 +45,33 @@ fn fixture_vertical_runs_full_pipeline() {
     assert_eq!(books.len(), 2);
     assert_eq!(books[0]["title"], "Dune");
 
-    assert_eq!(events[2]["data"]["book"]["author"], "Frank Herbert");
-    assert_eq!(events[2]["data"]["book"]["intro"], "A desert planet.");
+    assert_eq!(events[2]["type"], "host.request");
+    assert_eq!(events[2]["capability"], "http.execute");
+    assert_eq!(
+        events[2]["params"]["url"],
+        "https://books.example.test/search?q=dune"
+    );
 
-    let toc = events[3]["data"]["toc"].as_array().unwrap();
+    let host_books = events[3]["data"]["books"].as_array().unwrap();
+    assert_eq!(host_books.len(), 2);
+    assert_eq!(host_books[0]["title"], "Dune");
+
+    assert_eq!(events[4]["data"]["book"]["author"], "Frank Herbert");
+    assert_eq!(events[4]["data"]["book"]["intro"], "A desert planet.");
+
+    let toc = events[5]["data"]["toc"].as_array().unwrap();
     assert_eq!(toc.len(), 2);
 
-    assert_eq!(events[4]["data"]["via"], "rule");
-    assert!(events[4]["data"]["content"]
+    assert_eq!(events[6]["data"]["via"], "rule");
+    assert!(events[6]["data"]["content"]
         .as_str()
         .unwrap()
         .contains("First paragraph"));
 
-    assert_eq!(events[5]["data"]["stored"], true);
+    assert_eq!(events[7]["data"]["stored"], true);
 
     // JS unsupported: structured error, never a fake network result.
-    assert_eq!(events[6]["type"], "error");
-    assert_eq!(events[6]["error"]["code"], "INTERNAL");
-    assert_eq!(events[6]["error"]["details"]["unsupported"], true);
+    assert_eq!(events[8]["type"], "error");
+    assert_eq!(events[8]["error"]["code"], "INTERNAL");
+    assert_eq!(events[8]["error"]["details"]["unsupported"], true);
 }

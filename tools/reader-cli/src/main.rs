@@ -270,10 +270,55 @@ fn run_fixture_vertical(
     ))?;
     print_next_event(rx)?;
 
-    // 3. book.detail — merge into a base book carrying bookId.
-    let base_book = serde_json::json!({ "bookId": book_id });
+    // 3. book.search via host HTTP — Core emits http.execute, then continues
+    //    parsing after the host completes with a response body.
+    let base_url = source
+        .get("baseUrl")
+        .and_then(|v| v.as_str())
+        .unwrap_or("https://books.example.test");
     runtime.send(Command::new(
         3,
+        methods::BOOK_SEARCH,
+        serde_json::json!({
+            "sourceId": source.get("sourceId").cloned().unwrap_or_default(),
+            "searchRequest": {
+                "url": format!("{base_url}/search?q=dune"),
+                "headers": { "Accept": "application/json" }
+            },
+            "source": source,
+        }),
+    ))?;
+    let host_request = recv_event(rx)?;
+    print_event(&host_request);
+    let operation_id = match host_request {
+        Event::HostRequest {
+            operation_id,
+            capability,
+            ..
+        } if capability == "http.execute" => operation_id,
+        other => {
+            return Err(CoreError::internal(format!(
+                "expected http.execute host.request event, got {other:?}"
+            )));
+        }
+    };
+    runtime.send(Command::new(
+        4,
+        methods::HOST_COMPLETE,
+        serde_json::json!({
+            "operationId": operation_id,
+            "result": {
+                "status": 200,
+                "body": search_response
+            }
+        }),
+    ))?;
+    print_next_event(rx)?;
+
+    // 4. book.detail — merge into a base book carrying bookId.
+    let base_book = serde_json::json!({ "bookId": book_id });
+    runtime.send(Command::new(
+        5,
         methods::BOOK_DETAIL,
         serde_json::json!({
             "sourceId": source.get("sourceId").cloned().unwrap_or_default(),
@@ -284,9 +329,9 @@ fn run_fixture_vertical(
     ))?;
     print_next_event(rx)?;
 
-    // 4. book.toc
+    // 5. book.toc
     runtime.send(Command::new(
-        4,
+        6,
         methods::BOOK_TOC,
         serde_json::json!({
             "sourceId": source.get("sourceId").cloned().unwrap_or_default(),
@@ -297,9 +342,9 @@ fn run_fixture_vertical(
     ))?;
     print_next_event(rx)?;
 
-    // 5. chapter.content (rule path)
+    // 6. chapter.content (rule path)
     runtime.send(Command::new(
-        5,
+        7,
         methods::CHAPTER_CONTENT,
         serde_json::json!({
             "sourceId": source.get("sourceId").cloned().unwrap_or_default(),
@@ -311,9 +356,9 @@ fn run_fixture_vertical(
     ))?;
     print_next_event(rx)?;
 
-    // 6. reading.progress.update
+    // 7. reading.progress.update
     runtime.send(Command::new(
-        6,
+        8,
         methods::READING_PROGRESS_UPDATE,
         serde_json::json!({
             "bookId": book_id,
@@ -324,12 +369,12 @@ fn run_fixture_vertical(
     ))?;
     print_next_event(rx)?;
 
-    // 7. chapter.content (JS unsupported path) — a JS rule that calls java.get
+    // 8. chapter.content (JS unsupported path) — a JS rule that calls java.get
     //    with no registered host callback must surface a structured unsupported
     //    error, never a fake network result.
     if let Some(js_rule) = fixture.get("jsRuleUnsupported").and_then(|v| v.as_str()) {
         runtime.send(Command::new(
-            7,
+            9,
             methods::CHAPTER_CONTENT,
             serde_json::json!({
                 "sourceId": source.get("sourceId").cloned().unwrap_or_default(),
