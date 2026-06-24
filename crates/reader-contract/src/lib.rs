@@ -15,12 +15,12 @@ pub mod event;
 pub mod host;
 pub mod remote;
 
-pub use command::{Command, RuntimeCancelParams};
+pub use command::Command;
 pub use config::RuntimeConfig;
 pub use core_info::core_info;
 pub use error::{CoreError, ErrorCode};
 pub use event::Event;
-pub use host::{HostCompleteParams, HostErrorParams, HostSmokeParams};
+pub use host::{HostCompleteParams, HostErrorParams, HostSmokeParams, RuntimeCancelParams};
 pub use remote::{
     BookDetailParams, BookSearchParams, BookTocParams, ChapterContentParams, HostHttpRequest,
     ReadingProgressUpdateParams, SourceImportParams,

@@ -67,14 +67,6 @@ impl Command {
     }
 }
 
-/// Parameters for `runtime.cancel`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct RuntimeCancelParams {
-    #[serde(rename = "requestId")]
-    pub request_id: u64,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
