@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "requestId": 308,
+  "method": "runtime.hostSmoke",
+  "params": {
+    "capability": "host..echo",
+    "params": {
+      "message": "invalid capability"
+    }
+  }
+}

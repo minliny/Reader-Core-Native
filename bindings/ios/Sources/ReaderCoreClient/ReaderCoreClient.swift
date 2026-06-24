@@ -1,6 +1,20 @@
 import Foundation
 import ReaderCore
 
+public struct ReaderCoreCoreError: Error, Equatable {
+    public let code: String
+    public let message: String
+    public let retryable: Bool
+    public let rawData: Data
+
+    public init(code: String, message: String, retryable: Bool, rawData: Data) {
+        self.code = code
+        self.message = message
+        self.retryable = retryable
+        self.rawData = rawData
+    }
+}
+
 public enum ReaderCoreClientError: Error, Equatable {
     case createFailed(Int32)
     case sendFailed(Int32)
@@ -9,7 +23,9 @@ public enum ReaderCoreClientError: Error, Equatable {
     case invalidCommandJSON
     case invalidEventJSON
     case requestTimedOut(UInt64)
-    case coreError(Data)
+    case missingHostTransport
+    case hostTransportFailed(String)
+    case coreError(ReaderCoreCoreError)
 }
 
 public struct ReaderCoreEvent {
@@ -42,6 +58,33 @@ public struct ReaderCoreEvent {
         object["error"] as? [String: Any]
     }
 
+    public var isHostRequest: Bool {
+        type == "host.request"
+    }
+
+    public var operationId: UInt64? {
+        Self.uint64Value(object["operationId"])
+    }
+
+    public var capability: String? {
+        object["capability"] as? String
+    }
+
+    public var hostRequestParams: [String: Any]? {
+        object["params"] as? [String: Any]
+    }
+
+    public var coreError: ReaderCoreCoreError? {
+        guard type == "error" else { return nil }
+        let err = error ?? [:]
+        return ReaderCoreCoreError(
+            code: err["code"] as? String ?? "INTERNAL",
+            message: err["message"] as? String ?? "",
+            retryable: err["retryable"] as? Bool ?? false,
+            rawData: rawData
+        )
+    }
+
     private static func uint64Value(_ value: Any?) -> UInt64? {
         if let value = value as? UInt64 {
             return value
@@ -53,6 +96,129 @@ public struct ReaderCoreEvent {
             return UInt64(value)
         }
         return nil
+    }
+}
+
+public struct ReaderCoreHostRequest {
+    public let operationId: UInt64
+    public let capability: String
+    public let rawParams: [String: Any]
+
+    public init(operationId: UInt64, capability: String, rawParams: [String: Any]) {
+        self.operationId = operationId
+        self.capability = capability
+        self.rawParams = rawParams
+    }
+
+    public var url: String? {
+        rawParams["url"] as? String
+    }
+
+    public var method: String? {
+        rawParams["method"] as? String
+    }
+
+    public var headers: [String: String] {
+        guard let object = rawParams["headers"] as? [String: Any] else {
+            return [:]
+        }
+        var headers: [String: String] = [:]
+        for (key, value) in object {
+            headers[key] = value as? String ?? "\(value)"
+        }
+        return headers
+    }
+
+    public var body: String? {
+        rawParams["body"] as? String
+    }
+}
+
+public struct ReaderCoreHostResponse {
+    public let status: Int
+    public let headers: [String: String]
+    public let body: String
+
+    public init(status: Int = 200, headers: [String: String] = [:], body: String) {
+        self.status = status
+        self.headers = headers
+        self.body = body
+    }
+
+    public var resultObject: [String: Any] {
+        var object: [String: Any] = ["status": status, "body": body]
+        if !headers.isEmpty {
+            object["headers"] = headers
+        }
+        return object
+    }
+}
+
+public protocol ReaderCoreHostTransport {
+    func perform(_ request: ReaderCoreHostRequest) throws -> ReaderCoreHostResponse
+}
+
+public final class URLSessionHostTransport: ReaderCoreHostTransport {
+    public let session: URLSession
+    public let timeout: TimeInterval
+
+    public init(session: URLSession = .shared, timeout: TimeInterval = 30) {
+        self.session = session
+        self.timeout = timeout
+    }
+
+    public func perform(_ request: ReaderCoreHostRequest) throws -> ReaderCoreHostResponse {
+        guard let urlString = request.url, !urlString.isEmpty else {
+            throw ReaderCoreClientError.hostTransportFailed("http.execute request missing url")
+        }
+        guard let url = URL(string: urlString) else {
+            throw ReaderCoreClientError.hostTransportFailed("http.execute request url is invalid")
+        }
+
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = request.method ?? "GET"
+        for (field, value) in request.headers {
+            urlRequest.setValue(value, forHTTPHeaderField: field)
+        }
+        if let body = request.body, !body.isEmpty {
+            urlRequest.httpBody = body.data(using: .utf8)
+        }
+
+        let semaphore = DispatchSemaphore(value: 0)
+        var captured: Result<ReaderCoreHostResponse, Error>?
+
+        let task = session.dataTask(with: urlRequest) { data, response, error in
+            if let error {
+                captured = .failure(error)
+            } else if let httpResponse = response as? HTTPURLResponse {
+                let bodyString = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+                var headers: [String: String] = [:]
+                for (key, value) in httpResponse.allHeaderFields {
+                    if let key = key as? String {
+                        headers[key] = value as? String ?? "\(value)"
+                    }
+                }
+                captured = .success(ReaderCoreHostResponse(
+                    status: httpResponse.statusCode,
+                    headers: headers,
+                    body: bodyString
+                ))
+            } else {
+                captured = .failure(ReaderCoreClientError.hostTransportFailed("non-http response"))
+            }
+            semaphore.signal()
+        }
+
+        task.resume()
+        if semaphore.wait(timeout: .now() + timeout) == .timedOut {
+            task.cancel()
+            throw ReaderCoreClientError.hostTransportFailed("http.execute request timed out")
+        }
+
+        guard let result = captured else {
+            throw ReaderCoreClientError.hostTransportFailed("urlsession produced no result")
+        }
+        return try result.get()
     }
 }
 
@@ -121,6 +287,25 @@ private final class ReaderCoreEventBuffer {
             condition.wait(until: deadline)
         }
     }
+
+    func poll(requestId: UInt64) -> Result<ReaderCoreEvent, ReaderCoreClientError>? {
+        condition.lock()
+        defer { condition.unlock() }
+
+        for (index, event) in events.enumerated() {
+            switch event {
+            case .success(let event) where event.requestId == requestId:
+                events.remove(at: index)
+                return .success(event)
+            case .failure(let error):
+                events.remove(at: index)
+                return .failure(error)
+            default:
+                continue
+            }
+        }
+        return nil
+    }
 }
 
 public final class ReaderCoreRuntime {
@@ -129,11 +314,14 @@ public final class ReaderCoreRuntime {
     }
 
     private var handle: OpaquePointer?
-    private let sinkContext: UnsafeMutableRawPointer
+    private var sinkContext: UnsafeMutableRawPointer?
 
     public init(configJSON: Data = Data(), onEvent: @escaping (Data) -> Void) throws {
+        self.sinkContext = nil
+
         let sink = ReaderCoreEventSink(onEvent: onEvent)
-        self.sinkContext = Unmanaged.passRetained(sink).toOpaque()
+        let sinkContext = Unmanaged.passRetained(sink).toOpaque()
+        self.sinkContext = sinkContext
 
         var runtime: OpaquePointer?
         let status = configJSON.withUnsafeBytes { rawBuffer in
@@ -147,6 +335,7 @@ public final class ReaderCoreRuntime {
         }
 
         guard status == 0, let runtime else {
+            self.sinkContext = nil
             Unmanaged<ReaderCoreEventSink>.fromOpaque(sinkContext).release()
             throw ReaderCoreClientError.createFailed(status)
         }
@@ -158,7 +347,9 @@ public final class ReaderCoreRuntime {
         if let handle {
             rc_runtime_destroy(handle)
         }
-        Unmanaged<ReaderCoreEventSink>.fromOpaque(sinkContext).release()
+        if let sinkContext {
+            Unmanaged<ReaderCoreEventSink>.fromOpaque(sinkContext).release()
+        }
     }
 
     public func send(json: Data) throws {
@@ -210,10 +401,15 @@ public final class ReaderCoreClient {
 
     private let eventBuffer: ReaderCoreEventBuffer
     private let runtime: ReaderCoreRuntime
+    private let hostTransport: ReaderCoreHostTransport?
 
-    public init(configJSON: Data = Data()) throws {
+    private let commandIdLock = NSLock()
+    private var commandIdCounter: UInt64 = 9_000_000_000_000_000
+
+    public init(configJSON: Data = Data(), hostTransport: ReaderCoreHostTransport? = nil) throws {
         let eventBuffer = ReaderCoreEventBuffer()
         self.eventBuffer = eventBuffer
+        self.hostTransport = hostTransport
         self.runtime = try ReaderCoreRuntime(configJSON: configJSON) { data in
             eventBuffer.append(data)
         }
@@ -229,16 +425,83 @@ public final class ReaderCoreClient {
         try request(method: "runtime.ping", requestId: requestId, timeout: timeout)
     }
 
+    @discardableResult
+    public func send(
+        method: String,
+        requestId: UInt64,
+        params: [String: Any] = [:]
+    ) throws -> UInt64 {
+        try sendCommand(method: method, requestId: requestId, params: params)
+        return requestId
+    }
+
+    @discardableResult
+    public func request(
+        method: String,
+        requestId: UInt64,
+        params: [String: Any] = [:],
+        timeout: TimeInterval = 5
+    ) throws -> ReaderCoreEvent {
+        try sendCommand(method: method, requestId: requestId, params: params)
+        return try waitForResolved(requestId: requestId, timeout: timeout)
+    }
+
+    @discardableResult
+    public func pollEvent(requestId: UInt64) -> Result<ReaderCoreEvent, ReaderCoreClientError>? {
+        eventBuffer.poll(requestId: requestId)
+    }
+
+    public func cancel(requestId: UInt64) throws {
+        try runtime.cancel(requestId: requestId)
+    }
+
+    @discardableResult
+    public func sendHostComplete(
+        operationId: UInt64,
+        result: [String: Any],
+        requestId: UInt64? = nil
+    ) throws -> UInt64 {
+        let commandId = requestId ?? nextCommandId()
+        try sendCommand(
+            method: "host.complete",
+            requestId: commandId,
+            params: [
+                "operationId": NSNumber(value: operationId),
+                "result": result,
+            ]
+        )
+        return commandId
+    }
+
+    @discardableResult
+    public func sendHostError(
+        operationId: UInt64,
+        code: String,
+        message: String,
+        retryable: Bool,
+        requestId: UInt64? = nil
+    ) throws -> UInt64 {
+        let commandId = requestId ?? nextCommandId()
+        try sendCommand(
+            method: "host.error",
+            requestId: commandId,
+            params: [
+                "operationId": NSNumber(value: operationId),
+                "error": [
+                    "code": code,
+                    "message": message,
+                    "retryable": retryable,
+                ],
+            ]
+        )
+        return commandId
+    }
+
     public func destroy() {
         runtime.destroy()
     }
 
-    private func request(
-        method: String,
-        requestId: UInt64,
-        params: [String: Any] = [:],
-        timeout: TimeInterval
-    ) throws -> ReaderCoreEvent {
+    private func sendCommand(method: String, requestId: UInt64, params: [String: Any]) throws {
         let command: [String: Any] = [
             "protocolVersion": NSNumber(value: Self.protocolVersion),
             "requestId": NSNumber(value: requestId),
@@ -258,10 +521,73 @@ public final class ReaderCoreClient {
         }
 
         try runtime.send(json: json)
-        let event = try eventBuffer.wait(requestId: requestId, timeout: timeout)
-        if event.type == "error" {
-            throw ReaderCoreClientError.coreError(event.rawData)
+    }
+
+    private func waitForResolved(requestId: UInt64, timeout: TimeInterval) throws -> ReaderCoreEvent {
+        let deadline = Date().addingTimeInterval(timeout)
+
+        while true {
+            let remaining = max(0, deadline.timeIntervalSinceNow)
+            let event = try eventBuffer.wait(requestId: requestId, timeout: remaining)
+
+            switch event.type {
+            case "result":
+                return event
+            case "error":
+                throw ReaderCoreClientError.coreError(event.coreError ?? ReaderCoreCoreError(
+                    code: "INTERNAL",
+                    message: "",
+                    retryable: false,
+                    rawData: event.rawData
+                ))
+            case "host.request":
+                guard let transport = hostTransport else {
+                    throw ReaderCoreClientError.missingHostTransport
+                }
+                let hostRequest = try makeHostRequest(from: event)
+                do {
+                    let response = try transport.perform(hostRequest)
+                    _ = try sendHostComplete(
+                        operationId: hostRequest.operationId,
+                        result: response.resultObject
+                    )
+                } catch let error as ReaderCoreClientError {
+                    _ = try sendHostError(
+                        operationId: hostRequest.operationId,
+                        code: "INTERNAL",
+                        message: "\(error)",
+                        retryable: false
+                    )
+                } catch {
+                    _ = try sendHostError(
+                        operationId: hostRequest.operationId,
+                        code: "INTERNAL",
+                        message: "\(error)",
+                        retryable: false
+                    )
+                }
+                continue
+            default:
+                throw ReaderCoreClientError.invalidEventJSON
+            }
         }
-        return event
+    }
+
+    private func makeHostRequest(from event: ReaderCoreEvent) throws -> ReaderCoreHostRequest {
+        guard event.isHostRequest else {
+            throw ReaderCoreClientError.invalidEventJSON
+        }
+        return ReaderCoreHostRequest(
+            operationId: event.operationId ?? 0,
+            capability: event.capability ?? "",
+            rawParams: event.hostRequestParams ?? [:]
+        )
+    }
+
+    private func nextCommandId() -> UInt64 {
+        commandIdLock.lock()
+        defer { commandIdLock.unlock() }
+        commandIdCounter += 1
+        return commandIdCounter
     }
 }

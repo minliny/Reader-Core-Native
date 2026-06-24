@@ -20,10 +20,13 @@ pub use config::RuntimeConfig;
 pub use core_info::core_info;
 pub use error::{CoreError, ErrorCode};
 pub use event::Event;
-pub use host::{HostCompleteParams, HostErrorParams, HostSmokeParams};
+pub use host::{
+    HostCompleteParams, HostErrorParams, HostSmokeParams, PendingHostOperationStatus,
+    RuntimeCancelParams, RuntimeShutdownParams, RuntimeStatus, RuntimeStatusParams,
+};
 pub use remote::{
     BookDetailParams, BookSearchParams, BookTocParams, ChapterContentParams, HostHttpRequest,
-    ReadingProgressUpdateParams, SourceImportParams,
+    HostHttpResponse, ReadingProgressUpdateParams, SourceImportParams,
 };
 
 /// JSON protocol version. Bumped on non-backward-compatible schema changes.
@@ -35,6 +38,9 @@ pub mod methods {
     pub const CORE_INFO: &str = "core.info";
     pub const RUNTIME_PING: &str = "runtime.ping";
     pub const RUNTIME_HOST_SMOKE: &str = "runtime.hostSmoke";
+    pub const RUNTIME_CANCEL: &str = "runtime.cancel";
+    pub const RUNTIME_STATUS: &str = "runtime.status";
+    pub const RUNTIME_SHUTDOWN: &str = "runtime.shutdown";
     pub const HOST_COMPLETE: &str = "host.complete";
     pub const HOST_ERROR: &str = "host.error";
 
@@ -72,6 +78,9 @@ pub const V1_CAPABILITIES: &[&str] = &[
     methods::CORE_INFO,
     methods::RUNTIME_PING,
     methods::RUNTIME_HOST_SMOKE,
+    methods::RUNTIME_CANCEL,
+    methods::RUNTIME_STATUS,
+    methods::RUNTIME_SHUTDOWN,
     methods::HOST_COMPLETE,
     methods::HOST_ERROR,
     capabilities::HOST_BUS_V1,
@@ -121,6 +130,9 @@ mod tests {
                 methods::CORE_INFO,
                 methods::RUNTIME_PING,
                 methods::RUNTIME_HOST_SMOKE,
+                methods::RUNTIME_CANCEL,
+                methods::RUNTIME_STATUS,
+                methods::RUNTIME_SHUTDOWN,
                 methods::HOST_COMPLETE,
                 methods::HOST_ERROR,
                 methods::SOURCE_IMPORT,

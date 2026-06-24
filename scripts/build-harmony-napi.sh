@@ -3,6 +3,14 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+artifact_sha256() {
+  shasum -a 256 "$1" | awk '{print $1}'
+}
+
+artifact_bytes() {
+  wc -c < "$1" | tr -d '[:space:]'
+}
+
 sdk_root="${OHOS_SDK_HOME:-}"
 if [[ -z "$sdk_root" ]]; then
   echo "OHOS_SDK_HOME is not set" >&2
@@ -39,3 +47,110 @@ build_dir="target/harmony-napi/arm64-v8a"
 output="$build_dir/libreader_core_napi.so"
 test -f "$output"
 echo "built $output"
+
+sdk_smoke_tests="bindings/harmony/sdk"
+sdk_smoke_output="$build_dir/harmony-sdk-smoke.txt"
+sdk_smoke_raw_output="$build_dir/harmony-sdk-smoke.raw.txt"
+sdk_smoke="skipped"
+if command -v bun >/dev/null 2>&1; then
+  bun test "$sdk_smoke_tests" > "$sdk_smoke_raw_output" 2>&1
+  sdk_smoke="pass"
+  pass_count="$(awk '/^[[:space:]]*[0-9]+ pass$/ { value=$1 } END { print value }' "$sdk_smoke_raw_output")"
+  fail_count="$(awk '/^[[:space:]]*[0-9]+ fail$/ { value=$1 } END { print value }' "$sdk_smoke_raw_output")"
+  expect_count="$(awk '/expect\(\) calls/ { value=$1 } END { print value }' "$sdk_smoke_raw_output")"
+  test_files="$(find bindings/harmony/sdk -name '*.test.ts' | LC_ALL=C sort | tr '\n' ',' | sed 's/,$//')"
+  {
+    echo "name=reader-core-native-harmony-sdk-smoke"
+    echo "status=$sdk_smoke"
+    echo "tests=$sdk_smoke_tests"
+    echo "test_files=$test_files"
+    echo "pass_count=$pass_count"
+    echo "fail_count=$fail_count"
+    echo "expect_count=$expect_count"
+  } > "$sdk_smoke_output"
+else
+  {
+    echo "name=reader-core-native-harmony-sdk-smoke"
+    echo "status=$sdk_smoke"
+    echo "tests=$sdk_smoke_tests"
+    echo "reason=bun_not_found"
+  } > "$sdk_smoke_output"
+  echo "bun not found; skipped $sdk_smoke_tests" > "$sdk_smoke_raw_output"
+fi
+
+package_dir="$build_dir/package"
+package_manifest="$build_dir/harmony-package-manifest.sha256"
+rm -rf "$package_dir"
+mkdir -p "$package_dir/sdk" "$package_dir/libs/arm64-v8a"
+cp bindings/harmony/oh-package.json5 "$package_dir/"
+cp bindings/harmony/Index.ets "$package_dir/"
+cp bindings/harmony/README.md "$package_dir/"
+cp bindings/harmony/STATUS.md "$package_dir/"
+for sdk_file in bindings/harmony/sdk/*.ts; do
+  if [[ "$sdk_file" == *.test.ts ]]; then
+    continue
+  fi
+  cp "$sdk_file" "$package_dir/sdk/"
+done
+cp "$output" "$package_dir/libs/arm64-v8a/"
+(
+  cd "$package_dir"
+  find . -type f | LC_ALL=C sort | while IFS= read -r file; do
+    sha="$(shasum -a 256 "$file" | awk '{print $1}')"
+    bytes="$(wc -c < "$file" | tr -d '[:space:]')"
+    printf '%s  %s  %s\n' "$sha" "$bytes" "${file#./}"
+  done
+) > "$package_manifest"
+
+reader_core_static="target/aarch64-unknown-linux-ohos/release/libreader_core.a"
+symbols_file="$build_dir/libreader_core_napi.symbols.txt"
+napi_symbols_file="$build_dir/libreader_core_napi.napi-symbols.txt"
+nm_bin="$native_root/llvm/bin/llvm-nm"
+if [[ -x "$nm_bin" ]]; then
+  "$nm_bin" -D --defined-only "$output" | LC_ALL=C sort > "$symbols_file" || rm -f "$symbols_file"
+  "$nm_bin" -a "$output" \
+    | grep -E 'reader_core_napi|_register_reader_core_napi|napi_' \
+    | LC_ALL=C sort > "$napi_symbols_file" || rm -f "$napi_symbols_file"
+fi
+
+evidence="$build_dir/harmony-napi-build-evidence.txt"
+{
+  echo "name=reader-core-native-harmony-napi"
+  echo "target=aarch64-unknown-linux-ohos"
+  echo "ohos_arch=arm64-v8a"
+  echo "artifact=$output"
+  echo "artifact_sha256=$(artifact_sha256 "$output")"
+  echo "artifact_bytes=$(artifact_bytes "$output")"
+  echo "reader_core_static=$reader_core_static"
+  echo "reader_core_static_sha256=$(artifact_sha256 "$reader_core_static")"
+  echo "reader_core_static_bytes=$(artifact_bytes "$reader_core_static")"
+  echo "cmake=$("$cmake_bin" --version | head -n 1)"
+  echo "ninja=$("$ninja_bin" --version)"
+  echo "toolchain=$toolchain"
+  echo "ohos_sdk_home=$sdk_root"
+  echo "arkts_entry=bindings/harmony/Index.ets"
+  echo "ohpm_package=bindings/harmony/oh-package.json5"
+  echo "package_dir=$package_dir"
+  echo "package_manifest=$package_manifest"
+  echo "package_manifest_sha256=$(artifact_sha256 "$package_manifest")"
+  echo "exports=abiVersion,createRuntime,releaseRuntime,sendCommand,cancelRequest,readEvent,pendingEventCount,completeHostRequest,failHostRequest,pingSmoke,hostSmoke,lifecycleSmoke"
+  echo "sdk_smoke=$sdk_smoke"
+  echo "sdk_smoke_tests=$sdk_smoke_tests"
+  echo "sdk_smoke_output=$sdk_smoke_output"
+  echo "sdk_smoke_output_sha256=$(artifact_sha256 "$sdk_smoke_output")"
+  echo "sdk_smoke_raw_output=$sdk_smoke_raw_output"
+  if [[ -f "$symbols_file" ]]; then
+    echo "symbols=$symbols_file"
+    echo "symbols_sha256=$(artifact_sha256 "$symbols_file")"
+  else
+    echo "symbols=<unavailable>"
+  fi
+  if [[ -f "$napi_symbols_file" ]]; then
+    echo "napi_symbols=$napi_symbols_file"
+    echo "napi_symbols_sha256=$(artifact_sha256 "$napi_symbols_file")"
+  else
+    echo "napi_symbols=<unavailable>"
+  fi
+} > "$evidence"
+echo "evidence $evidence"
+cat "$evidence"
