@@ -499,6 +499,7 @@ mod tests {
         assert_eq!(req["type"], "host.request");
         assert_eq!(req["requestId"], 100);
         assert_eq!(req["capability"], "host.smoke.echo");
+        assert_eq!(req["params"]["hello"], "world");
         let operation_id = req["operationId"].as_u64().unwrap();
 
         // host.complete → Core routes the result back to requestId 100.

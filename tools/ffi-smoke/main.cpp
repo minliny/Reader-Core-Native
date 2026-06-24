@@ -316,6 +316,8 @@ int main() {
   uint64_t op = 0;
   if (!contains(event, "\"type\":\"host.request\"") ||
       !contains(event, "\"requestId\":20") ||
+      !contains(event, "\"capability\":\"host.smoke.echo\"") ||
+      !contains(event, "\"hello\":\"world\"") ||
       !json_u64(event, "operationId", &op)) {
     std::cerr << "host.request(20): " << event << '\n';
     return fail("host.request(20) shape");
@@ -354,7 +356,8 @@ int main() {
   event = wait_event(ch, ev++);
   if (!contains(event, "\"type\":\"error\"") ||
       !contains(event, "\"requestId\":22") ||
-      !contains(event, "\"INTERNAL\"")) {
+      !contains(event, "\"INTERNAL\"") ||
+      !contains(event, "\"retryable\":true")) {
     std::cerr << "error(22): " << event << '\n';
     return fail("host.error result shape");
   }
