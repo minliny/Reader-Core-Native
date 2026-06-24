@@ -10,6 +10,10 @@ use std::path::Path;
 use reader_domain::{Book, TocEntry};
 use serde::{Deserialize, Serialize};
 
+pub mod txt;
+
+pub use txt::{parse_txt, parse_txt_with_options, ParsedTxt, TxtChapter, TxtParseOptions};
+
 /// Current local-book library snapshot schema version.
 pub const LOCAL_BOOK_LIBRARY_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
 

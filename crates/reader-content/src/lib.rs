@@ -11,6 +11,11 @@
 //! / `java.post` without a registered host callback yields a structured
 //! `unsupported` outcome instead of being silently treated as a network
 //! capability.
+//!
+//! Content normalization helpers live in [`normalization`] and are applied to
+//! chapter body text before it is returned to callers.
+
+pub mod normalization;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -602,14 +607,16 @@ impl RemoteContentPipeline {
         Ok(entries)
     }
 
-    /// Extract chapter body text. Returns the joined output of the rule chain.
+    /// Extract chapter body text. Returns the joined output of the rule chain,
+    /// normalized via [`normalization::normalize_content`] (line endings
+    /// unified, excessive blank lines collapsed, edges trimmed).
     pub fn chapter_content(
         &self,
         source: &Source,
         chapter_response: &str,
     ) -> Result<String, ContentError> {
         let out = self.run_chain(chapter_response, &source.rules.chapter)?;
-        Ok(out.values().join("\n"))
+        Ok(normalization::normalize_content(&out.values().join("\n")))
     }
 
     /// Extract and normalize one chapter body for cache/storage.
