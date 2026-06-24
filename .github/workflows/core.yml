@@ -32,5 +32,5 @@ jobs:
       - name: Install iOS Rust targets
         run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 
-      - name: Build iOS XCFramework smoke
-        run: ./scripts/build-ios-xcframework.sh
+      - name: Check iOS Swift wrapper smoke
+        run: ./scripts/check-ios-swift-wrapper.sh
