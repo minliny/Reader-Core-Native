@@ -69,8 +69,13 @@ const VALID_RUNTIME_CANCEL: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-runtime-cancel.json");
 const VALID_RUNTIME_STATUS: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-runtime-status.json");
+const VALID_RUNTIME_SHUTDOWN: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-runtime-shutdown.json");
 const INVALID_RUNTIME_CANCEL_TARGET_ZERO: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-runtime-cancel-target-zero.json"
+);
+const INVALID_RUNTIME_SHUTDOWN_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-runtime-shutdown-unknown-field.json"
 );
 
 const CANCEL_UNKNOWN: &str =
@@ -530,6 +535,94 @@ pub(crate) fn run_conformance() -> ConformanceReport {
                     Ok(())
                 }
                 other => Err(format!("expected pending runtime.status, got {other:?}")),
+            }
+        },
+    );
+
+    record(
+        &mut report,
+        "runtime-shutdown-stops-future-commands",
+        || {
+            let (runtime, rx) = send_to_fresh_runtime(VALID_RUNTIME_SHUTDOWN)?;
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 330
+                    && data["shuttingDown"] == true
+                    && data["cancelledRequestIds"]
+                        .as_array()
+                        .is_some_and(Vec::is_empty) =>
+                {
+                    let err = runtime
+                        .send(Command::new(332, methods::RUNTIME_PING, json!({})))
+                        .err()
+                        .ok_or_else(|| "expected send after shutdown to fail".to_string())?;
+                    if err.code != ErrorCode::Internal {
+                        return Err(format!("expected INTERNAL after shutdown, got {err:?}"));
+                    }
+                    expect_no_event(&rx)
+                }
+                other => Err(format!("expected runtime.shutdown result, got {other:?}")),
+            }
+        },
+    );
+
+    record(
+        &mut report,
+        "runtime-shutdown-cancels-pending-host-request",
+        || {
+            let (runtime, rx) = send_to_fresh_runtime(HOST_REQUEST)?;
+            expect_host_request(&rx)?;
+            runtime
+                .send_json(VALID_RUNTIME_SHUTDOWN.as_bytes())
+                .map_err(|err| format!("runtime.shutdown send failed: {err:?}"))?;
+
+            match recv_event(&rx)? {
+                Event::Error {
+                    request_id, error, ..
+                } if request_id == 301 && error.code == ErrorCode::Cancelled => {}
+                other => return Err(format!("expected cancelled error for 301, got {other:?}")),
+            }
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 330
+                    && data["shuttingDown"] == true
+                    && data["cancelledRequestIds"] == json!([301]) =>
+                {
+                    Ok(())
+                }
+                other => Err(format!("expected runtime.shutdown result, got {other:?}")),
+            }
+        },
+    );
+
+    record(
+        &mut report,
+        "runtime-shutdown-invalid-params-does-not-stop-runtime",
+        || {
+            let (runtime, rx) = send_to_fresh_runtime(INVALID_RUNTIME_SHUTDOWN_UNKNOWN_FIELD)?;
+            match recv_event(&rx)? {
+                Event::Error {
+                    request_id, error, ..
+                } if request_id == 331 && error.code == ErrorCode::InvalidParams => {}
+                other => {
+                    return Err(format!(
+                        "expected runtime.shutdown params error, got {other:?}"
+                    ));
+                }
+            }
+
+            runtime
+                .send(Command::new(332, methods::RUNTIME_PING, json!({})))
+                .map_err(|err| format!("ping after invalid shutdown failed: {err:?}"))?;
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 332 && data["pong"] == true => Ok(()),
+                other => Err(format!(
+                    "expected ping after invalid shutdown, got {other:?}"
+                )),
             }
         },
     );

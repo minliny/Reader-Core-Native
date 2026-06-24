@@ -40,6 +40,10 @@
   active request IDs, pending host operation IDs/capabilities/states, and the
   runtime shutdown flag. It does not expose host request payloads or platform
   state.
+- `runtime.shutdown` is the JSON-protocol lifecycle shutdown method. It accepts
+  empty params, cancels other active requests, returns
+  `{ "shuttingDown": true, "cancelledRequestIds": [...] }`, and causes future
+  commands on that runtime handle to be rejected.
 
 ## Platform Contract
 

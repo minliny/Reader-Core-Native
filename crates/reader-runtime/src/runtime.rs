@@ -5,8 +5,8 @@ use std::thread::{self, JoinHandle};
 
 use reader_contract::{
     core_info, methods, Command, CoreError, Event, HostCompleteParams, HostErrorParams,
-    HostSmokeParams, PendingHostOperationStatus, RuntimeCancelParams, RuntimeConfig, RuntimeStatus,
-    RuntimeStatusParams,
+    HostSmokeParams, PendingHostOperationStatus, RuntimeCancelParams, RuntimeConfig,
+    RuntimeShutdownParams, RuntimeStatus, RuntimeStatusParams,
 };
 
 use crate::remote::{
@@ -25,6 +25,7 @@ const BUILD_VERSION: &str = concat!("reader-core-native ", env!("CARGO_PKG_VERSI
 
 enum WorkItem {
     Command(Command),
+    ProtocolShutdown(Command),
     Shutdown,
 }
 
@@ -181,7 +182,13 @@ impl Runtime {
             active.insert(command.request_id);
         }
 
-        match self.tx.send(WorkItem::Command(command.clone())) {
+        let work_item = if command.method == methods::RUNTIME_SHUTDOWN {
+            WorkItem::ProtocolShutdown(command.clone())
+        } else {
+            WorkItem::Command(command.clone())
+        };
+
+        match self.tx.send(work_item) {
             Ok(()) => Ok(()),
             Err(_) => {
                 remove_active(&self.active_requests, command.request_id);
@@ -228,12 +235,12 @@ impl Runtime {
         remote_state: Arc<RemoteState>,
     ) {
         for item in &rx {
-            if shutdown.load(Ordering::Acquire) {
-                break;
-            }
             match item {
                 WorkItem::Shutdown => break,
                 WorkItem::Command(cmd) => {
+                    if shutdown.load(Ordering::Acquire) {
+                        break;
+                    }
                     dispatch_command(
                         &cmd,
                         &sink,
@@ -244,6 +251,30 @@ impl Runtime {
                         &shutdown,
                         &remote_state,
                     );
+                }
+                WorkItem::ProtocolShutdown(cmd) => {
+                    if shutdown.load(Ordering::Acquire) {
+                        break;
+                    }
+                    dispatch_command(
+                        &cmd,
+                        &sink,
+                        &active_requests,
+                        &cancelled,
+                        &host_operations,
+                        &next_operation_id,
+                        &shutdown,
+                        &remote_state,
+                    );
+                    if shutdown.load(Ordering::Acquire) {
+                        drain_queued_after_protocol_shutdown(
+                            &rx,
+                            &sink,
+                            &active_requests,
+                            &cancelled,
+                        );
+                        break;
+                    }
                 }
             }
         }
@@ -314,6 +345,14 @@ fn dispatch_command(
             dispatch_runtime_cancel(cmd, sink, active_requests, cancelled, host_operations)
         }
         methods::RUNTIME_STATUS => dispatch_runtime_status(
+            cmd,
+            sink,
+            active_requests,
+            cancelled,
+            host_operations,
+            shutdown,
+        ),
+        methods::RUNTIME_SHUTDOWN => dispatch_runtime_shutdown(
             cmd,
             sink,
             active_requests,
@@ -553,6 +592,64 @@ fn dispatch_runtime_status(
     );
 }
 
+fn dispatch_runtime_shutdown(
+    cmd: &Command,
+    sink: &Arc<dyn EventSink>,
+    active_requests: &Mutex<HashSet<u64>>,
+    cancelled: &Mutex<HashSet<u64>>,
+    host_operations: &Mutex<HashMap<u64, HostOperation>>,
+    shutdown: &AtomicBool,
+) {
+    let _params = match parse_runtime_shutdown_params(cmd) {
+        Ok(params) => params,
+        Err(error) => {
+            finish_request(
+                sink,
+                active_requests,
+                cancelled,
+                cmd.request_id,
+                Event::error(cmd.request_id, error),
+            );
+            return;
+        }
+    };
+
+    shutdown.store(true, Ordering::Release);
+    let cancelled_request_ids = match cancel_active_requests_for_shutdown(
+        sink,
+        active_requests,
+        cancelled,
+        host_operations,
+        cmd.request_id,
+    ) {
+        Ok(cancelled_request_ids) => cancelled_request_ids,
+        Err(error) => {
+            finish_request(
+                sink,
+                active_requests,
+                cancelled,
+                cmd.request_id,
+                Event::error(cmd.request_id, error),
+            );
+            return;
+        }
+    };
+
+    finish_request(
+        sink,
+        active_requests,
+        cancelled,
+        cmd.request_id,
+        Event::result(
+            cmd.request_id,
+            serde_json::json!({
+                "shuttingDown": true,
+                "cancelledRequestIds": cancelled_request_ids,
+            }),
+        ),
+    );
+}
+
 fn dispatch_remote_host_request(
     cmd: &Command,
     sink: &Arc<dyn EventSink>,
@@ -736,6 +833,17 @@ fn parse_runtime_cancel_params(cmd: &Command) -> Result<RuntimeCancelParams, Cor
     Ok(params)
 }
 
+fn parse_runtime_shutdown_params(cmd: &Command) -> Result<RuntimeShutdownParams, CoreError> {
+    serde_json::from_value::<RuntimeShutdownParams>(cmd.params.clone()).map_err(|err| {
+        CoreError::invalid_params(format!("invalid params for {}", cmd.method)).with_details(
+            serde_json::json!({
+                "source": err.to_string(),
+                "method": cmd.method,
+            }),
+        )
+    })
+}
+
 fn parse_host_complete_params(cmd: &Command) -> Result<HostCompleteParams, CoreError> {
     let params =
         serde_json::from_value::<HostCompleteParams>(cmd.params.clone()).map_err(|err| {
@@ -814,6 +922,85 @@ fn runtime_status_snapshot(
         pending_host_operations,
         shutting_down,
     })
+}
+
+fn cancel_active_requests_for_shutdown(
+    sink: &Arc<dyn EventSink>,
+    active_requests: &Mutex<HashSet<u64>>,
+    cancelled: &Mutex<HashSet<u64>>,
+    host_operations: &Mutex<HashMap<u64, HostOperation>>,
+    current_request_id: u64,
+) -> Result<Vec<u64>, CoreError> {
+    let mut cancelled_request_ids = {
+        let mut active = active_requests
+            .lock()
+            .map_err(|_| CoreError::internal("active request registry poisoned"))?;
+        let mut ids = active
+            .iter()
+            .copied()
+            .filter(|request_id| *request_id != current_request_id)
+            .collect::<Vec<_>>();
+        ids.sort_unstable();
+        ids.dedup();
+        for request_id in &ids {
+            active.remove(request_id);
+        }
+        ids
+    };
+
+    {
+        let mut operations = host_operations
+            .lock()
+            .map_err(|_| CoreError::internal("host operation registry poisoned"))?;
+        operations.retain(|_, operation| {
+            if operation.request_id == current_request_id {
+                true
+            } else {
+                cancelled_request_ids.push(operation.request_id);
+                false
+            }
+        });
+    }
+
+    cancelled_request_ids.sort_unstable();
+    cancelled_request_ids.dedup();
+
+    {
+        let mut cancelled_set = cancelled
+            .lock()
+            .map_err(|_| CoreError::internal("cancel registry poisoned"))?;
+        for request_id in &cancelled_request_ids {
+            cancelled_set.remove(request_id);
+        }
+    }
+
+    for request_id in &cancelled_request_ids {
+        sink.emit(&Event::error(*request_id, CoreError::cancelled()));
+    }
+
+    Ok(cancelled_request_ids)
+}
+
+fn drain_queued_after_protocol_shutdown(
+    rx: &std::sync::mpsc::Receiver<WorkItem>,
+    sink: &Arc<dyn EventSink>,
+    active_requests: &Mutex<HashSet<u64>>,
+    cancelled: &Mutex<HashSet<u64>>,
+) {
+    for item in rx.try_iter() {
+        match item {
+            WorkItem::Command(cmd) | WorkItem::ProtocolShutdown(cmd) => {
+                finish_request(
+                    sink,
+                    active_requests,
+                    cancelled,
+                    cmd.request_id,
+                    Event::error(cmd.request_id, CoreError::cancelled()),
+                );
+            }
+            WorkItem::Shutdown => break,
+        }
+    }
 }
 
 fn contains_active(active_requests: &Mutex<HashSet<u64>>, request_id: u64) -> bool {
@@ -991,6 +1178,7 @@ mod tests {
                     methods::RUNTIME_HOST_SMOKE,
                     methods::RUNTIME_CANCEL,
                     methods::RUNTIME_STATUS,
+                    methods::RUNTIME_SHUTDOWN,
                     methods::HOST_COMPLETE,
                     methods::HOST_ERROR,
                 ] {
@@ -1103,6 +1291,126 @@ mod tests {
                 assert!(error.message.contains("runtime.status"));
             }
             other => panic!("expected runtime.status params error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn runtime_shutdown_stops_future_commands() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send(Command::new(
+            35,
+            methods::RUNTIME_SHUTDOWN,
+            serde_json::json!({}),
+        ))
+        .unwrap();
+
+        let events = sink.wait_len(1);
+        match &events[0] {
+            Event::Result {
+                request_id, data, ..
+            } => {
+                assert_eq!(*request_id, 35);
+                assert_eq!(data["shuttingDown"], true);
+                assert!(data["cancelledRequestIds"].as_array().unwrap().is_empty());
+            }
+            other => panic!("expected runtime.shutdown result, got {other:?}"),
+        }
+
+        let err = rt
+            .send(Command::new(
+                36,
+                methods::RUNTIME_PING,
+                serde_json::json!({}),
+            ))
+            .unwrap_err();
+        assert_eq!(err.code, ErrorCode::Internal);
+        std::thread::sleep(Duration::from_millis(20));
+        assert_eq!(sink.snapshot().len(), 1);
+    }
+
+    #[test]
+    fn runtime_shutdown_cancels_pending_host_request() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send(Command::new(
+            37,
+            methods::RUNTIME_HOST_SMOKE,
+            serde_json::json!({
+                "capability": "host.smoke.echo",
+                "params": { "message": "cancel on shutdown" }
+            }),
+        ))
+        .unwrap();
+        assert!(matches!(sink.wait_len(1)[0], Event::HostRequest { .. }));
+
+        rt.send(Command::new(
+            38,
+            methods::RUNTIME_SHUTDOWN,
+            serde_json::json!({}),
+        ))
+        .unwrap();
+
+        let events = sink.wait_len(3);
+        match &events[1] {
+            Event::Error {
+                request_id, error, ..
+            } => {
+                assert_eq!(*request_id, 37);
+                assert_eq!(error.code, ErrorCode::Cancelled);
+            }
+            other => panic!("expected pending request cancellation, got {other:?}"),
+        }
+        match &events[2] {
+            Event::Result {
+                request_id, data, ..
+            } => {
+                assert_eq!(*request_id, 38);
+                assert_eq!(data["shuttingDown"], true);
+                assert_eq!(data["cancelledRequestIds"], serde_json::json!([37]));
+            }
+            other => panic!("expected runtime.shutdown result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn runtime_shutdown_rejects_unknown_params_without_shutting_down() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send(Command::new(
+            39,
+            methods::RUNTIME_SHUTDOWN,
+            serde_json::json!({ "force": true }),
+        ))
+        .unwrap();
+
+        let events = sink.wait_len(1);
+        match &events[0] {
+            Event::Error {
+                request_id, error, ..
+            } => {
+                assert_eq!(*request_id, 39);
+                assert_eq!(error.code, ErrorCode::InvalidParams);
+                assert!(error.message.contains("runtime.shutdown"));
+            }
+            other => panic!("expected runtime.shutdown params error, got {other:?}"),
+        }
+
+        rt.send(Command::new(
+            40,
+            methods::RUNTIME_PING,
+            serde_json::json!({}),
+        ))
+        .unwrap();
+        let events = sink.wait_len(2);
+        match &events[1] {
+            Event::Result {
+                request_id, data, ..
+            } => {
+                assert_eq!(*request_id, 40);
+                assert_eq!(data["pong"], true);
+            }
+            other => panic!("expected ping after invalid shutdown, got {other:?}"),
         }
     }
 

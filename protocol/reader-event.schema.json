@@ -97,6 +97,19 @@
         "shuttingDown": { "type": "boolean" }
       }
     },
+    "RuntimeShutdownData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shuttingDown", "cancelledRequestIds"],
+      "description": "Result data for runtime.shutdown.",
+      "properties": {
+        "shuttingDown": { "type": "boolean", "const": true },
+        "cancelledRequestIds": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
     "PendingHostOperationStatus": {
       "type": "object",
       "additionalProperties": false,

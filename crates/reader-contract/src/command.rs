@@ -141,6 +141,12 @@ mod tests {
                     "../../../protocol/fixtures/conformance/commands/valid-runtime-status.json"
                 ),
             ),
+            (
+                "valid-runtime-shutdown",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/valid-runtime-shutdown.json"
+                ),
+            ),
         ] {
             Command::from_json_bytes(json.as_bytes())
                 .unwrap_or_else(|err| panic!("{name} should parse, got {err:?}"));

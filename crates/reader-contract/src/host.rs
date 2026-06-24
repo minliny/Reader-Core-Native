@@ -72,6 +72,15 @@ impl RuntimeCancelParams {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeStatusParams {}
 
+/// Parameters for `runtime.shutdown`.
+///
+/// The command accepts no method-specific fields. A valid shutdown request asks
+/// Core to reject future commands, cancel other active requests, and finish the
+/// worker lifecycle after emitting the shutdown result.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeShutdownParams {}
+
 /// One pending host operation reported by `runtime.status`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -268,6 +277,28 @@ mod tests {
             "includePayloads": true
         }))
         .unwrap_err();
+        assert!(err.to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn runtime_shutdown_params_accept_empty_and_reject_unknown_fields() {
+        let command: crate::Command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/valid-runtime-shutdown.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let _params: RuntimeShutdownParams = serde_json::from_value(command.params).unwrap();
+
+        let command: crate::Command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/invalid-runtime-shutdown-unknown-field.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let err = serde_json::from_value::<RuntimeShutdownParams>(command.params).unwrap_err();
         assert!(err.to_string().contains("unknown field"));
     }
 }

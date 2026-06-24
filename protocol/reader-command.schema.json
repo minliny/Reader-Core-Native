@@ -9,6 +9,7 @@
     "runtime.hostSmoke",
     "runtime.cancel",
     "runtime.status",
+    "runtime.shutdown",
     "host.complete",
     "host.error",
     "host.bus.v1",
@@ -41,6 +42,7 @@
         "runtime.hostSmoke",
         "runtime.cancel",
         "runtime.status",
+        "runtime.shutdown",
         "host.complete",
         "host.error",
         "source.import",
@@ -134,6 +136,11 @@
       "type": "object",
       "additionalProperties": false,
       "description": "Parameters for runtime.status. Must be an empty object."
+    },
+    "RuntimeShutdownParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Parameters for runtime.shutdown. Must be an empty object."
     }
   }
 }
