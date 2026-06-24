@@ -49,10 +49,7 @@ fn fallback_step_passes_through_non_empty_input_unchanged() {
 
     assert_eq!(
         output.values(),
-        &[
-            "Dune & Foundation".to_string(),
-            "Missing Href".to_string()
-        ]
+        &["Dune & Foundation".to_string(), "Missing Href".to_string()]
     );
 }
 
@@ -263,10 +260,7 @@ fn xpath_with_no_matching_nodes_returns_empty() {
     let output = engine
         .execute_step(
             XML,
-            &RuleStep::xpath_with_namespaces(
-                "//r:missing/text()",
-                [("r", "urn:reader:test")],
-            ),
+            &RuleStep::xpath_with_namespaces("//r:missing/text()", [("r", "urn:reader:test")]),
         )
         .unwrap();
     assert!(output.is_empty());
@@ -389,14 +383,12 @@ fn css_selector_preserves_duplicate_text_values() {
         </ul>
     "#;
 
-    let output = engine.execute_step(html, &RuleStep::css_text("li")).unwrap();
+    let output = engine
+        .execute_step(html, &RuleStep::css_text("li"))
+        .unwrap();
     assert_eq!(
         output.values(),
-        &[
-            "same".to_string(),
-            "same".to_string(),
-            "same".to_string()
-        ]
+        &["same".to_string(), "same".to_string(), "same".to_string()]
     );
 }
 
@@ -483,10 +475,7 @@ fn css_attr_preserves_url_encoding() {
         .execute_step(html, &RuleStep::css_attr("a", "href"))
         .unwrap();
     // &amp; is decoded to & by the HTML parser, but %C3%A9 stays encoded.
-    assert_eq!(
-        output.values(),
-        &["/search?q=caf%C3%A9&page=1".to_string()]
-    );
+    assert_eq!(output.values(), &["/search?q=caf%C3%A9&page=1".to_string()]);
 }
 
 #[test]
@@ -515,10 +504,7 @@ fn jsonpath_handles_unicode_and_escaped_field_names() {
     let tags = engine
         .execute_step(json, &RuleStep::json_path("$.tags[*]"))
         .unwrap();
-    assert_eq!(
-        tags.values(),
-        &["科幻".to_string(), "经典".to_string()]
-    );
+    assert_eq!(tags.values(), &["科幻".to_string(), "经典".to_string()]);
 }
 
 #[test]
@@ -531,10 +517,7 @@ fn regex_handles_unicode_patterns_and_input() {
             &RuleStep::regex_capture(r"书名:(\w+)", CaptureGroup::index(1)),
         )
         .unwrap();
-    assert_eq!(
-        output.values(),
-        &["沙une".to_string(), "沙丘".to_string()]
-    );
+    assert_eq!(output.values(), &["沙une".to_string(), "沙丘".to_string()]);
 }
 
 #[test]
@@ -542,10 +525,7 @@ fn regex_replace_supports_dollar_sign_escaping() {
     let engine = RuleEngine::new();
 
     let output = engine
-        .execute_step(
-            "price: 10",
-            &RuleStep::regex_replace(r"price:", "$$"),
-        )
+        .execute_step("price: 10", &RuleStep::regex_replace(r"price:", "$$"))
         .unwrap();
     // $$ is a literal $ in regex replacement.
     assert_eq!(output.values(), &["$ 10".to_string()]);
@@ -635,17 +615,134 @@ fn jsonpath_scalar_values_convert_to_text() {
 
     let json = r#"{"b": true, "n": null, "f": 3.14, "i": 42}"#;
 
-    let b = engine.execute_step(json, &RuleStep::json_path("$.b")).unwrap();
+    let b = engine
+        .execute_step(json, &RuleStep::json_path("$.b"))
+        .unwrap();
     assert_eq!(b.values(), &["true".to_string()]);
 
-    let n = engine.execute_step(json, &RuleStep::json_path("$.n")).unwrap();
+    let n = engine
+        .execute_step(json, &RuleStep::json_path("$.n"))
+        .unwrap();
     assert_eq!(n.values(), &["null".to_string()]);
 
-    let f = engine.execute_step(json, &RuleStep::json_path("$.f")).unwrap();
+    let f = engine
+        .execute_step(json, &RuleStep::json_path("$.f"))
+        .unwrap();
     assert_eq!(f.values(), &["3.14".to_string()]);
 
-    let i = engine.execute_step(json, &RuleStep::json_path("$.i")).unwrap();
+    let i = engine
+        .execute_step(json, &RuleStep::json_path("$.i"))
+        .unwrap();
     assert_eq!(i.values(), &["42".to_string()]);
+}
+
+#[test]
+fn jsonpath_filter_by_string_field_keeps_matching_array_items() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune", "category": "novel" },
+            { "title": "Foundation", "category": "novel" },
+            { "title": "Intro", "category": "metadata" }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("$.books[?(@.category == 'novel')].title"),
+        )
+        .unwrap();
+
+    assert_eq!(
+        output.values(),
+        &["Dune".to_string(), "Foundation".to_string()]
+    );
+}
+
+#[test]
+fn jsonpath_filter_compares_numeric_fields() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "chapters": [
+            { "title": "Intro", "order": 1 },
+            { "title": "Chapter 1", "order": 2 },
+            { "title": "Chapter 2", "order": 3 }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("$.chapters[?(@.order >= 2)].title"),
+        )
+        .unwrap();
+
+    assert_eq!(
+        output.values(),
+        &["Chapter 1".to_string(), "Chapter 2".to_string()]
+    );
+}
+
+#[test]
+fn jsonpath_filter_supports_bracket_quoted_field_names() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune", "category.name": "novel" },
+            { "title": "Intro", "category.name": "metadata" }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("$.books[?(@['category.name'] == 'novel')].title"),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["Dune".to_string()]);
+}
+
+#[test]
+fn jsonpath_filter_compares_against_current_item_field() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "items": [
+            { "name": "low", "score": 2, "min": 5 },
+            { "name": "pass", "score": 5, "min": 5 },
+            { "name": "high", "score": 8, "min": 5 }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.items[?(@.score >= @.min)].name"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["pass".to_string(), "high".to_string()]);
+}
+
+#[test]
+fn jsonpath_filter_keeps_items_where_field_exists() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "links": [
+            { "title": "Keep", "href": "/book/1" },
+            { "title": "Drop" },
+            { "title": "Also Keep", "href": "" }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.links[?(@.href)].title"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["Keep".to_string(), "Also Keep".to_string()]);
 }
 
 // ---------------------------------------------------------------------------
@@ -661,10 +758,7 @@ fn jsonpath_slice_extracts_inclusive_start_exclusive_end() {
     let output = engine
         .execute_step(json, &RuleStep::json_path("$.items[1:3]"))
         .unwrap();
-    assert_eq!(
-        output.values(),
-        &["b".to_string(), "c".to_string()]
-    );
+    assert_eq!(output.values(), &["b".to_string(), "c".to_string()]);
 }
 
 #[test]
@@ -691,10 +785,7 @@ fn jsonpath_slice_open_ended_start_begins_at_zero() {
     let output = engine
         .execute_step(json, &RuleStep::json_path("$.items[:2]"))
         .unwrap();
-    assert_eq!(
-        output.values(),
-        &["a".to_string(), "b".to_string()]
-    );
+    assert_eq!(output.values(), &["a".to_string(), "b".to_string()]);
 }
 
 #[test]
@@ -706,10 +797,7 @@ fn jsonpath_slice_negative_start_counts_from_end() {
     let output = engine
         .execute_step(json, &RuleStep::json_path("$.items[-2:]"))
         .unwrap();
-    assert_eq!(
-        output.values(),
-        &["d".to_string(), "e".to_string()]
-    );
+    assert_eq!(output.values(), &["d".to_string(), "e".to_string()]);
 }
 
 #[test]
