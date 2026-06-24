@@ -36,6 +36,10 @@
   `{ "requestId": <positive integer> }`, returns `{ "cancelled": <bool> }` on
   the cancel command request, and emits a separate `CANCELLED` error event on
   the original request when a pending Core request is cancelled.
+- `runtime.status` is a read-only JSON-protocol liveness snapshot. It returns
+  active request IDs, pending host operation IDs/capabilities/states, and the
+  runtime shutdown flag. It does not expose host request payloads or platform
+  state.
 
 ## Platform Contract
 

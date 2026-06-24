@@ -63,6 +63,8 @@ const HOST_ERROR_OPERATION_ZERO: &str =
 
 const VALID_RUNTIME_CANCEL: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-runtime-cancel.json");
+const VALID_RUNTIME_STATUS: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-runtime-status.json");
 const INVALID_RUNTIME_CANCEL_TARGET_ZERO: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-runtime-cancel-target-zero.json"
 );
@@ -408,6 +410,70 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         let (_runtime, rx) = send_to_fresh_runtime(INVALID_RUNTIME_CANCEL_TARGET_ZERO)?;
         expect_event_error(&rx, 311, ErrorCode::InvalidParams)
     });
+
+    record(
+        &mut report,
+        "runtime-status-empty-runtime-excludes-status-command",
+        || {
+            let (_runtime, rx) = send_to_fresh_runtime(VALID_RUNTIME_STATUS)?;
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 320
+                    && data["activeRequestCount"] == 0
+                    && data["activeRequestIds"]
+                        .as_array()
+                        .is_some_and(Vec::is_empty)
+                    && data["pendingHostOperationCount"] == 0
+                    && data["pendingHostOperations"]
+                        .as_array()
+                        .is_some_and(Vec::is_empty)
+                    && data["shuttingDown"] == false =>
+                {
+                    Ok(())
+                }
+                other => Err(format!("expected empty runtime.status, got {other:?}")),
+            }
+        },
+    );
+
+    record(
+        &mut report,
+        "runtime-status-reports-pending-host-operation-metadata",
+        || {
+            let (runtime, rx) = send_to_fresh_runtime(HOST_REQUEST)?;
+            expect_host_request(&rx)?;
+            runtime
+                .send_json(VALID_RUNTIME_STATUS.as_bytes())
+                .map_err(|err| format!("runtime.status send failed: {err:?}"))?;
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 320
+                    && data["activeRequestCount"] == 1
+                    && data["activeRequestIds"] == json!([301])
+                    && data["pendingHostOperationCount"] == 1 =>
+                {
+                    let operations = data["pendingHostOperations"]
+                        .as_array()
+                        .ok_or_else(|| "pendingHostOperations missing".to_string())?;
+                    let Some(operation) = operations.first() else {
+                        return Err("pendingHostOperations empty".to_string());
+                    };
+                    if operation["operationId"] != 1
+                        || operation["requestId"] != 301
+                        || operation["capability"] != "host.smoke.echo"
+                        || operation["state"] != "pending"
+                        || operation.get("params").is_some()
+                    {
+                        return Err(format!("unexpected pending operation {operation}"));
+                    }
+                    Ok(())
+                }
+                other => Err(format!("expected pending runtime.status, got {other:?}")),
+            }
+        },
+    );
 
     report
 }
