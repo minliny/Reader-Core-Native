@@ -219,6 +219,76 @@ impl BookshelfEntry {
     }
 }
 
+/// Query/filter/sort request for a bookshelf view.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookshelfQuery {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    /// Case-insensitive substring match over title, author, and book id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keyword: Option<String>,
+    /// `Some(true)` keeps books with current reading progress; `Some(false)`
+    /// keeps books without progress.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub has_reading_progress: Option<bool>,
+    #[serde(default)]
+    pub sort_by: BookshelfSortBy,
+    #[serde(default)]
+    pub sort_direction: BookshelfSortDirection,
+    #[serde(default)]
+    pub offset: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<usize>,
+}
+
+impl Default for BookshelfQuery {
+    fn default() -> Self {
+        Self {
+            source_id: None,
+            group: None,
+            keyword: None,
+            has_reading_progress: None,
+            sort_by: BookshelfSortBy::Manual,
+            sort_direction: BookshelfSortDirection::Ascending,
+            offset: 0,
+            limit: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BookshelfSortBy {
+    /// `sort_index` ascending, then added time descending.
+    Manual,
+    AddedAt,
+    LastReadAt,
+    Title,
+    Author,
+}
+
+impl Default for BookshelfSortBy {
+    fn default() -> Self {
+        Self::Manual
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BookshelfSortDirection {
+    Ascending,
+    Descending,
+}
+
+impl Default for BookshelfSortDirection {
+    fn default() -> Self {
+        Self::Ascending
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct ShelfKey {
     source_id: String,
@@ -470,6 +540,10 @@ pub trait BookshelfStore {
     /// `added_at` descending (most recently added first within the same index).
     fn list_shelf(&self) -> Result<Vec<BookshelfEntry>, StorageError>;
 
+    /// Query shelf entries by source/group/keyword/progress state with
+    /// deterministic sorting and pagination.
+    fn query_shelf(&self, query: BookshelfQuery) -> Result<Vec<BookshelfEntry>, StorageError>;
+
     /// List shelf entries in a given group, sorted as [`BookshelfStore::list_shelf`].
     fn list_shelf_by_group(&self, group: &str) -> Result<Vec<BookshelfEntry>, StorageError>;
 
@@ -481,6 +555,15 @@ pub trait BookshelfStore {
         book_id: &str,
         timestamp: i64,
     ) -> Result<(), StorageError>;
+
+    /// Move a shelf entry to a group and manual sort position.
+    fn move_shelf_entry(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        group: Option<String>,
+        sort_index: i32,
+    ) -> Result<BookshelfEntry, StorageError>;
 
     /// Number of entries on the shelf.
     fn shelf_count(&self) -> Result<usize, StorageError>;
@@ -988,7 +1071,94 @@ fn sort_shelf(entries: &mut Vec<BookshelfEntry>) {
         a.sort_index
             .cmp(&b.sort_index)
             .then_with(|| b.added_at.cmp(&a.added_at))
+            .then_with(|| a.source_id.cmp(&b.source_id))
+            .then_with(|| a.book_id.cmp(&b.book_id))
     });
+}
+
+fn normalize_required_filter(
+    value: Option<String>,
+    field: &str,
+) -> Result<Option<String>, StorageError> {
+    value
+        .map(|value| {
+            let trimmed = value.trim().to_string();
+            if trimmed.is_empty() {
+                Err(StorageError::InvalidKey {
+                    field: field.into(),
+                })
+            } else {
+                Ok(trimmed)
+            }
+        })
+        .transpose()
+}
+
+fn normalize_keyword(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty())
+}
+
+fn normalize_group(value: Option<String>) -> Result<Option<String>, StorageError> {
+    normalize_required_filter(value, "group")
+}
+
+fn entry_matches_keyword(entry: &BookshelfEntry, keyword: &str) -> bool {
+    entry.title.to_ascii_lowercase().contains(keyword)
+        || entry.author.to_ascii_lowercase().contains(keyword)
+        || entry.book_id.to_ascii_lowercase().contains(keyword)
+}
+
+fn entry_has_reading_progress(inner: &StorageInner, entry: &BookshelfEntry) -> bool {
+    inner.reading_progress.contains_key(&ReadingProgressKey {
+        source_id: entry.source_id.clone(),
+        book_id: entry.book_id.clone(),
+    })
+}
+
+fn sort_shelf_query(
+    entries: &mut Vec<BookshelfEntry>,
+    sort_by: BookshelfSortBy,
+    direction: BookshelfSortDirection,
+) {
+    if sort_by == BookshelfSortBy::Manual {
+        sort_shelf(entries);
+        if direction == BookshelfSortDirection::Descending {
+            entries.reverse();
+        }
+        return;
+    }
+
+    entries.sort_by(|a, b| {
+        let ordering = match sort_by {
+            BookshelfSortBy::Manual => std::cmp::Ordering::Equal,
+            BookshelfSortBy::AddedAt => a.added_at.cmp(&b.added_at),
+            BookshelfSortBy::LastReadAt => a.last_read_at.cmp(&b.last_read_at),
+            BookshelfSortBy::Title => a.title.cmp(&b.title),
+            BookshelfSortBy::Author => a.author.cmp(&b.author),
+        };
+        let ordering = if direction == BookshelfSortDirection::Descending {
+            ordering.reverse()
+        } else {
+            ordering
+        };
+        ordering
+            .then_with(|| a.source_id.cmp(&b.source_id))
+            .then_with(|| a.book_id.cmp(&b.book_id))
+    });
+}
+
+fn paginate_shelf(
+    entries: Vec<BookshelfEntry>,
+    offset: usize,
+    limit: Option<usize>,
+) -> Vec<BookshelfEntry> {
+    let iter = entries.into_iter().skip(offset);
+    match limit {
+        Some(limit) => iter.take(limit).collect(),
+        None => iter.collect(),
+    }
 }
 
 fn chapter_cache_content_bytes(entry: &ChapterCacheEntry) -> usize {
@@ -1094,12 +1264,52 @@ impl BookshelfStore for InMemoryStorage {
         Ok(entries)
     }
 
+    fn query_shelf(&self, query: BookshelfQuery) -> Result<Vec<BookshelfEntry>, StorageError> {
+        let source_id = normalize_required_filter(query.source_id, "source_id")?;
+        let group = normalize_group(query.group)?;
+        let keyword = normalize_keyword(query.keyword);
+        let inner = self.lock()?;
+        let mut entries = inner
+            .shelf
+            .values()
+            .filter(|entry| {
+                source_id
+                    .as_deref()
+                    .map(|source_id| entry.source_id == source_id)
+                    .unwrap_or(true)
+            })
+            .filter(|entry| {
+                group
+                    .as_deref()
+                    .map(|group| entry.group.as_deref() == Some(group))
+                    .unwrap_or(true)
+            })
+            .filter(|entry| {
+                keyword
+                    .as_deref()
+                    .map(|keyword| entry_matches_keyword(entry, keyword))
+                    .unwrap_or(true)
+            })
+            .filter(|entry| {
+                query
+                    .has_reading_progress
+                    .map(|expected| entry_has_reading_progress(&inner, entry) == expected)
+                    .unwrap_or(true)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        sort_shelf_query(&mut entries, query.sort_by, query.sort_direction);
+        Ok(paginate_shelf(entries, query.offset, query.limit))
+    }
+
     fn list_shelf_by_group(&self, group: &str) -> Result<Vec<BookshelfEntry>, StorageError> {
+        let group = normalize_group(Some(group.to_string()))?
+            .expect("normalize_group returns Some for Some input");
         let inner = self.lock()?;
         let mut entries: Vec<BookshelfEntry> = inner
             .shelf
             .values()
-            .filter(|e| e.group.as_deref() == Some(group))
+            .filter(|e| e.group.as_deref() == Some(group.as_str()))
             .cloned()
             .collect();
         sort_shelf(&mut entries);
@@ -1128,6 +1338,32 @@ impl BookshelfStore for InMemoryStorage {
                 book_id: book_id.to_string(),
             }),
         }
+    }
+
+    fn move_shelf_entry(
+        &self,
+        source_id: &str,
+        book_id: &str,
+        group: Option<String>,
+        sort_index: i32,
+    ) -> Result<BookshelfEntry, StorageError> {
+        validate_shelf_key(source_id, book_id)?;
+        let group = normalize_group(group)?;
+        let mut inner = self.lock()?;
+        let key = ShelfKey {
+            source_id: source_id.to_string(),
+            book_id: book_id.to_string(),
+        };
+        let entry = inner
+            .shelf
+            .get_mut(&key)
+            .ok_or_else(|| StorageError::NotFound {
+                source_id: source_id.to_string(),
+                book_id: book_id.to_string(),
+            })?;
+        entry.group = group;
+        entry.sort_index = sort_index;
+        Ok(entry.clone())
     }
 
     fn shelf_count(&self) -> Result<usize, StorageError> {
@@ -2344,6 +2580,200 @@ mod tests {
         assert_eq!(moren.len(), 1);
         assert_eq!(moren[0].title, "B");
         assert!(store.list_shelf_by_group("不存在").unwrap().is_empty());
+    }
+
+    #[test]
+    fn shelf_query_filters_by_source_group_keyword_and_progress() {
+        let store = InMemoryStorage::new();
+        let mut dune = shelf_entry("s1", "dune", "Dune", 1000);
+        dune.author = "Frank Herbert".into();
+        dune.group = Some("追更".into());
+        let mut foundation = shelf_entry("s1", "foundation", "Foundation", 2000);
+        foundation.author = "Isaac Asimov".into();
+        foundation.group = Some("追更".into());
+        let mut other_source = shelf_entry("s2", "dune", "Dune Mirror", 3000);
+        other_source.group = Some("追更".into());
+        store.add_to_shelf(dune).unwrap();
+        store.add_to_shelf(foundation).unwrap();
+        store.add_to_shelf(other_source).unwrap();
+        store
+            .save_reading_progress(progress_entry("s1", "dune", 1, 100, 0.2, 4000))
+            .unwrap();
+
+        let result = store
+            .query_shelf(BookshelfQuery {
+                source_id: Some("s1".into()),
+                group: Some("追更".into()),
+                keyword: Some("herbert".into()),
+                has_reading_progress: Some(true),
+                ..BookshelfQuery::default()
+            })
+            .unwrap();
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].book_id, "dune");
+
+        let without_progress = store
+            .query_shelf(BookshelfQuery {
+                source_id: Some("s1".into()),
+                has_reading_progress: Some(false),
+                ..BookshelfQuery::default()
+            })
+            .unwrap();
+        assert_eq!(
+            without_progress
+                .into_iter()
+                .map(|entry| entry.book_id)
+                .collect::<Vec<_>>(),
+            vec!["foundation"]
+        );
+    }
+
+    #[test]
+    fn shelf_query_sorts_and_paginates_deterministically() {
+        let store = InMemoryStorage::new();
+        let mut alpha = shelf_entry("s1", "a", "Alpha", 1000);
+        alpha.author = "C".into();
+        alpha.sort_index = 2;
+        let mut beta = shelf_entry("s1", "b", "Beta", 2000);
+        beta.author = "A".into();
+        beta.sort_index = 1;
+        let mut gamma = shelf_entry("s1", "c", "Gamma", 3000);
+        gamma.author = "B".into();
+        gamma.sort_index = 3;
+        store.add_to_shelf(alpha).unwrap();
+        store.add_to_shelf(beta).unwrap();
+        store.add_to_shelf(gamma).unwrap();
+        store.update_last_read("s1", "a", 5000).unwrap();
+        store.update_last_read("s1", "c", 4000).unwrap();
+
+        let recent = store
+            .query_shelf(BookshelfQuery {
+                sort_by: BookshelfSortBy::LastReadAt,
+                sort_direction: BookshelfSortDirection::Descending,
+                ..BookshelfQuery::default()
+            })
+            .unwrap();
+        assert_eq!(
+            recent
+                .into_iter()
+                .map(|entry| entry.book_id)
+                .collect::<Vec<_>>(),
+            vec!["a", "c", "b"]
+        );
+
+        let by_author_page = store
+            .query_shelf(BookshelfQuery {
+                sort_by: BookshelfSortBy::Author,
+                offset: 1,
+                limit: Some(1),
+                ..BookshelfQuery::default()
+            })
+            .unwrap();
+        assert_eq!(by_author_page[0].book_id, "c");
+
+        let manual_desc = store
+            .query_shelf(BookshelfQuery {
+                sort_by: BookshelfSortBy::Manual,
+                sort_direction: BookshelfSortDirection::Descending,
+                ..BookshelfQuery::default()
+            })
+            .unwrap();
+        assert_eq!(
+            manual_desc
+                .into_iter()
+                .map(|entry| entry.book_id)
+                .collect::<Vec<_>>(),
+            vec!["c", "a", "b"]
+        );
+    }
+
+    #[test]
+    fn shelf_move_updates_group_and_manual_order() {
+        let store = InMemoryStorage::new();
+        store
+            .add_to_shelf(shelf_entry("s1", "b1", "Dune", 1000))
+            .unwrap();
+
+        let moved = store
+            .move_shelf_entry("s1", "b1", Some("追更".into()), 7)
+            .unwrap();
+
+        assert_eq!(moved.group.as_deref(), Some("追更"));
+        assert_eq!(moved.sort_index, 7);
+        assert_eq!(
+            store
+                .list_shelf_by_group("追更")
+                .unwrap()
+                .into_iter()
+                .map(|entry| entry.book_id)
+                .collect::<Vec<_>>(),
+            vec!["b1"]
+        );
+
+        let cleared = store.move_shelf_entry("s1", "b1", None, -1).unwrap();
+        assert_eq!(cleared.group, None);
+        assert_eq!(cleared.sort_index, -1);
+    }
+
+    #[test]
+    fn shelf_query_and_move_reject_invalid_fields_or_missing_entry() {
+        let store = InMemoryStorage::new();
+        assert!(matches!(
+            store.query_shelf(BookshelfQuery {
+                source_id: Some("   ".into()),
+                ..BookshelfQuery::default()
+            }),
+            Err(StorageError::InvalidKey { .. })
+        ));
+        assert!(matches!(
+            store.query_shelf(BookshelfQuery {
+                group: Some("   ".into()),
+                ..BookshelfQuery::default()
+            }),
+            Err(StorageError::InvalidKey { .. })
+        ));
+        assert!(matches!(
+            store.list_shelf_by_group("   "),
+            Err(StorageError::InvalidKey { .. })
+        ));
+        assert_eq!(
+            store
+                .move_shelf_entry("s1", "missing", Some("追更".into()), 1)
+                .unwrap_err(),
+            StorageError::NotFound {
+                source_id: "s1".into(),
+                book_id: "missing".into()
+            }
+        );
+        store
+            .add_to_shelf(shelf_entry("s1", "b1", "Dune", 1000))
+            .unwrap();
+        assert!(matches!(
+            store.move_shelf_entry("s1", "b1", Some("   ".into()), 1),
+            Err(StorageError::InvalidKey { .. })
+        ));
+    }
+
+    #[test]
+    fn bookshelf_query_json_round_trips_and_denies_unknown_fields() {
+        let query = BookshelfQuery {
+            source_id: Some("s1".into()),
+            group: Some("追更".into()),
+            keyword: Some("dune".into()),
+            has_reading_progress: Some(true),
+            sort_by: BookshelfSortBy::Title,
+            sort_direction: BookshelfSortDirection::Descending,
+            offset: 10,
+            limit: Some(20),
+        };
+
+        let json = serde_json::to_string(&query).unwrap();
+        let back: BookshelfQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, query);
+        assert!(
+            serde_json::from_str::<BookshelfQuery>(r#"{"sortBy":"title","bogus":true}"#).is_err()
+        );
     }
 
     #[test]
