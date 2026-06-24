@@ -1,0 +1,12 @@
+[package]
+name = "reader-contract"
+description = "Reader-Core JSON command/event protocol types (ABI v1, protocol v1)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true

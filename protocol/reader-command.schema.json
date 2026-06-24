@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reader-core-native/reader-command.schema.json",
+  "title": "Reader Core Command Protocol",
+  "description": "JSON message protocol for platform → Core commands.",
+  "type": "object",
+  "required": ["protocolVersion", "requestId", "method"],
+  "properties": {
+    "protocolVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Protocol version. Must be 1."
+    },
+    "requestId": {
+      "type": "integer",
+      "description": "Unique request identifier for correlation."
+    },
+    "method": {
+      "type": "string",
+      "description": "Command method name, dot-separated.",
+      "examples": [
+        "core.info",
+        "core.ping",
+        "book.search",
+        "book.detail",
+        "book.toc",
+        "chapter.content",
+        "source.import",
+        "source.list",
+        "progress.get",
+        "progress.set",
+        "host.complete",
+        "host.error"
+      ]
+    },
+    "params": {
+      "type": "object",
+      "description": "Method-specific parameters."
+    }
+  }
+}

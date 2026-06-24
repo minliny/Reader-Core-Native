@@ -1,0 +1,35 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/reader-contract",
+    "crates/reader-domain",
+    "crates/reader-rule",
+    "crates/reader-js",
+    "crates/reader-content",
+    "crates/reader-storage",
+    "crates/reader-local-book",
+    "crates/reader-rss",
+    "crates/reader-sync",
+    "crates/reader-runtime",
+    "crates/reader-ffi",
+    "tools/reader-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+rust-version = "1.75"
+authors = ["minliny"]
+repository = "https://github.com/minliny/Reader-Core-Native"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

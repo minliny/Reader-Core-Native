@@ -1,0 +1,16 @@
+[package]
+name = "reader-ffi"
+description = "Reader-Core C ABI (reader_core.h) implementation"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[lib]
+crate-type = ["rlib", "staticlib", "cdylib"]
+
+[dependencies]
+reader-contract = { path = "../reader-contract" }
+reader-runtime = { path = "../reader-runtime" }
+serde_json.workspace = true

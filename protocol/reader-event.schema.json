@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reader-core-native/reader-event.schema.json",
+  "title": "Reader Core Event Protocol",
+  "description": "JSON message protocol for Core → platform events.",
+  "oneOf": [
+    { "$ref": "#/$defs/ResultEvent" },
+    { "$ref": "#/$defs/ErrorEvent" },
+    { "$ref": "#/$defs/HostRequestEvent" }
+  ],
+  "$defs": {
+    "ResultEvent": {
+      "type": "object",
+      "required": ["protocolVersion", "requestId", "type", "data"],
+      "properties": {
+        "protocolVersion": { "type": "integer", "const": 1 },
+        "requestId": { "type": "integer" },
+        "type": { "type": "string", "const": "result" },
+        "data": { "type": "object" }
+      }
+    },
+    "ErrorEvent": {
+      "type": "object",
+      "required": ["protocolVersion", "requestId", "type", "error"],
+      "properties": {
+        "protocolVersion": { "type": "integer", "const": 1 },
+        "requestId": { "type": "integer" },
+        "type": { "type": "string", "const": "error" },
+        "error": {
+          "type": "object",
+          "required": ["code", "message", "retryable"],
+          "properties": {
+            "code": { "type": "string", "description": "Machine-readable error code." },
+            "message": { "type": "string", "description": "Human-readable message." },
+            "retryable": { "type": "boolean" },
+            "details": { "type": "object" }
+          }
+        }
+      }
+    },
+    "HostRequestEvent": {
+      "type": "object",
+      "required": ["protocolVersion", "type", "operationId", "capability", "params"],
+      "properties": {
+        "protocolVersion": { "type": "integer", "const": 1 },
+        "type": { "type": "string", "const": "host.request" },
+        "operationId": { "type": "integer" },
+        "capability": { "type": "string" },
+        "params": { "type": "object" }
+      }
+    }
+  }
+}

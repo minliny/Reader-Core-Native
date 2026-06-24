@@ -1,0 +1,12 @@
+[package]
+name = "reader-runtime"
+description = "Reader-Core command dispatcher, worker pool, and cancellation"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[dependencies]
+reader-contract = { path = "../reader-contract" }
+serde_json.workspace = true

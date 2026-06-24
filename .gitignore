@@ -1,0 +1,25 @@
+# Rust
+target/
+# Cargo.lock IS tracked: this workspace ships staticlib/cdylib artifacts into
+# apps, so a locked dependency set keeps three platforms on identical builds.
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Build artifacts
+*.o
+*.a
+*.so
+*.dylib
+*.xcframework/
+*.framework/
+
+# OHOS
+.hvigor/
+oh_modules/

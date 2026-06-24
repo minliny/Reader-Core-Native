@@ -1,0 +1,13 @@
+[package]
+name = "reader-cli"
+description = "Reader-Core command-line driver and sample runner (ARCHITECTURE.md phase 3+)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[dependencies]
+reader-contract = { path = "../../crates/reader-contract" }
+reader-runtime = { path = "../../crates/reader-runtime" }
+serde_json.workspace = true

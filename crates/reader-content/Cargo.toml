@@ -1,0 +1,11 @@
+[package]
+name = "reader-content"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[dependencies]
+reader-domain = { path = "../reader-domain" }
+reader-rule = { path = "../reader-rule" }
