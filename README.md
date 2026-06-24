@@ -27,22 +27,35 @@ rustup target add aarch64-unknown-linux-ohos
 rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 ./scripts/build-ios-xcframework.sh
 
-# 阶段 1：Swift wrapper typecheck smoke（需要 Xcode）
+# 阶段 1：Swift wrapper compile/link/runtime smoke（需要 Xcode）
 ./scripts/check-ios-swift-wrapper.sh
 
 # 滚动集成：把已完成 agent 分支接入独立 integration worktree
 scripts/integration-queue.sh \
-  codex/core-product-integration \
-  origin/codex/core-foundation-integration \
-  origin/codex/remote-reading-vertical
+  codex/android-integration \
+  origin/codex/core-product-integration \
+  origin/codex/<android-jni-branch>
 ```
 
 `build-local.sh` 会同时运行 C 和 C++ host ABI smoke。C++ smoke 是
 JNI、NAPI、Objective-C++ shim 的头文件/链接基线。
 
+## 当前 Core-side 状态
+
+`origin/codex/core-product-integration` 已接入 Core-side
+`remote.reading.v1` 纵切 smoke：`source.import`、`book.search`、
+`book.detail`、`book.toc`、`chapter.content`、`reading.progress.update` 可在
+fixture/inline response 下跑通，并覆盖 content pipeline、in-memory cache
+和 progress 写入；同时支持 `http.execute` host request/complete 回路。V1
+不在 Core 内打开 socket；HTTP/TLS/WebView 等实际平台能力仍由 platform
+adapter 提供。
+
 OHOS、Android、iOS 平台产物脚本会按 [ARCHITECTURE.md](./ARCHITECTURE.md)
 阶段 1/2 补齐；当前 `build-harmony-napi.sh` 验证 Rust staticlib 能链接为
 HarmonyOS NAPI `.so`，HAP 集成和真机加载仍需在 HarmonyOS App 仓库完成。
+当前 iOS 证据覆盖 Core-side XCFramework / Swift wrapper compile-link-runtime
+smoke（`core.info` / `runtime.ping`）；URLSession/WebView/App 侧接入仍是后续
+滚动接入项。Android JNI 仍未在远端集成分支中完成。
 
 ## 目录
 

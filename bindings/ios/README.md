@@ -19,6 +19,11 @@ Output:
 target/ios/ReaderCore.xcframework
 ```
 
+Current status: this is a Core-side artifact smoke. The XCFramework/header
+packaging and Swift wrapper typecheck gate are covered in this repository; iOS
+App runtime loading, URLSession host transport, WebView login, and UI
+integration remain host-repository work.
+
 Each XCFramework slice includes:
 
 - `Headers/reader_core.h`
