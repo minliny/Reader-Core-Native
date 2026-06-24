@@ -5,7 +5,8 @@ use std::thread::{self, JoinHandle};
 
 use reader_contract::{
     core_info, methods, Command, CoreError, Event, HostCompleteParams, HostErrorParams,
-    HostSmokeParams, RuntimeCancelParams, RuntimeConfig,
+    HostSmokeParams, PendingHostOperationStatus, RuntimeCancelParams, RuntimeConfig, RuntimeStatus,
+    RuntimeStatusParams,
 };
 
 use crate::remote::{
@@ -32,6 +33,14 @@ enum HostOperationState {
     Pending,
 }
 
+impl HostOperationState {
+    fn as_protocol_str(&self) -> &'static str {
+        match self {
+            HostOperationState::Pending => "pending",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 enum HostOperationContinuation {
     Echo,
@@ -41,6 +50,7 @@ enum HostOperationContinuation {
 #[derive(Debug, Clone, PartialEq)]
 struct HostOperation {
     request_id: u64,
+    capability: String,
     state: HostOperationState,
     continuation: HostOperationContinuation,
 }
@@ -231,6 +241,7 @@ impl Runtime {
                         &cancelled,
                         &host_operations,
                         &next_operation_id,
+                        &shutdown,
                         &remote_state,
                     );
                 }
@@ -256,6 +267,7 @@ fn dispatch_command(
     cancelled: &Mutex<HashSet<u64>>,
     host_operations: &Mutex<HashMap<u64, HostOperation>>,
     next_operation_id: &AtomicU64,
+    shutdown: &AtomicBool,
     remote_state: &RemoteState,
 ) {
     if take_cancelled(cancelled, cmd.request_id) {
@@ -301,6 +313,14 @@ fn dispatch_command(
         methods::RUNTIME_CANCEL => {
             dispatch_runtime_cancel(cmd, sink, active_requests, cancelled, host_operations)
         }
+        methods::RUNTIME_STATUS => dispatch_runtime_status(
+            cmd,
+            sink,
+            active_requests,
+            cancelled,
+            host_operations,
+            shutdown,
+        ),
         methods::HOST_COMPLETE => dispatch_host_complete(
             cmd,
             sink,
@@ -381,6 +401,7 @@ fn dispatch_host_smoke(
             operation_id,
             HostOperation {
                 request_id: cmd.request_id,
+                capability: params.capability.clone(),
                 state: HostOperationState::Pending,
                 continuation: HostOperationContinuation::Echo,
             },
@@ -476,6 +497,62 @@ fn dispatch_runtime_cancel(
     );
 }
 
+fn dispatch_runtime_status(
+    cmd: &Command,
+    sink: &Arc<dyn EventSink>,
+    active_requests: &Mutex<HashSet<u64>>,
+    cancelled: &Mutex<HashSet<u64>>,
+    host_operations: &Mutex<HashMap<u64, HostOperation>>,
+    shutdown: &AtomicBool,
+) {
+    let _params: RuntimeStatusParams = match serde_json::from_value(cmd.params.clone()) {
+        Ok(params) => params,
+        Err(err) => {
+            finish_request(
+                sink,
+                active_requests,
+                cancelled,
+                cmd.request_id,
+                Event::error(
+                    cmd.request_id,
+                    CoreError::invalid_params(format!("invalid params for {}", cmd.method))
+                        .with_details(serde_json::json!({ "source": err.to_string() })),
+                ),
+            );
+            return;
+        }
+    };
+
+    let status = match runtime_status_snapshot(
+        active_requests,
+        host_operations,
+        cmd.request_id,
+        shutdown.load(Ordering::Acquire),
+    ) {
+        Ok(status) => status,
+        Err(error) => {
+            finish_request(
+                sink,
+                active_requests,
+                cancelled,
+                cmd.request_id,
+                Event::error(cmd.request_id, error),
+            );
+            return;
+        }
+    };
+
+    let data = serde_json::to_value(status)
+        .unwrap_or_else(|_| serde_json::json!({ "internalSerializationError": true }));
+    finish_request(
+        sink,
+        active_requests,
+        cancelled,
+        cmd.request_id,
+        Event::result(cmd.request_id, data),
+    );
+}
+
 fn dispatch_remote_host_request(
     cmd: &Command,
     sink: &Arc<dyn EventSink>,
@@ -491,6 +568,7 @@ fn dispatch_remote_host_request(
             operation_id,
             HostOperation {
                 request_id: cmd.request_id,
+                capability: pending.capability.clone(),
                 state: HostOperationState::Pending,
                 continuation: HostOperationContinuation::Remote(pending.continuation),
             },
@@ -632,14 +710,16 @@ fn dispatch_host_error(
 }
 
 fn parse_host_smoke_params(cmd: &Command) -> Result<HostSmokeParams, CoreError> {
-    serde_json::from_value::<HostSmokeParams>(cmd.params.clone()).map_err(|err| {
+    let params = serde_json::from_value::<HostSmokeParams>(cmd.params.clone()).map_err(|err| {
         CoreError::invalid_params(format!("invalid params for {}", cmd.method)).with_details(
             serde_json::json!({
                 "source": err.to_string(),
                 "method": cmd.method,
             }),
         )
-    })
+    })?;
+    params.validate()?;
+    Ok(params)
 }
 
 fn parse_runtime_cancel_params(cmd: &Command) -> Result<RuntimeCancelParams, CoreError> {
@@ -657,25 +737,30 @@ fn parse_runtime_cancel_params(cmd: &Command) -> Result<RuntimeCancelParams, Cor
 }
 
 fn parse_host_complete_params(cmd: &Command) -> Result<HostCompleteParams, CoreError> {
-    serde_json::from_value::<HostCompleteParams>(cmd.params.clone()).map_err(|err| {
-        CoreError::invalid_params(format!("invalid params for {}", cmd.method)).with_details(
-            serde_json::json!({
-                "source": err.to_string(),
-                "method": cmd.method,
-            }),
-        )
-    })
+    let params =
+        serde_json::from_value::<HostCompleteParams>(cmd.params.clone()).map_err(|err| {
+            CoreError::invalid_params(format!("invalid params for {}", cmd.method)).with_details(
+                serde_json::json!({
+                    "source": err.to_string(),
+                    "method": cmd.method,
+                }),
+            )
+        })?;
+    params.validate()?;
+    Ok(params)
 }
 
 fn parse_host_error_params(cmd: &Command) -> Result<HostErrorParams, CoreError> {
-    serde_json::from_value::<HostErrorParams>(cmd.params.clone()).map_err(|err| {
+    let params = serde_json::from_value::<HostErrorParams>(cmd.params.clone()).map_err(|err| {
         CoreError::invalid_params(format!("invalid params for {}", cmd.method)).with_details(
             serde_json::json!({
                 "source": err.to_string(),
                 "method": cmd.method,
             }),
         )
-    })
+    })?;
+    params.validate()?;
+    Ok(params)
 }
 
 fn finish_request(
@@ -692,6 +777,43 @@ fn finish_request(
     };
     remove_active(active_requests, request_id);
     sink.emit(&event);
+}
+
+fn runtime_status_snapshot(
+    active_requests: &Mutex<HashSet<u64>>,
+    host_operations: &Mutex<HashMap<u64, HostOperation>>,
+    current_request_id: u64,
+    shutting_down: bool,
+) -> Result<RuntimeStatus, CoreError> {
+    let mut active_request_ids = active_requests
+        .lock()
+        .map_err(|_| CoreError::internal("active request registry poisoned"))?
+        .iter()
+        .copied()
+        .filter(|request_id| *request_id != current_request_id)
+        .collect::<Vec<_>>();
+    active_request_ids.sort_unstable();
+
+    let mut pending_host_operations = host_operations
+        .lock()
+        .map_err(|_| CoreError::internal("host operation registry poisoned"))?
+        .iter()
+        .map(|(operation_id, operation)| PendingHostOperationStatus {
+            operation_id: *operation_id,
+            request_id: operation.request_id,
+            capability: operation.capability.clone(),
+            state: operation.state.as_protocol_str().to_string(),
+        })
+        .collect::<Vec<_>>();
+    pending_host_operations.sort_by_key(|operation| operation.operation_id);
+
+    Ok(RuntimeStatus {
+        active_request_count: active_request_ids.len() as u64,
+        active_request_ids,
+        pending_host_operation_count: pending_host_operations.len() as u64,
+        pending_host_operations,
+        shutting_down,
+    })
 }
 
 fn contains_active(active_requests: &Mutex<HashSet<u64>>, request_id: u64) -> bool {
@@ -868,6 +990,7 @@ mod tests {
                     methods::RUNTIME_PING,
                     methods::RUNTIME_HOST_SMOKE,
                     methods::RUNTIME_CANCEL,
+                    methods::RUNTIME_STATUS,
                     methods::HOST_COMPLETE,
                     methods::HOST_ERROR,
                 ] {
@@ -884,6 +1007,102 @@ mod tests {
                 assert!(!V1_CAPABILITIES.contains(&methods::LEGACY_CORE_PING));
             }
             other => panic!("expected result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn runtime_status_reports_empty_runtime_without_counting_itself() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send(Command::new(
+            31,
+            methods::RUNTIME_STATUS,
+            serde_json::json!({}),
+        ))
+        .unwrap();
+
+        let events = sink.wait_len(1);
+        match &events[0] {
+            Event::Result {
+                request_id, data, ..
+            } => {
+                assert_eq!(*request_id, 31);
+                assert_eq!(data["activeRequestCount"], 0);
+                assert!(data["activeRequestIds"].as_array().unwrap().is_empty());
+                assert_eq!(data["pendingHostOperationCount"], 0);
+                assert!(data["pendingHostOperations"].as_array().unwrap().is_empty());
+                assert_eq!(data["shuttingDown"], false);
+            }
+            other => panic!("expected runtime.status result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn runtime_status_reports_pending_host_operation_without_payload() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send(Command::new(
+            32,
+            methods::RUNTIME_HOST_SMOKE,
+            serde_json::json!({
+                "capability": "host.smoke.echo",
+                "params": { "message": "not exposed in status" }
+            }),
+        ))
+        .unwrap();
+        match &sink.wait_len(1)[0] {
+            Event::HostRequest { .. } => {}
+            other => panic!("expected host request, got {other:?}"),
+        }
+
+        rt.send(Command::new(
+            33,
+            methods::RUNTIME_STATUS,
+            serde_json::json!({}),
+        ))
+        .unwrap();
+        let events = sink.wait_len(2);
+        match &events[1] {
+            Event::Result {
+                request_id, data, ..
+            } => {
+                assert_eq!(*request_id, 33);
+                assert_eq!(data["activeRequestCount"], 1);
+                assert_eq!(data["activeRequestIds"], serde_json::json!([32]));
+                assert_eq!(data["pendingHostOperationCount"], 1);
+                let operations = data["pendingHostOperations"].as_array().unwrap();
+                assert_eq!(operations.len(), 1);
+                assert_eq!(operations[0]["operationId"], 1);
+                assert_eq!(operations[0]["requestId"], 32);
+                assert_eq!(operations[0]["capability"], "host.smoke.echo");
+                assert_eq!(operations[0]["state"], "pending");
+                assert!(operations[0].get("params").is_none());
+            }
+            other => panic!("expected runtime.status result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn runtime_status_rejects_unknown_params() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send(Command::new(
+            34,
+            methods::RUNTIME_STATUS,
+            serde_json::json!({ "includePayloads": true }),
+        ))
+        .unwrap();
+
+        let events = sink.wait_len(1);
+        match &events[0] {
+            Event::Error {
+                request_id, error, ..
+            } => {
+                assert_eq!(*request_id, 34);
+                assert_eq!(error.code, ErrorCode::InvalidParams);
+                assert!(error.message.contains("runtime.status"));
+            }
+            other => panic!("expected runtime.status params error, got {other:?}"),
         }
     }
 
@@ -1065,6 +1284,38 @@ mod tests {
     }
 
     #[test]
+    fn host_smoke_rejects_malformed_capability_names() {
+        for (request_id, capability) in [(37, "host. smoke.echo"), (38, "host..echo")] {
+            let sink = Arc::new(CollectSink::new());
+            let rt = Runtime::new(sink.clone());
+            rt.send(Command::new(
+                request_id,
+                methods::RUNTIME_HOST_SMOKE,
+                serde_json::json!({
+                    "capability": capability,
+                    "params": { "message": "invalid capability" }
+                }),
+            ))
+            .unwrap();
+
+            let events = sink.wait_len(1);
+            match &events[0] {
+                Event::Error {
+                    request_id: actual_request_id,
+                    error,
+                    ..
+                } => {
+                    assert_eq!(*actual_request_id, request_id);
+                    assert_eq!(error.code, ErrorCode::InvalidParams);
+                    assert!(error.message.contains("capability"));
+                    assert_eq!(error.details["capability"], capability);
+                }
+                other => panic!("expected capability validation error, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
     fn runtime_cancel_command_cancels_pending_host_request() {
         let sink = Arc::new(CollectSink::new());
         let rt = Runtime::new(sink.clone());
@@ -1228,6 +1479,42 @@ mod tests {
                 assert_eq!(error.details["operationId"], 404);
             }
             other => panic!("expected completion request error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn host_completion_rejects_zero_operation_id() {
+        for (name, json, expected_request_id) in [
+            (
+                "host.complete",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/host/complete-operation-zero.json"
+                ),
+                305,
+            ),
+            (
+                "host.error",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/host/error-operation-zero.json"
+                ),
+                306,
+            ),
+        ] {
+            let sink = Arc::new(CollectSink::new());
+            let rt = Runtime::new(sink.clone());
+            rt.send_json(json.as_bytes()).unwrap();
+
+            let events = sink.wait_len(1);
+            match &events[0] {
+                Event::Error {
+                    request_id, error, ..
+                } => {
+                    assert_eq!(*request_id, expected_request_id, "{name}");
+                    assert_eq!(error.code, ErrorCode::InvalidParams, "{name}");
+                    assert_eq!(error.details["operationId"], 0, "{name}");
+                }
+                other => panic!("expected {name} operationId error, got {other:?}"),
+            }
         }
     }
 

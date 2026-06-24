@@ -8,6 +8,7 @@
     "runtime.ping",
     "runtime.hostSmoke",
     "runtime.cancel",
+    "runtime.status",
     "host.complete",
     "host.error",
     "host.bus.v1",
@@ -39,6 +40,7 @@
         "runtime.ping",
         "runtime.hostSmoke",
         "runtime.cancel",
+        "runtime.status",
         "host.complete",
         "host.error",
         "source.import",
@@ -61,7 +63,7 @@
       "additionalProperties": false,
       "required": ["operationId", "result"],
       "properties": {
-        "operationId": { "type": "integer" },
+        "operationId": { "type": "integer", "minimum": 1 },
         "result": {
           "description": "Host capability result payload.",
           "type": "object"
@@ -73,7 +75,7 @@
       "additionalProperties": false,
       "required": ["operationId", "error"],
       "properties": {
-        "operationId": { "type": "integer" },
+        "operationId": { "type": "integer", "minimum": 1 },
         "error": { "$ref": "reader-event.schema.json#/$defs/CoreError" }
       }
     },
@@ -83,6 +85,7 @@
       "properties": {
         "capability": {
           "type": "string",
+          "pattern": "^[^\\s.]+(\\.[^\\s.]+)+$",
           "default": "host.smoke.echo"
         },
         "params": {
@@ -103,6 +106,11 @@
           "description": "The requestId to cancel. Must differ from the runtime.cancel command's own requestId."
         }
       }
+    },
+    "RuntimeStatusParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Parameters for runtime.status. Must be an empty object."
     }
   }
 }

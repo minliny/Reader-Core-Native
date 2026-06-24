@@ -42,8 +42,11 @@
           "description": "Original Core command requestId that is blocked on this host operation."
         },
         "type": { "type": "string", "const": "host.request" },
-        "operationId": { "type": "integer" },
-        "capability": { "type": "string" },
+        "operationId": { "type": "integer", "minimum": 1 },
+        "capability": {
+          "type": "string",
+          "pattern": "^[^\\s.]+(\\.[^\\s.]+)+$"
+        },
         "params": { "type": "object" }
       }
     },
