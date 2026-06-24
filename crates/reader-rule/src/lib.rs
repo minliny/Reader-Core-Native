@@ -6,7 +6,7 @@
 //! of string results.
 
 use regex::Regex;
-use scraper::{Html, Selector};
+use scraper::{ElementRef, Html, Selector};
 use serde_json::Value as JsonValue;
 use std::error::Error;
 use std::fmt;
@@ -432,6 +432,9 @@ enum JsonPathSegment {
     /// `..field`, `..*`, or `..[index]` — descend into every object/array and
     /// apply the inner segment at every depth.
     RecursiveDescent(Box<JsonPathSegment>),
+    /// `[0,2]` or `['title','name']` — apply each bracket segment to the same
+    /// input value and preserve the declared order.
+    Union(Vec<JsonPathSegment>),
     /// `[start:end:step]` — Python-style slice. `start`/`end` are optional and
     /// may be negative (counted from the end); `step` defaults to 1 and may be
     /// negative to reverse iteration. Resolved against the array length at
@@ -453,6 +456,9 @@ struct JsonPathSlice {
 enum JsonPathFilter {
     Exists(Vec<String>),
     Compare(JsonPathFilterComparison),
+    All(Vec<JsonPathFilter>),
+    Any(Vec<JsonPathFilter>),
+    Not(Box<JsonPathFilter>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -805,51 +811,40 @@ fn parse_recursive_descent(chars: &[char], index: &mut usize) -> Result<JsonPath
 
 fn parse_json_path_bracket(
     chars: &[char],
-    mut index: usize,
+    index: usize,
 ) -> Result<(JsonPathSegment, usize), String> {
     if index >= chars.len() {
         return Err("unterminated `[` segment".to_string());
     }
 
-    if chars[index] == '\'' || chars[index] == '"' {
-        let quote = chars[index];
-        index += 1;
-        let mut field = String::new();
-
-        while index < chars.len() {
-            match chars[index] {
-                '\\' if index + 1 < chars.len() => {
-                    index += 1;
-                    field.push(chars[index]);
-                    index += 1;
-                }
-                current if current == quote => {
-                    index += 1;
-                    if chars.get(index) != Some(&']') {
-                        return Err("quoted field segment must close with `]`".to_string());
-                    }
-                    return Ok((JsonPathSegment::Field(field), index + 1));
-                }
-                current => {
-                    field.push(current);
-                    index += 1;
-                }
-            }
-        }
-
-        return Err("unterminated quoted field segment".to_string());
-    }
-
     let start = index;
-    index = scan_json_path_bracket_token_end(chars, index)?;
+    let index = scan_json_path_bracket_token_end(chars, index)?;
 
     let token = chars[start..index]
         .iter()
         .collect::<String>()
         .trim()
         .to_string();
+    let segment = parse_json_path_bracket_token(&token)?;
+
+    Ok((segment, index + 1))
+}
+
+fn parse_json_path_bracket_token(token: &str) -> Result<JsonPathSegment, String> {
+    let token = token.trim();
+    let union_items = split_json_path_union_items(token)?;
+    if union_items.len() > 1 {
+        let segments = union_items
+            .into_iter()
+            .map(parse_json_path_bracket_token)
+            .collect::<Result<Vec<_>, _>>()?;
+        return Ok(JsonPathSegment::Union(segments));
+    }
+
     let segment = if token == "*" {
         JsonPathSegment::Wildcard
+    } else if token.starts_with('\'') || token.starts_with('"') {
+        JsonPathSegment::Field(parse_json_path_quoted_field_token(token)?)
     } else if token.starts_with("?(") {
         parse_json_path_filter(&token)?
     } else if token.contains(':') {
@@ -864,7 +859,92 @@ fn parse_json_path_bracket(
         return Err(format!("unsupported bracket segment `{token}`"));
     };
 
-    Ok((segment, index + 1))
+    Ok(segment)
+}
+
+fn parse_json_path_quoted_field_token(token: &str) -> Result<String, String> {
+    let chars = token.chars().collect::<Vec<_>>();
+    let Some(&quote @ ('\'' | '"')) = chars.first() else {
+        return Err(format!(
+            "quoted field segment must start with a quote in `{token}`"
+        ));
+    };
+
+    let mut index = 1;
+    let mut field = String::new();
+
+    while index < chars.len() {
+        match chars[index] {
+            '\\' if index + 1 < chars.len() => {
+                index += 1;
+                field.push(chars[index]);
+                index += 1;
+            }
+            current if current == quote => {
+                index += 1;
+                if index == chars.len() {
+                    return Ok(field);
+                }
+                return Err(format!(
+                    "unexpected trailing quoted field text in `{token}`"
+                ));
+            }
+            current => {
+                field.push(current);
+                index += 1;
+            }
+        }
+    }
+
+    Err(format!("unterminated quoted field segment in `{token}`"))
+}
+
+fn split_json_path_union_items(token: &str) -> Result<Vec<&str>, String> {
+    let mut quote = None;
+    let mut escaped = false;
+    let mut paren_depth = 0usize;
+    let mut start = 0usize;
+    let mut items = Vec::new();
+
+    for (index, value) in token.char_indices() {
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            continue;
+        }
+
+        match value {
+            '(' => paren_depth += 1,
+            ')' => paren_depth = paren_depth.saturating_sub(1),
+            ',' if paren_depth == 0 => {
+                let item = token[start..index].trim();
+                if item.is_empty() {
+                    return Err(format!("empty union segment in `{token}`"));
+                }
+                items.push(item);
+                start = index + 1;
+            }
+            _ => {}
+        }
+    }
+
+    let item = token[start..].trim();
+    if item.is_empty() {
+        return Err(format!("empty union segment in `{token}`"));
+    }
+    items.push(item);
+
+    Ok(items)
 }
 
 fn scan_json_path_bracket_token_end(chars: &[char], mut index: usize) -> Result<usize, String> {
@@ -911,9 +991,57 @@ fn parse_json_path_filter(token: &str) -> Result<JsonPathSegment, String> {
         .ok_or_else(|| format!("invalid filter segment `{token}`"))?
         .trim();
 
+    parse_filter_expression(expression).map(JsonPathSegment::Filter)
+}
+
+fn parse_filter_expression(expression: &str) -> Result<JsonPathFilter, String> {
+    let mut expression = expression.trim();
+    while let Some(inner) = strip_enclosing_filter_parentheses(expression) {
+        expression = inner;
+    }
+
+    if let Some(inner) = expression.strip_prefix('!') {
+        let inner = inner.trim();
+        if inner.is_empty() {
+            return Err(format!("empty filter condition in `{expression}`"));
+        }
+
+        return parse_filter_expression(inner).map(|filter| JsonPathFilter::Not(Box::new(filter)));
+    }
+
+    parse_filter_or_conditions(expression)
+}
+
+fn parse_filter_or_conditions(expression: &str) -> Result<JsonPathFilter, String> {
+    let alternatives = split_filter_conditions(expression, "||")?;
+    if alternatives.len() > 1 {
+        let filters = alternatives
+            .into_iter()
+            .map(parse_filter_expression)
+            .collect::<Result<Vec<_>, _>>()?;
+        return Ok(JsonPathFilter::Any(filters));
+    }
+
+    parse_filter_and_conditions(expression)
+}
+
+fn parse_filter_and_conditions(expression: &str) -> Result<JsonPathFilter, String> {
+    let conditions = split_filter_conditions(expression, "&&")?;
+    if conditions.len() > 1 {
+        let filters = conditions
+            .into_iter()
+            .map(parse_filter_expression)
+            .collect::<Result<Vec<_>, _>>()?;
+        return Ok(JsonPathFilter::All(filters));
+    }
+
+    parse_single_json_path_filter(expression)
+}
+
+fn parse_single_json_path_filter(expression: &str) -> Result<JsonPathFilter, String> {
     let Some((operator_index, operator_len, op)) = find_filter_operator(expression) else {
         let path = parse_filter_path(expression)?;
-        return Ok(JsonPathSegment::Filter(JsonPathFilter::Exists(path)));
+        return Ok(JsonPathFilter::Exists(path));
     };
     let lhs = expression[..operator_index].trim();
     let rhs = expression[operator_index + operator_len..].trim();
@@ -921,13 +1049,122 @@ fn parse_json_path_filter(token: &str) -> Result<JsonPathSegment, String> {
     let left = parse_filter_path(lhs)?;
     let right = parse_filter_operand(rhs)?;
 
-    Ok(JsonPathSegment::Filter(JsonPathFilter::Compare(
-        JsonPathFilterComparison {
-            left,
-            op,
-            right,
-        },
-    )))
+    Ok(JsonPathFilter::Compare(JsonPathFilterComparison {
+        left,
+        op,
+        right,
+    }))
+}
+
+fn strip_enclosing_filter_parentheses(expression: &str) -> Option<&str> {
+    let expression = expression.trim();
+    if !expression.starts_with('(') || !expression.ends_with(')') {
+        return None;
+    }
+
+    let mut quote = None;
+    let mut escaped = false;
+    let mut bracket_depth = 0usize;
+    let mut paren_depth = 0usize;
+
+    for (index, value) in expression.char_indices() {
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            continue;
+        }
+
+        match value {
+            '[' => bracket_depth += 1,
+            ']' => bracket_depth = bracket_depth.saturating_sub(1),
+            '(' if bracket_depth == 0 => paren_depth += 1,
+            ')' if bracket_depth == 0 => {
+                paren_depth = paren_depth.saturating_sub(1);
+                if paren_depth == 0 {
+                    if index + value.len_utf8() == expression.len() {
+                        return Some(expression[1..index].trim());
+                    }
+                    return None;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    None
+}
+
+fn split_filter_conditions<'a>(
+    expression: &'a str,
+    operator: &str,
+) -> Result<Vec<&'a str>, String> {
+    let operator_marker = operator
+        .chars()
+        .next()
+        .ok_or_else(|| "filter condition operator must not be empty".to_string())?;
+    let mut quote = None;
+    let mut escaped = false;
+    let mut bracket_depth = 0usize;
+    let mut paren_depth = 0usize;
+    let mut start = 0usize;
+    let mut conditions = Vec::new();
+
+    for (index, value) in expression.char_indices() {
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            continue;
+        }
+
+        match value {
+            '[' => bracket_depth += 1,
+            ']' => bracket_depth = bracket_depth.saturating_sub(1),
+            '(' => paren_depth += 1,
+            ')' => paren_depth = paren_depth.saturating_sub(1),
+            current
+                if current == operator_marker
+                    && bracket_depth == 0
+                    && paren_depth == 0
+                    && expression[index..].starts_with(operator) =>
+            {
+                let condition = expression[start..index].trim();
+                if condition.is_empty() {
+                    return Err(format!("empty filter condition in `{expression}`"));
+                }
+                conditions.push(condition);
+                start = index + operator.len();
+            }
+            _ => {}
+        }
+    }
+
+    let condition = expression[start..].trim();
+    if condition.is_empty() {
+        return Err(format!("empty filter condition in `{expression}`"));
+    }
+    conditions.push(condition);
+
+    Ok(conditions)
 }
 
 fn find_filter_operator(expression: &str) -> Option<(usize, usize, JsonPathFilterOp)> {
@@ -1027,7 +1264,9 @@ fn parse_filter_quoted_field(
 
     let quote = chars[*index];
     if quote != '\'' && quote != '"' {
-        return Err(format!("filter field bracket must contain a quoted key in `{lhs}`"));
+        return Err(format!(
+            "filter field bracket must contain a quoted key in `{lhs}`"
+        ));
     }
     *index += 1;
 
@@ -1042,7 +1281,9 @@ fn parse_filter_quoted_field(
             current if current == quote => {
                 *index += 1;
                 if chars.get(*index) != Some(&']') {
-                    return Err(format!("quoted filter field must close with `]` in `{lhs}`"));
+                    return Err(format!(
+                        "quoted filter field must close with `]` in `{lhs}`"
+                    ));
                 }
                 *index += 1;
                 return Ok(field);
@@ -1201,6 +1442,11 @@ fn apply_json_path_segment<'a>(
                 apply_json_path_segment(inner, descendant, output);
             }
         }
+        JsonPathSegment::Union(segments) => {
+            for segment in segments {
+                apply_json_path_segment(segment, value, output);
+            }
+        }
         JsonPathSegment::Slice(slice) => {
             if let JsonValue::Array(array) = value {
                 let len = array.len() as isize;
@@ -1244,15 +1490,20 @@ fn apply_json_path_segment<'a>(
 fn json_path_filter_matches(value: &JsonValue, filter: &JsonPathFilter) -> bool {
     match filter {
         JsonPathFilter::Exists(path) => resolve_filter_path(value, path).is_some(),
+        JsonPathFilter::All(filters) => filters
+            .iter()
+            .all(|filter| json_path_filter_matches(value, filter)),
+        JsonPathFilter::Any(filters) => filters
+            .iter()
+            .any(|filter| json_path_filter_matches(value, filter)),
+        JsonPathFilter::Not(filter) => !json_path_filter_matches(value, filter),
         JsonPathFilter::Compare(comparison) => {
             let Some(actual) = resolve_filter_path(value, &comparison.left) else {
                 return false;
             };
 
             match comparison.op {
-                JsonPathFilterOp::Equal => {
-                    filter_values_equal(value, actual, &comparison.right)
-                }
+                JsonPathFilterOp::Equal => filter_values_equal(value, actual, &comparison.right),
                 JsonPathFilterOp::NotEqual => {
                     filter_values_comparable(value, actual, &comparison.right)
                         .is_some_and(|equal| !equal)
@@ -1296,9 +1547,7 @@ fn filter_values_comparable(
     expected: &JsonPathFilterOperand,
 ) -> Option<bool> {
     match expected {
-        JsonPathFilterOperand::Literal(expected) => {
-            filter_value_equals_literal(actual, expected)
-        }
+        JsonPathFilterOperand::Literal(expected) => filter_value_equals_literal(actual, expected),
         JsonPathFilterOperand::Path(path) => {
             let expected = resolve_filter_path(context, path)?;
             filter_json_values_equal(actual, expected)
@@ -1364,9 +1613,7 @@ fn resolve_filter_number_operand(
         JsonPathFilterOperand::Literal(JsonPathFilterLiteral::Number(expected)) => {
             expected.parse::<f64>().ok()
         }
-        JsonPathFilterOperand::Path(path) => {
-            resolve_filter_path(context, path)?.as_f64()
-        }
+        JsonPathFilterOperand::Path(path) => resolve_filter_path(context, path)?.as_f64(),
         _ => None,
     }
 }
@@ -1456,18 +1703,48 @@ fn json_value_to_rule_text(value: &JsonValue) -> String {
 
 fn apply_css(input: &str, rule: &CssRule) -> RuleResult<Vec<String>> {
     let document = Html::parse_document(input);
-    let selector = Selector::parse(&rule.selector).map_err(|err| RuleError::CssSelectorSyntax {
-        selector: rule.selector.clone(),
-        message: format!("{err:?}"),
+    let compat_selector = parse_css_compat_selector(&rule.selector).map_err(|message| {
+        RuleError::CssSelectorSyntax {
+            selector: rule.selector.clone(),
+            message,
+        }
     })?;
+    let selector =
+        Selector::parse(&compat_selector.selector).map_err(|err| RuleError::CssSelectorSyntax {
+            selector: rule.selector.clone(),
+            message: format!("{err:?}"),
+        })?;
 
     let mut output = Vec::new();
     for element in document.select(&selector) {
+        let text = if compat_selector.contains_filter.is_some()
+            || matches!(&rule.extraction, CssExtraction::Text)
+        {
+            Some(normalize_text(
+                &element.text().collect::<Vec<_>>().join(" "),
+            ))
+        } else {
+            None
+        };
+        let own_text = compat_selector
+            .contains_filter
+            .as_ref()
+            .filter(|filter| filter.scope == CssContainsScope::Own)
+            .map(|_| normalize_text(&element_own_text(&element)));
+
+        if let Some(filter) = &compat_selector.contains_filter {
+            let haystack = match filter.scope {
+                CssContainsScope::Descendant => text.as_deref().unwrap_or_default(),
+                CssContainsScope::Own => own_text.as_deref().unwrap_or_default(),
+            };
+            if !css_contains_matches(haystack, &filter.text) {
+                continue;
+            }
+        }
+
         match &rule.extraction {
             CssExtraction::Text => {
-                let text = element.text().collect::<Vec<_>>().join(" ");
-                let text = normalize_text(&text);
-                output.push(text);
+                output.push(text.unwrap_or_default());
             }
             CssExtraction::Attr(attr) => {
                 if let Some(value) = element.value().attr(attr) {
@@ -1478,6 +1755,165 @@ fn apply_css(input: &str, rule: &CssRule) -> RuleResult<Vec<String>> {
     }
 
     Ok(output)
+}
+
+fn css_contains_matches(text: &str, needle: &str) -> bool {
+    text.to_lowercase().contains(&needle.to_lowercase())
+}
+
+fn element_own_text(element: &ElementRef<'_>) -> String {
+    element
+        .children()
+        .filter_map(|child| child.value().as_text())
+        .map(|text| &**text)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CssCompatSelector {
+    selector: String,
+    contains_filter: Option<CssContainsFilter>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CssContainsFilter {
+    text: String,
+    scope: CssContainsScope,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CssContainsScope {
+    Descendant,
+    Own,
+}
+
+fn parse_css_compat_selector(selector: &str) -> Result<CssCompatSelector, String> {
+    let selector = selector.trim();
+    let Some(suffix) = find_css_contains_suffix(selector) else {
+        return Ok(CssCompatSelector {
+            selector: selector.to_string(),
+            contains_filter: None,
+        });
+    };
+
+    let close_index = selector.len() - 1;
+    let base = selector[..suffix.open_index].trim();
+    let argument = selector[suffix.open_index + suffix.prefix_len..close_index].trim();
+    if argument.is_empty() {
+        return Err("CSS :contains() requires text".to_string());
+    }
+
+    let contains_text = parse_css_contains_argument(argument)?;
+    let selector = if base.is_empty() { "*" } else { base };
+
+    Ok(CssCompatSelector {
+        selector: selector.to_string(),
+        contains_filter: Some(CssContainsFilter {
+            text: contains_text,
+            scope: suffix.scope,
+        }),
+    })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct CssContainsSuffix {
+    open_index: usize,
+    prefix_len: usize,
+    scope: CssContainsScope,
+}
+
+fn find_css_contains_suffix(selector: &str) -> Option<CssContainsSuffix> {
+    if !selector.ends_with(')') {
+        return None;
+    }
+
+    let mut quote = None;
+    let mut escaped = false;
+    let mut bracket_depth = 0usize;
+    let mut paren_depth = 0usize;
+    let mut candidate = None;
+
+    for (index, value) in selector.char_indices() {
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            continue;
+        }
+
+        match value {
+            '[' => bracket_depth += 1,
+            ']' => bracket_depth = bracket_depth.saturating_sub(1),
+            '(' => paren_depth += 1,
+            ')' => paren_depth = paren_depth.saturating_sub(1),
+            ':' if bracket_depth == 0 && paren_depth == 0 => {
+                if selector[index..].starts_with(":containsOwn(") {
+                    candidate = Some(CssContainsSuffix {
+                        open_index: index,
+                        prefix_len: ":containsOwn(".len(),
+                        scope: CssContainsScope::Own,
+                    });
+                } else if selector[index..].starts_with(":contains(") {
+                    candidate = Some(CssContainsSuffix {
+                        open_index: index,
+                        prefix_len: ":contains(".len(),
+                        scope: CssContainsScope::Descendant,
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+
+    candidate
+}
+
+fn parse_css_contains_argument(argument: &str) -> Result<String, String> {
+    let chars = argument.chars().collect::<Vec<_>>();
+    if matches!(chars.first(), Some('\'' | '"')) {
+        let quote = chars[0];
+        let mut output = String::new();
+        let mut index = 1;
+
+        while index < chars.len() {
+            match chars[index] {
+                '\\' if index + 1 < chars.len() => {
+                    index += 1;
+                    output.push(chars[index]);
+                    index += 1;
+                }
+                current if current == quote => {
+                    index += 1;
+                    if index == chars.len() {
+                        return Ok(output);
+                    }
+                    return Err(format!(
+                        "unexpected trailing CSS :contains() argument text in `{argument}`"
+                    ));
+                }
+                current => {
+                    output.push(current);
+                    index += 1;
+                }
+            }
+        }
+
+        return Err(format!(
+            "unterminated CSS :contains() argument in `{argument}`"
+        ));
+    }
+
+    Ok(argument.to_string())
 }
 
 fn normalize_text(text: &str) -> String {

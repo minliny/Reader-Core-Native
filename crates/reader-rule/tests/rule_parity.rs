@@ -393,6 +393,69 @@ fn css_selector_preserves_duplicate_text_values() {
 }
 
 #[test]
+fn css_selector_contains_filters_by_text() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <ul>
+            <li>Dune Messiah</li>
+            <li>Foundation</li>
+            <li>Children of Dune</li>
+        </ul>
+    "#;
+
+    let output = engine
+        .execute_step(html, &RuleStep::css_text("li:contains('Dune')"))
+        .unwrap();
+
+    assert_eq!(
+        output.values(),
+        &["Dune Messiah".to_string(), "Children of Dune".to_string()]
+    );
+}
+
+#[test]
+fn css_selector_contains_is_case_insensitive() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <ul>
+            <li>Dune Messiah</li>
+            <li>Foundation</li>
+            <li>Children of Dune</li>
+        </ul>
+    "#;
+
+    let output = engine
+        .execute_step(html, &RuleStep::css_text("li:contains('dune')"))
+        .unwrap();
+
+    assert_eq!(
+        output.values(),
+        &["Dune Messiah".to_string(), "Children of Dune".to_string()]
+    );
+}
+
+#[test]
+fn css_selector_contains_own_ignores_descendant_text() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <section>
+            <p>Dune <span>Appendix</span></p>
+            <p><span>Dune</span> Appendix</p>
+            <p>Foundation</p>
+        </section>
+    "#;
+
+    let output = engine
+        .execute_step(html, &RuleStep::css_text("p:containsOwn('Dune')"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["Dune Appendix".to_string()]);
+}
+
+#[test]
 fn jsonpath_wildcard_preserves_duplicate_values() {
     let engine = RuleEngine::new();
 
@@ -720,7 +783,10 @@ fn jsonpath_filter_compares_against_current_item_field() {
     }"#;
 
     let output = engine
-        .execute_step(json, &RuleStep::json_path("$.items[?(@.score >= @.min)].name"))
+        .execute_step(
+            json,
+            &RuleStep::json_path("$.items[?(@.score >= @.min)].name"),
+        )
         .unwrap();
 
     assert_eq!(output.values(), &["pass".to_string(), "high".to_string()]);
@@ -742,7 +808,118 @@ fn jsonpath_filter_keeps_items_where_field_exists() {
         .execute_step(json, &RuleStep::json_path("$.links[?(@.href)].title"))
         .unwrap();
 
-    assert_eq!(output.values(), &["Keep".to_string(), "Also Keep".to_string()]);
+    assert_eq!(
+        output.values(),
+        &["Keep".to_string(), "Also Keep".to_string()]
+    );
+}
+
+#[test]
+fn jsonpath_filter_supports_and_conditions() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune", "category": "novel", "enabled": true },
+            { "title": "Draft", "category": "novel", "enabled": false },
+            { "title": "Index", "category": "metadata", "enabled": true }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("$.books[?(@.category == 'novel' && @.enabled == true)].title"),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["Dune".to_string()]);
+}
+
+#[test]
+fn jsonpath_filter_supports_or_conditions() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune", "category": "novel" },
+            { "title": "Notes", "category": "essay" },
+            { "title": "Index", "category": "metadata" }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path(
+                "$.books[?(@.category == 'novel' || @.category == 'essay')].title",
+            ),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["Dune".to_string(), "Notes".to_string()]);
+}
+
+#[test]
+fn jsonpath_filter_supports_grouped_boolean_conditions() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune", "category": "novel", "enabled": true },
+            { "title": "Draft", "category": "novel", "enabled": false },
+            { "title": "Notes", "category": "essay", "enabled": true },
+            { "title": "Index", "category": "metadata", "enabled": true }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path(
+                "$.books[?((@.category == 'novel' || @.category == 'essay') && @.enabled == true)].title",
+            ),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["Dune".to_string(), "Notes".to_string()]);
+}
+
+#[test]
+fn jsonpath_filter_supports_not_conditions() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune", "category": "novel" },
+            { "title": "Index", "category": "metadata" },
+            { "title": "Notes", "category": "essay" }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("$.books[?(!(@.category == 'metadata'))].title"),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["Dune".to_string(), "Notes".to_string()]);
+}
+
+#[test]
+fn jsonpath_union_extracts_multiple_array_indices() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "items": ["zero", "one", "two", "three"]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.items[0,2]"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["zero".to_string(), "two".to_string()]);
 }
 
 // ---------------------------------------------------------------------------
