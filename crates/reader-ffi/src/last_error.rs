@@ -11,14 +11,17 @@
 //! Semantics (frozen for ABI v1):
 //! - The slot is per-thread. Only the thread that issued the failing call can
 //!   read its error — matches the synchronous nature of the entry points.
-//! - Every failing entry point calls [`set`]; every successful entry point
-//!   calls [`clear`]. Reading does not consume the slot (peek, not take), so a
-//!   host may inspect it more than once; the next successful call clears it.
+//! - Runtime lifecycle/command entry points (`create`, `send`, `cancel`,
+//!   `destroy`) call [`set`] on failure and [`clear`] on success. Reading does
+//!   not consume the slot (peek, not take), so a host may inspect it more than
+//!   once; the next successful runtime call clears it.
 //! - Argument-level failures (null pointers) are also recorded, mapped to the
 //!   closest protocol code, so the host always has a message to log.
 //!
-//! Async command-processing errors are NOT recorded here: they are delivered
-//! as `error` events through `rc_event_callback`, exactly as in the pure-Rust
+//! `rc_abi_version` is a pure version query and does not touch the slot.
+//! `rc_last_error` is a peek API and does not clear the slot. Async
+//! command-processing errors are NOT recorded here: they are delivered as
+//! `error` events through `rc_event_callback`, exactly as in the pure-Rust
 //! runtime. This slot covers only synchronous call-site failures.
 
 use std::cell::RefCell;
@@ -55,9 +58,11 @@ pub fn code_of(code: ErrorCode) -> i32 {
 
 /// Peek the calling thread's last error without consuming it.
 ///
-/// Returns `RC_OK` (0) when no error is pending. Otherwise returns the
-/// structured code and, when `out_message` is a non-null buffer of positive
-/// `capacity`, writes a NUL-terminated copy of the message (truncated to fit).
+/// Returns `RC_OK` (0) when no error is pending. In that case, when
+/// `out_message` is a non-null buffer of positive `capacity`, writes an empty
+/// NUL-terminated string so host-side stale text is cleared. Otherwise returns
+/// the structured code and writes a NUL-terminated copy of the message
+/// (truncated to fit).
 ///
 /// # Safety
 /// `out_message` must point to at least `capacity` writable bytes when non-null.
@@ -65,6 +70,14 @@ pub unsafe fn read(out_message: *mut u8, capacity: usize) -> i32 {
     LAST_ERROR.with(|slot| {
         let guard = slot.borrow();
         let Some(err) = guard.as_ref() else {
+            if !out_message.is_null() && capacity > 0 {
+                // SAFETY: caller guarantees `out_message` points to
+                // `capacity` writable bytes; writing one NUL byte is within
+                // bounds because capacity is positive.
+                unsafe {
+                    *out_message = 0;
+                }
+            }
             return 0;
         };
         let code = code_of(err.code);
@@ -92,6 +105,15 @@ mod tests {
         clear();
         let code = unsafe { read(std::ptr::null_mut(), 0) };
         assert_eq!(code, 0);
+    }
+
+    #[test]
+    fn read_clears_message_buffer_when_empty() {
+        clear();
+        let mut buf = *b"stale";
+        let code = unsafe { read(buf.as_mut_ptr(), buf.len()) };
+        assert_eq!(code, 0);
+        assert_eq!(buf[0], 0);
     }
 
     #[test]
@@ -125,7 +147,9 @@ mod tests {
     #[test]
     fn message_is_truncated_and_nul_terminated() {
         clear();
-        set(CoreError::internal("a very long message that does not fit in a tiny buffer"));
+        set(CoreError::internal(
+            "a very long message that does not fit in a tiny buffer",
+        ));
         let mut buf = [0u8; 8];
         let code = unsafe { read(buf.as_mut_ptr(), buf.len()) };
         assert_eq!(code, code_of(ErrorCode::Internal));

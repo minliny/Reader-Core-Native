@@ -18,6 +18,29 @@
 #define EVENT_BUF 8192
 #define MSG_BUF 256
 
+_Static_assert(RC_CREATE_PANIC == -1, "RC_CREATE_PANIC changed");
+_Static_assert(RC_CREATE_OK == 0, "RC_CREATE_OK changed");
+_Static_assert(RC_CREATE_NULL_OUT_RUNTIME == 2,
+               "RC_CREATE_NULL_OUT_RUNTIME changed");
+_Static_assert(RC_CREATE_NULL_CALLBACK == 3,
+               "RC_CREATE_NULL_CALLBACK changed");
+_Static_assert(RC_CREATE_INVALID_CONFIG == 4,
+               "RC_CREATE_INVALID_CONFIG changed");
+_Static_assert(RC_SEND_PANIC == -1, "RC_SEND_PANIC changed");
+_Static_assert(RC_SEND_OK == 0, "RC_SEND_OK changed");
+_Static_assert(RC_SEND_NULL_RUNTIME == 1, "RC_SEND_NULL_RUNTIME changed");
+_Static_assert(RC_SEND_NULL_COMMAND == 2, "RC_SEND_NULL_COMMAND changed");
+_Static_assert(RC_SEND_INVALID_COMMAND == 3,
+               "RC_SEND_INVALID_COMMAND changed");
+_Static_assert(RC_SEND_PROTOCOL_ERROR == 4,
+               "RC_SEND_PROTOCOL_ERROR changed");
+_Static_assert(RC_CANCEL_PANIC == -1, "RC_CANCEL_PANIC changed");
+_Static_assert(RC_CANCEL_OK == 0, "RC_CANCEL_OK changed");
+_Static_assert(RC_CANCEL_NULL_RUNTIME == 1,
+               "RC_CANCEL_NULL_RUNTIME changed");
+_Static_assert(RC_OK == 0, "RC_OK changed");
+_Static_assert(RC_ERR_INTERNAL == 6, "RC_ERR_INTERNAL changed");
+
 struct captured_event {
   char json[EVENT_BUF];
   size_t length;
@@ -109,34 +132,70 @@ int main(void) {
     fprintf(stderr, "unexpected ABI version: %u\n", rc_abi_version());
     return 1;
   }
+  char msg[MSG_BUF];
+  int32_t code = RC_OK;
 
   // --- Failure paths that need no runtime -------------------------------
-  if (rc_runtime_send(NULL, (const uint8_t *)"{}", 2) != 1) {
-    return fail("null runtime send did not return status 1");
+  if (rc_runtime_send(NULL, (const uint8_t *)"{}", 2) !=
+      RC_SEND_NULL_RUNTIME) {
+    return fail("null runtime send did not return RC_SEND_NULL_RUNTIME");
   }
-  if (rc_runtime_cancel(NULL, 42) != 1) {
-    return fail("null runtime cancel did not return status 1");
+  (void)rc_abi_version();
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "runtime handle")) {
+    fprintf(stderr, "abi version last_error side effect: code=%d msg=%s\n", code,
+            msg);
+    return fail("rc_abi_version touched last_error");
+  }
+  if (rc_runtime_cancel(NULL, 42) != RC_CANCEL_NULL_RUNTIME) {
+    return fail("null runtime cancel did not return RC_CANCEL_NULL_RUNTIME");
   }
   rc_runtime_destroy(NULL); // no-op contract
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("null destroy did not clear last_error");
+  }
 
   // --- Create rejection paths -------------------------------------------
-  if (rc_runtime_create(NULL, 0, capture_event, NULL, NULL) != 2) {
-    return fail("null out_runtime did not return status 2");
+  if (rc_runtime_create(NULL, 0, capture_event, NULL, NULL) !=
+      RC_CREATE_NULL_OUT_RUNTIME) {
+    return fail("null out_runtime did not return RC_CREATE_NULL_OUT_RUNTIME");
   }
   rc_runtime_t *no_runtime = NULL;
-  if (rc_runtime_create(NULL, 0, NULL, NULL, &no_runtime) != 3 ||
+  rc_runtime_t *sentinel = (rc_runtime_t *)(uintptr_t)1;
+  if (rc_runtime_create(NULL, 0, NULL, NULL, &no_runtime) !=
+          RC_CREATE_NULL_CALLBACK ||
       no_runtime != NULL) {
-    return fail("null callback did not return status 3");
+    return fail("null callback did not return RC_CREATE_NULL_CALLBACK");
+  }
+  if (rc_runtime_create(NULL, 0, NULL, NULL, &sentinel) !=
+          RC_CREATE_NULL_CALLBACK ||
+      sentinel != NULL) {
+    return fail("create failure did not clear out_runtime");
   }
 
-  // Invalid config -> status 4 + structured INVALID_MESSAGE.
-  const char *bad_config = "{not json";
-  if (rc_runtime_create((const uint8_t *)bad_config, strlen(bad_config),
-                        capture_event, NULL, &no_runtime) != 4) {
-    return fail("invalid config did not return status 4");
+  // Invalid config -> RC_CREATE_INVALID_CONFIG + structured INVALID_MESSAGE.
+  sentinel = (rc_runtime_t *)(uintptr_t)1;
+  if (rc_runtime_create(NULL, 1, capture_event, NULL, &sentinel) !=
+          RC_CREATE_INVALID_CONFIG ||
+      sentinel != NULL) {
+    return fail("null config with non-zero length did not return RC_CREATE_INVALID_CONFIG");
   }
-  char msg[MSG_BUF];
-  int32_t code = rc_last_error(msg, sizeof msg);
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "config_json")) {
+    fprintf(stderr, "null config last_error: code=%d msg=%s\n", code, msg);
+    return fail("null config did not record INVALID_MESSAGE");
+  }
+
+  const char *bad_config = "{not json";
+  sentinel = (rc_runtime_t *)(uintptr_t)1;
+  if (rc_runtime_create((const uint8_t *)bad_config, strlen(bad_config),
+                        capture_event, NULL, &sentinel) !=
+          RC_CREATE_INVALID_CONFIG ||
+      sentinel != NULL) {
+    return fail("invalid config did not return RC_CREATE_INVALID_CONFIG");
+  }
+  code = rc_last_error(msg, sizeof msg);
   if (code != RC_ERR_INVALID_MESSAGE || msg[0] == '\0') {
     fprintf(stderr, "invalid config last_error: code=%d msg=%s\n", code, msg);
     return fail("invalid config did not record INVALID_MESSAGE");
@@ -153,18 +212,38 @@ int main(void) {
       "reader-smoke-cache\"}";
   code = rc_runtime_create((const uint8_t *)config, strlen(config),
                            capture_event, &ch, &rt);
-  if (code != 0 || rt == NULL) {
+  if (code != RC_CREATE_OK || rt == NULL) {
     fprintf(stderr, "rc_runtime_create failed: %d\n", code);
     return 1;
   }
-  // A successful create clears the last-error slot.
-  if (rc_last_error(msg, sizeof msg) != RC_OK) {
+  // A successful create clears the last-error slot and the message buffer.
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
     return fail("successful create did not clear last_error");
   }
 
   // --- Synchronous send failures (no events emitted) --------------------
-  if (send_str(rt, "{") != 3) {
-    return fail("malformed send did not return status 3");
+  if (rc_runtime_send(rt, NULL, 1) != RC_SEND_NULL_COMMAND) {
+    return fail("null command with non-zero length did not return RC_SEND_NULL_COMMAND");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "command_json")) {
+    fprintf(stderr, "null command last_error: code=%d msg=%s\n", code, msg);
+    return fail("null command did not record INVALID_MESSAGE");
+  }
+
+  if (rc_runtime_send(rt, NULL, 0) != RC_SEND_INVALID_COMMAND) {
+    return fail("zero-length command did not return RC_SEND_INVALID_COMMAND");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "command JSON")) {
+    fprintf(stderr, "zero-length command last_error: code=%d msg=%s\n", code,
+            msg);
+    return fail("zero-length command did not record INVALID_MESSAGE");
+  }
+
+  if (send_str(rt, "{") != RC_SEND_INVALID_COMMAND) {
+    return fail("malformed send did not return RC_SEND_INVALID_COMMAND");
   }
   code = rc_last_error(msg, sizeof msg);
   if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "command JSON")) {
@@ -175,8 +254,8 @@ int main(void) {
   const char *proto_v2 =
       "{\"protocolVersion\":2,\"requestId\":9,\"method\":\"runtime.ping\","
       "\"params\":{}}";
-  if (send_str(rt, proto_v2) != 4) {
-    return fail("protocol v2 send did not return status 4");
+  if (send_str(rt, proto_v2) != RC_SEND_PROTOCOL_ERROR) {
+    return fail("protocol v2 send did not return RC_SEND_PROTOCOL_ERROR");
   }
   code = rc_last_error(msg, sizeof msg);
   if (code != RC_ERR_INVALID_PROTOCOL_VERSION ||
@@ -190,7 +269,7 @@ int main(void) {
   char event[EVENT_BUF];
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":10,\"method\":\"core."
-               "info\",\"params\":{}}") != 0) {
+               "info\",\"params\":{}}") != RC_SEND_OK) {
     return fail("core.info send failed");
   }
   if (wait_event(&ch, ev, event, sizeof event) != 0) {
@@ -206,7 +285,7 @@ int main(void) {
   // --- runtime.ping + last_error cleared on success ---------------------
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":11,\"method\":\"runtime."
-               "ping\",\"params\":{}}") != 0) {
+               "ping\",\"params\":{}}") != RC_SEND_OK) {
     return fail("runtime.ping send failed");
   }
   if (wait_event(&ch, ev, event, sizeof event) != 0) {
@@ -217,7 +296,8 @@ int main(void) {
     fprintf(stderr, "unexpected ping event: %s\n", event);
     return fail("ping event shape");
   }
-  if (rc_last_error(msg, sizeof msg) != RC_OK) {
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
     return fail("successful send did not clear last_error");
   }
 
@@ -225,7 +305,7 @@ int main(void) {
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":50,\"method\":\"runtime."
                "hostSmoke\",\"params\":{\"capability\":\"host.smoke.echo\","
-               "\"params\":{}}}") != 0) {
+               "\"params\":{}}}") != RC_SEND_OK) {
     return fail("hostSmoke(50) send failed");
   }
   if (wait_event(&ch, ev, event, sizeof event) != 0) {
@@ -238,15 +318,15 @@ int main(void) {
   }
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":50,\"method\":\"runtime."
-               "ping\",\"params\":{}}") != 4) {
-    return fail("duplicate requestId did not return status 4");
+               "ping\",\"params\":{}}") != RC_SEND_PROTOCOL_ERROR) {
+    return fail("duplicate requestId did not return RC_SEND_PROTOCOL_ERROR");
   }
   code = rc_last_error(msg, sizeof msg);
   if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "duplicate")) {
     fprintf(stderr, "duplicate last_error: code=%d msg=%s\n", code, msg);
     return fail("duplicate did not record INVALID_MESSAGE");
   }
-  if (rc_runtime_cancel(rt, 50) != 0) {
+  if (rc_runtime_cancel(rt, 50) != RC_CANCEL_OK) {
     return fail("cancel(50) failed");
   }
   if (wait_event(&ch, ev, event, sizeof event) != 0) {
@@ -262,7 +342,7 @@ int main(void) {
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":60,\"method\":\"runtime."
                "hostSmoke\",\"params\":{\"capability\":\"host.smoke.echo\","
-               "\"params\":{\"hello\":\"world\"}}}") != 0) {
+               "\"params\":{\"hello\":\"world\"}}}") != RC_SEND_OK) {
     return fail("hostSmoke(60) send failed");
   }
   if (wait_event(&ch, ev, event, sizeof event) != 0) {
@@ -282,7 +362,7 @@ int main(void) {
            "complete\",\"params\":{\"operationId\":%llu,\"result\":{\"echoed\":"
            "true}}}",
            (unsigned long long)op60);
-  if (send_str(rt, complete) != 0) {
+  if (send_str(rt, complete) != RC_SEND_OK) {
     return fail("host.complete(60) send failed");
   }
   if (wait_event(&ch, ev, event, sizeof event) != 0) {
@@ -300,7 +380,7 @@ int main(void) {
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":62,\"method\":\"runtime."
                "hostSmoke\",\"params\":{\"capability\":\"host.smoke.echo\","
-               "\"params\":{}}}") != 0) {
+               "\"params\":{}}}") != RC_SEND_OK) {
     return fail("hostSmoke(62) send failed");
   }
   if (wait_event(&ch, ev, event, sizeof event) != 0) {
@@ -317,7 +397,7 @@ int main(void) {
            "error\",\"params\":{\"operationId\":%llu,\"error\":{\"code\":"
            "\"INTERNAL\",\"message\":\"host failed\",\"retryable\":true}}}",
            (unsigned long long)op62);
-  if (send_str(rt, err_cmd) != 0) {
+  if (send_str(rt, err_cmd) != RC_SEND_OK) {
     return fail("host.error(62) send failed");
   }
   if (wait_event(&ch, ev, event, sizeof event) != 0) {
@@ -331,10 +411,32 @@ int main(void) {
     return fail("host.error result shape");
   }
 
+  // --- host.complete for an unknown operation -> async INVALID_PARAMS ----
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":66,\"method\":\"host."
+               "complete\",\"params\":{\"operationId\":999999,\"result\":{"
+               "\"ok\":true}}}") != RC_SEND_OK) {
+    return fail("unknown host.complete send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for unknown host.complete");
+  }
+  ev++;
+  if (!contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":66") ||
+      !contains(event, "\"INVALID_PARAMS\"")) {
+    fprintf(stderr, "unknown host.complete error: %s\n", event);
+    return fail("unknown host.complete error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("unknown host.complete send left synchronous last_error");
+  }
+
   // --- unknown method -> async error event ------------------------------
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":64,\"method\":\"no.such."
-               "method\",\"params\":{}}") != 0) {
+               "method\",\"params\":{}}") != RC_SEND_OK) {
     return fail("unknown method send failed");
   }
   if (wait_event(&ch, ev, event, sizeof event) != 0) {
@@ -351,14 +453,14 @@ int main(void) {
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":65,\"method\":\"runtime."
                "hostSmoke\",\"params\":{\"capability\":\"host.smoke.echo\","
-               "\"params\":{}}}") != 0) {
+               "\"params\":{}}}") != RC_SEND_OK) {
     return fail("hostSmoke(65) send failed");
   }
   if (wait_event(&ch, ev, event, sizeof event) != 0) {
     return fail("no host.request for 65");
   }
   ev++;
-  if (rc_runtime_cancel(rt, 65) != 0) {
+  if (rc_runtime_cancel(rt, 65) != RC_CANCEL_OK) {
     return fail("cancel(65) failed");
   }
   if (wait_event(&ch, ev, event, sizeof event) != 0) {
@@ -371,7 +473,14 @@ int main(void) {
     return fail("cancelled(65) shape");
   }
 
+  if (rc_runtime_send(rt, (const uint8_t *)"{", 1) != RC_SEND_INVALID_COMMAND) {
+    return fail("pre-destroy invalid command did not return RC_SEND_INVALID_COMMAND");
+  }
   rc_runtime_destroy(rt);
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("successful destroy did not clear last_error");
+  }
   pthread_mutex_destroy(&ch.mutex);
 
   puts("c-abi-smoke: ok");

@@ -4,8 +4,8 @@ use std::sync::Arc;
 use reader_contract::{Command, CoreError};
 use reader_runtime::Runtime;
 
-use crate::last_error;
 use crate::sink::{CEventCallback, CEventSink};
+use crate::{last_error, status};
 
 /// C ABI version this build advertises. Authoritative source of truth.
 pub const ABI_VERSION: u32 = 1;
@@ -34,30 +34,31 @@ pub unsafe fn create_runtime(
 ) -> i32 {
     if out_runtime.is_null() {
         last_error::set(CoreError::invalid_message("out_runtime pointer is null"));
-        return 2; // invalid out-pointer
+        return status::create::NULL_OUT_RUNTIME;
     }
+    *out_runtime = std::ptr::null_mut();
     if callback.is_none() {
         last_error::set(CoreError::invalid_message("event callback is null"));
-        return 3; // a callback is required
+        return status::create::NULL_CALLBACK;
     }
     let Some(bytes) = borrow_bytes(config_json, config_length) else {
         last_error::set(CoreError::invalid_message(
             "config_json is null with non-zero length",
         ));
-        return 4; // invalid config buffer
+        return status::create::INVALID_CONFIG;
     };
     let sink = Arc::new(CEventSink::new(callback, context));
     let runtime = match Runtime::new_with_config_json(sink, bytes) {
         Ok(runtime) => runtime,
         Err(err) => {
             last_error::set(err);
-            return 4; // invalid config
+            return status::create::INVALID_CONFIG;
         }
     };
     let handle = Box::new(RuntimeHandle { runtime });
     *out_runtime = Box::into_raw(handle);
     last_error::clear();
-    0
+    status::create::OK
 }
 
 pub unsafe fn send(
@@ -67,11 +68,13 @@ pub unsafe fn send(
 ) -> i32 {
     let Some(handle) = runtime.as_ref() else {
         last_error::set(CoreError::invalid_message("runtime handle is null"));
-        return 1;
+        return status::send::NULL_RUNTIME;
     };
     let Some(bytes) = borrow_bytes(command_json, command_length) else {
-        last_error::set(CoreError::invalid_message("command_json is null with non-zero length"));
-        return 2;
+        last_error::set(CoreError::invalid_message(
+            "command_json is null with non-zero length",
+        ));
+        return status::send::NULL_COMMAND;
     };
     // Parse JSON + structure only. Protocol-version / duplicate-requestId /
     // shutdown checks happen in `Runtime::send` so they map to status 4, not
@@ -83,17 +86,17 @@ pub unsafe fn send(
                 CoreError::invalid_message("invalid command JSON")
                     .with_details(serde_json::json!({ "source": err.to_string() })),
             );
-            return 3; // malformed JSON / message structure
+            return status::send::INVALID_COMMAND;
         }
     };
     match handle.runtime.send(command) {
         Ok(()) => {
             last_error::clear();
-            0
+            status::send::OK
         }
         Err(err) => {
             last_error::set(err);
-            4 // protocol mismatch / duplicate requestId / shutting down
+            status::send::PROTOCOL_ERROR
         }
     }
 }
@@ -101,20 +104,22 @@ pub unsafe fn send(
 pub unsafe fn cancel(runtime: *mut RuntimeHandle, request_id: u64) -> i32 {
     let Some(handle) = runtime.as_ref() else {
         last_error::set(CoreError::invalid_message("runtime handle is null"));
-        return 1;
+        return status::cancel::NULL_RUNTIME;
     };
     handle.runtime.cancel(request_id);
     last_error::clear();
-    0
+    status::cancel::OK
 }
 
 pub unsafe fn destroy(runtime: *mut RuntimeHandle) -> i32 {
     if runtime.is_null() {
-        return 0;
+        last_error::clear();
+        return status::OK;
     }
     // Reclaim the box; dropping it joins the worker, so no callback fires after.
     let _ = Box::from_raw(runtime);
-    0
+    last_error::clear();
+    status::OK
 }
 
 #[cfg(test)]
@@ -195,6 +200,23 @@ mod tests {
         let code = unsafe { create_runtime(b"{}".as_ptr(), 2, None, ctx_ptr, &mut handle) };
         assert_eq!(code, 3);
         assert!(handle.is_null());
+
+        let mut stale = ptr::dangling_mut::<RuntimeHandle>();
+        let code = unsafe { create_runtime(b"{}".as_ptr(), 2, None, ctx_ptr, &mut stale) };
+        assert_eq!(code, 3);
+        assert!(stale.is_null());
+
+        let bad = br#"{not json"#;
+        stale = ptr::dangling_mut::<RuntimeHandle>();
+        let code =
+            unsafe { create_runtime(bad.as_ptr(), bad.len(), Some(capture), ctx_ptr, &mut stale) };
+        assert_eq!(code, 4);
+        assert!(stale.is_null());
+
+        stale = ptr::dangling_mut::<RuntimeHandle>();
+        let code = unsafe { create_runtime(ptr::null(), 1, Some(capture), ctx_ptr, &mut stale) };
+        assert_eq!(code, 4);
+        assert!(stale.is_null());
     }
 
     #[test]
@@ -213,6 +235,9 @@ mod tests {
         let code = unsafe { send(handle, ptr::null(), 1) };
         assert_eq!(code, 2);
 
+        let code = unsafe { send(handle, ptr::null(), 0) };
+        assert_eq!(code, 3);
+
         let malformed = b"{";
         let code = unsafe { send(handle, malformed.as_ptr(), malformed.len()) };
         assert_eq!(code, 3);
@@ -229,7 +254,22 @@ mod tests {
     #[test]
     fn cancel_and_destroy_accept_null_runtime_contracts() {
         assert_eq!(unsafe { cancel(ptr::null_mut(), 42) }, 1);
+        assert_eq!(
+            last_error_code(),
+            last_error::code_of(ErrorCode::InvalidMessage)
+        );
         assert_eq!(unsafe { destroy(ptr::null_mut()) }, 0);
+        assert_eq!(last_error_code(), 0);
+    }
+
+    #[test]
+    fn successful_destroy_clears_last_error() {
+        let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
+        let handle = make_runtime(&events);
+
+        crate::last_error::set(CoreError::internal("stale"));
+        assert_eq!(unsafe { destroy(handle) }, 0);
+        assert_eq!(last_error_code(), 0);
     }
 
     // --- last_error integration -------------------------------------------
@@ -250,7 +290,8 @@ mod tests {
     fn make_runtime(events: &Arc<CapturedEvents>) -> *mut RuntimeHandle {
         let ctx_ptr = Arc::as_ptr(events) as *mut c_void;
         let mut handle: *mut RuntimeHandle = ptr::null_mut();
-        let code = unsafe { create_runtime(b"{}".as_ptr(), 2, Some(capture), ctx_ptr, &mut handle) };
+        let code =
+            unsafe { create_runtime(b"{}".as_ptr(), 2, Some(capture), ctx_ptr, &mut handle) };
         assert_eq!(code, 0);
         assert!(!handle.is_null());
         handle
@@ -293,8 +334,7 @@ mod tests {
         // Duplicate active requestId → status 4, INVALID_MESSAGE with details.
         let dup_a =
             br#"{"protocolVersion":1,"requestId":7,"method":"runtime.hostSmoke","params":{}}"#;
-        let dup_b =
-            br#"{"protocolVersion":1,"requestId":7,"method":"runtime.ping","params":{}}"#;
+        let dup_b = br#"{"protocolVersion":1,"requestId":7,"method":"runtime.ping","params":{}}"#;
         assert_eq!(unsafe { send(handle, dup_a.as_ptr(), dup_a.len()) }, 0);
         assert_eq!(unsafe { send(handle, dup_b.as_ptr(), dup_b.len()) }, 4);
         assert_eq!(
@@ -313,15 +353,8 @@ mod tests {
 
         // Malformed config JSON → status 4, INVALID_MESSAGE.
         let bad = br#"{not json"#;
-        let code = unsafe {
-            create_runtime(
-                bad.as_ptr(),
-                bad.len(),
-                Some(capture),
-                ctx_ptr,
-                &mut handle,
-            )
-        };
+        let code =
+            unsafe { create_runtime(bad.as_ptr(), bad.len(), Some(capture), ctx_ptr, &mut handle) };
         assert_eq!(code, 4);
         assert!(handle.is_null());
         assert_eq!(
@@ -331,15 +364,8 @@ mod tests {
 
         // Unknown config field → INVALID_MESSAGE.
         let bad = br#"{"bogus":true}"#;
-        let code = unsafe {
-            create_runtime(
-                bad.as_ptr(),
-                bad.len(),
-                Some(capture),
-                ctx_ptr,
-                &mut handle,
-            )
-        };
+        let code =
+            unsafe { create_runtime(bad.as_ptr(), bad.len(), Some(capture), ctx_ptr, &mut handle) };
         assert_eq!(code, 4);
         assert_eq!(
             last_error_code(),
@@ -348,15 +374,8 @@ mod tests {
 
         // Empty data directory → INVALID_PARAMS.
         let bad = br#"{"dataDirectory":"  "}"#;
-        let code = unsafe {
-            create_runtime(
-                bad.as_ptr(),
-                bad.len(),
-                Some(capture),
-                ctx_ptr,
-                &mut handle,
-            )
-        };
+        let code =
+            unsafe { create_runtime(bad.as_ptr(), bad.len(), Some(capture), ctx_ptr, &mut handle) };
         assert_eq!(code, 4);
         assert_eq!(
             last_error_code(),
@@ -369,7 +388,8 @@ mod tests {
         let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
         let ctx_ptr = Arc::as_ptr(&events) as *mut c_void;
         let mut handle: *mut RuntimeHandle = ptr::null_mut();
-        let config = br#"{"dataDirectory":"/tmp/reader-ffi-data","cacheDirectory":"/tmp/reader-ffi-cache"}"#;
+        let config =
+            br#"{"dataDirectory":"/tmp/reader-ffi-data","cacheDirectory":"/tmp/reader-ffi-cache"}"#;
         let code = unsafe {
             create_runtime(
                 config.as_ptr(),
@@ -381,8 +401,14 @@ mod tests {
         };
         assert_eq!(code, 0);
         let config = unsafe { (&*handle).runtime.config() };
-        assert_eq!(config.data_directory.as_deref(), Some("/tmp/reader-ffi-data"));
-        assert_eq!(config.cache_directory.as_deref(), Some("/tmp/reader-ffi-cache"));
+        assert_eq!(
+            config.data_directory.as_deref(),
+            Some("/tmp/reader-ffi-data")
+        );
+        assert_eq!(
+            config.cache_directory.as_deref(),
+            Some("/tmp/reader-ffi-cache")
+        );
         assert_eq!(unsafe { destroy(handle) }, 0);
     }
 
@@ -518,13 +544,35 @@ mod tests {
     }
 
     #[test]
+    fn destroy_with_pending_host_request_stops_callbacks_after_return() {
+        let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
+        let handle = make_runtime(&events);
+
+        let smoke = br#"{"protocolVersion":1,"requestId":450,"method":"runtime.hostSmoke","params":{"capability":"host.smoke.echo","params":{}}}"#;
+        assert_eq!(unsafe { send(handle, smoke.as_ptr(), smoke.len()) }, 0);
+        wait_events(&events, 1);
+
+        assert_eq!(unsafe { destroy(handle) }, 0);
+        std::thread::sleep(std::time::Duration::from_millis(25));
+
+        let evs = events.0.lock().unwrap();
+        assert_eq!(evs.len(), 1);
+        let req: serde_json::Value = serde_json::from_slice(&evs[0]).unwrap();
+        assert_eq!(req["type"], "host.request");
+        assert_eq!(req["requestId"], 450);
+    }
+
+    #[test]
     fn host_complete_for_unknown_operation_emits_invalid_params_via_c_abi() {
         let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
         let handle = make_runtime(&events);
 
         let complete =
             br#"{"protocolVersion":1,"requestId":500,"method":"host.complete","params":{"operationId":404,"result":{"ok":true}}}"#;
-        assert_eq!(unsafe { send(handle, complete.as_ptr(), complete.len()) }, 0);
+        assert_eq!(
+            unsafe { send(handle, complete.as_ptr(), complete.len()) },
+            0
+        );
 
         let evs = wait_events(&events, 1);
         let err: serde_json::Value = serde_json::from_slice(&evs[0]).unwrap();
