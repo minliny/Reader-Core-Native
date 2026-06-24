@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  parseReaderCoreEvent,
   ReaderCoreRequestError,
   ReaderCoreRuntime,
   type JsonObject,
@@ -266,5 +267,41 @@ describe("ReaderCoreRuntime", () => {
     expect(result.iterations).toBe(3);
     expect(result.lastEvent.type).toBe("result");
     expect(result.lastEvent.requestId).toBe(3);
+  });
+
+  test("rejects malformed native event payloads at the SDK boundary", () => {
+    expect(() =>
+      parseReaderCoreEvent(
+        JSON.stringify({
+          protocolVersion: 1,
+          requestId: 1,
+          type: "result",
+        })
+      )
+    ).toThrow("invalid Reader-Core result event");
+
+    expect(() =>
+      parseReaderCoreEvent(
+        JSON.stringify({
+          protocolVersion: 1,
+          requestId: 1,
+          type: "error",
+          error: { code: "INTERNAL", message: "failed" },
+        })
+      )
+    ).toThrow("invalid Reader-Core error event");
+
+    expect(() =>
+      parseReaderCoreEvent(
+        JSON.stringify({
+          protocolVersion: 1,
+          requestId: 1,
+          type: "host.request",
+          operationId: 1,
+          capability: "",
+          params: {},
+        })
+      )
+    ).toThrow("invalid Reader-Core host.request event");
   });
 });

@@ -21,12 +21,16 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
 - Interleaved event handling: the SDK keeps unrelated events queued while
   waiting for a specific request result, so a pending `host.request` from
   another request does not break the current command/result flow.
+- Event validation: SDK event parsing rejects malformed `result`, `error`, and
+  `host.request` payloads before they enter request waiting or host completion
+  logic.
 - Host error path: NAPI exposes `failHostRequest`, backed by the `host.error`
   JSON command path; the SDK sends `host.error` automatically if a host request
   handler throws.
 - SDK behavior smoke: `bindings/harmony/sdk/reader_core.test.ts` uses a fake
   native module to verify `runtime.ping`, `host.complete`, handler failure to
-  `host.error`, unrelated event queuing, and `cancelRequest` dispatch.
+  `host.error`, unrelated event queuing, malformed native event rejection, and
+  `cancelRequest` dispatch.
 - ArkTS package entry: `bindings/harmony/Index.ets` imports
   `libreader_core_napi.so` and exposes `createReaderCoreRuntime` plus
   `runHarmonyNapiSmoke`.

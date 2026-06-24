@@ -297,20 +297,53 @@ export class ReaderCoreRequestError extends Error {
 }
 
 export function parseReaderCoreEvent(raw: string): ReaderCoreEvent {
-  const value = JSON.parse(raw) as Partial<ReaderCoreEvent>;
-  if (value.protocolVersion !== 1 || typeof value.requestId !== "number") {
+  const value = JSON.parse(raw) as unknown;
+  if (!isJsonObject(value)) {
     throw new Error("invalid Reader-Core event envelope");
   }
-  if (value.type === "result" || value.type === "error" || value.type === "host.request") {
-    return value as ReaderCoreEvent;
+
+  const requestId = value.requestId;
+  if (value.protocolVersion !== 1 || !isNonNegativeSafeInteger(requestId)) {
+    throw new Error("invalid Reader-Core event envelope");
   }
+
+  if (value.type === "result") {
+    if (!isJsonObject(value.data)) {
+      throw new Error("invalid Reader-Core result event");
+    }
+    return value as ReaderCoreResultEvent;
+  }
+
+  if (value.type === "error") {
+    if (!isReaderCoreError(value.error)) {
+      throw new Error("invalid Reader-Core error event");
+    }
+    return value as ReaderCoreErrorEvent;
+  }
+
+  if (value.type === "host.request") {
+    if (
+      !isNonNegativeSafeInteger(value.operationId) ||
+      typeof value.capability !== "string" ||
+      value.capability.length === 0 ||
+      !isJsonObject(value.params)
+    ) {
+      throw new Error("invalid Reader-Core host.request event");
+    }
+    return value as ReaderCoreHostRequestEvent;
+  }
+
   throw new Error(`unknown Reader-Core event type: ${String(value.type)}`);
 }
 
 function assertNonNegativeSafeInteger(value: number, name: string): void {
-  if (!Number.isSafeInteger(value) || value < 0) {
+  if (!isNonNegativeSafeInteger(value)) {
     throw new Error(`${name} must be a non-negative safe integer`);
   }
+}
+
+function isNonNegativeSafeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
 function normalizeHostError(error: unknown): ReaderCoreError {
@@ -346,8 +379,13 @@ function isReaderCoreError(value: unknown): value is ReaderCoreError {
   return (
     typeof candidate.code === "string" &&
     typeof candidate.message === "string" &&
-    typeof candidate.retryable === "boolean"
+    typeof candidate.retryable === "boolean" &&
+    (candidate.details === undefined || isJsonObject(candidate.details))
   );
+}
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function delay(ms: number): Promise<void> {
