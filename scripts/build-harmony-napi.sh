@@ -48,13 +48,34 @@ output="$build_dir/libreader_core_napi.so"
 test -f "$output"
 echo "built $output"
 
+sdk_smoke_tests="bindings/harmony/sdk"
 sdk_smoke_output="$build_dir/harmony-sdk-smoke.txt"
+sdk_smoke_raw_output="$build_dir/harmony-sdk-smoke.raw.txt"
 sdk_smoke="skipped"
 if command -v bun >/dev/null 2>&1; then
-  bun test bindings/harmony/sdk/reader_core.test.ts > "$sdk_smoke_output"
+  bun test "$sdk_smoke_tests" > "$sdk_smoke_raw_output" 2>&1
   sdk_smoke="pass"
+  pass_count="$(awk '/^[[:space:]]*[0-9]+ pass$/ { value=$1 } END { print value }' "$sdk_smoke_raw_output")"
+  fail_count="$(awk '/^[[:space:]]*[0-9]+ fail$/ { value=$1 } END { print value }' "$sdk_smoke_raw_output")"
+  expect_count="$(awk '/expect\(\) calls/ { value=$1 } END { print value }' "$sdk_smoke_raw_output")"
+  test_files="$(find bindings/harmony/sdk -name '*.test.ts' | LC_ALL=C sort | tr '\n' ',' | sed 's/,$//')"
+  {
+    echo "name=reader-core-native-harmony-sdk-smoke"
+    echo "status=$sdk_smoke"
+    echo "tests=$sdk_smoke_tests"
+    echo "test_files=$test_files"
+    echo "pass_count=$pass_count"
+    echo "fail_count=$fail_count"
+    echo "expect_count=$expect_count"
+  } > "$sdk_smoke_output"
 else
-  echo "bun not found; skipped bindings/harmony/sdk/reader_core.test.ts" > "$sdk_smoke_output"
+  {
+    echo "name=reader-core-native-harmony-sdk-smoke"
+    echo "status=$sdk_smoke"
+    echo "tests=$sdk_smoke_tests"
+    echo "reason=bun_not_found"
+  } > "$sdk_smoke_output"
+  echo "bun not found; skipped $sdk_smoke_tests" > "$sdk_smoke_raw_output"
 fi
 
 package_dir="$build_dir/package"
@@ -65,7 +86,12 @@ cp bindings/harmony/oh-package.json5 "$package_dir/"
 cp bindings/harmony/Index.ets "$package_dir/"
 cp bindings/harmony/README.md "$package_dir/"
 cp bindings/harmony/STATUS.md "$package_dir/"
-cp bindings/harmony/sdk/reader_core.ts "$package_dir/sdk/"
+for sdk_file in bindings/harmony/sdk/*.ts; do
+  if [[ "$sdk_file" == *.test.ts ]]; then
+    continue
+  fi
+  cp "$sdk_file" "$package_dir/sdk/"
+done
 cp "$output" "$package_dir/libs/arm64-v8a/"
 (
   cd "$package_dir"
@@ -109,8 +135,10 @@ evidence="$build_dir/harmony-napi-build-evidence.txt"
   echo "package_manifest_sha256=$(artifact_sha256 "$package_manifest")"
   echo "exports=abiVersion,createRuntime,releaseRuntime,sendCommand,cancelRequest,readEvent,pendingEventCount,completeHostRequest,failHostRequest,pingSmoke,hostSmoke,lifecycleSmoke"
   echo "sdk_smoke=$sdk_smoke"
+  echo "sdk_smoke_tests=$sdk_smoke_tests"
   echo "sdk_smoke_output=$sdk_smoke_output"
   echo "sdk_smoke_output_sha256=$(artifact_sha256 "$sdk_smoke_output")"
+  echo "sdk_smoke_raw_output=$sdk_smoke_raw_output"
   if [[ -f "$symbols_file" ]]; then
     echo "symbols=$symbols_file"
     echo "symbols_sha256=$(artifact_sha256 "$symbols_file")"

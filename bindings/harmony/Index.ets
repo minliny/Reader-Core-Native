@@ -4,8 +4,13 @@ import {
   ReaderCoreRuntime,
   type JsonObject,
   type NativeReaderCoreModule,
-  type ReaderCoreResultEvent,
 } from './sdk/reader_core';
+import {
+  assertHarmonyNapiSmokeReport,
+  buildHarmonyNapiSmokeReport,
+  type HarmonyNapiSmokeReport,
+  type HarmonyNapiSmokeResult,
+} from './sdk/smoke_report';
 
 export {
   ReaderCoreRequestError,
@@ -23,14 +28,15 @@ export {
   type ReaderCoreResultEvent,
   type RequestOptions,
 } from './sdk/reader_core';
-
-export type HarmonyNapiSmokeResult = {
-  abiVersion: number;
-  nativeLifecycle: JsonObject;
-  coreInfo: ReaderCoreResultEvent;
-  ping: ReaderCoreResultEvent;
-  hostSmoke: ReaderCoreResultEvent;
-};
+export {
+  assertHarmonyNapiSmokeReport,
+  buildHarmonyNapiSmokeReport,
+  formatHarmonyNapiSmokeReport,
+  type HarmonyNapiSmokeCheck,
+  type HarmonyNapiSmokeCheckName,
+  type HarmonyNapiSmokeReport,
+  type HarmonyNapiSmokeResult,
+} from './sdk/smoke_report';
 
 const nativeReaderCore = readerCoreNapi as NativeReaderCoreModule;
 
@@ -57,4 +63,12 @@ export async function runHarmonyNapiSmoke(
   } finally {
     runtime.close();
   }
+}
+
+export async function runHarmonyNapiSmokeReport(
+  config: JsonObject = {}
+): Promise<HarmonyNapiSmokeReport> {
+  const report = buildHarmonyNapiSmokeReport(await runHarmonyNapiSmoke(config));
+  assertHarmonyNapiSmokeReport(report);
+  return report;
 }

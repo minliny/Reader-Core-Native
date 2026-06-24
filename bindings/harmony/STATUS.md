@@ -30,6 +30,9 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
 - ArkTS package entry: `bindings/harmony/Index.ets` imports
   `libreader_core_napi.so` and exposes `createReaderCoreRuntime` plus
   `runHarmonyNapiSmoke`.
+- Device smoke report entry: `runHarmonyNapiSmokeReport` validates the HAP-side
+  smoke result and returns a formatted-report-compatible pass/fail structure
+  that can be archived beside local build evidence.
 - Build evidence: OHOS and Harmony scripts emit deterministic artifact paths,
   SHA-256 hashes, byte sizes, tool versions, NAPI symbol evidence, and a
   package-ready Harmony directory manifest.
@@ -44,10 +47,14 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
   exports into `ReaderCoreRuntime`, including `coreInfo`, `ping`, `hostSmoke`,
   generic `request`, explicit `readEvent`, explicit `completeHostRequest`, and
   explicit `failHostRequest`.
+- Smoke report helper: `bindings/harmony/sdk/smoke_report.ts` validates
+  lifecycle, `core.info`, `runtime.ping`, and `runtime.hostSmoke` output and
+  formats a deterministic JSON report for device-log archival.
 - Package entry: `bindings/harmony/oh-package.json5` points to `Index.ets`.
 - Package artifact: `scripts/build-harmony-napi.sh` assembles
-  `target/harmony-napi/arm64-v8a/package` with the `.so`, ArkTS entry, SDK, and
-  status/readme files, then emits `harmony-package-manifest.sha256`.
+  `target/harmony-napi/arm64-v8a/package` with the `.so`, ArkTS entry, non-test
+  SDK files, and status/readme files, then emits
+  `harmony-package-manifest.sha256`.
 
 ## ABI Constraints
 
@@ -66,7 +73,5 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
 
 ## Open Harmony Work
 
-- Add device-side smoke tests that import the `.so`, run `coreInfo`, `ping`, and
-  `hostSmoke`, and archive the script output beside the build evidence. The
-  repo now provides `runHarmonyNapiSmoke`; the remaining work is running it in
-  a signed HAP on device.
+- Run `runHarmonyNapiSmokeReport` in a signed HAP on device and archive the
+  formatted report output beside the local OHOS/Harmony build evidence.
