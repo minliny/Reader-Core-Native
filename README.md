@@ -1,82 +1,105 @@
 # Reader-Core-Native
 
-> **Reader 三平台统一内核 — Rust 实现**
->
-> 以 [ARCHITECTURE.md](./ARCHITECTURE.md) 为唯一实施规划来源。
+Reader three-platform Core implemented in Rust. This repository is the Core
+product baseline: domain protocol, rule/content/runtime crates, C ABI, CLI
+driver, and smoke-level iOS/Harmony binding artifacts.
 
-## 快速开始
+The source of truth for current status is the checked-in code plus the
+verification commands below. Older platform roadmap documents are not used as
+evidence for completed capability.
+
+## Quick Start
 
 ```bash
-# 安装 Rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# 本机验证
+# local format + workspace tests
 ./scripts/check-local.sh
 
-# 本机构建 Rust workspace、FFI release 产物，并运行 Rust/C ABI smoke
+# build workspace, release C ABI staticlib, CLI info, and C/C++ ABI smoke
 ./scripts/build-local.sh
 
-# 阶段 1：仅构建 OHOS Rust staticlib
-rustup target add aarch64-unknown-linux-ohos
-./scripts/build-ohos.sh
+# protocol fixture conformance report
+cargo run -p reader-cli -- --conformance
 
-# 阶段 1：构建 HarmonyOS NAPI smoke module（需要 DevEco/OHOS SDK）
+# remote-reading V1 fixture vertical
+cargo run -p reader-cli -- --fixture-vertical tests/fixtures/remote_source/basic_source.json
+
+# C and C++ host ABI smoke
+./scripts/ffi-smoke.sh
+```
+
+Environment-gated platform smoke:
+
+```bash
+# OHOS SDK required: OHOS_SDK_HOME must point at an OpenHarmony SDK
 ./scripts/build-harmony-napi.sh
 
-# 阶段 1：构建 iOS XCFramework smoke artifact（需要 Xcode）
+# Xcode and iOS Rust targets required
 rustup target add aarch64-apple-ios aarch64-apple-ios-sim
-./scripts/build-ios-xcframework.sh
-
-# 阶段 1：Swift wrapper compile/link/runtime smoke（需要 Xcode）
 ./scripts/check-ios-swift-wrapper.sh
-
-# 滚动集成：把已完成 agent 分支接入独立 integration worktree
-scripts/integration-queue.sh \
-  codex/android-integration \
-  origin/codex/core-product-integration \
-  origin/codex/<android-jni-branch>
 ```
 
-`build-local.sh` 会同时运行 C 和 C++ host ABI smoke。C++ smoke 是
-JNI、NAPI、Objective-C++ shim 的头文件/链接基线。
+## Current Product State
 
-## 当前 Core-side 状态
+`origin/codex/core-product-integration` is at `fb4c3a7` for this branch HEAD. It has
+merged the Core foundation, QuickJS/rule batches, remote-reading V1 vertical,
+HTTP host contract, protocol/docs status, CLI host HTTP smoke, and iOS wrapper
+smoke. Evidence:
 
-`origin/codex/core-product-integration` 已接入 Core-side
-`remote.reading.v1` 纵切 smoke：`source.import`、`book.search`、
-`book.detail`、`book.toc`、`chapter.content`、`reading.progress.update` 可在
-fixture/inline response 下跑通，并覆盖 content pipeline、in-memory cache
-和 progress 写入；同时支持 `http.execute` host request/complete 回路。V1
-不在 Core 内打开 socket；HTTP/TLS/WebView 等实际平台能力仍由 platform
-adapter 提供。
+- `crates/reader-contract/src/lib.rs` advertises ABI/protocol v1 capabilities:
+  `core.info`, `runtime.ping`, `runtime.hostSmoke`, `host.complete`,
+  `host.error`, `host.bus.v1`, `http.execute`, `runtime.config.v1`, and
+  `remote.reading.v1`.
+- `crates/reader-runtime/src/remote.rs` implements `source.import`,
+  `book.search`, `book.detail`, `book.toc`, `chapter.content`, and
+  `reading.progress.update` over inline/fixture responses or host-provided
+  `http.execute` completions.
+- `tools/reader-cli/tests/fixture_vertical.rs` drives the import -> search ->
+  host HTTP search -> detail -> toc -> chapter -> progress path and verifies the
+  JS-network-unsupported error path.
+- `include/reader_core.h` and `crates/reader-ffi/src/lib.rs` expose the ABI v1
+  runtime lifecycle: create, send, cancel, destroy, and ABI version.
+- `bindings/ios/Sources/ReaderCoreClient/ReaderCoreClient.swift` wraps ABI
+  lifecycle plus `core.info` and `runtime.ping`; `scripts/check-ios-swift-wrapper.sh`
+  is the compile/link/runtime smoke gate.
+- `bindings/harmony/native/reader_napi.cpp` and `scripts/build-harmony-napi.sh`
+  build the Core-side Harmony NAPI `.so` when OHOS SDK tooling is present.
 
-OHOS、Android、iOS 平台产物脚本会按 [ARCHITECTURE.md](./ARCHITECTURE.md)
-阶段 1/2 补齐；当前 `build-harmony-napi.sh` 验证 Rust staticlib 能链接为
-HarmonyOS NAPI `.so`，HAP 集成和真机加载仍需在 HarmonyOS App 仓库完成。
-当前 iOS 证据覆盖 Core-side XCFramework / Swift wrapper compile-link-runtime
-smoke（`core.info` / `runtime.ping`）；URLSession/WebView/App 侧接入仍是后续
-滚动接入项。Android JNI 仍未在远端集成分支中完成。
+Current limits are also code-backed:
 
-## 目录
+- Storage is V1 in-memory only. `crates/reader-storage/src/lib.rs` says the real
+  SQLite-backed store is deferred, and no SQLite backend is implemented.
+- Local book, RSS, and sync crates are placeholders:
+  `crates/reader-local-book/src/lib.rs`, `crates/reader-rss/src/lib.rs`, and
+  `crates/reader-sync/src/lib.rs`.
+- Core never opens sockets. Remote reading emits `host.request` with
+  `capability: "http.execute"` and resumes only after the host sends
+  `host.complete`; see `crates/reader-runtime/src/remote.rs`.
+- Runtime config schema exists, and the pure Rust runtime can parse it, but the
+  current C ABI create path ignores `_config_json` and creates `Runtime::new`.
+  See `crates/reader-contract/src/config.rs` and `crates/reader-ffi/src/runtime.rs`.
+- Android JNI smoke exists as a branch fact on `origin/codex/android-jni-smoke`
+  and is merged into `origin/codex/android-integration`, but it is not in this
+  `origin/codex/core-product-integration` baseline. In branch HEAD, `HEAD`
+  only contains `bindings/android/.gitkeep`.
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md) — 完整架构与实施规划（**唯一权威文档**）
-- [FEATURE_MATRIX.md](./FEATURE_MATRIX.md) — 能力归属表
-- [MIGRATION_MAP.md](./MIGRATION_MAP.md) — 各平台迁移进度
-- [docs/ROLLING_INTEGRATION.md](./docs/ROLLING_INTEGRATION.md) — 并行 agent 滚动集成队列
-- [include/reader_core.h](./include/reader_core.h) — C ABI 头文件
-- [protocol/](./protocol/) — JSON 消息协议 Schema
-- [bindings/ios/README.md](./bindings/ios/README.md) — iOS XCFramework smoke 产物说明
+## Documentation
 
-## 仓库关系
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - current architecture, product status,
+  and Core/host ownership boundary.
+- [FEATURE_MATRIX.md](./FEATURE_MATRIX.md) - current capability matrix with
+  evidence paths.
+- [MIGRATION_MAP.md](./MIGRATION_MAP.md) - branch-aware platform migration map.
+- [protocol/compatibility.md](./protocol/compatibility.md) - ABI/protocol v1
+  compatibility contract.
+- [docs/ROLLING_INTEGRATION.md](./docs/ROLLING_INTEGRATION.md) - branch
+  integration helper notes.
 
+## Repository Roles
+
+```text
+Reader-Core-Native       Rust Core, C ABI, protocol, CLI, Core-side smokes
+Reader-for-iOS           UI plus Apple host adapters and app integration
+Reader-for-Android       UI plus Android host adapters and app integration
+Reader-for-HarmonyOS     UI plus ArkTS/NAPI host adapters and app integration
+Reader-Core (Swift)      Frozen reference, not the target runtime Core
 ```
-Reader-Core-Native          ← 此仓库：唯一业务内核（Rust）
-Reader-for-iOS              ← UI + Apple Host Adapters
-Reader-for-Android          ← UI + Android Host Adapters
-Reader-for-HarmonyOS        ← UI + Harmony Host Adapters（首个平台验收目标）
-Reader-Core (Swift)         ← 归档参考（冻结新功能）
-```
-
-## 旧规划文档
-
-各平台仓库中的旧规划/架构/开发计划等文档已在 2026-06-24 统一归档至各自 `_archived_planning_2026-06-24/` 目录，不再作为实施依据。

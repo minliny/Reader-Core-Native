@@ -1,65 +1,111 @@
 # Migration Map
 
-> 记录各平台从独立实现迁移到 Rust Core 的进度。
-> 旧迁移/roadmap/handoff 文档均已归档至各仓库 `_archived_planning_2026-06-24/`。
+This map records what has actually landed in the current Core product baseline
+and what remains Core-owned versus host/app-owned work. Claims are backed by
+paths or commands in this repository.
 
-## 整体状态
+## Baseline
 
-| 阶段 | 描述 | 状态 | 开始 | 完成 |
-|------|------|:----:|------|------|
-| 0 | 冻结方向与建立迁移清单 | ✅ | 2026-06-24 | 2026-06-24 |
-| 1 | HarmonyOS Rust 地基 | 🟡 | 2026-06-24 | |
-| 2 | 统一 C ABI 和三端空壳接入 | 🟡 | 2026-06-24 | |
-| 3 | 规则内核和 QuickJS | 🟡 | 2026-06-24 | |
-| 4 | 远程阅读 Core-side 纵切 | ✅ | 2026-06-24 | 2026-06-24 |
-| 5 | 统一数据库、缓存和进度 | 🟡 | 2026-06-24 | |
-| 6 | 补齐规则兼容面 | ⬜ | | |
-| 7 | 本地书和扩展能力 | ⬜ | | |
-| 8 | 退役重复后端和发布 | ⬜ | | |
+Current branch was created from `origin/codex/core-product-integration`
+(`fb4c3a7` locally). The baseline includes Core protocol/runtime, FFI, rule/JS
+foundation, remote-reading V1, host HTTP contract, CLI smoke, and iOS wrapper
+smoke.
 
-阶段 4 的完成范围仅限 Core-side smoke：`remote.reading.v1` 覆盖
-`source.import` → `book.search` → `book.detail` → `book.toc` →
-`chapter.content` → `reading.progress.update`，支持 fixture/inline response
-以及 `http.execute` host request/complete 回路。它不代表任何平台 App 已完成
-真实网络、WebView 或真机阅读链路。阶段 5 当前只有 in-memory
-cache/progress smoke，SQLite 持久化和平台迁移仍在后续阶段。
+Evidence commands:
 
-## 平台迁移进度
+```bash
+git log --oneline --first-parent -n 20 origin/codex/core-product-integration
+git branch -r --contains origin/codex/core-product-integration
+```
+
+## Phase Status
+
+| Area | Status | Evidence |
+| --- | --- | --- |
+| Core protocol and runtime | Done for v1 | `crates/reader-contract/src/lib.rs`, `crates/reader-runtime/src/runtime.rs`, `cargo run -p reader-cli -- --conformance` |
+| C ABI foundation | Done for v1 lifecycle | `include/reader_core.h`, `crates/reader-ffi/src/lib.rs`, `./scripts/ffi-smoke.sh` |
+| Non-JS rules and QuickJS sandbox | Partial product foundation | `crates/reader-rule/tests/*.rs`, `crates/reader-js/src/lib.rs`, `cargo test -p reader-rule -p reader-js` |
+| Remote-reading V1 vertical | Done for fixture/inline/host-complete smoke | `crates/reader-runtime/src/remote.rs`, `tools/reader-cli/tests/fixture_vertical.rs` |
+| Storage/cache/progress | In-memory V1 only | `crates/reader-storage/src/lib.rs` |
+| Persistent SQLite and migrations | Not implemented | No SQLite backend in `crates/reader-storage`; crate documents deferred backend |
+| Local book | Not implemented | `crates/reader-local-book/src/lib.rs` placeholder |
+| RSS | Not implemented | `crates/reader-rss/src/lib.rs` placeholder |
+| Sync/WebDAV/backup | Not implemented | `crates/reader-sync/src/lib.rs` placeholder |
+
+## Platform Migration
 
 ### HarmonyOS
 
-| 模块 | 状态 | 备注 |
-|------|:----:|------|
-| NAPI C++ Shim | 🟡 | Core-side `.so` smoke passes; App-side HAP integration is on `codex/harmony-napi-runtime` and is not claimed complete here |
-| ArkTS Wrapper | 🟡 | App-side bridge is being validated separately; no device/runtime completion claimed |
-| HTTP Host Adapter | ⬜ | |
-| WebView Host Adapter | ⬜ | |
-| TTS Host Adapter | ⬜ | |
+| Item | Status | Evidence |
+| --- | --- | --- |
+| Core-side NAPI build lane | Present | `bindings/harmony/native/reader_napi.cpp`, `bindings/harmony/native/CMakeLists.txt`, `scripts/build-harmony-napi.sh` |
+| OHOS Rust staticlib build lane | Present | `scripts/build-ohos.sh` |
+| App-side HAP integration and device runtime | Host/app pending | No app repo code in this Core tree; build script only produces Core-side native artifact |
+| ArkTS wrapper, HTTP/WebView/TTS adapters | Host/app pending | No ArkTS adapter code in this Core tree |
 
-### Android
+Validation command when OHOS SDK is installed:
 
-| 模块 | 状态 | 备注 |
-|------|:----:|------|
-| NativeCoreBridge (JNI) | ⬜ | Pending; no completed remote Android JNI integration branch is present on origin |
-| HTTP Transport (OkHttp) | ⬜ | 保留为 transport |
-| WebView Adapter | ⬜ | 保留 |
-| TTS Adapter | ⬜ | 保留 |
-| Room → Rust DB | ⬜ | Core V1 has in-memory smoke only; durable SQLite/platform migration pending |
-| Parser → Rust | ⬜ | |
-| RSS → Rust | ⬜ | |
-| WebDAV/Sync → Rust | ⬜ | |
+```bash
+OHOS_SDK_HOME=/path/to/ohos-sdk ./scripts/build-harmony-napi.sh
+```
 
 ### iOS
 
-| 模块 | 状态 | 备注 |
-|------|:----:|------|
-| XCFramework | 🟡 | Core-side staticlib + header smoke passes; App runtime integration not claimed |
-| ReaderCoreClient.swift | 🟡 | Minimal ABI lifecycle + `core.info` / `runtime.ping` compile/link/runtime smoke passes; host adapters and App integration pending |
-| HTTP Transport (URLSession) | ⬜ | 保留为 transport |
-| WebView Login Adapter | ⬜ | 保留 |
-| TTS Adapter | ⬜ | 保留 |
-| Swift Core → Rust | ⬜ | 最终移除 Swift Core 依赖 |
+| Item | Status | Evidence |
+| --- | --- | --- |
+| XCFramework/header/modulemap smoke | Present | `scripts/build-ios-xcframework.sh`, `bindings/ios/module.modulemap`, `bindings/ios/README.md` |
+| Swift wrapper lifecycle, `core.info`, `runtime.ping` | Present | `bindings/ios/Sources/ReaderCoreClient/ReaderCoreClient.swift`, `scripts/check-ios-swift-wrapper.sh` |
+| URLSession host transport, WebView login, app UI integration | Host/app pending | `bindings/ios/README.md` explicitly scopes them to the iOS host repository |
 
----
+Validation command when Xcode and iOS Rust targets are installed:
 
-*最后更新: 2026-06-24 | 以 `ARCHITECTURE.md` 为准*
+```bash
+./scripts/check-ios-swift-wrapper.sh
+```
+
+### Android
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| Android JNI in current Core product baseline | Not present | `git ls-tree -r HEAD | rg 'bindings/android|build-android-jni'` shows only `bindings/android/.gitkeep` |
+| Android JNI smoke branch | Exists outside current baseline | `origin/codex/android-jni-smoke` contains `bindings/android/jni/reader_jni.cpp` and `scripts/build-android-jni.sh` |
+| Android integration branch | Exists outside current baseline | `origin/codex/android-integration` contains current baseline plus `f205b2d feat: add android jni smoke build` |
+| OkHttp/WebView/TTS/Room/app UI migration | Host/app pending | No Android host adapter implementation in branch HEAD |
+
+Branch-fact commands:
+
+```bash
+git merge-base --is-ancestor origin/codex/android-jni-smoke HEAD
+git log --oneline HEAD..origin/codex/android-integration --
+git ls-tree -r origin/codex/android-jni-smoke | rg 'bindings/android|build-android-jni'
+```
+
+Expected current-baseline result: the merge-base command is non-zero because
+Android JNI smoke has not landed in `origin/codex/core-product-integration`.
+
+## Next Core-Owned Gaps
+
+These are product gaps owned by this repo, not platform hosts:
+
+- Route `config_json` from `rc_runtime_create` into `Runtime::new_with_config_json`
+  and return structured ABI status for invalid config.
+- Replace V1 `InMemoryStorage` with a persistent SQLite-backed backend while
+  preserving the runtime-facing storage API.
+- Add real TXT/EPUB, RSS, and sync/WebDAV implementations where placeholder
+  crates exist today.
+- Expand rule compatibility beyond primitive V1 tests with a sample-corpus
+  runner that exercises source behavior through `reader-cli`.
+- Bridge JS host callbacks to the runtime host bus instead of only reporting
+  unregistered `java.get`/`java.post` as unsupported in the default pipeline.
+
+## Host/App-Owned Gaps
+
+These remain outside this Core repo:
+
+- Real socket/TLS execution for `http.execute`.
+- WebView login/captcha and cookie extraction.
+- Secure storage, file picker, sandbox permissions, TTS playback.
+- App lifecycle, UI, navigation, theme, background work, notifications.
+- Platform packaging, signing, store distribution, and device-level telemetry.
+
+Last updated: 2026-06-24.
