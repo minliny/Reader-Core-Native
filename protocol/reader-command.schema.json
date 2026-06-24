@@ -10,6 +10,7 @@
     "host.complete",
     "host.error",
     "host.bus.v1",
+    "http.execute",
     "runtime.config.v1",
     "remote.reading.v1"
   ],

@@ -8,7 +8,10 @@ use reader_contract::{
     HostSmokeParams, RuntimeConfig,
 };
 
-use crate::remote::{dispatch_remote, RemoteState};
+use crate::remote::{
+    complete_remote_host, dispatch_remote, PendingHostRequest, RemoteDispatch,
+    RemoteHostContinuation, RemoteState,
+};
 use crate::sink::EventSink;
 
 /// C ABI version this runtime advertises via `core.info`. The authoritative
@@ -29,10 +32,17 @@ enum HostOperationState {
     Pending,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
+enum HostOperationContinuation {
+    Echo,
+    Remote(RemoteHostContinuation),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 struct HostOperation {
     request_id: u64,
     state: HostOperationState,
+    continuation: HostOperationContinuation,
 }
 
 /// A handle to a running Core runtime.
@@ -288,15 +298,33 @@ fn dispatch_command(
             host_operations,
             next_operation_id,
         ),
-        methods::HOST_COMPLETE => {
-            dispatch_host_complete(cmd, sink, active_requests, cancelled, host_operations)
-        }
+        methods::HOST_COMPLETE => dispatch_host_complete(
+            cmd,
+            sink,
+            active_requests,
+            cancelled,
+            host_operations,
+            remote_state,
+        ),
         methods::HOST_ERROR => {
             dispatch_host_error(cmd, sink, active_requests, cancelled, host_operations)
         }
         other => {
-            if dispatch_remote(other, cmd, sink, active_requests, remote_state) {
-                return;
+            match dispatch_remote(other, cmd, sink, active_requests, remote_state) {
+                RemoteDispatch::Finished => return,
+                RemoteDispatch::Pending(pending) => {
+                    dispatch_remote_host_request(
+                        cmd,
+                        sink,
+                        active_requests,
+                        cancelled,
+                        host_operations,
+                        next_operation_id,
+                        pending,
+                    );
+                    return;
+                }
+                RemoteDispatch::NotHandled => {}
             }
             finish_request(
                 sink,
@@ -351,6 +379,7 @@ fn dispatch_host_smoke(
             HostOperation {
                 request_id: cmd.request_id,
                 state: HostOperationState::Pending,
+                continuation: HostOperationContinuation::Echo,
             },
         );
     } else {
@@ -387,12 +416,66 @@ fn dispatch_host_smoke(
     ));
 }
 
+fn dispatch_remote_host_request(
+    cmd: &Command,
+    sink: &Arc<dyn EventSink>,
+    active_requests: &Mutex<HashSet<u64>>,
+    cancelled: &Mutex<HashSet<u64>>,
+    host_operations: &Mutex<HashMap<u64, HostOperation>>,
+    next_operation_id: &AtomicU64,
+    pending: PendingHostRequest,
+) {
+    let operation_id = next_operation_id.fetch_add(1, Ordering::AcqRel);
+    if let Ok(mut operations) = host_operations.lock() {
+        operations.insert(
+            operation_id,
+            HostOperation {
+                request_id: cmd.request_id,
+                state: HostOperationState::Pending,
+                continuation: HostOperationContinuation::Remote(pending.continuation),
+            },
+        );
+    } else {
+        finish_request(
+            sink,
+            active_requests,
+            cancelled,
+            cmd.request_id,
+            Event::error(
+                cmd.request_id,
+                CoreError::internal("host operation registry poisoned"),
+            ),
+        );
+        return;
+    }
+
+    if take_cancelled(cancelled, cmd.request_id) {
+        remove_operation(host_operations, operation_id);
+        finish_request(
+            sink,
+            active_requests,
+            cancelled,
+            cmd.request_id,
+            Event::error(cmd.request_id, CoreError::cancelled()),
+        );
+        return;
+    }
+
+    sink.emit(&Event::host_request(
+        cmd.request_id,
+        operation_id,
+        pending.capability,
+        pending.params,
+    ));
+}
+
 fn dispatch_host_complete(
     cmd: &Command,
     sink: &Arc<dyn EventSink>,
     active_requests: &Mutex<HashSet<u64>>,
     cancelled: &Mutex<HashSet<u64>>,
     host_operations: &Mutex<HashMap<u64, HostOperation>>,
+    remote_state: &RemoteState,
 ) {
     let params = match parse_host_complete_params(cmd) {
         Ok(params) => params,
@@ -430,12 +513,22 @@ fn dispatch_host_complete(
         return;
     };
 
+    let event = match operation.continuation {
+        HostOperationContinuation::Echo => Event::result(operation.request_id, params.result),
+        HostOperationContinuation::Remote(continuation) => {
+            match complete_remote_host(continuation, params.result, remote_state) {
+                Ok(data) => Event::result(operation.request_id, data),
+                Err(error) => Event::error(operation.request_id, error),
+            }
+        }
+    };
+
     finish_request(
         sink,
         active_requests,
         cancelled,
         operation.request_id,
-        Event::result(operation.request_id, params.result),
+        event,
     );
 }
 
@@ -1093,6 +1186,137 @@ mod tests {
                 assert_eq!(books[0]["title"], "Dune");
             }
             other => panic!("expected result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn book_search_fetches_response_through_host_http() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send(Command::new(
+            21,
+            methods::BOOK_SEARCH,
+            serde_json::json!({
+                "sourceId": "vtest-src",
+                "searchRequest": {
+                    "url": "https://books.example.test/search?q=dune",
+                    "headers": { "Accept": "application/json" }
+                },
+                "source": vertical_source(),
+            }),
+        ))
+        .unwrap();
+
+        let events = sink.wait_len(1);
+        let operation_id = match &events[0] {
+            Event::HostRequest {
+                request_id,
+                operation_id,
+                capability,
+                params,
+                ..
+            } => {
+                assert_eq!(*request_id, 21);
+                assert_eq!(capability, "http.execute");
+                assert_eq!(params["method"], "GET");
+                assert_eq!(params["url"], "https://books.example.test/search?q=dune");
+                assert_eq!(params["headers"]["Accept"], "application/json");
+                *operation_id
+            }
+            other => panic!("expected http host request, got {other:?}"),
+        };
+
+        rt.send(Command::new(
+            22,
+            methods::HOST_COMPLETE,
+            serde_json::json!({
+                "operationId": operation_id,
+                "result": {
+                    "status": 200,
+                    "body": "{\"books\":[{\"bookId\":\"1\",\"title\":\"Dune\",\"author\":\"Herbert\"}]}"
+                }
+            }),
+        ))
+        .unwrap();
+
+        let events = sink.wait_len(2);
+        match &events[1] {
+            Event::Result {
+                request_id, data, ..
+            } => {
+                assert_eq!(*request_id, 21);
+                let books = data["books"].as_array().expect("books array");
+                assert_eq!(books[0]["title"], "Dune");
+            }
+            other => panic!("expected remote result after host completion, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn book_search_requires_response_or_host_request() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                23,
+                methods::BOOK_SEARCH,
+                serde_json::json!({
+                    "sourceId": "vtest-src",
+                    "source": vertical_source(),
+                }),
+            ),
+        );
+        match event {
+            Event::Error { error, .. } => {
+                assert_eq!(error.code, ErrorCode::InvalidParams);
+                assert!(error.message.contains("searchResponse"));
+            }
+            other => panic!("expected missing response error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn remote_host_http_completion_requires_body_string() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send(Command::new(
+            24,
+            methods::BOOK_SEARCH,
+            serde_json::json!({
+                "sourceId": "vtest-src",
+                "searchRequest": { "url": "https://books.example.test/search" },
+                "source": vertical_source(),
+            }),
+        ))
+        .unwrap();
+
+        let operation_id = match &sink.wait_len(1)[0] {
+            Event::HostRequest { operation_id, .. } => *operation_id,
+            other => panic!("expected host request, got {other:?}"),
+        };
+
+        rt.send(Command::new(
+            25,
+            methods::HOST_COMPLETE,
+            serde_json::json!({
+                "operationId": operation_id,
+                "result": { "status": 200 }
+            }),
+        ))
+        .unwrap();
+
+        let events = sink.wait_len(2);
+        match &events[1] {
+            Event::Error {
+                request_id, error, ..
+            } => {
+                assert_eq!(*request_id, 24);
+                assert_eq!(error.code, ErrorCode::InvalidParams);
+                assert!(error.message.contains("result.body"));
+            }
+            other => panic!("expected original request error, got {other:?}"),
         }
     }
 

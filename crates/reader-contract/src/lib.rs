@@ -22,7 +22,7 @@ pub use error::{CoreError, ErrorCode};
 pub use event::Event;
 pub use host::{HostCompleteParams, HostErrorParams, HostSmokeParams};
 pub use remote::{
-    BookDetailParams, BookSearchParams, BookTocParams, ChapterContentParams,
+    BookDetailParams, BookSearchParams, BookTocParams, ChapterContentParams, HostHttpRequest,
     ReadingProgressUpdateParams, SourceImportParams,
 };
 
@@ -45,13 +45,13 @@ pub mod methods {
     // --- Remote-reading vertical (V1 minimal) -------------------------------
     /// Import a remote book source definition.
     pub const SOURCE_IMPORT: &str = "source.import";
-    /// Search books at a source using a pre-fetched search response.
+    /// Search books at a source using a prefetched or host-fetched response.
     pub const BOOK_SEARCH: &str = "book.search";
-    /// Fetch/merge book detail metadata from a pre-fetched detail response.
+    /// Fetch/merge book detail metadata from a prefetched or host-fetched response.
     pub const BOOK_DETAIL: &str = "book.detail";
-    /// Fetch a book's table of contents from a pre-fetched toc response.
+    /// Fetch a book's table of contents from a prefetched or host-fetched response.
     pub const BOOK_TOC: &str = "book.toc";
-    /// Extract chapter body text from a pre-fetched chapter response.
+    /// Extract chapter body text from a prefetched or host-fetched response.
     pub const CHAPTER_CONTENT: &str = "chapter.content";
     /// Update reading progress/state for a book.
     pub const READING_PROGRESS_UPDATE: &str = "reading.progress.update";
@@ -60,8 +60,10 @@ pub mod methods {
 /// Non-method capability names advertised by `core.info` in v1.
 pub mod capabilities {
     pub const HOST_BUS_V1: &str = "host.bus.v1";
+    /// Host-provided HTTP transport capability used by remote-reading commands.
+    pub const HTTP_EXECUTE: &str = "http.execute";
     pub const RUNTIME_CONFIG_V1: &str = "runtime.config.v1";
-    /// Remote-reading vertical (V1 minimal, fixture/inline content only).
+    /// Remote-reading vertical (V1 minimal).
     pub const REMOTE_READING_V1: &str = "remote.reading.v1";
 }
 
@@ -73,6 +75,7 @@ pub const V1_CAPABILITIES: &[&str] = &[
     methods::HOST_COMPLETE,
     methods::HOST_ERROR,
     capabilities::HOST_BUS_V1,
+    capabilities::HTTP_EXECUTE,
     capabilities::RUNTIME_CONFIG_V1,
     capabilities::REMOTE_READING_V1,
 ];
