@@ -33,6 +33,12 @@ if [[ -z "$ndk_root" || ! -d "$ndk_root" ]]; then
   exit 1
 fi
 
+ndk_toolchain="$ndk_root/build/cmake/android.toolchain.cmake"
+if [[ ! -f "$ndk_toolchain" ]]; then
+  echo "missing NDK CMake toolchain: $ndk_toolchain" >&2
+  exit 1
+fi
+
 toolchain=""
 for host_tag in darwin-arm64 darwin-x86_64 linux-x86_64 windows-x86_64; do
   candidate="$ndk_root/toolchains/llvm/prebuilt/$host_tag"
@@ -59,6 +65,12 @@ for required in "$clang" "$clangxx" "$llvm_ar" "$llvm_ranlib" "$sysroot/usr/incl
     exit 1
   fi
 done
+
+if ! command -v cmake >/dev/null 2>&1; then
+  echo "cmake not found on PATH (required for the NDK build)." >&2
+  echo "install CMake >= 3.18.1 (Android Studio bundles one, or use your package manager)." >&2
+  exit 1
+fi
 
 if ! rustup target list --installed | grep -qx "$rust_target"; then
   echo "missing Rust target: $rust_target" >&2
@@ -90,18 +102,20 @@ if [[ ! -f "$staticlib" ]]; then
 fi
 
 build_dir="target/android-jni/$android_abi"
-mkdir -p "$build_dir"
+cmake_build_dir="$build_dir/cmake"
+mkdir -p "$cmake_build_dir"
 
-"$clangxx" \
-  -std=c++17 \
-  -fPIC \
-  -shared \
-  -I"$PWD/include" \
-  -o "$build_dir/libreader_core_jni.so" \
-  bindings/android/jni/reader_jni.cpp \
-  -Wl,--whole-archive "$staticlib" -Wl,--no-whole-archive \
-  -llog -ldl -lm
+cmake -S bindings/android -B "$cmake_build_dir" \
+  -DCMAKE_TOOLCHAIN_FILE="$ndk_toolchain" \
+  -DANDROID_ABI="$android_abi" \
+  -DANDROID_PLATFORM="android-$android_api" \
+  -DANDROID_STL=c++_static \
+  -DREADER_CORE_STATICLIB="$PWD/$staticlib" \
+  -DREADER_CORE_INCLUDE_DIR="$PWD/include"
+
+cmake --build "$cmake_build_dir" --target reader_core_jni
 
 output="$build_dir/libreader_core_jni.so"
+cp "$cmake_build_dir/libreader_core_jni.so" "$output"
 test -f "$output"
 echo "built $output"
