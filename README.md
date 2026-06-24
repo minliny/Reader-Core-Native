@@ -37,6 +37,9 @@ scripts/integration-queue.sh \
   origin/codex/remote-reading-vertical
 ```
 
+`build-local.sh` 会同时运行 C 和 C++ host ABI smoke。C++ smoke 是
+JNI、NAPI、Objective-C++ shim 的头文件/链接基线。
+
 OHOS、Android、iOS 平台产物脚本会按 [ARCHITECTURE.md](./ARCHITECTURE.md)
 阶段 1/2 补齐；当前 `build-harmony-napi.sh` 验证 Rust staticlib 能链接为
 HarmonyOS NAPI `.so`，HAP 集成和真机加载仍需在 HarmonyOS App 仓库完成。
