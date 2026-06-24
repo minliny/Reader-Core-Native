@@ -9,4 +9,8 @@ authors.workspace = true
 
 [dependencies]
 reader-contract = { path = "../reader-contract" }
+reader-domain = { path = "../reader-domain" }
+reader-content = { path = "../reader-content" }
+reader-storage = { path = "../reader-storage" }
 serde_json.workspace = true
+serde.workspace = true
