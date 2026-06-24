@@ -1,0 +1,4 @@
+{
+  "dataDirectory": "/tmp/reader-core-native/data",
+  "cacheDirectory": "/tmp/reader-core-native/cache"
+}

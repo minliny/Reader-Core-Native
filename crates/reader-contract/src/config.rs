@@ -69,4 +69,56 @@ mod tests {
             .unwrap_err();
         assert_eq!(err.code, crate::ErrorCode::InvalidMessage);
     }
+
+    #[test]
+    fn conformance_valid_config_fixtures_parse() {
+        for (name, json) in [
+            (
+                "valid-empty",
+                include_str!("../../../protocol/fixtures/conformance/configs/valid-empty.json"),
+            ),
+            (
+                "valid-directories",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/configs/valid-directories.json"
+                ),
+            ),
+        ] {
+            RuntimeConfig::from_json_bytes(json.as_bytes())
+                .unwrap_or_else(|err| panic!("{name} should parse, got {err:?}"));
+        }
+    }
+
+    #[test]
+    fn conformance_invalid_config_fixtures_return_expected_codes() {
+        for (name, json, expected) in [
+            (
+                "invalid-malformed-json",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/configs/invalid-malformed-json.json"
+                ),
+                crate::ErrorCode::InvalidMessage,
+            ),
+            (
+                "invalid-unknown-field",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/configs/invalid-unknown-field.json"
+                ),
+                crate::ErrorCode::InvalidMessage,
+            ),
+            (
+                "invalid-empty-data-directory",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/configs/invalid-empty-data-directory.json"
+                ),
+                crate::ErrorCode::InvalidParams,
+            ),
+        ] {
+            let err = match RuntimeConfig::from_json_bytes(json.as_bytes()) {
+                Ok(_) => panic!("{name} should be rejected"),
+                Err(err) => err,
+            };
+            assert_eq!(err.code, expected, "{name} returned {err:?}");
+        }
+    }
 }

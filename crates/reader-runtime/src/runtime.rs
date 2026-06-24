@@ -584,6 +584,10 @@ mod tests {
             }
             events.clone()
         }
+
+        fn snapshot(&self) -> Vec<Event> {
+            self.events.lock().unwrap().clone()
+        }
     }
 
     impl EventSink for CollectSink {
@@ -683,6 +687,67 @@ mod tests {
     }
 
     #[test]
+    fn send_json_malformed_command_returns_structured_error() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+
+        let err = rt
+            .send_json(
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-malformed-json.json"
+                )
+                .as_bytes(),
+            )
+            .unwrap_err();
+
+        assert_eq!(err.code, ErrorCode::InvalidMessage);
+        assert!(sink.wait_len(1).is_empty());
+    }
+
+    #[test]
+    fn send_json_missing_request_id_returns_structured_error() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+
+        let err = rt
+            .send_json(
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-missing-request-id.json"
+                )
+                .as_bytes(),
+            )
+            .unwrap_err();
+
+        assert_eq!(err.code, ErrorCode::InvalidMessage);
+        assert!(sink.wait_len(1).is_empty());
+    }
+
+    #[test]
+    fn duplicate_active_request_id_is_rejected_before_enqueue() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send(Command::new(
+            90,
+            methods::RUNTIME_HOST_SMOKE,
+            serde_json::json!({}),
+        ))
+        .unwrap();
+
+        let events = sink.wait_len(1);
+        assert!(matches!(events[0], Event::HostRequest { .. }));
+
+        let err = rt
+            .send(Command::new(
+                90,
+                methods::RUNTIME_PING,
+                serde_json::json!({}),
+            ))
+            .unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidMessage);
+        assert_eq!(sink.snapshot().len(), 1);
+    }
+
+    #[test]
     fn host_request_event_shape_and_completion_route_to_original_request() {
         let sink = Arc::new(CollectSink::new());
         let rt = Runtime::new(sink.clone());
@@ -737,6 +802,93 @@ mod tests {
     }
 
     #[test]
+    fn host_error_routes_error_to_original_request() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send_json(
+            include_str!("../../../protocol/fixtures/conformance/host/request.json").as_bytes(),
+        )
+        .unwrap();
+
+        let events = sink.wait_len(1);
+        assert!(matches!(events[0], Event::HostRequest { .. }));
+
+        rt.send_json(
+            include_str!("../../../protocol/fixtures/conformance/host/error.json").as_bytes(),
+        )
+        .unwrap();
+
+        let events = sink.wait_len(2);
+        match &events[1] {
+            Event::Error {
+                request_id, error, ..
+            } => {
+                assert_eq!(*request_id, 301);
+                assert_eq!(error.code, ErrorCode::Internal);
+                assert!(error.retryable);
+            }
+            other => panic!("expected original request error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unknown_host_completion_returns_error_for_completion_request() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send_json(
+            include_str!("../../../protocol/fixtures/conformance/host/unknown-complete.json")
+                .as_bytes(),
+        )
+        .unwrap();
+
+        let events = sink.wait_len(1);
+        match &events[0] {
+            Event::Error {
+                request_id, error, ..
+            } => {
+                assert_eq!(*request_id, 304);
+                assert_eq!(error.code, ErrorCode::InvalidParams);
+                assert_eq!(error.details["operationId"], 404);
+            }
+            other => panic!("expected completion request error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn repeated_host_completion_after_operation_completed_is_rejected() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send_json(
+            include_str!("../../../protocol/fixtures/conformance/host/request.json").as_bytes(),
+        )
+        .unwrap();
+        assert!(matches!(sink.wait_len(1)[0], Event::HostRequest { .. }));
+
+        rt.send_json(
+            include_str!("../../../protocol/fixtures/conformance/host/complete.json").as_bytes(),
+        )
+        .unwrap();
+        let events = sink.wait_len(2);
+        assert!(matches!(events[1], Event::Result { .. }));
+
+        rt.send_json(
+            include_str!("../../../protocol/fixtures/conformance/host/complete.json").as_bytes(),
+        )
+        .unwrap();
+        let events = sink.wait_len(3);
+        match &events[2] {
+            Event::Error {
+                request_id, error, ..
+            } => {
+                assert_eq!(*request_id, 302);
+                assert_eq!(error.code, ErrorCode::InvalidParams);
+                assert_eq!(error.details["operationId"], 1);
+            }
+            other => panic!("expected duplicate completion error, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn cancelling_pending_host_request_emits_cancelled() {
         let sink = Arc::new(CollectSink::new());
         let rt = Runtime::new(sink.clone());
@@ -761,6 +913,31 @@ mod tests {
             }
             other => panic!("expected cancellation error, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn cancel_unknown_and_completed_requests_is_idempotent() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+
+        rt.cancel(404);
+        rt.cancel(404);
+        std::thread::sleep(Duration::from_millis(20));
+        assert!(sink.snapshot().is_empty());
+
+        rt.send(Command::new(
+            401,
+            methods::RUNTIME_PING,
+            serde_json::json!({}),
+        ))
+        .unwrap();
+        let events = sink.wait_len(1);
+        assert!(matches!(events[0], Event::Result { .. }));
+
+        rt.cancel(401);
+        rt.cancel(401);
+        std::thread::sleep(Duration::from_millis(20));
+        assert_eq!(sink.snapshot().len(), 1);
     }
 
     #[test]

@@ -3,6 +3,15 @@
   "$id": "https://reader-core-native/reader-command.schema.json",
   "title": "Reader Core Command Protocol",
   "description": "JSON message protocol for platform → Core commands.",
+  "x-reader-core-v1-capabilities": [
+    "core.info",
+    "runtime.ping",
+    "runtime.hostSmoke",
+    "host.complete",
+    "host.error",
+    "host.bus.v1",
+    "runtime.config.v1"
+  ],
   "type": "object",
   "additionalProperties": false,
   "required": ["protocolVersion", "requestId", "method"],
@@ -23,14 +32,6 @@
         "core.info",
         "runtime.ping",
         "runtime.hostSmoke",
-        "book.search",
-        "book.detail",
-        "book.toc",
-        "chapter.content",
-        "source.import",
-        "source.list",
-        "progress.get",
-        "progress.set",
         "host.complete",
         "host.error"
       ]
