@@ -8,6 +8,7 @@
     "runtime.ping",
     "runtime.hostSmoke",
     "runtime.cancel",
+    "runtime.status",
     "host.complete",
     "host.error",
     "host.bus.v1",
@@ -26,16 +27,20 @@
     },
     "requestId": {
       "type": "integer",
-      "description": "Unique request identifier for correlation."
+      "minimum": 1,
+      "description": "Unique positive request identifier for correlation. Value 0 is reserved for process-level errors emitted outside a host command."
     },
     "method": {
       "type": "string",
-      "description": "Command method name, dot-separated.",
+      "minLength": 1,
+      "pattern": "^[^\\s.]+(\\.[^\\s.]+)+$",
+      "description": "Command method name, dot-separated. Must contain two or more non-empty tokens and no whitespace.",
       "examples": [
         "core.info",
         "runtime.ping",
         "runtime.hostSmoke",
         "runtime.cancel",
+        "runtime.status",
         "host.complete",
         "host.error",
         "source.import",
@@ -58,7 +63,7 @@
       "additionalProperties": false,
       "required": ["operationId", "result"],
       "properties": {
-        "operationId": { "type": "integer" },
+        "operationId": { "type": "integer", "minimum": 1 },
         "result": {
           "description": "Host capability result payload.",
           "type": "object"
@@ -70,7 +75,7 @@
       "additionalProperties": false,
       "required": ["operationId", "error"],
       "properties": {
-        "operationId": { "type": "integer" },
+        "operationId": { "type": "integer", "minimum": 1 },
         "error": { "$ref": "reader-event.schema.json#/$defs/CoreError" }
       }
     },
@@ -80,6 +85,7 @@
       "properties": {
         "capability": {
           "type": "string",
+          "pattern": "^[^\\s.]+(\\.[^\\s.]+)+$",
           "default": "host.smoke.echo"
         },
         "params": {
@@ -96,7 +102,43 @@
       "properties": {
         "requestId": {
           "type": "integer",
+          "minimum": 1,
           "description": "The requestId to cancel. Must differ from the runtime.cancel command's own requestId."
+        }
+      }
+    },
+    "RuntimeStatusParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Parameters for runtime.status. Must be an empty object."
+    },
+    "HostHttpRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url"],
+      "description": "Host HTTP request payload emitted by Core as capability http.execute.",
+      "properties": {
+        "url": { "type": "string", "minLength": 1 },
+        "method": { "type": "string", "default": "GET" },
+        "headers": { "type": "object", "default": {} },
+        "body": { "type": ["string", "null"], "default": null }
+      }
+    },
+    "HostHttpResponse": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["body"],
+      "description": "Host completion result payload consumed by Core for capability http.execute.",
+      "properties": {
+        "body": { "type": "string" },
+        "status": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "headers": {
+          "type": "object",
+          "default": {}
         }
       }
     }

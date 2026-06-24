@@ -55,6 +55,8 @@ runtime handle. The public surface:
 - `send(method:requestId:params:)` — non-blocking send; pair with `pollEvent`.
 - `pollEvent(requestId:)` — non-blocking drain of the next buffered event
   (`Result<ReaderCoreEvent, ReaderCoreClientError>?`).
+- `cancel(requestId:)` — cancel a pending Core request and keep the resulting
+  event available through `pollEvent` / `request` flows.
 - `sendHostComplete(operationId:result:requestId:)` /
   `sendHostError(operationId:code:message:retryable:requestId:)` — manual host
   completion for hosts that drive `host.request` themselves.
@@ -73,12 +75,14 @@ runtime handle. The public surface:
 - `ReaderCoreHostResponse` (`status`, `headers`, `body`).
 - `URLSessionHostTransport` — default `http.execute` implementation backed by
   `URLSession`, bridged onto the synchronous send/event model with a
-  `DispatchSemaphore`.
+  `DispatchSemaphore` and a configurable timeout.
 
 **Errors** — `ReaderCoreClientError`
-- `createFailed(Int32)`, `sendFailed(Int32)`, `cancelFailed(Int32)` carry the
-  coarse ABI status from `rc_runtime_create` / `rc_runtime_send` /
-  `rc_runtime_cancel`.
+- `createFailed(status:lastError:)`, `sendFailed(status:lastError:)`,
+  `cancelFailed(status:lastError:)` carry the coarse ABI status from
+  `rc_runtime_create` / `rc_runtime_send` / `rc_runtime_cancel`, plus the
+  structured `ReaderCoreFFIError(code,message)` captured from `rc_last_error`
+  on the calling thread when one was recorded.
 - `coreError(ReaderCoreCoreError)` for Core `error` events.
 - `missingHostTransport`, `hostTransportFailed(String)`, `requestTimedOut`,
   `invalidCommandJSON`, `invalidEventJSON`, `runtimeDestroyed`.
@@ -86,14 +90,26 @@ runtime handle. The public surface:
 Validate it with:
 
 ```bash
-./scripts/check-ios-swift-wrapper.sh
+bash ./scripts/check-ios-swift-wrapper.sh
+```
+
+The default mode is the full gate: it rebuilds the iOS XCFramework and the
+macOS host static library before compiling/running the Swift smoke. If Rust
+source outside this binding lane is temporarily broken, a wrapper-only
+diagnostic path is available and must be treated as weaker evidence because it
+uses the current header plus an existing host static library:
+
+```bash
+READER_CORE_IOS_SWIFT_ONLY=1 bash ./scripts/check-ios-swift-wrapper.sh
 ```
 
 The gate first type-checks the wrapper against the
 `arm64-apple-ios13.0-simulator` XCFramework slice, then builds the host
 `reader-ffi` static library and runs a macOS Swift executable that exercises
-`core.info`, `runtime.ping`, event polling, the `http.execute` host loop,
-`host.error` propagation, and structured-error exposure through
+`core.info`, `runtime.ping`, event polling, cancellation, manual
+`host.complete`, internal host-command request ID allocation, the default
+`URLSessionHostTransport` success and timeout paths via local `URLProtocol`
+handlers, the `http.execute` host loop, `host.error` propagation, and structured-error exposure through
 `ReaderCoreClient`. This keeps the checked-in smoke free of a full iOS app
 project while proving wrapper compile/link/runtime behavior.
 
@@ -105,6 +121,9 @@ The XCFramework exposes the ABI v1 functions declared in
 - `rc_runtime_send`
 - `rc_runtime_cancel`
 - `rc_runtime_destroy`
+- `rc_last_error` — per-thread structured error text for protocol-origin
+  failures (config/command parse, protocol mismatch, duplicate requestId,
+  shutdown); read after a failing `rc_runtime_create` / `rc_runtime_send`.
 
 The event callback buffers are borrowed for the callback duration only. Swift
 or Objective-C wrappers must copy event bytes before returning from the callback

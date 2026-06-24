@@ -22,6 +22,13 @@
 - Changing field semantics → **protocol version bump required**.
 - Unknown top-level command fields and runtime config fields are rejected as
   `INVALID_MESSAGE`; hosts must not depend on silent field dropping.
+- Command `requestId` must be a positive integer. `0` is reserved for
+  process-level errors emitted outside a host command, such as CLI startup or
+  argument/config parsing failures.
+- Command `method` must be a dot-separated token path with at least two
+  non-empty segments and no whitespace. Empty, whitespace-only, whitespace-
+  containing, or empty-segment method names are malformed messages, not unknown
+  runtime methods.
 - `params` must be a JSON object. Method-specific invalid params return
   `INVALID_PARAMS`.
 - `runtime.ping` is the advertised v1 ping method. `core.ping` is accepted as a
@@ -33,8 +40,18 @@
   `{ "requestId": <integer> }`. Result data: `{ "cancelled": <bool> }`.
   The cancelled original request receives a separate `CANCELLED` error event
   on its own `requestId`. Unknown / already-completed IDs return
-  `{ "cancelled": false }` (idempotent). Self-cancellation (target equals the
-  command's own `requestId`) is rejected with `INVALID_PARAMS`.
+  `{ "cancelled": false }` (idempotent). The target `requestId` must be greater
+  than `0`. Self-cancellation (target equals the command's own `requestId`) is
+  rejected with `INVALID_PARAMS`.
+- `runtime.status` is a read-only runtime diagnostics method. It accepts empty
+  params (`{}`) and returns:
+  `{ "activeRequestCount": <integer>, "activeRequestIds": [...],
+     "pendingHostOperationCount": <integer>, "pendingHostOperations": [...],
+     "shuttingDown": <bool> }`.
+  The current `runtime.status` command is excluded from `activeRequestIds`.
+  `pendingHostOperations` entries contain only `operationId`, original
+  `requestId`, `capability`, and `state: "pending"`; Core does not echo host
+  request params or business payloads through this diagnostic surface.
 
 ## Platform Contract
 
@@ -64,11 +81,14 @@ Host capability calls are represented as events and completion commands:
 
 1. Core emits `type: "host.request"` with the original `requestId`, a generated
    `operationId`, `capability`, and object `params`.
+   `capability` must use the same dot-separated token-path shape as command
+   `method`: at least two non-empty segments and no whitespace.
 2. The host answers with `method: "host.complete"` and params
    `{ "operationId": ..., "result": ... }`, or `method: "host.error"` and params
    `{ "operationId": ..., "error": ... }`.
-3. Core routes the completion back to the original `requestId`. Unknown
-   operation IDs return `INVALID_PARAMS` on the completion command request.
+3. `operationId` must be greater than `0`. Core routes the completion back to
+   the original `requestId`. Unknown operation IDs return `INVALID_PARAMS` on
+   the completion command request.
 4. Cancelling the original request cancels its pending host operation and emits
    a `CANCELLED` error for that original request. Cancellation is reachable via
    the C ABI (`rc_runtime_cancel`) or the JSON `runtime.cancel` command; both
@@ -92,18 +112,28 @@ The host request params are:
 ```
 
 The host completes the operation with an object result containing string
-`body`. Additional fields such as `status`, `headers`, or final URL are allowed
-for host diagnostics, but Core v1 only consumes `body`:
+`body`. Optional `status` and `headers` fields are protocol-validated and
+returned in the remote-reading result under `data.http` for diagnostics. A
+provided `status` must be an integer from `100` through `599`; provided
+`headers` must be an object. Additional fields such as final URL are allowed for
+host diagnostics, but Core v1 does not interpret them:
 
 ```json
 {
   "operationId": 1,
   "result": {
     "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
     "body": "{\"books\":[]}"
   }
 }
 ```
+
+Status/header diagnostics do not mean Core owns platform HTTP, cookies, login,
+TLS, WebView, or session storage. The host remains responsible for transport and
+only reports the response shape that Core used to continue parsing.
 
 ## Memory & Lifetime Contract (ABI v1)
 

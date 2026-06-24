@@ -15,7 +15,7 @@ use reader_contract::{
     self as contract,
     remote::{
         parse_params, BookDetailParams, BookSearchParams, BookTocParams, ChapterContentParams,
-        HostHttpRequest, ReadingProgressUpdateParams, SourceImportParams,
+        HostHttpRequest, HostHttpResponse, ReadingProgressUpdateParams, SourceImportParams,
     },
     CoreError, Event,
 };
@@ -239,42 +239,47 @@ fn pending_http_request(
     })
 }
 
-fn http_response_body(result: &serde_json::Value) -> Result<String, CoreError> {
-    result
-        .get("body")
-        .and_then(|body| body.as_str())
-        .map(ToOwned::to_owned)
-        .ok_or_else(|| {
-            CoreError::invalid_params("http.execute host result.body must be a string")
-                .with_details(serde_json::json!({ "result": result }))
-        })
-}
-
 /// Continue a remote-reading command after its host HTTP request completes.
 pub fn complete_remote_host(
     continuation: RemoteHostContinuation,
     host_result: serde_json::Value,
     state: &RemoteState,
 ) -> Result<serde_json::Value, CoreError> {
-    let body = http_response_body(&host_result)?;
+    let response = HostHttpResponse::from_host_result(&host_result)?;
     match continuation {
         RemoteHostContinuation::BookSearch(mut params) => {
-            params.search_response = body;
+            params.search_response = response.body.clone();
             book_search_from_params(params, state)
+                .map(|data| attach_http_diagnostics(data, &response))
         }
         RemoteHostContinuation::BookDetail(mut params) => {
-            params.detail_response = body;
+            params.detail_response = response.body.clone();
             book_detail_from_params(params, state)
+                .map(|data| attach_http_diagnostics(data, &response))
         }
         RemoteHostContinuation::BookToc(mut params) => {
-            params.toc_response = body;
-            book_toc_from_params(params, state)
+            params.toc_response = response.body.clone();
+            book_toc_from_params(params, state).map(|data| attach_http_diagnostics(data, &response))
         }
         RemoteHostContinuation::ChapterContent(mut params) => {
-            params.chapter_response = body;
+            params.chapter_response = response.body.clone();
             chapter_content_from_params(params, state)
+                .map(|data| attach_http_diagnostics(data, &response))
         }
     }
+}
+
+fn attach_http_diagnostics(
+    mut data: serde_json::Value,
+    response: &HostHttpResponse,
+) -> serde_json::Value {
+    let Some(diagnostics) = response.diagnostics() else {
+        return data;
+    };
+    if let Some(object) = data.as_object_mut() {
+        object.insert("http".to_string(), diagnostics);
+    }
+    data
 }
 
 fn source_import(

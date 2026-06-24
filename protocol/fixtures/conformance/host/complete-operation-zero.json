@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "requestId": 305,
+  "method": "host.complete",
+  "params": {
+    "operationId": 0,
+    "result": {
+      "status": "unexpected"
+    }
+  }
+}

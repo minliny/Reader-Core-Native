@@ -6,6 +6,8 @@
 //! that Core emits as `capability: "http.execute"` (see
 //! `protocol/compatibility.md`).
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -13,6 +15,10 @@ use crate::CoreError;
 
 fn empty_string() -> String {
     String::new()
+}
+
+fn empty_object() -> Value {
+    Value::Object(Default::default())
 }
 
 fn default_http_method() -> String {
@@ -33,6 +39,112 @@ pub struct HostHttpRequest {
     pub headers: Value,
     #[serde(default)]
     pub body: Option<String>,
+}
+
+/// Host HTTP response payload accepted by `host.complete` for
+/// `capability: "http.execute"`.
+///
+/// `body` is the only required field consumed by the content pipeline. Optional
+/// `status` and `headers` are validated and surfaced back as result diagnostics
+/// so hosts can prove which platform transport response drove Core parsing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostHttpResponse {
+    pub body: String,
+    #[serde(default)]
+    pub status: Option<u16>,
+    #[serde(default = "empty_object")]
+    pub headers: Value,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl HostHttpResponse {
+    /// Parse the untyped `host.complete.result` object into the stable
+    /// `http.execute` response contract.
+    pub fn from_host_result(result: &Value) -> Result<Self, CoreError> {
+        if !result.is_object() {
+            return Err(CoreError::invalid_params(
+                "http.execute host result must be a JSON object",
+            ));
+        }
+
+        let body = result
+            .get("body")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned)
+            .ok_or_else(|| {
+                CoreError::invalid_params("http.execute host result.body must be a string")
+                    .with_details(serde_json::json!({ "result": result }))
+            })?;
+
+        let status = match result.get("status") {
+            None | Some(Value::Null) => None,
+            Some(value) => {
+                let Some(raw) = value.as_u64() else {
+                    return Err(CoreError::invalid_params(
+                        "http.execute host result.status must be an integer",
+                    )
+                    .with_details(serde_json::json!({ "status": value })));
+                };
+                if !(100..=599).contains(&raw) {
+                    return Err(CoreError::invalid_params(
+                        "http.execute host result.status must be between 100 and 599",
+                    )
+                    .with_details(serde_json::json!({ "status": raw })));
+                }
+                Some(raw as u16)
+            }
+        };
+
+        let headers = match result.get("headers") {
+            None | Some(Value::Null) => empty_object(),
+            Some(value) if value.is_object() => value.clone(),
+            Some(value) => {
+                return Err(CoreError::invalid_params(
+                    "http.execute host result.headers must be an object",
+                )
+                .with_details(serde_json::json!({ "headers": value })));
+            }
+        };
+
+        let mut extra = BTreeMap::new();
+        if let Some(object) = result.as_object() {
+            for (key, value) in object {
+                if !matches!(key.as_str(), "body" | "status" | "headers") {
+                    extra.insert(key.clone(), value.clone());
+                }
+            }
+        }
+
+        Ok(Self {
+            body,
+            status,
+            headers,
+            extra,
+        })
+    }
+
+    /// Diagnostics that Core should attach to remote-reading results after a
+    /// host-provided HTTP response was parsed.
+    pub fn diagnostics(&self) -> Option<Value> {
+        let mut diagnostics = serde_json::Map::new();
+        if let Some(status) = self.status {
+            diagnostics.insert("status".to_string(), serde_json::json!(status));
+        }
+        if self
+            .headers
+            .as_object()
+            .is_some_and(|headers| !headers.is_empty())
+        {
+            diagnostics.insert("headers".to_string(), self.headers.clone());
+        }
+        if diagnostics.is_empty() {
+            None
+        } else {
+            Some(Value::Object(diagnostics))
+        }
+    }
 }
 
 /// Parameters for `source.import`.
@@ -152,4 +264,55 @@ pub fn parse_params<T: for<'de> Deserialize<'de>>(
             }),
         )
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ErrorCode;
+
+    #[test]
+    fn host_http_response_accepts_status_headers_and_extra_diagnostics() {
+        let result = serde_json::json!({
+            "status": 200,
+            "headers": { "content-type": "application/json" },
+            "body": "{\"books\":[]}",
+            "finalUrl": "https://books.example.test/search?q=dune"
+        });
+
+        let response = HostHttpResponse::from_host_result(&result).unwrap();
+        assert_eq!(response.body, "{\"books\":[]}");
+        assert_eq!(response.status, Some(200));
+        assert_eq!(response.headers["content-type"], "application/json");
+        assert_eq!(
+            response.extra["finalUrl"],
+            "https://books.example.test/search?q=dune"
+        );
+        assert_eq!(
+            response.diagnostics().unwrap(),
+            serde_json::json!({
+                "status": 200,
+                "headers": { "content-type": "application/json" }
+            })
+        );
+    }
+
+    #[test]
+    fn host_http_response_rejects_unstable_status_and_headers_shapes() {
+        let err = HostHttpResponse::from_host_result(&serde_json::json!({
+            "status": 99,
+            "body": "{}"
+        }))
+        .unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert!(err.message.contains("status"));
+
+        let err = HostHttpResponse::from_host_result(&serde_json::json!({
+            "headers": ["set-cookie"],
+            "body": "{}"
+        }))
+        .unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert!(err.message.contains("headers"));
+    }
 }

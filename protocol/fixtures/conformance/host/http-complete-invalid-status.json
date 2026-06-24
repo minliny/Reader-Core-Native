@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "requestId": 503,
+  "method": "host.complete",
+  "params": {
+    "operationId": 1,
+    "result": {
+      "status": 99,
+      "body": "{\"books\":[]}"
+    }
+  }
+}

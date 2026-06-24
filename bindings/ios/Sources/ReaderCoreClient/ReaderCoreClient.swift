@@ -21,19 +21,31 @@ public struct ReaderCoreCoreError: Error, Equatable {
     }
 }
 
+/// Structured synchronous FFI error read from `rc_last_error`.
+public struct ReaderCoreFFIError: Error, Equatable {
+    public let code: Int32
+    public let message: String
+
+    public init(code: Int32, message: String) {
+        self.code = code
+        self.message = message
+    }
+}
+
 public enum ReaderCoreClientError: Error, Equatable {
-    /// `rc_runtime_create` failed. Carries the coarse ABI status; the
-    /// structured `rc_last_error` text is not yet surfaced (see STATUS.md).
-    case createFailed(Int32)
+    /// `rc_runtime_create` failed. Carries the coarse ABI status plus the
+    /// synchronous `rc_last_error` payload when Core recorded one.
+    case createFailed(status: Int32, lastError: ReaderCoreFFIError?)
     case runtimeDestroyed
     case invalidCommandJSON
     case invalidEventJSON
     case requestTimedOut(UInt64)
-    /// `rc_runtime_send` failed. Carries the coarse ABI status.
-    case sendFailed(Int32)
+    /// `rc_runtime_send` failed. Carries the coarse ABI status plus the
+    /// synchronous `rc_last_error` payload when Core recorded one.
+    case sendFailed(status: Int32, lastError: ReaderCoreFFIError?)
     /// `rc_runtime_cancel` failed. (Always succeeds in ABI v1, including
     /// not-found; this case is reserved for future status changes.)
-    case cancelFailed(Int32)
+    case cancelFailed(status: Int32, lastError: ReaderCoreFFIError?)
     /// A `host.request` arrived but no `ReaderCoreHostTransport` was configured.
     case missingHostTransport
     /// The host transport rejected the request before it could be completed.
@@ -211,9 +223,11 @@ public protocol ReaderCoreHostTransport {
 /// callback thread.
 public final class URLSessionHostTransport: ReaderCoreHostTransport {
     public let session: URLSession
+    public let timeout: TimeInterval
 
-    public init(session: URLSession = .shared) {
+    public init(session: URLSession = .shared, timeout: TimeInterval = 30) {
         self.session = session
+        self.timeout = timeout
     }
 
     public func perform(_ request: ReaderCoreHostRequest) throws -> ReaderCoreHostResponse {
@@ -259,7 +273,10 @@ public final class URLSessionHostTransport: ReaderCoreHostTransport {
         }
 
         task.resume()
-        semaphore.wait()
+        if semaphore.wait(timeout: .now() + timeout) == .timedOut {
+            task.cancel()
+            throw ReaderCoreClientError.hostTransportFailed("http.execute request timed out")
+        }
 
         guard let result = captured else {
             throw ReaderCoreClientError.hostTransportFailed("urlsession produced no result")
@@ -371,11 +388,14 @@ public final class ReaderCoreRuntime {
     }
 
     private var handle: OpaquePointer?
-    private let sinkContext: UnsafeMutableRawPointer
+    private var sinkContext: UnsafeMutableRawPointer?
 
     public init(configJSON: Data = Data(), onEvent: @escaping (Data) -> Void) throws {
+        self.sinkContext = nil
+
         let sink = ReaderCoreEventSink(onEvent: onEvent)
-        self.sinkContext = Unmanaged.passRetained(sink).toOpaque()
+        let sinkContext = Unmanaged.passRetained(sink).toOpaque()
+        self.sinkContext = sinkContext
 
         var runtime: OpaquePointer?
         let status = configJSON.withUnsafeBytes { rawBuffer in
@@ -389,8 +409,10 @@ public final class ReaderCoreRuntime {
         }
 
         guard status == 0, let runtime else {
+            let lastError = Self.captureLastError()
+            self.sinkContext = nil
             Unmanaged<ReaderCoreEventSink>.fromOpaque(sinkContext).release()
-            throw ReaderCoreClientError.createFailed(status)
+            throw ReaderCoreClientError.createFailed(status: status, lastError: lastError)
         }
 
         self.handle = runtime
@@ -400,7 +422,9 @@ public final class ReaderCoreRuntime {
         if let handle {
             rc_runtime_destroy(handle)
         }
-        Unmanaged<ReaderCoreEventSink>.fromOpaque(sinkContext).release()
+        if let sinkContext {
+            Unmanaged<ReaderCoreEventSink>.fromOpaque(sinkContext).release()
+        }
     }
 
     public func send(json: Data) throws {
@@ -417,13 +441,13 @@ public final class ReaderCoreRuntime {
         }
 
         guard status == 0 else {
-            throw ReaderCoreClientError.sendFailed(status)
+            throw ReaderCoreClientError.sendFailed(status: status, lastError: Self.captureLastError())
         }
     }
 
     public func send(jsonString: String) throws {
         guard let data = jsonString.data(using: .utf8) else {
-            throw ReaderCoreClientError.sendFailed(-1)
+            throw ReaderCoreClientError.sendFailed(status: -1, lastError: nil)
         }
         try send(json: data)
     }
@@ -435,7 +459,7 @@ public final class ReaderCoreRuntime {
 
         let status = rc_runtime_cancel(handle, requestId)
         guard status == 0 else {
-            throw ReaderCoreClientError.cancelFailed(status)
+            throw ReaderCoreClientError.cancelFailed(status: status, lastError: Self.captureLastError())
         }
     }
 
@@ -444,6 +468,23 @@ public final class ReaderCoreRuntime {
             rc_runtime_destroy(handle)
             self.handle = nil
         }
+    }
+
+    private static func captureLastError() -> ReaderCoreFFIError? {
+        var buffer = [CChar](repeating: 0, count: 1024)
+        var code: Int32 = 0
+        let message = buffer.withUnsafeMutableBufferPointer { pointer -> String in
+            code = rc_last_error(pointer.baseAddress, pointer.count)
+            guard let baseAddress = pointer.baseAddress else {
+                return ""
+            }
+            return String(cString: baseAddress)
+        }
+
+        guard code != 0 || !message.isEmpty else {
+            return nil
+        }
+        return ReaderCoreFFIError(code: code, message: message)
     }
 }
 
@@ -459,7 +500,7 @@ public final class ReaderCoreClient {
     private let hostTransport: ReaderCoreHostTransport?
 
     private let commandIdLock = NSLock()
-    private var commandIdCounter: UInt64 = 1000
+    private var commandIdCounter: UInt64 = 9_000_000_000_000_000
 
     public init(configJSON: Data = Data(), hostTransport: ReaderCoreHostTransport? = nil) throws {
         let eventBuffer = ReaderCoreEventBuffer()
@@ -517,6 +558,11 @@ public final class ReaderCoreClient {
     @discardableResult
     public func pollEvent(requestId: UInt64) -> Result<ReaderCoreEvent, ReaderCoreClientError>? {
         eventBuffer.poll(requestId: requestId)
+    }
+
+    /// Cancel a pending Core request by request ID.
+    public func cancel(requestId: UInt64) throws {
+        try runtime.cancel(requestId: requestId)
     }
 
     // Host completion -----------------------------------------------------

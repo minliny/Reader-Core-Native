@@ -57,6 +57,22 @@ impl Command {
         if self.protocol_version != PROTOCOL_VERSION {
             return Err(CoreError::invalid_protocol_version(self.protocol_version));
         }
+        if self.request_id == 0 {
+            return Err(CoreError::invalid_message(
+                "command requestId must be greater than 0",
+            ));
+        }
+        if self.method.trim().is_empty() {
+            return Err(CoreError::invalid_message(
+                "command method must be a non-empty string",
+            ));
+        }
+        if !is_valid_token_path(&self.method) {
+            return Err(CoreError::invalid_message(
+                "command method must be dot-separated non-empty tokens without whitespace",
+            )
+            .with_details(json!({ "method": self.method })));
+        }
         if !self.params.is_object() {
             return Err(
                 CoreError::invalid_params("command params must be a JSON object")
@@ -65,6 +81,13 @@ impl Command {
         }
         Ok(())
     }
+}
+
+pub(crate) fn is_valid_token_path(value: &str) -> bool {
+    if value.chars().any(char::is_whitespace) || !value.contains('.') {
+        return false;
+    }
+    value.split('.').all(|segment| !segment.is_empty())
 }
 
 #[cfg(test)]
@@ -107,6 +130,12 @@ mod tests {
                 ),
             ),
             (
+                "valid-runtime-status",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/valid-runtime-status.json"
+                ),
+            ),
+            (
                 "valid-core-info",
                 include_str!(
                     "../../../protocol/fixtures/conformance/commands/valid-core-info.json"
@@ -139,6 +168,34 @@ mod tests {
                 "invalid-missing-request-id",
                 include_str!(
                     "../../../protocol/fixtures/conformance/commands/invalid-missing-request-id.json"
+                ),
+                crate::ErrorCode::InvalidMessage,
+            ),
+            (
+                "invalid-request-id-zero",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-request-id-zero.json"
+                ),
+                crate::ErrorCode::InvalidMessage,
+            ),
+            (
+                "invalid-empty-method",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-empty-method.json"
+                ),
+                crate::ErrorCode::InvalidMessage,
+            ),
+            (
+                "invalid-method-whitespace",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-method-whitespace.json"
+                ),
+                crate::ErrorCode::InvalidMessage,
+            ),
+            (
+                "invalid-method-empty-segment",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-method-empty-segment.json"
                 ),
                 crate::ErrorCode::InvalidMessage,
             ),

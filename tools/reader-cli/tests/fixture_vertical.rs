@@ -55,6 +55,11 @@ fn fixture_vertical_runs_full_pipeline() {
     let host_books = events[3]["data"]["books"].as_array().unwrap();
     assert_eq!(host_books.len(), 2);
     assert_eq!(host_books[0]["title"], "Dune");
+    assert_eq!(events[3]["data"]["http"]["status"], 200);
+    assert_eq!(
+        events[3]["data"]["http"]["headers"]["content-type"],
+        "application/json"
+    );
 
     assert_eq!(events[4]["data"]["book"]["author"], "Frank Herbert");
     assert_eq!(events[4]["data"]["book"]["intro"], "A desert planet.");

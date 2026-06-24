@@ -2,7 +2,7 @@ use std::sync::mpsc::{self, Receiver};
 use std::sync::Arc;
 use std::time::Duration;
 
-use reader_contract::{methods, CoreError, ErrorCode, Event, RuntimeConfig};
+use reader_contract::{methods, Command, CoreError, ErrorCode, Event, RuntimeConfig};
 use reader_runtime::{EventSink, Runtime};
 use serde_json::{json, Value};
 
@@ -20,6 +20,15 @@ const INVALID_UNSUPPORTED_PROTOCOL: &str = include_str!(
 );
 const INVALID_MISSING_REQUEST_ID: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/invalid-missing-request-id.json");
+const INVALID_REQUEST_ID_ZERO: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/invalid-request-id-zero.json");
+const INVALID_EMPTY_METHOD: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/invalid-empty-method.json");
+const INVALID_METHOD_WHITESPACE: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/invalid-method-whitespace.json");
+const INVALID_METHOD_EMPTY_SEGMENT: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-method-empty-segment.json"
+);
 const INVALID_PARAMS_NOT_OBJECT: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/invalid-params-not-object.json");
 
@@ -36,14 +45,33 @@ const INVALID_CONFIG_EMPTY_DATA_DIR: &str = include_str!(
 );
 
 const HOST_REQUEST: &str = include_str!("../../../protocol/fixtures/conformance/host/request.json");
+const HOST_REQUEST_INVALID_CAPABILITY_WHITESPACE: &str = include_str!(
+    "../../../protocol/fixtures/conformance/host/request-invalid-capability-whitespace.json"
+);
+const HOST_REQUEST_INVALID_CAPABILITY_EMPTY_SEGMENT: &str = include_str!(
+    "../../../protocol/fixtures/conformance/host/request-invalid-capability-empty-segment.json"
+);
 const HOST_COMPLETE: &str =
     include_str!("../../../protocol/fixtures/conformance/host/complete.json");
 const HOST_ERROR: &str = include_str!("../../../protocol/fixtures/conformance/host/error.json");
 const HOST_UNKNOWN_COMPLETE: &str =
     include_str!("../../../protocol/fixtures/conformance/host/unknown-complete.json");
+const HOST_COMPLETE_OPERATION_ZERO: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/complete-operation-zero.json");
+const HOST_ERROR_OPERATION_ZERO: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/error-operation-zero.json");
+const HOST_HTTP_COMPLETE_WITH_METADATA: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/http-complete-with-metadata.json");
+const HOST_HTTP_COMPLETE_INVALID_STATUS: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/http-complete-invalid-status.json");
 
 const VALID_RUNTIME_CANCEL: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-runtime-cancel.json");
+const VALID_RUNTIME_STATUS: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-runtime-status.json");
+const INVALID_RUNTIME_CANCEL_TARGET_ZERO: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-runtime-cancel-target-zero.json"
+);
 
 const CANCEL_UNKNOWN: &str =
     include_str!("../../../protocol/fixtures/conformance/cancel/unknown.json");
@@ -144,6 +172,26 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             ErrorCode::InvalidMessage,
         ),
         (
+            "invalid-command-request-id-zero",
+            INVALID_REQUEST_ID_ZERO,
+            ErrorCode::InvalidMessage,
+        ),
+        (
+            "invalid-command-empty-method",
+            INVALID_EMPTY_METHOD,
+            ErrorCode::InvalidMessage,
+        ),
+        (
+            "invalid-command-method-whitespace",
+            INVALID_METHOD_WHITESPACE,
+            ErrorCode::InvalidMessage,
+        ),
+        (
+            "invalid-command-method-empty-segment",
+            INVALID_METHOD_EMPTY_SEGMENT,
+            ErrorCode::InvalidMessage,
+        ),
+        (
             "invalid-command-params-not-object",
             INVALID_PARAMS_NOT_OBJECT,
             ErrorCode::InvalidParams,
@@ -208,6 +256,25 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         }
     });
 
+    record(
+        &mut report,
+        "host-request-invalid-capability-whitespace",
+        || {
+            let (_runtime, rx) = send_to_fresh_runtime(HOST_REQUEST_INVALID_CAPABILITY_WHITESPACE)?;
+            expect_event_error(&rx, 307, ErrorCode::InvalidParams)
+        },
+    );
+
+    record(
+        &mut report,
+        "host-request-invalid-capability-empty-segment",
+        || {
+            let (_runtime, rx) =
+                send_to_fresh_runtime(HOST_REQUEST_INVALID_CAPABILITY_EMPTY_SEGMENT)?;
+            expect_event_error(&rx, 308, ErrorCode::InvalidParams)
+        },
+    );
+
     record(&mut report, "host-complete-routes-result", || {
         let (runtime, rx) = send_to_fresh_runtime(HOST_REQUEST)?;
         expect_host_request(&rx)?;
@@ -243,6 +310,16 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         expect_event_error(&rx, 304, ErrorCode::InvalidParams)
     });
 
+    record(&mut report, "host-complete-zero-operation-id", || {
+        let (_runtime, rx) = send_to_fresh_runtime(HOST_COMPLETE_OPERATION_ZERO)?;
+        expect_event_error(&rx, 305, ErrorCode::InvalidParams)
+    });
+
+    record(&mut report, "host-error-zero-operation-id", || {
+        let (_runtime, rx) = send_to_fresh_runtime(HOST_ERROR_OPERATION_ZERO)?;
+        expect_event_error(&rx, 306, ErrorCode::InvalidParams)
+    });
+
     record(
         &mut report,
         "host-complete-after-completed-operation",
@@ -260,6 +337,59 @@ pub(crate) fn run_conformance() -> ConformanceReport {
                 .send_json(HOST_COMPLETE.as_bytes())
                 .map_err(|err| format!("second host.complete send failed: {err:?}"))?;
             expect_event_error(&rx, 302, ErrorCode::InvalidParams)
+        },
+    );
+
+    record(
+        &mut report,
+        "remote-http-complete-carries-status-headers",
+        || {
+            let (runtime, rx) = fresh_runtime();
+            runtime
+                .send(remote_http_search_command(501))
+                .map_err(|err| format!("book.search send failed: {err:?}"))?;
+            expect_http_host_request(&rx)?;
+            runtime
+                .send_json(HOST_HTTP_COMPLETE_WITH_METADATA.as_bytes())
+                .map_err(|err| format!("http host.complete send failed: {err:?}"))?;
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 501
+                    && data["books"].as_array().is_some_and(Vec::is_empty)
+                    && data["http"]["status"] == 200
+                    && data["http"]["headers"]["content-type"] == "application/json" =>
+                {
+                    Ok(())
+                }
+                other => Err(format!("unexpected http completion result {other:?}")),
+            }
+        },
+    );
+
+    record(
+        &mut report,
+        "remote-http-complete-rejects-invalid-status",
+        || {
+            let (runtime, rx) = fresh_runtime();
+            runtime
+                .send(remote_http_search_command(504))
+                .map_err(|err| format!("book.search send failed: {err:?}"))?;
+            expect_http_host_request(&rx)?;
+            runtime
+                .send_json(HOST_HTTP_COMPLETE_INVALID_STATUS.as_bytes())
+                .map_err(|err| format!("invalid http host.complete send failed: {err:?}"))?;
+            match recv_event(&rx)? {
+                Event::Error {
+                    request_id, error, ..
+                } if request_id == 504
+                    && error.code == ErrorCode::InvalidParams
+                    && error.message.contains("status") =>
+                {
+                    Ok(())
+                }
+                other => Err(format!("unexpected invalid-status event {other:?}")),
+            }
         },
     );
 
@@ -311,9 +441,7 @@ pub(crate) fn run_conformance() -> ConformanceReport {
                 Event::Error {
                     request_id, error, ..
                 } if request_id == 301 && error.code == ErrorCode::Cancelled => {}
-                other => {
-                    return Err(format!("expected cancelled error for 301, got {other:?}"))
-                }
+                other => return Err(format!("expected cancelled error for 301, got {other:?}")),
             }
             // Second: result for the cancel command itself (requestId 310).
             match recv_event(&rx)? {
@@ -326,16 +454,91 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         },
     );
 
-    record(&mut report, "runtime-cancel-unknown-id-returns-false", || {
-        let (_runtime, rx) = send_to_fresh_runtime(VALID_RUNTIME_CANCEL)?;
-        // Target 301 is not active here → cancelled:false, no other events.
-        match recv_event(&rx)? {
-            Event::Result {
-                request_id, data, ..
-            } if request_id == 310 && data["cancelled"] == false => Ok(()),
-            other => Err(format!("expected cancelled:false result, got {other:?}")),
-        }
+    record(
+        &mut report,
+        "runtime-cancel-unknown-id-returns-false",
+        || {
+            let (_runtime, rx) = send_to_fresh_runtime(VALID_RUNTIME_CANCEL)?;
+            // Target 301 is not active here → cancelled:false, no other events.
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 310 && data["cancelled"] == false => Ok(()),
+                other => Err(format!("expected cancelled:false result, got {other:?}")),
+            }
+        },
+    );
+
+    record(&mut report, "runtime-cancel-zero-target-id", || {
+        let (_runtime, rx) = send_to_fresh_runtime(INVALID_RUNTIME_CANCEL_TARGET_ZERO)?;
+        expect_event_error(&rx, 311, ErrorCode::InvalidParams)
     });
+
+    // --- runtime.status JSON command ---------------------------------------
+
+    record(
+        &mut report,
+        "runtime-status-empty-runtime-excludes-status-command",
+        || {
+            let (_runtime, rx) = send_to_fresh_runtime(VALID_RUNTIME_STATUS)?;
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 320
+                    && data["activeRequestCount"] == 0
+                    && data["activeRequestIds"]
+                        .as_array()
+                        .is_some_and(Vec::is_empty)
+                    && data["pendingHostOperationCount"] == 0
+                    && data["pendingHostOperations"]
+                        .as_array()
+                        .is_some_and(Vec::is_empty)
+                    && data["shuttingDown"] == false =>
+                {
+                    Ok(())
+                }
+                other => Err(format!("expected empty runtime.status, got {other:?}")),
+            }
+        },
+    );
+
+    record(
+        &mut report,
+        "runtime-status-reports-pending-host-operation-metadata",
+        || {
+            let (runtime, rx) = send_to_fresh_runtime(HOST_REQUEST)?;
+            expect_host_request(&rx)?;
+            runtime
+                .send_json(VALID_RUNTIME_STATUS.as_bytes())
+                .map_err(|err| format!("runtime.status send failed: {err:?}"))?;
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 320
+                    && data["activeRequestCount"] == 1
+                    && data["activeRequestIds"] == json!([301])
+                    && data["pendingHostOperationCount"] == 1 =>
+                {
+                    let operations = data["pendingHostOperations"]
+                        .as_array()
+                        .ok_or_else(|| "pendingHostOperations missing".to_string())?;
+                    let Some(operation) = operations.first() else {
+                        return Err("pendingHostOperations empty".to_string());
+                    };
+                    if operation["operationId"] != 1
+                        || operation["requestId"] != 301
+                        || operation["capability"] != "host.smoke.echo"
+                        || operation["state"] != "pending"
+                        || operation.get("params").is_some()
+                    {
+                        return Err(format!("unexpected pending operation {operation}"));
+                    }
+                    Ok(())
+                }
+                other => Err(format!("expected pending runtime.status, got {other:?}")),
+            }
+        },
+    );
 
     report
 }
@@ -408,6 +611,52 @@ fn expect_host_request(rx: &Receiver<Event>) -> Result<(), String> {
         Event::HostRequest { .. } => Ok(()),
         other => Err(format!("expected host.request, got {other:?}")),
     }
+}
+
+fn expect_http_host_request(rx: &Receiver<Event>) -> Result<(), String> {
+    match recv_event(rx)? {
+        Event::HostRequest {
+            request_id,
+            operation_id,
+            capability,
+            params,
+            ..
+        } if request_id == 501 || request_id == 504 => {
+            if operation_id != 1 {
+                return Err(format!("expected operationId=1, got {operation_id}"));
+            }
+            if capability != "http.execute" {
+                return Err(format!("expected http.execute, got {capability}"));
+            }
+            if params["url"] != "https://books.example.test/search?q=empty" {
+                return Err(format!("unexpected http params {params}"));
+            }
+            Ok(())
+        }
+        other => Err(format!("expected http.execute host.request, got {other:?}")),
+    }
+}
+
+fn remote_http_search_command(request_id: u64) -> Command {
+    Command::new(
+        request_id,
+        methods::BOOK_SEARCH,
+        json!({
+            "sourceId": "conformance-src",
+            "searchRequest": {
+                "url": "https://books.example.test/search?q=empty",
+                "headers": { "Accept": "application/json" }
+            },
+            "source": {
+                "sourceId": "conformance-src",
+                "name": "Conformance Source",
+                "baseUrl": "https://books.example.test",
+                "rules": {
+                    "search": [ { "kind": "jsonPath", "path": "$.books[*]" } ]
+                }
+            }
+        }),
+    )
 }
 
 fn expect_event_error(

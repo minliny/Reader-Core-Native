@@ -43,7 +43,10 @@
         },
         "type": { "type": "string", "const": "host.request" },
         "operationId": { "type": "integer" },
-        "capability": { "type": "string" },
+        "capability": {
+          "type": "string",
+          "pattern": "^[^\\s.]+(\\.[^\\s.]+)+$"
+        },
         "params": { "type": "object" }
       }
     },
@@ -67,6 +70,45 @@
         "message": { "type": "string", "description": "Human-readable message." },
         "retryable": { "type": "boolean" },
         "details": { "type": "object" }
+      }
+    },
+    "RuntimeStatusData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "activeRequestCount",
+        "activeRequestIds",
+        "pendingHostOperationCount",
+        "pendingHostOperations",
+        "shuttingDown"
+      ],
+      "description": "Result data for runtime.status.",
+      "properties": {
+        "activeRequestCount": { "type": "integer", "minimum": 0 },
+        "activeRequestIds": {
+          "type": "array",
+          "items": { "type": "integer" }
+        },
+        "pendingHostOperationCount": { "type": "integer", "minimum": 0 },
+        "pendingHostOperations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PendingHostOperationStatus" }
+        },
+        "shuttingDown": { "type": "boolean" }
+      }
+    },
+    "PendingHostOperationStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operationId", "requestId", "capability", "state"],
+      "properties": {
+        "operationId": { "type": "integer" },
+        "requestId": { "type": "integer" },
+        "capability": {
+          "type": "string",
+          "pattern": "^[^\\s.]+(\\.[^\\s.]+)+$"
+        },
+        "state": { "type": "string", "const": "pending" }
       }
     }
   }
