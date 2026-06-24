@@ -63,6 +63,10 @@ uint32_t rc_abi_version(void);
 // `3` means `RC_CREATE_NULL_CALLBACK` for `rc_runtime_create`, but
 // `RC_SEND_INVALID_COMMAND` for `rc_runtime_send`. Hosts should compare against
 // the enum for the function they called instead of hard-coded numbers.
+//
+// Panic statuses are part of the ABI, but only unwind-capable builds can return
+// them. Builds compiled with Rust `panic=abort` terminate the process before a
+// panic can be caught and converted into `RC_*_PANIC`.
 
 typedef enum rc_runtime_create_status {
     RC_CREATE_PANIC = -1,
@@ -103,7 +107,8 @@ typedef enum rc_runtime_cancel_status {
 ///   `RC_CREATE_NULL_CALLBACK` = `callback` is NULL
 ///   `RC_CREATE_INVALID_CONFIG` = `config_json` is invalid (malformed JSON,
 ///       unknown field, or invalid value).
-///   `RC_CREATE_PANIC` = an internal Rust panic was caught by the ABI guard.
+///   `RC_CREATE_PANIC` = an internal Rust panic was caught by the ABI guard
+///       (only possible in unwind-capable builds).
 /// Every non-panic failure records a structured error via `rc_last_error`.
 /// `config_json` may be NULL when `config_length` is 0 (defaults applied).
 int32_t rc_runtime_create(
@@ -130,7 +135,8 @@ int32_t rc_runtime_create(
 ///   `RC_SEND_INVALID_COMMAND` = malformed command JSON / message structure
 ///   `RC_SEND_PROTOCOL_ERROR` = protocol-version mismatch, duplicate active
 ///       requestId, or runtime shutting down.
-///   `RC_SEND_PANIC` = an internal Rust panic was caught by the ABI guard.
+///   `RC_SEND_PANIC` = an internal Rust panic was caught by the ABI guard
+///       (only possible in unwind-capable builds).
 /// Every non-panic failure records a structured error via `rc_last_error`.
 int32_t rc_runtime_send(
     rc_runtime_t *runtime,
@@ -147,7 +153,8 @@ int32_t rc_runtime_send(
 /// are silent no-op successes: they do not emit an event and they clear
 /// `rc_last_error` like any successful runtime call. Returns
 /// `RC_CANCEL_NULL_RUNTIME` when `runtime` is NULL, or `RC_CANCEL_PANIC` if an
-/// internal Rust panic was caught by the ABI guard.
+/// internal Rust panic was caught by the ABI guard (only possible in
+/// unwind-capable builds).
 /// Every non-panic failure records a structured error via `rc_last_error`.
 int32_t rc_runtime_cancel(
     rc_runtime_t *runtime,

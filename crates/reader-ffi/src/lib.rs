@@ -2,8 +2,10 @@
 //!
 //! Safety invariants:
 //! - Every fallible `extern "C"` entry is wrapped in `panic::catch_unwind` so
-//!   a Rust panic can never cross the FFI boundary (UB). On panic we return a
-//!   non-zero status code. `rc_abi_version` is a pure constant getter.
+//!   a Rust panic cannot unwind across the FFI boundary (UB). In unwind-capable
+//!   builds we convert panics into a non-zero status code. Builds compiled with
+//!   `panic=abort` terminate before `catch_unwind` can return. `rc_abi_version`
+//!   is a pure constant getter.
 //! - The runtime owns its worker thread and a C-backed event sink. The sink
 //!   serializes events to JSON and invokes the C `rc_event_callback` from the
 //!   worker thread, so the callback MUST be thread-safe (documented in the
