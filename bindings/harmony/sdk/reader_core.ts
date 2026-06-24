@@ -133,6 +133,7 @@ export class ReaderCoreRuntime {
 
   readEvent(timeoutMs = 0): ReaderCoreEvent | null {
     this.ensureOpen();
+    assertNonNegativeSafeInteger(timeoutMs, "timeoutMs");
     const queued = this.pendingEvents.shift();
     if (queued !== undefined) {
       return queued;
@@ -190,8 +191,8 @@ export class ReaderCoreRuntime {
     options: RequestOptions = {}
   ): Promise<ReaderCoreResultEvent> {
     this.ensureOpen();
-    const timeoutMs = options.timeoutMs ?? 2000;
-    const pollMs = Math.max(1, options.pollMs ?? 10);
+    const timeoutMs = readTimeoutMs(options.timeoutMs);
+    const pollMs = readPollMs(options.pollMs);
     const deadline = Date.now() + timeoutMs;
 
     while (Date.now() <= deadline) {
@@ -355,6 +356,20 @@ function assertJsonObjectValue(value: unknown, name: string): asserts value is J
   if (!isJsonObject(value)) {
     throw new Error(`${name} must be a JSON object`);
   }
+}
+
+function readTimeoutMs(value: number | undefined): number {
+  const timeoutMs = value ?? 2000;
+  assertNonNegativeSafeInteger(timeoutMs, "timeoutMs");
+  return timeoutMs;
+}
+
+function readPollMs(value: number | undefined): number {
+  const pollMs = value ?? 10;
+  if (!isNonNegativeSafeInteger(pollMs) || pollMs === 0) {
+    throw new Error("pollMs must be a positive safe integer");
+  }
+  return pollMs;
 }
 
 function isNonNegativeSafeInteger(value: unknown): value is number {

@@ -243,6 +243,23 @@ describe("ReaderCoreRuntime", () => {
     ).toThrow("host.complete result must be a JSON object");
   });
 
+  test("rejects invalid timeout options before native polling", async () => {
+    const native = new FakeNativeReaderCore();
+    const runtime = new ReaderCoreRuntime(native);
+
+    expect(() => runtime.readEvent(-1)).toThrow(
+      "timeoutMs must be a non-negative safe integer"
+    );
+
+    await expect(
+      runtime.waitForResult(1, { timeoutMs: -1 })
+    ).rejects.toThrow("timeoutMs must be a non-negative safe integer");
+
+    await expect(
+      runtime.waitForResult(1, { pollMs: 0 })
+    ).rejects.toThrow("pollMs must be a positive safe integer");
+  });
+
   test("turns host handler failures into host.error and surfaces core error", async () => {
     const native = new FakeNativeReaderCore();
     const runtime = new ReaderCoreRuntime(native);

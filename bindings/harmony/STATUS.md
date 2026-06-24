@@ -16,6 +16,8 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
   from a thread-safe queue.
 - Command guard: the SDK rejects empty command methods, non-object command
   params, and non-object `host.complete` results before dispatching to native.
+- Timeout guard: the SDK rejects negative/non-integer `timeoutMs` and non-positive
+  `pollMs` values before native polling.
 - Cancellation: NAPI exposes `cancelRequest`, backed by `rc_runtime_cancel`.
 - Host bus minimum loop: `host.request` can be read and answered with
   `host.complete`; the SDK helper can auto-complete host requests while waiting
@@ -31,8 +33,8 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
   handler throws.
 - SDK behavior smoke: `bindings/harmony/sdk/reader_core.test.ts` uses a fake
   native module to verify `runtime.ping`, `host.complete`, handler failure to
-  `host.error`, command input rejection, unrelated event queuing, malformed
-  native event rejection, and `cancelRequest` dispatch.
+  `host.error`, command input rejection, timeout option rejection, unrelated
+  event queuing, malformed native event rejection, and `cancelRequest` dispatch.
 - ArkTS package entry: `bindings/harmony/Index.ets` imports
   `libreader_core_napi.so` and exposes `createReaderCoreRuntime` plus
   `runHarmonyNapiSmoke`.
