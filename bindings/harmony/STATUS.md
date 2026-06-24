@@ -15,6 +15,12 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
 - Host bus minimum loop: `host.request` can be read and answered with
   `host.complete`; the SDK helper can auto-complete host requests while waiting
   for the original request result.
+- Host error path: NAPI exposes `failHostRequest`, backed by the `host.error`
+  JSON command path; the SDK sends `host.error` automatically if a host request
+  handler throws.
+- SDK behavior smoke: `bindings/harmony/sdk/reader_core.test.ts` uses a fake
+  native module to verify `runtime.ping`, `host.complete`, handler failure to
+  `host.error`, and `cancelRequest` dispatch.
 - Build evidence: OHOS and Harmony scripts emit deterministic artifact paths,
   SHA-256 hashes, byte sizes, tool versions, and NAPI symbol evidence.
 
@@ -22,10 +28,11 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
 
 - Native NAPI exports: `abiVersion`, `createRuntime`, `releaseRuntime`,
   `sendCommand`, `cancelRequest`, `readEvent`, `pendingEventCount`,
-  `completeHostRequest`, `pingSmoke`, and `hostSmoke`.
+  `completeHostRequest`, `failHostRequest`, `pingSmoke`, and `hostSmoke`.
 - TypeScript/ArkTS wrapper: `bindings/harmony/sdk/reader_core.ts` wraps native
   exports into `ReaderCoreRuntime`, including `coreInfo`, `ping`, `hostSmoke`,
-  generic `request`, explicit `readEvent`, and explicit `completeHostRequest`.
+  generic `request`, explicit `readEvent`, explicit `completeHostRequest`, and
+  explicit `failHostRequest`.
 
 ## ABI Constraints
 
@@ -39,11 +46,11 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
 - `host.complete` is intentionally sent through the JSON command protocol via
   `rc_runtime_send`; there is no separate C ABI function for host completion in
   v1.
+- `host.error` follows the same v1 constraint: Harmony sends it through
+  `rc_runtime_send`; there is no separate C ABI function for host failure.
 
 ## Open Harmony Work
 
 - Add an ArkTS package layout once the host app module structure is available.
 - Add device-side smoke tests that import the `.so`, run `coreInfo`, `ping`, and
   `hostSmoke`, and archive the script output beside the build evidence.
-- Decide whether Harmony should expose a first-class `host.error` helper or keep
-  it as a generic `sendCommand` path.

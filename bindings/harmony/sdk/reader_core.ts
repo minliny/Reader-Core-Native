@@ -16,6 +16,12 @@ export type NativeReaderCoreModule = {
     result: JsonObject | string,
     requestId?: number
   ): void;
+  failHostRequest(
+    runtime: NativeRuntimeHandle,
+    operationId: number,
+    error: ReaderCoreError | JsonObject | string,
+    requestId?: number
+  ): void;
   pingSmoke(): string;
   hostSmoke(): string;
 };
@@ -149,6 +155,23 @@ export class ReaderCoreRuntime {
     this.native.completeHostRequest(this.runtime, operationId, result, requestId);
   }
 
+  failHostRequest(
+    eventOrOperationId: ReaderCoreHostRequestEvent | number,
+    error: ReaderCoreError | Error | string,
+    requestId?: number
+  ): void {
+    this.ensureOpen();
+    const operationId =
+      typeof eventOrOperationId === "number"
+        ? eventOrOperationId
+        : eventOrOperationId.operationId;
+    assertNonNegativeSafeInteger(operationId, "operationId");
+    if (requestId !== undefined) {
+      assertNonNegativeSafeInteger(requestId, "requestId");
+    }
+    this.native.failHostRequest(this.runtime, operationId, normalizeHostError(error), requestId);
+  }
+
   async request(
     method: string,
     params: JsonObject = {},
@@ -178,8 +201,12 @@ export class ReaderCoreRuntime {
 
       if (event.type === "host.request") {
         if (event.requestId === requestId && options.hostRequest !== undefined) {
-          const result = await options.hostRequest(event);
-          this.completeHostRequest(event, result);
+          try {
+            const result = await options.hostRequest(event);
+            this.completeHostRequest(event, result);
+          } catch (error) {
+            this.failHostRequest(event, normalizeHostError(error));
+          }
         } else {
           this.pendingEvents.push(event);
           throw new Error(`Reader-Core host.request requires a handler: ${event.operationId}`);
@@ -279,6 +306,43 @@ function assertNonNegativeSafeInteger(value: number, name: string): void {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new Error(`${name} must be a non-negative safe integer`);
   }
+}
+
+function normalizeHostError(error: unknown): ReaderCoreError {
+  if (isReaderCoreError(error)) {
+    return error;
+  }
+
+  if (error instanceof Error) {
+    return {
+      code: "INTERNAL",
+      message: error.message,
+      retryable: false,
+      details: { name: error.name },
+    };
+  }
+
+  const normalized: ReaderCoreError = {
+    code: "INTERNAL",
+    message: typeof error === "string" ? error : "host request failed",
+    retryable: false,
+  };
+  if (typeof error === "object" && error !== null) {
+    normalized.details = { cause: error };
+  }
+  return normalized;
+}
+
+function isReaderCoreError(value: unknown): value is ReaderCoreError {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const candidate = value as Partial<ReaderCoreError>;
+  return (
+    typeof candidate.code === "string" &&
+    typeof candidate.message === "string" &&
+    typeof candidate.retryable === "boolean"
+  );
 }
 
 function delay(ms: number): Promise<void> {

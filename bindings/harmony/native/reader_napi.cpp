@@ -13,14 +13,14 @@
 
 namespace {
 
-constexpr uint64_t kDefaultHostCompleteRequestId = 9000000000000ULL;
+constexpr uint64_t kDefaultHostResponseRequestId = 9000000000000ULL;
 
 struct RuntimeState {
   std::mutex mutex;
   std::condition_variable cv;
   std::deque<std::string> events;
   rc_runtime_t *runtime = nullptr;
-  uint64_t next_host_complete_request_id = kDefaultHostCompleteRequestId;
+  uint64_t next_host_response_request_id = kDefaultHostResponseRequestId;
   bool destroyed = false;
 };
 
@@ -262,6 +262,13 @@ std::string BuildHostCompleteCommand(uint64_t request_id, uint64_t operation_id,
   return "{\"protocolVersion\":1,\"requestId\":" + std::to_string(request_id) +
          ",\"method\":\"host.complete\",\"params\":{\"operationId\":" +
          std::to_string(operation_id) + ",\"result\":" + result_json + "}}";
+}
+
+std::string BuildHostErrorCommand(uint64_t request_id, uint64_t operation_id,
+                                  const std::string &error_json) {
+  return "{\"protocolVersion\":1,\"requestId\":" + std::to_string(request_id) +
+         ",\"method\":\"host.error\",\"params\":{\"operationId\":" +
+         std::to_string(operation_id) + ",\"error\":" + error_json + "}}";
 }
 
 bool ExtractUnsignedField(const std::string &json, const char *field,
@@ -522,7 +529,7 @@ napi_value CompleteHostRequest(napi_env env, napi_callback_info info) {
     request_id = static_cast<uint64_t>(request_id_signed);
   } else {
     std::lock_guard<std::mutex> lock(state->mutex);
-    request_id = state->next_host_complete_request_id++;
+    request_id = state->next_host_response_request_id++;
   }
 
   std::string command = BuildHostCompleteCommand(
@@ -530,6 +537,61 @@ napi_value CompleteHostRequest(napi_env env, napi_callback_info info) {
   int32_t code = SendCommandToCore(state, command);
   if (code != 0) {
     return ThrowError(env, "rc_runtime_send host.complete failed");
+  }
+  return Undefined(env);
+}
+
+napi_value FailHostRequest(napi_env env, napi_callback_info info) {
+  size_t argc = 4;
+  napi_value args[4] = {nullptr, nullptr, nullptr, nullptr};
+  if (napi_get_cb_info(env, info, &argc, args, nullptr, nullptr) != napi_ok ||
+      argc < 3) {
+    return ThrowError(
+        env,
+        "failHostRequest requires runtime handle, operationId, and error");
+  }
+
+  RuntimeState *state = GetRuntimeState(env, args[0], true);
+  if (state == nullptr) {
+    return nullptr;
+  }
+
+  int64_t operation_id_signed = 0;
+  if (!GetInt64Value(env, args[1], &operation_id_signed)) {
+    return nullptr;
+  }
+  if (operation_id_signed < 0) {
+    return ThrowError(env, "operationId must be a non-negative integer");
+  }
+
+  std::string error_json;
+  if (!GetJsonStringValue(env, args[2], &error_json)) {
+    return nullptr;
+  }
+  if (!LooksLikeJsonObject(error_json)) {
+    return ThrowError(env, "host.error error must be a JSON object");
+  }
+
+  uint64_t request_id = 0;
+  if (argc > 3 && !IsNullish(env, args[3])) {
+    int64_t request_id_signed = 0;
+    if (!GetInt64Value(env, args[3], &request_id_signed)) {
+      return nullptr;
+    }
+    if (request_id_signed < 0) {
+      return ThrowError(env, "requestId must be a non-negative integer");
+    }
+    request_id = static_cast<uint64_t>(request_id_signed);
+  } else {
+    std::lock_guard<std::mutex> lock(state->mutex);
+    request_id = state->next_host_response_request_id++;
+  }
+
+  std::string command = BuildHostErrorCommand(
+      request_id, static_cast<uint64_t>(operation_id_signed), error_json);
+  int32_t code = SendCommandToCore(state, command);
+  if (code != 0) {
+    return ThrowError(env, "rc_runtime_send host.error failed");
   }
   return Undefined(env);
 }
@@ -642,6 +704,8 @@ napi_value Init(napi_env env, napi_value exports) {
        nullptr, napi_default, nullptr},
       {"completeHostRequest", nullptr, CompleteHostRequest, nullptr, nullptr,
        nullptr, napi_default, nullptr},
+      {"failHostRequest", nullptr, FailHostRequest, nullptr, nullptr, nullptr,
+       napi_default, nullptr},
       {"pingSmoke", nullptr, PingSmoke, nullptr, nullptr, nullptr, napi_default,
        nullptr},
       {"hostSmoke", nullptr, HostSmoke, nullptr, nullptr, nullptr, napi_default,
