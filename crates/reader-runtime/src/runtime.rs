@@ -8,6 +8,7 @@ use reader_contract::{
     HostSmokeParams, RuntimeConfig,
 };
 
+use crate::remote::{dispatch_remote, RemoteState};
 use crate::sink::EventSink;
 
 /// C ABI version this runtime advertises via `core.info`. The authoritative
@@ -50,6 +51,8 @@ pub struct Runtime {
     cancelled: Arc<Mutex<HashSet<u64>>>,
     /// Pending host operations keyed by operationId.
     host_operations: Arc<Mutex<HashMap<u64, HostOperation>>>,
+    /// Shared remote-reading state (content pipeline + in-memory storage).
+    remote_state: Arc<RemoteState>,
     /// Shutdown latch so the worker can stop even mid-processing.
     shutdown: Arc<AtomicBool>,
 }
@@ -74,6 +77,7 @@ impl Runtime {
         let host_operations = Arc::new(Mutex::new(HashMap::new()));
         let next_operation_id = Arc::new(AtomicU64::new(1));
         let shutdown = Arc::new(AtomicBool::new(false));
+        let remote_state = Arc::new(RemoteState::new());
 
         let worker_active = active_requests.clone();
         let worker_cancelled = cancelled.clone();
@@ -81,6 +85,7 @@ impl Runtime {
         let worker_next_operation_id = next_operation_id.clone();
         let worker_shutdown = shutdown.clone();
         let worker_sink = sink.clone();
+        let worker_remote_state = remote_state.clone();
 
         let worker = thread::Builder::new()
             .name("reader-core-worker".into())
@@ -93,6 +98,7 @@ impl Runtime {
                     worker_host_operations,
                     worker_next_operation_id,
                     worker_shutdown,
+                    worker_remote_state,
                 );
             })
             .expect("reader-core worker thread spawn failed");
@@ -105,6 +111,7 @@ impl Runtime {
             active_requests,
             cancelled,
             host_operations,
+            remote_state,
             shutdown,
         })
     }
@@ -119,6 +126,14 @@ impl Runtime {
 
     pub fn config(&self) -> &RuntimeConfig {
         &self.config
+    }
+
+    /// Shared remote-reading state. Exposed so tests (and hosts that embed the
+    /// pure-Rust runtime) can inspect storage/cache contents after a vertical
+    /// pipeline run. The FFI layer does not surface this; it is not part of the
+    /// C ABI.
+    pub fn remote_state(&self) -> &RemoteState {
+        &self.remote_state
     }
 
     /// Parse and enqueue a JSON command payload.
@@ -190,6 +205,7 @@ impl Runtime {
         host_operations: Arc<Mutex<HashMap<u64, HostOperation>>>,
         next_operation_id: Arc<AtomicU64>,
         shutdown: Arc<AtomicBool>,
+        remote_state: Arc<RemoteState>,
     ) {
         for item in &rx {
             if shutdown.load(Ordering::Acquire) {
@@ -205,6 +221,7 @@ impl Runtime {
                         &cancelled,
                         &host_operations,
                         &next_operation_id,
+                        &remote_state,
                     );
                 }
             }
@@ -229,6 +246,7 @@ fn dispatch_command(
     cancelled: &Mutex<HashSet<u64>>,
     host_operations: &Mutex<HashMap<u64, HostOperation>>,
     next_operation_id: &AtomicU64,
+    remote_state: &RemoteState,
 ) {
     if take_cancelled(cancelled, cmd.request_id) {
         finish_request(
@@ -241,6 +259,9 @@ fn dispatch_command(
         return;
     }
 
+    // Built-in host-bus / runtime commands first. Remote-reading vertical
+    // commands are dispatched afterwards; if `dispatch_remote` returns false
+    // (method not recognized by either), we fall through to unknown_method.
     match cmd.method.as_str() {
         methods::CORE_INFO => finish_request(
             sink,
@@ -273,13 +294,18 @@ fn dispatch_command(
         methods::HOST_ERROR => {
             dispatch_host_error(cmd, sink, active_requests, cancelled, host_operations)
         }
-        other => finish_request(
-            sink,
-            active_requests,
-            cancelled,
-            cmd.request_id,
-            Event::error(cmd.request_id, CoreError::unknown_method(other)),
-        ),
+        other => {
+            if dispatch_remote(other, cmd, sink, active_requests, remote_state) {
+                return;
+            }
+            finish_request(
+                sink,
+                active_requests,
+                cancelled,
+                cmd.request_id,
+                Event::error(cmd.request_id, CoreError::unknown_method(other)),
+            )
+        }
     }
 }
 
@@ -957,6 +983,328 @@ mod tests {
             rt.config().cache_directory.as_deref(),
             Some("/tmp/reader-cache")
         );
+    }
+
+    // --- Remote-reading vertical (V1 minimal) -------------------------------
+
+    /// A source definition with JSONPath/CSS rules matching the test fixtures.
+    fn vertical_source() -> serde_json::Value {
+        serde_json::json!({
+            "sourceId": "vtest-src",
+            "name": "Vertical Test Source",
+            "baseUrl": "https://books.example.test",
+            "rules": {
+                "search": [ { "kind": "jsonPath", "path": "$.books[*]" } ],
+                "detail": [ { "kind": "jsonPath", "path": "$.detail" } ],
+                "toc":   [ { "kind": "jsonPath", "path": "$.toc" } ],
+                "chapter": [ { "kind": "cssText", "selector": "p" } ]
+            }
+        })
+    }
+
+    fn send_and_wait(rt: &Runtime, sink: &CollectSink, command: Command) -> Event {
+        rt.send(command).unwrap();
+        let events = sink.wait_len(1);
+        // wait_len is cumulative for this sink instance; we only use fresh
+        // sinks per test, so the single emitted event is the last one.
+        events.into_iter().last().expect("at least one event")
+    }
+
+    #[test]
+    fn source_import_succeeds_and_stores() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                1,
+                methods::SOURCE_IMPORT,
+                serde_json::json!({
+                    "sourceId": "vtest-src",
+                    "name": "Vertical Test Source",
+                    "baseUrl": "https://books.example.test",
+                    "rules": vertical_source()["rules"].clone(),
+                }),
+            ),
+        );
+        match event {
+            Event::Result { data, .. } => {
+                assert_eq!(data["imported"], true);
+                assert_eq!(data["sourceId"], "vtest-src");
+            }
+            other => panic!("expected result, got {other:?}"),
+        }
+        // Stored in remote_state storage.
+        let stored = rt
+            .remote_state()
+            .storage()
+            .get_source("vtest-src")
+            .unwrap()
+            .expect("source stored");
+        assert_eq!(stored.name, "Vertical Test Source");
+    }
+
+    #[test]
+    fn source_import_rejects_empty_name() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                1,
+                methods::SOURCE_IMPORT,
+                serde_json::json!({
+                    "sourceId": "bad",
+                    "name": "  ",
+                    "baseUrl": "",
+                    "rules": serde_json::Value::Null,
+                }),
+            ),
+        );
+        match event {
+            Event::Error { error, .. } => assert_eq!(error.code, ErrorCode::InvalidParams),
+            other => panic!("expected error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn book_search_returns_books() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                2,
+                methods::BOOK_SEARCH,
+                serde_json::json!({
+                    "sourceId": "vtest-src",
+                    "searchResponse": "{\"books\":[{\"bookId\":\"1\",\"title\":\"Dune\",\"author\":\"Herbert\"}]}",
+                    "source": vertical_source(),
+                }),
+            ),
+        );
+        match event {
+            Event::Result { data, .. } => {
+                let books = data["books"].as_array().expect("books array");
+                assert_eq!(books.len(), 1);
+                assert_eq!(books[0]["title"], "Dune");
+            }
+            other => panic!("expected result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn book_detail_merges_metadata() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                3,
+                methods::BOOK_DETAIL,
+                serde_json::json!({
+                    "sourceId": "vtest-src",
+                    "book": { "bookId": "1" },
+                    "detailResponse": "{\"detail\":{\"bookId\":\"1\",\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"intro\":\"desert\"}}",
+                    "source": vertical_source(),
+                }),
+            ),
+        );
+        match event {
+            Event::Result { data, .. } => {
+                assert_eq!(data["book"]["title"], "Dune");
+                assert_eq!(data["book"]["author"], "Frank Herbert");
+                assert_eq!(data["book"]["intro"], "desert");
+            }
+            other => panic!("expected result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn book_toc_returns_entries_and_caches() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                4,
+                methods::BOOK_TOC,
+                serde_json::json!({
+                    "sourceId": "vtest-src",
+                    "bookId": "1",
+                    "tocResponse": "{\"toc\":[{\"title\":\"C1\",\"url\":\"u1\"},{\"title\":\"C2\",\"url\":\"u2\"}]}",
+                    "source": vertical_source(),
+                }),
+            ),
+        );
+        match event {
+            Event::Result { data, .. } => {
+                let toc = data["toc"].as_array().expect("toc array");
+                assert_eq!(toc.len(), 2);
+                assert_eq!(toc[0]["title"], "C1");
+            }
+            other => panic!("expected result, got {other:?}"),
+        }
+        // Cache write verified via storage.
+        let cached = rt
+            .remote_state()
+            .storage()
+            .get_cache("toc:1")
+            .unwrap()
+            .expect("toc cached");
+        assert!(cached.payload.contains("C1"));
+    }
+
+    #[test]
+    fn chapter_content_extracts_body() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                5,
+                methods::CHAPTER_CONTENT,
+                serde_json::json!({
+                    "sourceId": "vtest-src",
+                    "bookId": "1",
+                    "chapterTitle": "C1",
+                    "chapterResponse": "<html><body><p>One.</p><p>Two.</p></body></html>",
+                    "source": vertical_source(),
+                }),
+            ),
+        );
+        match event {
+            Event::Result { data, .. } => {
+                assert_eq!(data["via"], "rule");
+                assert_eq!(data["content"], "One.\nTwo.");
+            }
+            other => panic!("expected result, got {other:?}"),
+        }
+        let cached = rt
+            .remote_state()
+            .storage()
+            .get_cache("chapter:1:C1")
+            .unwrap()
+            .expect("chapter cached");
+        assert_eq!(cached.payload, "One.\nTwo.");
+    }
+
+    #[test]
+    fn js_rule_unsupported_is_structured_not_fake_network() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                6,
+                methods::CHAPTER_CONTENT,
+                serde_json::json!({
+                    "sourceId": "vtest-src",
+                    "bookId": "1",
+                    "chapterTitle": "C1",
+                    "chapterResponse": "<p>x</p>",
+                    "jsRule": "java.get(\"https://books.example.test/protected\")",
+                    "source": vertical_source(),
+                }),
+            ),
+        );
+        match event {
+            Event::Error { error, .. } => {
+                assert_eq!(error.code, ErrorCode::Internal);
+                assert_eq!(error.details["unsupported"], true);
+                // Must never claim a network result happened.
+                assert!(error.message.contains("unsupported"));
+            }
+            other => panic!("expected structured unsupported error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn js_rule_success_path_returns_value() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        // A pure-computation JS rule with no host calls succeeds.
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                7,
+                methods::CHAPTER_CONTENT,
+                serde_json::json!({
+                    "sourceId": "vtest-src",
+                    "bookId": "1",
+                    "chapterTitle": "C1",
+                    "chapterResponse": "<p>x</p>",
+                    "jsRule": "({ status: 'ok', words: 42 })",
+                    "source": vertical_source(),
+                }),
+            ),
+        );
+        match event {
+            Event::Result { data, .. } => {
+                assert_eq!(data["via"], "js");
+                assert_eq!(data["content"]["status"], "ok");
+                assert_eq!(data["content"]["words"], 42);
+            }
+            other => panic!("expected js result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn reading_progress_writes_and_reads_back() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                8,
+                methods::READING_PROGRESS_UPDATE,
+                serde_json::json!({
+                    "bookId": "1",
+                    "chapterIndex": 2,
+                    "chapterOffset": 128,
+                    "chapterProgress": 0.5,
+                }),
+            ),
+        );
+        match event {
+            Event::Result { data, .. } => {
+                assert_eq!(data["stored"], true);
+                assert_eq!(data["chapterIndex"], 2);
+            }
+            other => panic!("expected result, got {other:?}"),
+        }
+        let progress = rt
+            .remote_state()
+            .storage()
+            .get_progress("1")
+            .unwrap()
+            .expect("progress stored");
+        assert_eq!(progress.chapter_index, 2);
+        assert_eq!(progress.chapter_offset, 128);
+    }
+
+    #[test]
+    fn unknown_method_still_errors_after_remote_dispatch() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(9, "totally.bogus.method", serde_json::json!({})),
+        );
+        match event {
+            Event::Error { error, .. } => assert_eq!(error.code, ErrorCode::UnknownMethod),
+            other => panic!("expected unknown method error, got {other:?}"),
+        }
     }
 
     #[test]

@@ -10,7 +10,8 @@
     "host.complete",
     "host.error",
     "host.bus.v1",
-    "runtime.config.v1"
+    "runtime.config.v1",
+    "remote.reading.v1"
   ],
   "type": "object",
   "additionalProperties": false,
@@ -33,7 +34,13 @@
         "runtime.ping",
         "runtime.hostSmoke",
         "host.complete",
-        "host.error"
+        "host.error",
+        "source.import",
+        "book.search",
+        "book.detail",
+        "book.toc",
+        "chapter.content",
+        "reading.progress.update"
       ]
     },
     "params": {

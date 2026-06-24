@@ -13,6 +13,7 @@ pub mod core_info;
 pub mod error;
 pub mod event;
 pub mod host;
+pub mod remote;
 
 pub use command::Command;
 pub use config::RuntimeConfig;
@@ -20,6 +21,10 @@ pub use core_info::core_info;
 pub use error::{CoreError, ErrorCode};
 pub use event::Event;
 pub use host::{HostCompleteParams, HostErrorParams, HostSmokeParams};
+pub use remote::{
+    BookDetailParams, BookSearchParams, BookTocParams, ChapterContentParams,
+    ReadingProgressUpdateParams, SourceImportParams,
+};
 
 /// JSON protocol version. Bumped on non-backward-compatible schema changes.
 /// See `protocol/compatibility.md`.
@@ -36,12 +41,28 @@ pub mod methods {
     /// Bootstrap alias kept so the current FFI/Harmony smoke binaries can keep
     /// proving ABI loadability while hosts migrate to `runtime.ping`.
     pub const LEGACY_CORE_PING: &str = "core.ping";
+
+    // --- Remote-reading vertical (V1 minimal) -------------------------------
+    /// Import a remote book source definition.
+    pub const SOURCE_IMPORT: &str = "source.import";
+    /// Search books at a source using a pre-fetched search response.
+    pub const BOOK_SEARCH: &str = "book.search";
+    /// Fetch/merge book detail metadata from a pre-fetched detail response.
+    pub const BOOK_DETAIL: &str = "book.detail";
+    /// Fetch a book's table of contents from a pre-fetched toc response.
+    pub const BOOK_TOC: &str = "book.toc";
+    /// Extract chapter body text from a pre-fetched chapter response.
+    pub const CHAPTER_CONTENT: &str = "chapter.content";
+    /// Update reading progress/state for a book.
+    pub const READING_PROGRESS_UPDATE: &str = "reading.progress.update";
 }
 
 /// Non-method capability names advertised by `core.info` in v1.
 pub mod capabilities {
     pub const HOST_BUS_V1: &str = "host.bus.v1";
     pub const RUNTIME_CONFIG_V1: &str = "runtime.config.v1";
+    /// Remote-reading vertical (V1 minimal, fixture/inline content only).
+    pub const REMOTE_READING_V1: &str = "remote.reading.v1";
 }
 
 /// Capabilities advertised by `core.info` in v1.
@@ -53,6 +74,7 @@ pub const V1_CAPABILITIES: &[&str] = &[
     methods::HOST_ERROR,
     capabilities::HOST_BUS_V1,
     capabilities::RUNTIME_CONFIG_V1,
+    capabilities::REMOTE_READING_V1,
 ];
 
 #[cfg(test)]
@@ -98,6 +120,12 @@ mod tests {
                 methods::RUNTIME_HOST_SMOKE,
                 methods::HOST_COMPLETE,
                 methods::HOST_ERROR,
+                methods::SOURCE_IMPORT,
+                methods::BOOK_SEARCH,
+                methods::BOOK_DETAIL,
+                methods::BOOK_TOC,
+                methods::CHAPTER_CONTENT,
+                methods::READING_PROGRESS_UPDATE,
             ]
         );
         assert!(!schema_examples.contains(&methods::LEGACY_CORE_PING));
