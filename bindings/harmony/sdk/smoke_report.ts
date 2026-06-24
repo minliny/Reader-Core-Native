@@ -9,6 +9,7 @@ export type HarmonyNapiSmokeResult = {
 };
 
 export type HarmonyNapiSmokeCheckName =
+  | "execution"
   | "abiVersion"
   | "native.lifecycle"
   | "core.info"
@@ -21,11 +22,17 @@ export type HarmonyNapiSmokeCheck = {
   detail: string;
 };
 
+export type HarmonyNapiSmokeError = {
+  name: string;
+  message: string;
+};
+
 export type HarmonyNapiSmokeReport = {
   schemaVersion: 1;
   status: "pass" | "fail";
   checks: HarmonyNapiSmokeCheck[];
-  result: HarmonyNapiSmokeResult;
+  result?: HarmonyNapiSmokeResult;
+  error?: HarmonyNapiSmokeError;
 };
 
 export function buildHarmonyNapiSmokeReport(
@@ -62,6 +69,22 @@ export function buildHarmonyNapiSmokeReport(
     status: checks.every((item) => item.pass) ? "pass" : "fail",
     checks,
     result,
+  };
+}
+
+export function buildHarmonyNapiSmokeErrorReport(error: unknown): HarmonyNapiSmokeReport {
+  const normalized = normalizeSmokeError(error);
+  return {
+    schemaVersion: 1,
+    status: "fail",
+    checks: [
+      check(
+        "execution",
+        false,
+        `${normalized.name}: ${normalized.message}`
+      ),
+    ],
+    error: normalized,
   };
 }
 
@@ -127,4 +150,18 @@ function eventDetail(value: unknown): string {
   }
   const event = value as Partial<ReaderCoreResultEvent>;
   return `type=${String(event.type)} requestId=${String(event.requestId)}`;
+}
+
+function normalizeSmokeError(error: unknown): HarmonyNapiSmokeError {
+  if (error instanceof Error) {
+    return {
+      name: error.name || "Error",
+      message: error.message || "unknown error",
+    };
+  }
+
+  return {
+    name: "Error",
+    message: typeof error === "string" ? error : String(error),
+  };
 }

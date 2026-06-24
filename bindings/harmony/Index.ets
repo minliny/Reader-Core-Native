@@ -7,6 +7,7 @@ import {
 } from './sdk/reader_core';
 import {
   assertHarmonyNapiSmokeReport,
+  buildHarmonyNapiSmokeErrorReport,
   buildHarmonyNapiSmokeReport,
   type HarmonyNapiSmokeReport,
   type HarmonyNapiSmokeResult,
@@ -30,8 +31,10 @@ export {
 } from './sdk/reader_core';
 export {
   assertHarmonyNapiSmokeReport,
+  buildHarmonyNapiSmokeErrorReport,
   buildHarmonyNapiSmokeReport,
   formatHarmonyNapiSmokeReport,
+  type HarmonyNapiSmokeError,
   type HarmonyNapiSmokeCheck,
   type HarmonyNapiSmokeCheckName,
   type HarmonyNapiSmokeReport,
@@ -65,10 +68,20 @@ export async function runHarmonyNapiSmoke(
   }
 }
 
+export async function captureHarmonyNapiSmokeReport(
+  config: JsonObject = {}
+): Promise<HarmonyNapiSmokeReport> {
+  try {
+    return buildHarmonyNapiSmokeReport(await runHarmonyNapiSmoke(config));
+  } catch (error) {
+    return buildHarmonyNapiSmokeErrorReport(error);
+  }
+}
+
 export async function runHarmonyNapiSmokeReport(
   config: JsonObject = {}
 ): Promise<HarmonyNapiSmokeReport> {
-  const report = buildHarmonyNapiSmokeReport(await runHarmonyNapiSmoke(config));
+  const report = await captureHarmonyNapiSmokeReport(config);
   assertHarmonyNapiSmokeReport(report);
   return report;
 }

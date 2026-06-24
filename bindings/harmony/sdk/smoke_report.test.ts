@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   assertHarmonyNapiSmokeReport,
+  buildHarmonyNapiSmokeErrorReport,
   buildHarmonyNapiSmokeReport,
   formatHarmonyNapiSmokeReport,
   type HarmonyNapiSmokeResult,
@@ -71,5 +72,20 @@ describe("Harmony NAPI smoke report", () => {
       schemaVersion: 1,
       status: "pass",
     });
+  });
+
+  test("builds a structured failure report when smoke execution throws", () => {
+    const report = buildHarmonyNapiSmokeErrorReport(new Error("native module unavailable"));
+
+    expect(report).toMatchObject({
+      schemaVersion: 1,
+      status: "fail",
+      checks: [{ name: "execution", pass: false }],
+      error: {
+        name: "Error",
+        message: "native module unavailable",
+      },
+    });
+    expect(() => assertHarmonyNapiSmokeReport(report)).toThrow("execution");
   });
 });

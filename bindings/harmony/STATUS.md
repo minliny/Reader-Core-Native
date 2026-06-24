@@ -30,9 +30,12 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
 - ArkTS package entry: `bindings/harmony/Index.ets` imports
   `libreader_core_napi.so` and exposes `createReaderCoreRuntime` plus
   `runHarmonyNapiSmoke`.
-- Device smoke report entry: `runHarmonyNapiSmokeReport` validates the HAP-side
-  smoke result and returns a formatted-report-compatible pass/fail structure
-  that can be archived beside local build evidence.
+- Device smoke report entry: `captureHarmonyNapiSmokeReport` validates the
+  HAP-side smoke result and returns a formatted-report-compatible pass/fail
+  structure that can be archived beside local build evidence, including a
+  structured failure report if native loading or runtime execution throws.
+  `runHarmonyNapiSmokeReport` keeps the same checks but throws on failure for
+  gate-style callers.
 - Build evidence: OHOS and Harmony scripts emit deterministic artifact paths,
   SHA-256 hashes, byte sizes, tool versions, NAPI symbol evidence, and a
   package-ready Harmony directory manifest.
@@ -49,7 +52,8 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
   explicit `failHostRequest`.
 - Smoke report helper: `bindings/harmony/sdk/smoke_report.ts` validates
   lifecycle, `core.info`, `runtime.ping`, and `runtime.hostSmoke` output and
-  formats a deterministic JSON report for device-log archival.
+  formats a deterministic JSON report for device-log archival, including an
+  `execution` failure check for early runtime/native errors.
 - Package entry: `bindings/harmony/oh-package.json5` points to `Index.ets`.
 - Package artifact: `scripts/build-harmony-napi.sh` assembles
   `target/harmony-napi/arm64-v8a/package` with the `.so`, ArkTS entry, non-test
@@ -73,5 +77,5 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
 
 ## Open Harmony Work
 
-- Run `runHarmonyNapiSmokeReport` in a signed HAP on device and archive the
+- Run `captureHarmonyNapiSmokeReport` in a signed HAP on device and archive the
   formatted report output beside the local OHOS/Harmony build evidence.
