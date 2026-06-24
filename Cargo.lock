@@ -686,6 +686,8 @@ name = "reader-local-book"
 version = "0.1.0"
 dependencies = [
  "reader-domain",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -693,6 +695,8 @@ name = "reader-rss"
 version = "0.1.0"
 dependencies = [
  "reader-domain",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -733,6 +737,8 @@ name = "reader-sync"
 version = "0.1.0"
 dependencies = [
  "reader-domain",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
