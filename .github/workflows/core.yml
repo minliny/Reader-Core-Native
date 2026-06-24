@@ -28,3 +28,9 @@ jobs:
 
       - name: Protocol conformance smoke
         run: cargo run -p reader-cli -- --conformance
+
+      - name: Install iOS Rust targets
+        run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+
+      - name: Build iOS XCFramework smoke
+        run: ./scripts/build-ios-xcframework.sh

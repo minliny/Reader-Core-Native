@@ -18,6 +18,14 @@ Output:
 target/ios/ReaderCore.xcframework
 ```
 
+Each XCFramework slice includes:
+
+- `Headers/reader_core.h`
+- `Headers/module.modulemap`
+
+The build script also type-checks a Swift smoke file with `import ReaderCore`
+against the simulator slice.
+
 The XCFramework exposes the ABI v1 functions declared in
 `include/reader_core.h`:
 
