@@ -44,6 +44,10 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
   structured failure report if native loading or runtime execution throws.
   `runHarmonyNapiSmokeReport` keeps the same checks but throws on failure for
   gate-style callers.
+- Device smoke artifact entry: `captureHarmonyNapiSmokeArtifact` wraps the
+  report with a stable artifact name, pass/fail summary, and raw report payload
+  for device-log archival; `runHarmonyNapiSmokeArtifact` keeps gate-style
+  failure semantics.
 - Build evidence: OHOS and Harmony scripts emit deterministic artifact paths,
   SHA-256 hashes, byte sizes, tool versions, NAPI symbol evidence, and a
   package-ready Harmony directory manifest.
@@ -61,7 +65,8 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
 - Smoke report helper: `bindings/harmony/sdk/smoke_report.ts` validates
   lifecycle, `core.info`, `runtime.ping`, and `runtime.hostSmoke` output and
   formats a deterministic JSON report for device-log archival, including an
-  `execution` failure check for early runtime/native errors.
+  `execution` failure check for early runtime/native errors and an artifact
+  wrapper with stable pass/fail counts.
 - Package entry: `bindings/harmony/oh-package.json5` points to `Index.ets`.
 - Package artifact: `scripts/build-harmony-napi.sh` assembles
   `target/harmony-napi/arm64-v8a/package` with the `.so`, ArkTS entry, non-test
@@ -85,5 +90,5 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
 
 ## Open Harmony Work
 
-- Run `captureHarmonyNapiSmokeReport` in a signed HAP on device and archive the
-  formatted report output beside the local OHOS/Harmony build evidence.
+- Run `captureHarmonyNapiSmokeArtifact` in a signed HAP on device and archive
+  the formatted artifact output beside the local OHOS/Harmony build evidence.
