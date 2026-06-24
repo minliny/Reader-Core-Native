@@ -85,9 +85,11 @@ void DispatchDirectEvent(void *context, const uint8_t *json,
 
   JNIEnv *env = nullptr;
   if (g_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) != JNI_OK) {
-    if (g_vm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+    void *attached_env = nullptr;
+    if (g_vm->AttachCurrentThread(&attached_env, nullptr) != JNI_OK) {
       return;
     }
+    env = static_cast<JNIEnv *>(attached_env);
   }
   if (env == nullptr) {
     return;
