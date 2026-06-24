@@ -42,6 +42,9 @@ const HOST_ERROR: &str = include_str!("../../../protocol/fixtures/conformance/ho
 const HOST_UNKNOWN_COMPLETE: &str =
     include_str!("../../../protocol/fixtures/conformance/host/unknown-complete.json");
 
+const VALID_RUNTIME_CANCEL: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-runtime-cancel.json");
+
 const CANCEL_UNKNOWN: &str =
     include_str!("../../../protocol/fixtures/conformance/cancel/unknown.json");
 const CANCEL_COMPLETED: &str =
@@ -289,6 +292,49 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         runtime.cancel(cancel_id);
         runtime.cancel(cancel_id);
         expect_no_event(&rx)
+    });
+
+    // --- runtime.cancel JSON command ---------------------------------------
+
+    record(
+        &mut report,
+        "runtime-cancel-cancels-pending-host-request",
+        || {
+            let (runtime, rx) = send_to_fresh_runtime(HOST_REQUEST)?;
+            expect_host_request(&rx)?;
+            // Fixture cancels target requestId 301 via the JSON protocol.
+            runtime
+                .send_json(VALID_RUNTIME_CANCEL.as_bytes())
+                .map_err(|err| format!("runtime.cancel send failed: {err:?}"))?;
+            // First: CANCELLED error routed to the original request 301.
+            match recv_event(&rx)? {
+                Event::Error {
+                    request_id, error, ..
+                } if request_id == 301 && error.code == ErrorCode::Cancelled => {}
+                other => {
+                    return Err(format!("expected cancelled error for 301, got {other:?}"))
+                }
+            }
+            // Second: result for the cancel command itself (requestId 310).
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 310 && data["cancelled"] == true => {}
+                other => return Err(format!("expected cancel result true, got {other:?}")),
+            }
+            Ok(())
+        },
+    );
+
+    record(&mut report, "runtime-cancel-unknown-id-returns-false", || {
+        let (_runtime, rx) = send_to_fresh_runtime(VALID_RUNTIME_CANCEL)?;
+        // Target 301 is not active here → cancelled:false, no other events.
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 310 && data["cancelled"] == false => Ok(()),
+            other => Err(format!("expected cancelled:false result, got {other:?}")),
+        }
     });
 
     report

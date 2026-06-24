@@ -15,7 +15,7 @@ pub mod event;
 pub mod host;
 pub mod remote;
 
-pub use command::Command;
+pub use command::{Command, RuntimeCancelParams};
 pub use config::RuntimeConfig;
 pub use core_info::core_info;
 pub use error::{CoreError, ErrorCode};
@@ -35,6 +35,7 @@ pub mod methods {
     pub const CORE_INFO: &str = "core.info";
     pub const RUNTIME_PING: &str = "runtime.ping";
     pub const RUNTIME_HOST_SMOKE: &str = "runtime.hostSmoke";
+    pub const RUNTIME_CANCEL: &str = "runtime.cancel";
     pub const HOST_COMPLETE: &str = "host.complete";
     pub const HOST_ERROR: &str = "host.error";
 
@@ -72,6 +73,7 @@ pub const V1_CAPABILITIES: &[&str] = &[
     methods::CORE_INFO,
     methods::RUNTIME_PING,
     methods::RUNTIME_HOST_SMOKE,
+    methods::RUNTIME_CANCEL,
     methods::HOST_COMPLETE,
     methods::HOST_ERROR,
     capabilities::HOST_BUS_V1,
@@ -121,6 +123,7 @@ mod tests {
                 methods::CORE_INFO,
                 methods::RUNTIME_PING,
                 methods::RUNTIME_HOST_SMOKE,
+                methods::RUNTIME_CANCEL,
                 methods::HOST_COMPLETE,
                 methods::HOST_ERROR,
                 methods::SOURCE_IMPORT,

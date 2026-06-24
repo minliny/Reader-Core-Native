@@ -1,0 +1,8 @@
+{
+  "protocolVersion": 1,
+  "requestId": 310,
+  "method": "runtime.cancel",
+  "params": {
+    "requestId": 301
+  }
+}

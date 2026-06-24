@@ -7,6 +7,7 @@
     "core.info",
     "runtime.ping",
     "runtime.hostSmoke",
+    "runtime.cancel",
     "host.complete",
     "host.error",
     "host.bus.v1",
@@ -34,6 +35,7 @@
         "core.info",
         "runtime.ping",
         "runtime.hostSmoke",
+        "runtime.cancel",
         "host.complete",
         "host.error",
         "source.import",
@@ -83,6 +85,18 @@
         "params": {
           "type": "object",
           "default": {}
+        }
+      }
+    },
+    "RuntimeCancelParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId"],
+      "description": "Parameters for runtime.cancel. Cancels an in-flight request by its requestId.",
+      "properties": {
+        "requestId": {
+          "type": "integer",
+          "description": "The requestId to cancel. Must differ from the runtime.cancel command's own requestId."
         }
       }
     }

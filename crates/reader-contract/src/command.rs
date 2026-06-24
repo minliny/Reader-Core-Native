@@ -67,6 +67,14 @@ impl Command {
     }
 }
 
+/// Parameters for `runtime.cancel`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeCancelParams {
+    #[serde(rename = "requestId")]
+    pub request_id: u64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -98,6 +106,12 @@ mod tests {
                 "valid-runtime-ping",
                 include_str!(
                     "../../../protocol/fixtures/conformance/commands/valid-runtime-ping.json"
+                ),
+            ),
+            (
+                "valid-runtime-cancel",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/valid-runtime-cancel.json"
                 ),
             ),
             (

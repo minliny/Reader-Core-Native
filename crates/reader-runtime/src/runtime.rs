@@ -5,7 +5,7 @@ use std::thread::{self, JoinHandle};
 
 use reader_contract::{
     core_info, methods, Command, CoreError, Event, HostCompleteParams, HostErrorParams,
-    HostSmokeParams, RuntimeConfig,
+    HostSmokeParams, RuntimeCancelParams, RuntimeConfig,
 };
 
 use crate::remote::{
@@ -187,24 +187,13 @@ impl Runtime {
     /// If the command is still queued or currently dispatching, the worker
     /// emits the same structured error when it observes the cancellation.
     pub fn cancel(&self, request_id: u64) {
-        if !contains_active(&self.active_requests, request_id) {
-            return;
-        }
-
-        if let Ok(mut set) = self.cancelled.lock() {
-            set.insert(request_id);
-        }
-
-        let removed_host_operation =
-            remove_host_operations_for_request(&self.host_operations, request_id);
-        if removed_host_operation {
-            if let Ok(mut set) = self.cancelled.lock() {
-                set.remove(&request_id);
-            }
-            remove_active(&self.active_requests, request_id);
-            self.sink
-                .emit(&Event::error(request_id, CoreError::cancelled()));
-        }
+        cancel_request(
+            &self.active_requests,
+            &self.cancelled,
+            &self.host_operations,
+            &self.sink,
+            request_id,
+        );
     }
 
     fn worker_loop(
@@ -297,6 +286,13 @@ fn dispatch_command(
             cancelled,
             host_operations,
             next_operation_id,
+        ),
+        methods::RUNTIME_CANCEL => dispatch_runtime_cancel(
+            cmd,
+            sink,
+            active_requests,
+            cancelled,
+            host_operations,
         ),
         methods::HOST_COMPLETE => dispatch_host_complete(
             cmd,
@@ -414,6 +410,71 @@ fn dispatch_host_smoke(
         params.capability,
         params.params,
     ));
+}
+
+fn dispatch_runtime_cancel(
+    cmd: &Command,
+    sink: &Arc<dyn EventSink>,
+    active_requests: &Mutex<HashSet<u64>>,
+    cancelled: &Mutex<HashSet<u64>>,
+    host_operations: &Mutex<HashMap<u64, HostOperation>>,
+) {
+    let params: RuntimeCancelParams = match serde_json::from_value(cmd.params.clone()) {
+        Ok(params) => params,
+        Err(err) => {
+            finish_request(
+                sink,
+                active_requests,
+                cancelled,
+                cmd.request_id,
+                Event::error(
+                    cmd.request_id,
+                    CoreError::invalid_params(format!("invalid params for {}", cmd.method))
+                        .with_details(serde_json::json!({ "source": err.to_string() })),
+                ),
+            );
+            return;
+        }
+    };
+
+    // Self-cancellation would race the cancel command's own completion and
+    // produce a CANCELLED error instead of a result; reject it explicitly so
+    // hosts get a predictable outcome.
+    if params.request_id == cmd.request_id {
+        finish_request(
+            sink,
+            active_requests,
+            cancelled,
+            cmd.request_id,
+            Event::error(
+                cmd.request_id,
+                CoreError::invalid_params(
+                    "runtime.cancel target requestId must differ from the command requestId",
+                )
+                .with_details(serde_json::json!({ "requestId": params.request_id })),
+            ),
+        );
+        return;
+    }
+
+    let was_cancelled = cancel_request(
+        active_requests,
+        cancelled,
+        host_operations,
+        sink,
+        params.request_id,
+    );
+
+    finish_request(
+        sink,
+        active_requests,
+        cancelled,
+        cmd.request_id,
+        Event::result(
+            cmd.request_id,
+            serde_json::json!({ "cancelled": was_cancelled }),
+        ),
+    );
 }
 
 fn dispatch_remote_host_request(
@@ -666,6 +727,42 @@ fn remove_host_operations_for_request(
     let before = operations.len();
     operations.retain(|_, operation| operation.request_id != request_id);
     operations.len() != before
+}
+
+/// Core cancellation logic shared by the C ABI path ([`Runtime::cancel`]) and
+/// the JSON `runtime.cancel` command. Returns `true` if `request_id` was active
+/// and got cancelled.
+///
+/// - If the request is blocked on a host operation, the operation is removed
+///   and a `CANCELLED` error is emitted immediately for `request_id`.
+/// - If the request is still queued or currently dispatching, it is marked in
+///   the cancelled set; the worker emits the `CANCELLED` error when it
+///   observes the mark.
+/// - Unknown / already-completed IDs are no-ops and return `false`.
+fn cancel_request(
+    active_requests: &Mutex<HashSet<u64>>,
+    cancelled: &Mutex<HashSet<u64>>,
+    host_operations: &Mutex<HashMap<u64, HostOperation>>,
+    sink: &Arc<dyn EventSink>,
+    request_id: u64,
+) -> bool {
+    if !contains_active(active_requests, request_id) {
+        return false;
+    }
+
+    if let Ok(mut set) = cancelled.lock() {
+        set.insert(request_id);
+    }
+
+    let removed_host_operation = remove_host_operations_for_request(host_operations, request_id);
+    if removed_host_operation {
+        if let Ok(mut set) = cancelled.lock() {
+            set.remove(&request_id);
+        }
+        remove_active(active_requests, request_id);
+        sink.emit(&Event::error(request_id, CoreError::cancelled()));
+    }
+    true
 }
 
 #[cfg(test)]
@@ -1057,6 +1154,183 @@ mod tests {
         rt.cancel(401);
         std::thread::sleep(Duration::from_millis(20));
         assert_eq!(sink.snapshot().len(), 1);
+    }
+
+    // --- runtime.cancel JSON command ---------------------------------------
+
+    #[test]
+    fn runtime_cancel_command_cancels_pending_host_request() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        // Block request 50 on a host operation.
+        rt.send(Command::new(
+            50,
+            methods::RUNTIME_HOST_SMOKE,
+            serde_json::json!({
+                "capability": "host.smoke.echo",
+                "params": { "url": "https://example.invalid" }
+            }),
+        ))
+        .unwrap();
+        assert!(matches!(sink.wait_len(1)[0], Event::HostRequest { .. }));
+
+        // Cancel request 50 via the JSON protocol command.
+        rt.send(Command::new(
+            51,
+            methods::RUNTIME_CANCEL,
+            serde_json::json!({ "requestId": 50 }),
+        ))
+        .unwrap();
+
+        let events = sink.wait_len(3);
+        // events[1]: CANCELLED error for the original request 50.
+        match &events[1] {
+            Event::Error {
+                request_id, error, ..
+            } => {
+                assert_eq!(*request_id, 50);
+                assert_eq!(error.code, ErrorCode::Cancelled);
+            }
+            other => panic!("expected cancelled error for 50, got {other:?}"),
+        }
+        // events[2]: result for the cancel command itself.
+        match &events[2] {
+            Event::Result {
+                request_id, data, ..
+            } => {
+                assert_eq!(*request_id, 51);
+                assert_eq!(data["cancelled"], true);
+            }
+            other => panic!("expected cancel result, got {other:?}"),
+        }
+
+        // The host operation is gone: a late host.complete for it is rejected.
+        rt.send(Command::new(
+            52,
+            methods::HOST_COMPLETE,
+            serde_json::json!({
+                "operationId": 1,
+                "result": { "status": "ok" }
+            }),
+        ))
+        .unwrap();
+        match &sink.wait_len(4)[3] {
+            Event::Error { error, .. } => assert_eq!(error.code, ErrorCode::InvalidParams),
+            other => panic!("expected unknown operation error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn runtime_cancel_command_for_unknown_id_returns_false() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send(Command::new(
+            60,
+            methods::RUNTIME_CANCEL,
+            serde_json::json!({ "requestId": 9999 }),
+        ))
+        .unwrap();
+
+        let events = sink.wait_len(1);
+        match &events[0] {
+            Event::Result {
+                request_id, data, ..
+            } => {
+                assert_eq!(*request_id, 60);
+                assert_eq!(data["cancelled"], false);
+            }
+            other => panic!("expected cancel result false, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn runtime_cancel_command_for_completed_request_returns_false() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        // 70 completes immediately.
+        rt.send(Command::new(
+            70,
+            methods::RUNTIME_PING,
+            serde_json::json!({}),
+        ))
+        .unwrap();
+        assert!(matches!(sink.wait_len(1)[0], Event::Result { .. }));
+
+        // Cancelling the now-completed 70 is a no-op.
+        rt.send(Command::new(
+            71,
+            methods::RUNTIME_CANCEL,
+            serde_json::json!({ "requestId": 70 }),
+        ))
+        .unwrap();
+        match &sink.wait_len(2)[1] {
+            Event::Result { data, .. } => assert_eq!(data["cancelled"], false),
+            other => panic!("expected cancel result false, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn runtime_cancel_command_rejects_self_cancel() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send(Command::new(
+            80,
+            methods::RUNTIME_CANCEL,
+            serde_json::json!({ "requestId": 80 }),
+        ))
+        .unwrap();
+
+        match &sink.wait_len(1)[0] {
+            Event::Error {
+                request_id, error, ..
+            } => {
+                assert_eq!(*request_id, 80);
+                assert_eq!(error.code, ErrorCode::InvalidParams);
+                assert_eq!(error.details["requestId"], 80);
+            }
+            other => panic!("expected self-cancel invalid params, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn runtime_cancel_command_rejects_invalid_params() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send(Command::new(
+            81,
+            methods::RUNTIME_CANCEL,
+            serde_json::json!({ "notRequestId": 1 }),
+        ))
+        .unwrap();
+
+        match &sink.wait_len(1)[0] {
+            Event::Error {
+                request_id, error, ..
+            } => {
+                assert_eq!(*request_id, 81);
+                assert_eq!(error.code, ErrorCode::InvalidParams);
+            }
+            other => panic!("expected invalid params, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn runtime_cancel_command_via_send_json_fixture() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send_json(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/valid-runtime-cancel.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+
+        // Fixture cancels requestId 301, which is unknown here → cancelled:false.
+        match &sink.wait_len(1)[0] {
+            Event::Result { data, .. } => assert_eq!(data["cancelled"], false),
+            other => panic!("expected cancel result, got {other:?}"),
+        }
     }
 
     #[test]

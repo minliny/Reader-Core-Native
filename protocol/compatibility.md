@@ -27,6 +27,14 @@
 - `runtime.ping` is the advertised v1 ping method. `core.ping` is accepted as a
   bootstrap alias for current ABI smoke harnesses, but it is not advertised in
   `core.info.capabilities`.
+- `runtime.cancel` is the JSON-protocol counterpart of the C ABI
+  `rc_runtime_cancel`. It lets a host driving Core purely over the JSON
+  protocol (no direct FFI handle) cancel an in-flight request. Params:
+  `{ "requestId": <integer> }`. Result data: `{ "cancelled": <bool> }`.
+  The cancelled original request receives a separate `CANCELLED` error event
+  on its own `requestId`. Unknown / already-completed IDs return
+  `{ "cancelled": false }` (idempotent). Self-cancellation (target equals the
+  command's own `requestId`) is rejected with `INVALID_PARAMS`.
 
 ## Platform Contract
 
@@ -62,7 +70,9 @@ Host capability calls are represented as events and completion commands:
 3. Core routes the completion back to the original `requestId`. Unknown
    operation IDs return `INVALID_PARAMS` on the completion command request.
 4. Cancelling the original request cancels its pending host operation and emits
-   a `CANCELLED` error for that original request.
+   a `CANCELLED` error for that original request. Cancellation is reachable via
+   the C ABI (`rc_runtime_cancel`) or the JSON `runtime.cancel` command; both
+   share the same semantics.
 
 ### HTTP Transport Capability
 
