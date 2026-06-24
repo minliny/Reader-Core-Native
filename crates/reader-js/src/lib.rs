@@ -1163,4 +1163,438 @@ mod tests {
         assert_eq!(error.kind, JsErrorKind::HostCallback);
         assert!(error.message.contains("unknown host method"));
     }
+
+    // -----------------------------------------------------------------------
+    // Empty results
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn returns_empty_array_and_empty_object() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate("[]").unwrap();
+        assert_eq!(result.value, json!([]));
+
+        let result = sandbox.evaluate("({})").unwrap();
+        assert_eq!(result.value, json!({}));
+    }
+
+    #[test]
+    fn undefined_and_null_both_become_json_null() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate("undefined").unwrap();
+        assert_eq!(result.value, json!(null));
+
+        let result = sandbox.evaluate("null").unwrap();
+        assert_eq!(result.value, json!(null));
+    }
+
+    #[test]
+    fn empty_string_preserved_as_json_string() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate("\"\"").unwrap();
+        assert_eq!(result.value, json!(""));
+    }
+
+    // -----------------------------------------------------------------------
+    // Error expressions
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn maps_type_error_to_exception() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox
+            .evaluate("null.foo")
+            .unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::Exception);
+        assert!(!error.message.is_empty());
+    }
+
+    #[test]
+    fn maps_range_error_to_exception() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox
+            .evaluate("new Array(-1)")
+            .unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::Exception);
+    }
+
+    #[test]
+    fn thrown_string_maps_to_exception() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox.evaluate(r#"throw "string error""#).unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::Exception);
+    }
+
+    #[test]
+    fn thrown_number_maps_to_exception() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox.evaluate("throw 42").unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::Exception);
+    }
+
+    #[test]
+    fn thrown_object_maps_to_exception() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox
+            .evaluate(r#"throw { code: 500, reason: "internal" }"#)
+            .unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::Exception);
+    }
+
+    #[test]
+    fn syntax_error_includes_message() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox.evaluate("var x = ;").unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::Syntax);
+        assert!(!error.message.is_empty());
+    }
+
+    #[test]
+    fn error_stack_is_captured_when_available() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox
+            .evaluate(
+                r#"
+                function boom() { throw new Error("stack-test"); }
+                boom();
+                "#,
+            )
+            .unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::Exception);
+        assert!(error.stack.is_some());
+    }
+
+    // -----------------------------------------------------------------------
+    // Duplicate results
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn arrays_preserve_duplicate_values() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate("[1, 1, 2, 2, 3]").unwrap();
+        assert_eq!(result.value, json!([1, 1, 2, 2, 3]));
+    }
+
+    #[test]
+    fn arrays_preserve_duplicate_strings() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate(r#"["dup", "dup", "unique"]"#)
+            .unwrap();
+        assert_eq!(
+            result.value,
+            json!(["dup", "dup", "unique"])
+        );
+    }
+
+    #[test]
+    fn object_keys_with_duplicate_values_preserved() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate(r#"({ a: "same", b: "same", c: "different" })"#)
+            .unwrap();
+        assert_eq!(
+            result.value,
+            json!({ "a": "same", "b": "same", "c": "different" })
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Encoding / escaping
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn unicode_strings_round_trip_through_sandbox() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate(r#""日本語テスト 🚀 ✨""#)
+            .unwrap();
+        assert_eq!(result.value, json!("日本語テスト 🚀 ✨"));
+    }
+
+    #[test]
+    fn escaped_string_characters_preserved() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate(r#""line1\nline2\ttabbed\\backslash""#)
+            .unwrap();
+        assert_eq!(
+            result.value,
+            json!("line1\nline2\ttabbed\\backslash")
+        );
+    }
+
+    #[test]
+    fn strings_with_quotes_and_special_chars() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate(r#""quote: \" end & <tag>""#)
+            .unwrap();
+        assert_eq!(result.value, json!("quote: \" end & <tag>"));
+    }
+
+    #[test]
+    fn unicode_escape_sequences_decoded() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate(r#""\u00e9""#).unwrap();
+        assert_eq!(result.value, json!("é"));
+    }
+
+    #[test]
+    fn nested_unicode_in_arrays_and_objects() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate(r#"({ "标题": ["沙丘", "基地"], "作者": "弗兰克" })"#)
+            .unwrap();
+        assert_eq!(
+            result.value,
+            json!({ "标题": ["沙丘", "基地"], "作者": "弗兰克" })
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // JS expression edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn negative_and_float_numbers_preserved() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate("[-1, -2.5, 0, 3.14159]").unwrap();
+        assert_eq!(result.value, json!([-1, -2.5, 0, 3.14159]));
+    }
+
+    #[test]
+    fn deeply_nested_object_converts() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate(
+                r#"
+                ({ a: { b: { c: { d: { e: "deep" } } } } })
+                "#,
+            )
+            .unwrap();
+        assert_eq!(
+            result.value,
+            json!({ "a": { "b": { "c": { "d": { "e": "deep" } } } } })
+        );
+    }
+
+    #[test]
+    fn function_value_rejected_as_non_json() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox.evaluate("(function() { return 1; })").unwrap_err();
+        assert_eq!(error.kind, JsErrorKind::NonJsonValue);
+    }
+
+    #[test]
+    fn symbol_value_rejected_as_non_json() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox.evaluate("Symbol('test')").unwrap_err();
+        assert_eq!(error.kind, JsErrorKind::NonJsonValue);
+    }
+
+    #[test]
+    fn boolean_and_number_constants() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate("true").unwrap();
+        assert_eq!(result.value, json!(true));
+
+        let result = sandbox.evaluate("false").unwrap();
+        assert_eq!(result.value, json!(false));
+
+        let result = sandbox.evaluate("42").unwrap();
+        assert_eq!(result.value, json!(42));
+    }
+
+    #[test]
+    fn nan_and_infinity_rejected_as_non_json() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox.evaluate("NaN").unwrap_err();
+        assert_eq!(error.kind, JsErrorKind::NonJsonValue);
+
+        let error = sandbox.evaluate("Infinity").unwrap_err();
+        assert_eq!(error.kind, JsErrorKind::NonJsonValue);
+    }
+
+    // -----------------------------------------------------------------------
+    // Fallback / host callback edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn host_callback_returning_null_propagates_null() {
+        let mut registry = HostCallbackRegistry::new();
+        registry.register("java.get", |_| Ok(json!(null)));
+        let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
+
+        let result = sandbox
+            .evaluate(r#"java.get("https://example.test")"#)
+            .unwrap();
+        assert_eq!(result.value, json!(null));
+    }
+
+    #[test]
+    fn host_callback_returning_empty_array_propagates() {
+        let mut registry = HostCallbackRegistry::new();
+        registry.register("java.get", |_| Ok(json!([])));
+        let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
+
+        let result = sandbox
+            .evaluate(r#"java.get("https://example.test")"#)
+            .unwrap();
+        assert_eq!(result.value, json!([]));
+    }
+
+    #[test]
+    fn unregistered_host_callback_errors() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox
+            .evaluate(r#"java.get("https://example.test")"#)
+            .unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::HostCallback);
+        assert!(error.message.contains("unregistered"));
+    }
+
+    #[test]
+    fn host_callback_can_provide_fallback_data() {
+        let mut registry = HostCallbackRegistry::new();
+        registry.register("java.get", move |_| {
+            Ok(json!({
+                "title": "fallback-title",
+                "items": ["a", "a", "b"]
+            }))
+        });
+        let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
+
+        let result = sandbox
+            .evaluate(
+                r#"
+                const response = java.get("https://example.test");
+                ({ title: response.title, count: response.items.length })
+                "#,
+            )
+            .unwrap();
+
+        assert_eq!(
+            result.value,
+            json!({ "title": "fallback-title", "count": 3 })
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Console capture edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn console_log_with_no_arguments_captured() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate("console.log(); 'done'").unwrap();
+        assert_eq!(result.value, json!("done"));
+        assert_eq!(result.console.len(), 1);
+        assert!(result.console[0].args.is_empty());
+    }
+
+    #[test]
+    fn console_log_with_null_and_undefined() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate("console.log(null, undefined); 'done'")
+            .unwrap();
+
+        assert_eq!(result.console.len(), 1);
+        assert_eq!(
+            result.console[0].args,
+            vec![json!(null), json!(null)]
+        );
+    }
+
+    #[test]
+    fn console_log_preserves_duplicate_arguments() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate(r#"console.log("dup", "dup", "dup"); 'done'"#)
+            .unwrap();
+
+        assert_eq!(
+            result.console[0].args,
+            vec![json!("dup"), json!("dup"), json!("dup")]
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Promise edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn rejected_promise_maps_to_exception() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox
+            .evaluate("Promise.reject(new Error('rejected'))")
+            .unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::Exception);
+        assert!(error.message.contains("rejected"));
+    }
+
+    #[test]
+    fn promise_resolving_with_null() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate("Promise.resolve(null)").unwrap();
+        assert_eq!(result.value, json!(null));
+    }
+
+    #[test]
+    fn promise_resolving_with_empty_object() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate("Promise.resolve({})").unwrap();
+        assert_eq!(result.value, json!({}));
+    }
+
+    #[test]
+    fn promise_chain_preserves_duplicate_values() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate("Promise.resolve([1, 1, 2]).then(arr => arr)")
+            .unwrap();
+        assert_eq!(result.value, json!([1, 1, 2]));
+    }
 }

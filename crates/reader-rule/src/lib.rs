@@ -32,21 +32,37 @@ impl RuleEngine {
         for (index, step) in steps.iter().enumerate() {
             let mut next = Vec::new();
 
-            for value in &values {
-                match apply_step(value, step) {
-                    Ok(mut results) => next.append(&mut results),
-                    Err(source) => {
-                        return Err(RuleError::ChainStepFailed {
-                            index,
-                            source: Box::new(source),
-                        });
+            if values.is_empty() {
+                // Fallback steps can seed new values when the chain has no
+                // prior results, letting downstream steps continue instead of
+                // short-circuiting on empty.
+                if let RuleStep::Fallback(rule) = step {
+                    next = rule.values.clone();
+                }
+            } else {
+                for value in &values {
+                    match apply_step(value, step) {
+                        Ok(mut results) => next.append(&mut results),
+                        Err(source) => {
+                            return Err(RuleError::ChainStepFailed {
+                                index,
+                                source: Box::new(source),
+                            });
+                        }
                     }
                 }
             }
 
             values = next;
             if values.is_empty() {
-                break;
+                // Continue only if a subsequent Fallback step can recover the
+                // chain; otherwise short-circuit to avoid needless iteration.
+                let has_fallback = steps[index + 1..]
+                    .iter()
+                    .any(|step| matches!(step, RuleStep::Fallback(_)));
+                if !has_fallback {
+                    break;
+                }
             }
         }
 
@@ -92,6 +108,10 @@ pub enum RuleStep {
     JsonPath(JsonPathRule),
     Css(CssRule),
     XPath(XPathRule),
+    /// Passes through non-empty input unchanged. When a chain reaches this
+    /// step with no prior results, the configured `values` are emitted so
+    /// downstream steps continue with a deterministic default.
+    Fallback(FallbackRule),
 }
 
 impl RuleStep {
@@ -138,6 +158,14 @@ impl RuleStep {
         U: Into<String>,
     {
         Self::XPath(XPathRule::with_namespaces(expression, namespaces))
+    }
+
+    pub fn fallback<I, S>(values: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        Self::Fallback(FallbackRule::new(values))
     }
 }
 
@@ -279,6 +307,23 @@ impl XPathRule {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FallbackRule {
+    pub values: Vec<String>,
+}
+
+impl FallbackRule {
+    pub fn new<I, S>(values: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        Self {
+            values: values.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuleError {
     RegexSyntax {
         pattern: String,
@@ -380,7 +425,13 @@ impl Error for RuleError {
 enum JsonPathSegment {
     Field(String),
     Index(usize),
+    /// `[-1]` → `IndexFromEnd(1)`, `[-2]` → `IndexFromEnd(2)`. Resolved against
+    /// the array length at evaluation time.
+    IndexFromEnd(usize),
     Wildcard,
+    /// `..field`, `..*`, or `..[index]` — descend into every object/array and
+    /// apply the inner segment at every depth.
+    RecursiveDescent(Box<JsonPathSegment>),
 }
 
 fn apply_step(input: &str, step: &RuleStep) -> RuleResult<Vec<String>> {
@@ -390,6 +441,15 @@ fn apply_step(input: &str, step: &RuleStep) -> RuleResult<Vec<String>> {
         RuleStep::JsonPath(rule) => apply_json_path(input, rule),
         RuleStep::Css(rule) => apply_css(input, rule),
         RuleStep::XPath(rule) => apply_xpath(input, rule),
+        RuleStep::Fallback(rule) => apply_fallback(input, rule),
+    }
+}
+
+fn apply_fallback(input: &str, rule: &FallbackRule) -> RuleResult<Vec<String>> {
+    if input.is_empty() {
+        Ok(rule.values.clone())
+    } else {
+        Ok(vec![input.to_string()])
     }
 }
 
@@ -629,6 +689,10 @@ fn parse_json_path(path: &str) -> Result<Vec<JsonPathSegment>, String> {
                 if index >= chars.len() {
                     return Err("field name expected after `.`".to_string());
                 }
+                if chars[index] == '.' {
+                    segments.push(parse_recursive_descent(&chars, &mut index)?);
+                    continue;
+                }
                 if chars[index] == '*' {
                     segments.push(JsonPathSegment::Wildcard);
                     index += 1;
@@ -657,6 +721,37 @@ fn parse_json_path(path: &str) -> Result<Vec<JsonPathSegment>, String> {
     }
 
     Ok(segments)
+}
+
+fn parse_recursive_descent(
+    chars: &[char],
+    index: &mut usize,
+) -> Result<JsonPathSegment, String> {
+    *index += 1;
+    if *index >= chars.len() {
+        return Err("segment expected after `..`".to_string());
+    }
+
+    let inner = if chars[*index] == '*' {
+        *index += 1;
+        JsonPathSegment::Wildcard
+    } else if chars[*index] == '[' {
+        *index += 1;
+        let (segment, next_index) = parse_json_path_bracket(chars, *index)?;
+        *index = next_index;
+        segment
+    } else {
+        let start = *index;
+        while *index < chars.len() && chars[*index] != '.' && chars[*index] != '[' {
+            *index += 1;
+        }
+        if start == *index {
+            return Err("field name expected after `..`".to_string());
+        }
+        JsonPathSegment::Field(chars[start..*index].iter().collect())
+    };
+
+    Ok(JsonPathSegment::RecursiveDescent(Box::new(inner)))
 }
 
 fn parse_json_path_bracket(
@@ -711,8 +806,12 @@ fn parse_json_path_bracket(
         .to_string();
     let segment = if token == "*" {
         JsonPathSegment::Wildcard
-    } else if let Ok(array_index) = token.parse::<usize>() {
-        JsonPathSegment::Index(array_index)
+    } else if let Ok(signed) = token.parse::<isize>() {
+        if signed >= 0 {
+            JsonPathSegment::Index(signed as usize)
+        } else {
+            JsonPathSegment::IndexFromEnd((-signed) as usize)
+        }
     } else {
         return Err(format!("unsupported bracket segment `{token}`"));
     };
@@ -725,29 +824,9 @@ fn evaluate_json_path<'a>(root: &'a JsonValue, segments: &[JsonPathSegment]) -> 
 
     for segment in segments {
         let mut next = Vec::new();
-
-        for value in current {
-            match (segment, value) {
-                (JsonPathSegment::Field(field), JsonValue::Object(object)) => {
-                    if let Some(value) = object.get(field) {
-                        next.push(value);
-                    }
-                }
-                (JsonPathSegment::Index(index), JsonValue::Array(array)) => {
-                    if let Some(value) = array.get(*index) {
-                        next.push(value);
-                    }
-                }
-                (JsonPathSegment::Wildcard, JsonValue::Array(array)) => {
-                    next.extend(array);
-                }
-                (JsonPathSegment::Wildcard, JsonValue::Object(object)) => {
-                    next.extend(object.values());
-                }
-                _ => {}
-            }
+        for value in &current {
+            apply_json_path_segment(segment, value, &mut next);
         }
-
         current = next;
         if current.is_empty() {
             break;
@@ -755,6 +834,68 @@ fn evaluate_json_path<'a>(root: &'a JsonValue, segments: &[JsonPathSegment]) -> 
     }
 
     current
+}
+
+fn apply_json_path_segment<'a>(
+    segment: &JsonPathSegment,
+    value: &'a JsonValue,
+    output: &mut Vec<&'a JsonValue>,
+) {
+    match segment {
+        JsonPathSegment::Field(field) => {
+            if let JsonValue::Object(object) = value {
+                if let Some(child) = object.get(field) {
+                    output.push(child);
+                }
+            }
+        }
+        JsonPathSegment::Index(index) => {
+            if let JsonValue::Array(array) = value {
+                if let Some(child) = array.get(*index) {
+                    output.push(child);
+                }
+            }
+        }
+        JsonPathSegment::IndexFromEnd(offset) => {
+            if let JsonValue::Array(array) = value {
+                if let Some(child) = array
+                    .len()
+                    .checked_sub(*offset)
+                    .and_then(|i| array.get(i))
+                {
+                    output.push(child);
+                }
+            }
+        }
+        JsonPathSegment::Wildcard => match value {
+            JsonValue::Array(array) => output.extend(array.iter()),
+            JsonValue::Object(object) => output.extend(object.values()),
+            _ => {}
+        },
+        JsonPathSegment::RecursiveDescent(inner) => {
+            for descendant in collect_json_descendants(value) {
+                apply_json_path_segment(inner, descendant, output);
+            }
+        }
+    }
+}
+
+fn collect_json_descendants<'a>(value: &'a JsonValue) -> Vec<&'a JsonValue> {
+    let mut result = vec![value];
+    match value {
+        JsonValue::Array(array) => {
+            for item in array {
+                result.extend(collect_json_descendants(item));
+            }
+        }
+        JsonValue::Object(object) => {
+            for child in object.values() {
+                result.extend(collect_json_descendants(child));
+            }
+        }
+        _ => {}
+    }
+    result
 }
 
 fn json_value_to_rule_text(value: &JsonValue) -> String {
