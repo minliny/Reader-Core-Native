@@ -10,7 +10,11 @@
 //!   header).
 //! - On [`rc_runtime_destroy`] the [`reader_runtime::Runtime`] is dropped,
 //!   which joins the worker; no callback can fire after `destroy` returns.
+//! - Failures of protocol origin record a structured [`CoreError`] on the
+//!   calling thread via [`last_error`], retrievable through `rc_last_error`.
+//!   Successful calls clear it; see [`last_error`] for the full contract.
 
+mod last_error;
 mod panic_guard;
 mod runtime;
 mod sink;
@@ -23,6 +27,18 @@ pub use runtime::{RuntimeHandle, ABI_VERSION};
 #[no_mangle]
 pub extern "C" fn rc_abi_version() -> u32 {
     ABI_VERSION
+}
+
+/// `rc_last_error` — peek the structured error recorded by the most recent
+/// failed FFI call on the calling thread. Returns the error code (0 = none).
+///
+/// # Safety
+/// When `out_message` is non-null, the caller must guarantee it points to at
+/// least `capacity` writable bytes. Core writes at most `capacity` bytes
+/// (including the NUL terminator) and never aliases the buffer.
+#[no_mangle]
+pub unsafe extern "C" fn rc_last_error(out_message: *mut u8, capacity: usize) -> i32 {
+    last_error::read(out_message, capacity)
 }
 
 /// `rc_runtime_create`. Returns 0 on success, non-zero on failure.
