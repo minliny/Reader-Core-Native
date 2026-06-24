@@ -64,6 +64,37 @@ Host capability calls are represented as events and completion commands:
 4. Cancelling the original request cancels its pending host operation and emits
    a `CANCELLED` error for that original request.
 
+### HTTP Transport Capability
+
+Remote-reading commands may emit `capability: "http.execute"` when their
+prefetched response body is omitted and a `searchRequest` / `detailRequest` /
+`tocRequest` / `chapterRequest` is supplied.
+
+The host request params are:
+
+```json
+{
+  "url": "https://example.test/path",
+  "method": "GET",
+  "headers": {},
+  "body": null
+}
+```
+
+The host completes the operation with an object result containing string
+`body`. Additional fields such as `status`, `headers`, or final URL are allowed
+for host diagnostics, but Core v1 only consumes `body`:
+
+```json
+{
+  "operationId": 1,
+  "result": {
+    "status": 200,
+    "body": "{\"books\":[]}"
+  }
+}
+```
+
 ## Memory & Lifetime Contract (ABI v1)
 
 - Event JSON buffers passed to `rc_event_callback` are **borrowed**: valid only

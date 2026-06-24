@@ -1,10 +1,11 @@
 //! Remote-reading vertical command handlers (V1 minimal).
 //!
 //! These commands implement the import → search → detail → toc → chapter →
-//! progress pipeline over inline/fixture content. They do **not** perform live
-//! network I/O: the host is expected to supply pre-fetched response bodies. A
-//! JS rule that calls a host capability (`java.get`/`java.post`) without a
-//! registered callback yields a structured `unsupported` error.
+//! progress pipeline over inline/fixture content or host-provided HTTP
+//! transport. Core never opens sockets itself: it emits `http.execute`
+//! host.request events and resumes parsing when the host completes the
+//! operation. A JS rule that calls a host capability (`java.get`/`java.post`)
+//! without a registered callback yields a structured `unsupported` error.
 
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
@@ -14,7 +15,7 @@ use reader_contract::{
     self as contract,
     remote::{
         parse_params, BookDetailParams, BookSearchParams, BookTocParams, ChapterContentParams,
-        ReadingProgressUpdateParams, SourceImportParams,
+        HostHttpRequest, ReadingProgressUpdateParams, SourceImportParams,
     },
     CoreError, Event,
 };
@@ -55,6 +56,35 @@ impl Default for RemoteState {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Outcome of a remote-reading dispatch attempt.
+pub enum RemoteDispatch {
+    NotHandled,
+    Finished,
+    Pending(PendingHostRequest),
+}
+
+enum RemoteCommandResult {
+    Complete(serde_json::Value),
+    Pending(PendingHostRequest),
+}
+
+/// A host capability request that must complete before the original remote
+/// command can finish.
+pub struct PendingHostRequest {
+    pub capability: String,
+    pub params: serde_json::Value,
+    pub continuation: RemoteHostContinuation,
+}
+
+/// Continuation state for remote commands blocked on host HTTP.
+#[derive(Debug, Clone, PartialEq)]
+pub enum RemoteHostContinuation {
+    BookSearch(BookSearchParams),
+    BookDetail(BookDetailParams),
+    BookToc(BookTocParams),
+    ChapterContent(ChapterContentParams),
 }
 
 fn finish(
@@ -120,23 +150,131 @@ pub fn dispatch_remote(
     sink: &Arc<dyn EventSink>,
     active_requests: &Mutex<HashSet<u64>>,
     state: &RemoteState,
-) -> bool {
+) -> RemoteDispatch {
     let request_id = cmd.request_id;
-    let result: Result<serde_json::Value, CoreError> = match method {
-        contract::methods::SOURCE_IMPORT => source_import(cmd, state),
+    let result: Result<RemoteCommandResult, CoreError> = match method {
+        contract::methods::SOURCE_IMPORT => {
+            source_import(cmd, state).map(RemoteCommandResult::Complete)
+        }
         contract::methods::BOOK_SEARCH => book_search(cmd, state),
         contract::methods::BOOK_DETAIL => book_detail(cmd, state),
         contract::methods::BOOK_TOC => book_toc(cmd, state),
         contract::methods::CHAPTER_CONTENT => chapter_content(cmd, state),
-        contract::methods::READING_PROGRESS_UPDATE => reading_progress_update(cmd, state),
-        _ => return false,
+        contract::methods::READING_PROGRESS_UPDATE => {
+            reading_progress_update(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        _ => return RemoteDispatch::NotHandled,
     };
-    let event = match result {
-        Ok(data) => Event::result(request_id, data),
-        Err(err) => error_event(request_id, err),
+    match result {
+        Ok(RemoteCommandResult::Complete(data)) => {
+            finish(
+                sink,
+                active_requests,
+                request_id,
+                Event::result(request_id, data),
+            );
+            RemoteDispatch::Finished
+        }
+        Ok(RemoteCommandResult::Pending(pending)) => RemoteDispatch::Pending(pending),
+        Err(err) => {
+            finish(
+                sink,
+                active_requests,
+                request_id,
+                error_event(request_id, err),
+            );
+            RemoteDispatch::Finished
+        }
+    }
+}
+
+fn pending_or_missing_response(
+    response: &str,
+    request: Option<HostHttpRequest>,
+    response_field: &str,
+    request_field: &str,
+    continuation: RemoteHostContinuation,
+) -> Result<Option<RemoteCommandResult>, CoreError> {
+    if !response.is_empty() {
+        return Ok(None);
+    }
+    let Some(request) = request else {
+        return Err(CoreError::invalid_params(format!(
+            "{response_field} is required unless {request_field} is provided"
+        )));
     };
-    finish(sink, active_requests, request_id, event);
-    true
+    Ok(Some(RemoteCommandResult::Pending(pending_http_request(
+        request,
+        continuation,
+    )?)))
+}
+
+fn pending_http_request(
+    request: HostHttpRequest,
+    continuation: RemoteHostContinuation,
+) -> Result<PendingHostRequest, CoreError> {
+    if request.url.trim().is_empty() {
+        return Err(CoreError::invalid_params(
+            "http.execute request url must be non-empty",
+        ));
+    }
+    let headers = if request.headers.is_null() {
+        serde_json::json!({})
+    } else if request.headers.is_object() {
+        request.headers
+    } else {
+        return Err(CoreError::invalid_params(
+            "http.execute request headers must be an object",
+        ));
+    };
+    Ok(PendingHostRequest {
+        capability: contract::capabilities::HTTP_EXECUTE.to_string(),
+        params: serde_json::json!({
+            "url": request.url,
+            "method": request.method,
+            "headers": headers,
+            "body": request.body,
+        }),
+        continuation,
+    })
+}
+
+fn http_response_body(result: &serde_json::Value) -> Result<String, CoreError> {
+    result
+        .get("body")
+        .and_then(|body| body.as_str())
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| {
+            CoreError::invalid_params("http.execute host result.body must be a string")
+                .with_details(serde_json::json!({ "result": result }))
+        })
+}
+
+/// Continue a remote-reading command after its host HTTP request completes.
+pub fn complete_remote_host(
+    continuation: RemoteHostContinuation,
+    host_result: serde_json::Value,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let body = http_response_body(&host_result)?;
+    match continuation {
+        RemoteHostContinuation::BookSearch(mut params) => {
+            params.search_response = body;
+            book_search_from_params(params, state)
+        }
+        RemoteHostContinuation::BookDetail(mut params) => {
+            params.detail_response = body;
+            book_detail_from_params(params, state)
+        }
+        RemoteHostContinuation::BookToc(mut params) => {
+            params.toc_response = body;
+            book_toc_from_params(params, state)
+        }
+        RemoteHostContinuation::ChapterContent(mut params) => {
+            params.chapter_response = body;
+            chapter_content_from_params(params, state)
+        }
+    }
 }
 
 fn source_import(
@@ -182,8 +320,24 @@ fn source_import(
 fn book_search(
     cmd: &reader_contract::Command,
     state: &RemoteState,
-) -> Result<serde_json::Value, CoreError> {
+) -> Result<RemoteCommandResult, CoreError> {
     let params: BookSearchParams = parse_params(contract::methods::BOOK_SEARCH, &cmd.params)?;
+    if let Some(pending) = pending_or_missing_response(
+        &params.search_response,
+        params.search_request.clone(),
+        "searchResponse",
+        "searchRequest",
+        RemoteHostContinuation::BookSearch(params.clone()),
+    )? {
+        return Ok(pending);
+    }
+    book_search_from_params(params, state).map(RemoteCommandResult::Complete)
+}
+
+fn book_search_from_params(
+    params: BookSearchParams,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
     let source = resolve_source(state.storage(), &params.source_id, &params.source)?;
     let books = state
         .pipeline()
@@ -201,8 +355,24 @@ fn book_search(
 fn book_detail(
     cmd: &reader_contract::Command,
     state: &RemoteState,
-) -> Result<serde_json::Value, CoreError> {
+) -> Result<RemoteCommandResult, CoreError> {
     let params: BookDetailParams = parse_params(contract::methods::BOOK_DETAIL, &cmd.params)?;
+    if let Some(pending) = pending_or_missing_response(
+        &params.detail_response,
+        params.detail_request.clone(),
+        "detailResponse",
+        "detailRequest",
+        RemoteHostContinuation::BookDetail(params.clone()),
+    )? {
+        return Ok(pending);
+    }
+    book_detail_from_params(params, state).map(RemoteCommandResult::Complete)
+}
+
+fn book_detail_from_params(
+    params: BookDetailParams,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
     let base: Book = serde_json::from_value(params.book.clone()).map_err(|err| {
         CoreError::invalid_params("book.detail requires a base book object")
             .with_details(serde_json::json!({ "source": err.to_string() }))
@@ -222,8 +392,24 @@ fn book_detail(
 fn book_toc(
     cmd: &reader_contract::Command,
     state: &RemoteState,
-) -> Result<serde_json::Value, CoreError> {
+) -> Result<RemoteCommandResult, CoreError> {
     let params: BookTocParams = parse_params(contract::methods::BOOK_TOC, &cmd.params)?;
+    if let Some(pending) = pending_or_missing_response(
+        &params.toc_response,
+        params.toc_request.clone(),
+        "tocResponse",
+        "tocRequest",
+        RemoteHostContinuation::BookToc(params.clone()),
+    )? {
+        return Ok(pending);
+    }
+    book_toc_from_params(params, state).map(RemoteCommandResult::Complete)
+}
+
+fn book_toc_from_params(
+    params: BookTocParams,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
     let source = resolve_source(state.storage(), &params.source_id, &params.source)?;
     let toc = state
         .pipeline()
@@ -242,9 +428,27 @@ fn book_toc(
 fn chapter_content(
     cmd: &reader_contract::Command,
     state: &RemoteState,
-) -> Result<serde_json::Value, CoreError> {
+) -> Result<RemoteCommandResult, CoreError> {
     let params: ChapterContentParams =
         parse_params(contract::methods::CHAPTER_CONTENT, &cmd.params)?;
+    if params.js_rule.is_none() {
+        if let Some(pending) = pending_or_missing_response(
+            &params.chapter_response,
+            params.chapter_request.clone(),
+            "chapterResponse",
+            "chapterRequest",
+            RemoteHostContinuation::ChapterContent(params.clone()),
+        )? {
+            return Ok(pending);
+        }
+    }
+    chapter_content_from_params(params, state).map(RemoteCommandResult::Complete)
+}
+
+fn chapter_content_from_params(
+    params: ChapterContentParams,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
     let source = resolve_source(state.storage(), &params.source_id, &params.source)?;
     let pipeline = state.pipeline();
 

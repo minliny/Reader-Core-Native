@@ -1,10 +1,10 @@
 //! Typed params for the remote-reading vertical commands.
 //!
 //! These mirror the V1 "minimal vertical" pipeline: source import → search →
-//! detail → toc → chapter → progress. Each command takes its source/content
-//! payload inline so the pipeline is testable without a live network. Real
-//! network fetching is the host's responsibility and is explicitly out of scope
-//! for V1 (see `protocol/compatibility.md`).
+//! detail → toc → chapter → progress. Each command can take a prefetched
+//! response body for deterministic tests, or a host HTTP request descriptor
+//! that Core emits as `capability: "http.execute"` (see
+//! `protocol/compatibility.md`).
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -13,6 +13,26 @@ use crate::CoreError;
 
 fn empty_string() -> String {
     String::new()
+}
+
+fn default_http_method() -> String {
+    "GET".to_string()
+}
+
+/// Host HTTP request description emitted as `capability: "http.execute"`.
+///
+/// Core owns request semantics; platform hosts own the actual socket/TLS stack
+/// and answer with `host.complete { result: { body: "..." } }`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HostHttpRequest {
+    pub url: String,
+    #[serde(default = "default_http_method")]
+    pub method: String,
+    #[serde(default)]
+    pub headers: Value,
+    #[serde(default)]
+    pub body: Option<String>,
 }
 
 /// Parameters for `source.import`.
@@ -38,7 +58,12 @@ pub struct SourceImportParams {
 pub struct BookSearchParams {
     pub source_id: String,
     /// Pre-fetched search response body (HTML or JSON).
+    #[serde(default = "empty_string")]
     pub search_response: String,
+    /// Optional host HTTP request. If `searchResponse` is empty/missing, Core
+    /// emits `http.execute` and continues parsing after host completion.
+    #[serde(default)]
+    pub search_request: Option<HostHttpRequest>,
     /// Optional inline source definition. If present, it is used instead of
     /// looking up `source_id` in storage (useful for smoke tests).
     #[serde(default)]
@@ -53,7 +78,10 @@ pub struct BookDetailParams {
     /// Base book to merge metadata into (must contain at least `bookId`).
     pub book: Value,
     /// Pre-fetched detail response body.
+    #[serde(default = "empty_string")]
     pub detail_response: String,
+    #[serde(default)]
+    pub detail_request: Option<HostHttpRequest>,
     #[serde(default)]
     pub source: Option<Value>,
 }
@@ -65,7 +93,10 @@ pub struct BookTocParams {
     pub source_id: String,
     pub book_id: String,
     /// Pre-fetched toc response body.
+    #[serde(default = "empty_string")]
     pub toc_response: String,
+    #[serde(default)]
+    pub toc_request: Option<HostHttpRequest>,
     #[serde(default)]
     pub source: Option<Value>,
 }
@@ -80,7 +111,10 @@ pub struct ChapterContentParams {
     #[serde(default = "empty_string")]
     pub chapter_title: String,
     /// Pre-fetched chapter response body.
+    #[serde(default = "empty_string")]
     pub chapter_response: String,
+    #[serde(default)]
+    pub chapter_request: Option<HostHttpRequest>,
     /// Optional JS rule script. If present and it calls a host capability
     /// (`java.get`/`java.post`) without a registered callback, the command
     /// returns a structured `unsupported` error rather than pretending a
