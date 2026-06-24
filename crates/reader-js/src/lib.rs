@@ -279,10 +279,58 @@ impl QuickJsSandbox {
             make_host_callback(ctx.clone(), HostMethod::Post, self.host_callbacks.clone())?,
         )?;
         java.set(
+            "connect",
+            make_host_callback(
+                ctx.clone(),
+                HostMethod::Connect,
+                self.host_callbacks.clone(),
+            )?,
+        )?;
+        java.set(
+            "ajaxAll",
+            make_host_callback(
+                ctx.clone(),
+                HostMethod::AjaxAll,
+                self.host_callbacks.clone(),
+            )?,
+        )?;
+        java.set(
+            "getSource",
+            make_host_callback(
+                ctx.clone(),
+                HostMethod::GetSource,
+                self.host_callbacks.clone(),
+            )?,
+        )?;
+        java.set(
+            "getString",
+            make_host_callback(
+                ctx.clone(),
+                HostMethod::GetString,
+                self.host_callbacks.clone(),
+            )?,
+        )?;
+        java.set(
+            "getStringList",
+            make_host_callback(
+                ctx.clone(),
+                HostMethod::GetStringList,
+                self.host_callbacks.clone(),
+            )?,
+        )?;
+        java.set(
             "call",
             make_host_dispatch_callback(ctx.clone(), self.host_callbacks.clone())?,
         )?;
         ctx.globals().set("java", java)?;
+        ctx.globals().set(
+            "getSource",
+            make_host_callback(
+                ctx.clone(),
+                HostMethod::GetSource,
+                self.host_callbacks.clone(),
+            )?,
+        )?;
         Ok(())
     }
 
@@ -466,6 +514,11 @@ fn configured_status(configured: bool) -> CapabilityStatus {
 enum HostMethod {
     Get,
     Post,
+    Connect,
+    AjaxAll,
+    GetSource,
+    GetString,
+    GetStringList,
 }
 
 impl HostMethod {
@@ -473,6 +526,11 @@ impl HostMethod {
         match self {
             Self::Get => "java.get",
             Self::Post => "java.post",
+            Self::Connect => "java.connect",
+            Self::AjaxAll => "java.ajaxAll",
+            Self::GetSource => "java.getSource",
+            Self::GetString => "java.getString",
+            Self::GetStringList => "java.getStringList",
         }
     }
 
@@ -480,11 +538,63 @@ impl HostMethod {
         match name {
             "get" | "java.get" => Some(Self::Get),
             "post" | "java.post" => Some(Self::Post),
+            "connect" | "java.connect" => Some(Self::Connect),
+            "ajaxAll" | "java.ajaxAll" => Some(Self::AjaxAll),
+            "getSource" | "java.getSource" => Some(Self::GetSource),
+            "getString" | "java.getString" => Some(Self::GetString),
+            "getStringList" | "java.getStringList" => Some(Self::GetStringList),
             _ => None,
         }
     }
 
     fn validate_args<'js>(self, ctx: &Ctx<'js>, args: &[JsonValue]) -> Result<(), QuickJsError> {
+        if self == Self::GetSource {
+            if args.is_empty() {
+                return Ok(());
+            }
+
+            return Err(Exception::throw_type(
+                ctx,
+                "java.getSource does not accept arguments",
+            ));
+        }
+
+        if self == Self::AjaxAll {
+            let Some(requests) = args.first() else {
+                return Err(Exception::throw_type(
+                    ctx,
+                    "java.ajaxAll requires a request array argument",
+                ));
+            };
+
+            if !requests.is_array() {
+                return Err(Exception::throw_type(
+                    ctx,
+                    "java.ajaxAll request argument must be an array",
+                ));
+            }
+
+            return Ok(());
+        }
+
+        if matches!(self, Self::GetString | Self::GetStringList) {
+            let Some(rule) = args.first() else {
+                return Err(Exception::throw_type(
+                    ctx,
+                    format!("{} requires a rule string argument", self.callback_name()).as_str(),
+                ));
+            };
+
+            if !rule.is_string() {
+                return Err(Exception::throw_type(
+                    ctx,
+                    format!("{} rule argument must be a string", self.callback_name()).as_str(),
+                ));
+            }
+
+            return Ok(());
+        }
+
         let Some(url) = args.first() else {
             return Err(Exception::throw_type(
                 ctx,
@@ -1101,6 +1211,187 @@ mod tests {
     }
 
     #[test]
+    fn routes_java_connect_through_host_callback_registry() {
+        let calls = Arc::new(Mutex::new(Vec::<HostCall>::new()));
+        let captured = calls.clone();
+        let mut registry = HostCallbackRegistry::new();
+        registry.register("java.connect", move |call| {
+            captured.lock().unwrap().push(call.clone());
+            Ok(json!({
+                "status": "connected",
+                "args": call.args
+            }))
+        });
+
+        let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
+        let result = sandbox
+            .evaluate(
+                r#"
+                java.connect("https://example.test", { headers: { Accept: "text/plain" } })
+                "#,
+            )
+            .unwrap();
+
+        assert_eq!(
+            result.value,
+            json!({
+                "status": "connected",
+                "args": [
+                    "https://example.test",
+                    { "headers": { "Accept": "text/plain" } }
+                ]
+            })
+        );
+
+        let calls = calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].name, "java.connect");
+        assert_eq!(
+            calls[0].args,
+            vec![
+                json!("https://example.test"),
+                json!({ "headers": { "Accept": "text/plain" } })
+            ]
+        );
+    }
+
+    #[test]
+    fn routes_java_ajax_all_through_host_callback_registry() {
+        let calls = Arc::new(Mutex::new(Vec::<HostCall>::new()));
+        let captured = calls.clone();
+        let mut registry = HostCallbackRegistry::new();
+        registry.register("java.ajaxAll", move |call| {
+            captured.lock().unwrap().push(call.clone());
+            Ok(json!([
+                { "url": call.args[0][0]["url"], "status": "ok" },
+                { "url": call.args[0][1]["url"], "status": "ok" }
+            ]))
+        });
+
+        let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
+        let result = sandbox
+            .evaluate(
+                r#"
+                java.ajaxAll(
+                    [
+                        { url: "https://one.example.test" },
+                        { url: "https://two.example.test" }
+                    ],
+                    { headers: { Accept: "application/json" } }
+                )
+                "#,
+            )
+            .unwrap();
+
+        assert_eq!(
+            result.value,
+            json!([
+                { "url": "https://one.example.test", "status": "ok" },
+                { "url": "https://two.example.test", "status": "ok" }
+            ])
+        );
+
+        let calls = calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].name, "java.ajaxAll");
+        assert_eq!(
+            calls[0].args,
+            vec![
+                json!([
+                    { "url": "https://one.example.test" },
+                    { "url": "https://two.example.test" }
+                ]),
+                json!({ "headers": { "Accept": "application/json" } })
+            ]
+        );
+    }
+
+    #[test]
+    fn routes_get_source_through_host_callback_registry() {
+        let calls = Arc::new(Mutex::new(Vec::<HostCall>::new()));
+        let captured = calls.clone();
+        let mut registry = HostCallbackRegistry::new();
+        registry.register("java.getSource", move |call| {
+            captured.lock().unwrap().push(call.clone());
+            Ok(json!({
+                "sourceId": "fixture-source",
+                "sourceName": "Fixture"
+            }))
+        });
+
+        let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
+        let result = sandbox
+            .evaluate(
+                r#"
+                ({
+                    javaSource: java.getSource().sourceId,
+                    globalSource: getSource().sourceName
+                })
+                "#,
+            )
+            .unwrap();
+
+        assert_eq!(
+            result.value,
+            json!({
+                "javaSource": "fixture-source",
+                "globalSource": "Fixture"
+            })
+        );
+
+        let calls = calls.lock().unwrap();
+        assert_eq!(calls.len(), 2);
+        assert_eq!(calls[0].name, "java.getSource");
+        assert_eq!(calls[0].args, Vec::<JsonValue>::new());
+        assert_eq!(calls[1].name, "java.getSource");
+        assert_eq!(calls[1].args, Vec::<JsonValue>::new());
+    }
+
+    #[test]
+    fn routes_java_get_string_through_host_callback_registry() {
+        let calls = Arc::new(Mutex::new(Vec::<HostCall>::new()));
+        let captured = calls.clone();
+        let mut registry = HostCallbackRegistry::new();
+        registry.register("java.getString", move |call| {
+            captured.lock().unwrap().push(call.clone());
+            Ok(json!("Dune"))
+        });
+
+        let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
+        let result = sandbox.evaluate(r#"java.getString("article h1")"#).unwrap();
+
+        assert_eq!(result.value, json!("Dune"));
+
+        let calls = calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].name, "java.getString");
+        assert_eq!(calls[0].args, vec![json!("article h1")]);
+    }
+
+    #[test]
+    fn routes_java_get_string_list_through_host_callback_registry() {
+        let calls = Arc::new(Mutex::new(Vec::<HostCall>::new()));
+        let captured = calls.clone();
+        let mut registry = HostCallbackRegistry::new();
+        registry.register("java.getStringList", move |call| {
+            captured.lock().unwrap().push(call.clone());
+            Ok(json!(["Dune", "Foundation"]))
+        });
+
+        let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
+        let result = sandbox
+            .evaluate(r#"java.getStringList("article a.title")"#)
+            .unwrap();
+
+        assert_eq!(result.value, json!(["Dune", "Foundation"]));
+
+        let calls = calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].name, "java.getStringList");
+        assert_eq!(calls[0].args, vec![json!("article a.title")]);
+    }
+
+    #[test]
     fn routes_java_post_and_returns_json() {
         let mut registry = HostCallbackRegistry::new();
         registry.register("java.post", |call| {
@@ -1162,5 +1453,420 @@ mod tests {
 
         assert_eq!(error.kind, JsErrorKind::HostCallback);
         assert!(error.message.contains("unknown host method"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Empty results
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn returns_empty_array_and_empty_object() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate("[]").unwrap();
+        assert_eq!(result.value, json!([]));
+
+        let result = sandbox.evaluate("({})").unwrap();
+        assert_eq!(result.value, json!({}));
+    }
+
+    #[test]
+    fn undefined_and_null_both_become_json_null() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate("undefined").unwrap();
+        assert_eq!(result.value, json!(null));
+
+        let result = sandbox.evaluate("null").unwrap();
+        assert_eq!(result.value, json!(null));
+    }
+
+    #[test]
+    fn empty_string_preserved_as_json_string() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate("\"\"").unwrap();
+        assert_eq!(result.value, json!(""));
+    }
+
+    // -----------------------------------------------------------------------
+    // Error expressions
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn maps_type_error_to_exception() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox.evaluate("null.foo").unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::Exception);
+        assert!(!error.message.is_empty());
+    }
+
+    #[test]
+    fn maps_range_error_to_exception() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox.evaluate("new Array(-1)").unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::Exception);
+    }
+
+    #[test]
+    fn thrown_string_maps_to_exception() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox.evaluate(r#"throw "string error""#).unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::Exception);
+    }
+
+    #[test]
+    fn thrown_number_maps_to_exception() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox.evaluate("throw 42").unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::Exception);
+    }
+
+    #[test]
+    fn thrown_object_maps_to_exception() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox
+            .evaluate(r#"throw { code: 500, reason: "internal" }"#)
+            .unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::Exception);
+    }
+
+    #[test]
+    fn syntax_error_includes_message() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox.evaluate("var x = ;").unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::Syntax);
+        assert!(!error.message.is_empty());
+    }
+
+    #[test]
+    fn error_stack_is_captured_when_available() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox
+            .evaluate(
+                r#"
+                function boom() { throw new Error("stack-test"); }
+                boom();
+                "#,
+            )
+            .unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::Exception);
+        assert!(error.stack.is_some());
+    }
+
+    // -----------------------------------------------------------------------
+    // Duplicate results
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn arrays_preserve_duplicate_values() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate("[1, 1, 2, 2, 3]").unwrap();
+        assert_eq!(result.value, json!([1, 1, 2, 2, 3]));
+    }
+
+    #[test]
+    fn arrays_preserve_duplicate_strings() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate(r#"["dup", "dup", "unique"]"#).unwrap();
+        assert_eq!(result.value, json!(["dup", "dup", "unique"]));
+    }
+
+    #[test]
+    fn object_keys_with_duplicate_values_preserved() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate(r#"({ a: "same", b: "same", c: "different" })"#)
+            .unwrap();
+        assert_eq!(
+            result.value,
+            json!({ "a": "same", "b": "same", "c": "different" })
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Encoding / escaping
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn unicode_strings_round_trip_through_sandbox() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate(r#""日本語テスト 🚀 ✨""#).unwrap();
+        assert_eq!(result.value, json!("日本語テスト 🚀 ✨"));
+    }
+
+    #[test]
+    fn escaped_string_characters_preserved() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate(r#""line1\nline2\ttabbed\\backslash""#)
+            .unwrap();
+        assert_eq!(result.value, json!("line1\nline2\ttabbed\\backslash"));
+    }
+
+    #[test]
+    fn strings_with_quotes_and_special_chars() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate(r#""quote: \" end & <tag>""#).unwrap();
+        assert_eq!(result.value, json!("quote: \" end & <tag>"));
+    }
+
+    #[test]
+    fn unicode_escape_sequences_decoded() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate(r#""\u00e9""#).unwrap();
+        assert_eq!(result.value, json!("é"));
+    }
+
+    #[test]
+    fn nested_unicode_in_arrays_and_objects() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate(r#"({ "标题": ["沙丘", "基地"], "作者": "弗兰克" })"#)
+            .unwrap();
+        assert_eq!(
+            result.value,
+            json!({ "标题": ["沙丘", "基地"], "作者": "弗兰克" })
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // JS expression edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn negative_and_float_numbers_preserved() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate("[-1, -2.5, 0, 3.14159]").unwrap();
+        assert_eq!(result.value, json!([-1, -2.5, 0, 3.14159]));
+    }
+
+    #[test]
+    fn deeply_nested_object_converts() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate(
+                r#"
+                ({ a: { b: { c: { d: { e: "deep" } } } } })
+                "#,
+            )
+            .unwrap();
+        assert_eq!(
+            result.value,
+            json!({ "a": { "b": { "c": { "d": { "e": "deep" } } } } })
+        );
+    }
+
+    #[test]
+    fn function_value_rejected_as_non_json() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox.evaluate("(function() { return 1; })").unwrap_err();
+        assert_eq!(error.kind, JsErrorKind::NonJsonValue);
+    }
+
+    #[test]
+    fn symbol_value_rejected_as_non_json() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox.evaluate("Symbol('test')").unwrap_err();
+        assert_eq!(error.kind, JsErrorKind::NonJsonValue);
+    }
+
+    #[test]
+    fn boolean_and_number_constants() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate("true").unwrap();
+        assert_eq!(result.value, json!(true));
+
+        let result = sandbox.evaluate("false").unwrap();
+        assert_eq!(result.value, json!(false));
+
+        let result = sandbox.evaluate("42").unwrap();
+        assert_eq!(result.value, json!(42));
+    }
+
+    #[test]
+    fn nan_and_infinity_rejected_as_non_json() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox.evaluate("NaN").unwrap_err();
+        assert_eq!(error.kind, JsErrorKind::NonJsonValue);
+
+        let error = sandbox.evaluate("Infinity").unwrap_err();
+        assert_eq!(error.kind, JsErrorKind::NonJsonValue);
+    }
+
+    // -----------------------------------------------------------------------
+    // Fallback / host callback edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn host_callback_returning_null_propagates_null() {
+        let mut registry = HostCallbackRegistry::new();
+        registry.register("java.get", |_| Ok(json!(null)));
+        let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
+
+        let result = sandbox
+            .evaluate(r#"java.get("https://example.test")"#)
+            .unwrap();
+        assert_eq!(result.value, json!(null));
+    }
+
+    #[test]
+    fn host_callback_returning_empty_array_propagates() {
+        let mut registry = HostCallbackRegistry::new();
+        registry.register("java.get", |_| Ok(json!([])));
+        let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
+
+        let result = sandbox
+            .evaluate(r#"java.get("https://example.test")"#)
+            .unwrap();
+        assert_eq!(result.value, json!([]));
+    }
+
+    #[test]
+    fn unregistered_host_callback_errors() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox
+            .evaluate(r#"java.get("https://example.test")"#)
+            .unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::HostCallback);
+        assert!(error.message.contains("unregistered"));
+    }
+
+    #[test]
+    fn host_callback_can_provide_fallback_data() {
+        let mut registry = HostCallbackRegistry::new();
+        registry.register("java.get", move |_| {
+            Ok(json!({
+                "title": "fallback-title",
+                "items": ["a", "a", "b"]
+            }))
+        });
+        let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
+
+        let result = sandbox
+            .evaluate(
+                r#"
+                const response = java.get("https://example.test");
+                ({ title: response.title, count: response.items.length })
+                "#,
+            )
+            .unwrap();
+
+        assert_eq!(
+            result.value,
+            json!({ "title": "fallback-title", "count": 3 })
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Console capture edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn console_log_with_no_arguments_captured() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate("console.log(); 'done'").unwrap();
+        assert_eq!(result.value, json!("done"));
+        assert_eq!(result.console.len(), 1);
+        assert!(result.console[0].args.is_empty());
+    }
+
+    #[test]
+    fn console_log_with_null_and_undefined() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate("console.log(null, undefined); 'done'")
+            .unwrap();
+
+        assert_eq!(result.console.len(), 1);
+        assert_eq!(result.console[0].args, vec![json!(null), json!(null)]);
+    }
+
+    #[test]
+    fn console_log_preserves_duplicate_arguments() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate(r#"console.log("dup", "dup", "dup"); 'done'"#)
+            .unwrap();
+
+        assert_eq!(
+            result.console[0].args,
+            vec![json!("dup"), json!("dup"), json!("dup")]
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Promise edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn rejected_promise_maps_to_exception() {
+        let sandbox = QuickJsSandbox::default();
+
+        let error = sandbox
+            .evaluate("Promise.reject(new Error('rejected'))")
+            .unwrap_err();
+
+        assert_eq!(error.kind, JsErrorKind::Exception);
+        assert!(error.message.contains("rejected"));
+    }
+
+    #[test]
+    fn promise_resolving_with_null() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate("Promise.resolve(null)").unwrap();
+        assert_eq!(result.value, json!(null));
+    }
+
+    #[test]
+    fn promise_resolving_with_empty_object() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox.evaluate("Promise.resolve({})").unwrap();
+        assert_eq!(result.value, json!({}));
+    }
+
+    #[test]
+    fn promise_chain_preserves_duplicate_values() {
+        let sandbox = QuickJsSandbox::default();
+
+        let result = sandbox
+            .evaluate("Promise.resolve([1, 1, 2]).then(arr => arr)")
+            .unwrap();
+        assert_eq!(result.value, json!([1, 1, 2]));
     }
 }

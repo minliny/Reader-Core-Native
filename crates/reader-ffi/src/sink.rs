@@ -10,15 +10,17 @@ pub type CEventCallback =
 ///
 /// `Send + Sync`: the callback + context are raw pointers, but the C side
 /// guarantees the callback and context remain valid until `rc_runtime_destroy`
-/// (which joins the worker before returning). The context is opaque to Rust
-/// and only handed back to C, which is the one place it's dereferenced.
+/// (which joins the worker before returning). The C side also guarantees
+/// destroy is not called reentrantly from this callback. The context is opaque
+/// to Rust and only handed back to C, which is the one place it's dereferenced.
 pub struct CEventSink {
     callback: CEventCallback,
     context: *mut c_void,
 }
 
 // SAFETY: the C contract guarantees the callback/context are valid for the
-// lifetime of the runtime, and we only pass the context back to C.
+// lifetime of the runtime, does not destroy reentrantly from the callback, and
+// we only pass the context back to C.
 unsafe impl Send for CEventSink {}
 unsafe impl Sync for CEventSink {}
 
@@ -38,8 +40,9 @@ impl reader_runtime::EventSink for CEventSink {
             return;
         };
         // SAFETY: the C contract guarantees the callback and context are valid
-        // until destroy joins this worker. The buffer is borrowed for the call
-        // only and never freed by the platform (see header).
+        // until destroy joins this worker; the header forbids reentrant destroy
+        // from this callback. The buffer is borrowed for the call only and
+        // never freed by the platform.
         unsafe { callback(self.context, json.as_ptr(), json.len()) };
     }
 }

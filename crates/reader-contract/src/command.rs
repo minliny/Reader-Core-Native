@@ -124,6 +124,12 @@ mod tests {
                 ),
             ),
             (
+                "valid-runtime-cancel",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/valid-runtime-cancel.json"
+                ),
+            ),
+            (
                 "valid-core-info",
                 include_str!(
                     "../../../protocol/fixtures/conformance/commands/valid-core-info.json"

@@ -32,21 +32,37 @@ impl RuleEngine {
         for (index, step) in steps.iter().enumerate() {
             let mut next = Vec::new();
 
-            for value in &values {
-                match apply_step(value, step) {
-                    Ok(mut results) => next.append(&mut results),
-                    Err(source) => {
-                        return Err(RuleError::ChainStepFailed {
-                            index,
-                            source: Box::new(source),
-                        });
+            if values.is_empty() {
+                // Fallback steps can seed new values when the chain has no
+                // prior results, letting downstream steps continue instead of
+                // short-circuiting on empty.
+                if let RuleStep::Fallback(rule) = step {
+                    next = rule.values.clone();
+                }
+            } else {
+                for value in &values {
+                    match apply_step(value, step) {
+                        Ok(mut results) => next.append(&mut results),
+                        Err(source) => {
+                            return Err(RuleError::ChainStepFailed {
+                                index,
+                                source: Box::new(source),
+                            });
+                        }
                     }
                 }
             }
 
             values = next;
             if values.is_empty() {
-                break;
+                // Continue only if a subsequent Fallback step can recover the
+                // chain; otherwise short-circuit to avoid needless iteration.
+                let has_fallback = steps[index + 1..]
+                    .iter()
+                    .any(|step| matches!(step, RuleStep::Fallback(_)));
+                if !has_fallback {
+                    break;
+                }
             }
         }
 
@@ -92,6 +108,10 @@ pub enum RuleStep {
     JsonPath(JsonPathRule),
     Css(CssRule),
     XPath(XPathRule),
+    /// Passes through non-empty input unchanged. When a chain reaches this
+    /// step with no prior results, the configured `values` are emitted so
+    /// downstream steps continue with a deterministic default.
+    Fallback(FallbackRule),
 }
 
 impl RuleStep {
@@ -138,6 +158,14 @@ impl RuleStep {
         U: Into<String>,
     {
         Self::XPath(XPathRule::with_namespaces(expression, namespaces))
+    }
+
+    pub fn fallback<I, S>(values: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        Self::Fallback(FallbackRule::new(values))
     }
 }
 
@@ -279,6 +307,23 @@ impl XPathRule {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FallbackRule {
+    pub values: Vec<String>,
+}
+
+impl FallbackRule {
+    pub fn new<I, S>(values: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        Self {
+            values: values.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuleError {
     RegexSyntax {
         pattern: String,
@@ -380,7 +425,65 @@ impl Error for RuleError {
 enum JsonPathSegment {
     Field(String),
     Index(usize),
+    /// `[-1]` → `IndexFromEnd(1)`, `[-2]` → `IndexFromEnd(2)`. Resolved against
+    /// the array length at evaluation time.
+    IndexFromEnd(usize),
     Wildcard,
+    /// `..field`, `..*`, or `..[index]` — descend into every object/array and
+    /// apply the inner segment at every depth.
+    RecursiveDescent(Box<JsonPathSegment>),
+    /// `[start:end:step]` — Python-style slice. `start`/`end` are optional and
+    /// may be negative (counted from the end); `step` defaults to 1 and may be
+    /// negative to reverse iteration. Resolved against the array length at
+    /// evaluation time.
+    Slice(JsonPathSlice),
+    /// `[?(@.field == 'value')]` or `[?(@.field >= 1)]` — filter array items by
+    /// a scalar field before applying subsequent JSONPath segments.
+    Filter(JsonPathFilter),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct JsonPathSlice {
+    start: Option<isize>,
+    end: Option<isize>,
+    step: Option<isize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum JsonPathFilter {
+    Exists(Vec<String>),
+    Compare(JsonPathFilterComparison),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct JsonPathFilterComparison {
+    left: Vec<String>,
+    op: JsonPathFilterOp,
+    right: JsonPathFilterOperand,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum JsonPathFilterOp {
+    Equal,
+    NotEqual,
+    GreaterThan,
+    GreaterThanOrEqual,
+    LessThan,
+    LessThanOrEqual,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum JsonPathFilterLiteral {
+    String(String),
+    Number(String),
+    Bool(bool),
+    Null,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum JsonPathFilterOperand {
+    Literal(JsonPathFilterLiteral),
+    Path(Vec<String>),
 }
 
 fn apply_step(input: &str, step: &RuleStep) -> RuleResult<Vec<String>> {
@@ -390,6 +493,15 @@ fn apply_step(input: &str, step: &RuleStep) -> RuleResult<Vec<String>> {
         RuleStep::JsonPath(rule) => apply_json_path(input, rule),
         RuleStep::Css(rule) => apply_css(input, rule),
         RuleStep::XPath(rule) => apply_xpath(input, rule),
+        RuleStep::Fallback(rule) => apply_fallback(input, rule),
+    }
+}
+
+fn apply_fallback(input: &str, rule: &FallbackRule) -> RuleResult<Vec<String>> {
+    if input.is_empty() {
+        Ok(rule.values.clone())
+    } else {
+        Ok(vec![input.to_string()])
     }
 }
 
@@ -629,6 +741,10 @@ fn parse_json_path(path: &str) -> Result<Vec<JsonPathSegment>, String> {
                 if index >= chars.len() {
                     return Err("field name expected after `.`".to_string());
                 }
+                if chars[index] == '.' {
+                    segments.push(parse_recursive_descent(&chars, &mut index)?);
+                    continue;
+                }
                 if chars[index] == '*' {
                     segments.push(JsonPathSegment::Wildcard);
                     index += 1;
@@ -657,6 +773,34 @@ fn parse_json_path(path: &str) -> Result<Vec<JsonPathSegment>, String> {
     }
 
     Ok(segments)
+}
+
+fn parse_recursive_descent(chars: &[char], index: &mut usize) -> Result<JsonPathSegment, String> {
+    *index += 1;
+    if *index >= chars.len() {
+        return Err("segment expected after `..`".to_string());
+    }
+
+    let inner = if chars[*index] == '*' {
+        *index += 1;
+        JsonPathSegment::Wildcard
+    } else if chars[*index] == '[' {
+        *index += 1;
+        let (segment, next_index) = parse_json_path_bracket(chars, *index)?;
+        *index = next_index;
+        segment
+    } else {
+        let start = *index;
+        while *index < chars.len() && chars[*index] != '.' && chars[*index] != '[' {
+            *index += 1;
+        }
+        if start == *index {
+            return Err("field name expected after `..`".to_string());
+        }
+        JsonPathSegment::Field(chars[start..*index].iter().collect())
+    };
+
+    Ok(JsonPathSegment::RecursiveDescent(Box::new(inner)))
 }
 
 fn parse_json_path_bracket(
@@ -697,12 +841,7 @@ fn parse_json_path_bracket(
     }
 
     let start = index;
-    while index < chars.len() && chars[index] != ']' {
-        index += 1;
-    }
-    if index >= chars.len() {
-        return Err("unterminated `[` segment".to_string());
-    }
+    index = scan_json_path_bracket_token_end(chars, index)?;
 
     let token = chars[start..index]
         .iter()
@@ -711,8 +850,16 @@ fn parse_json_path_bracket(
         .to_string();
     let segment = if token == "*" {
         JsonPathSegment::Wildcard
-    } else if let Ok(array_index) = token.parse::<usize>() {
-        JsonPathSegment::Index(array_index)
+    } else if token.starts_with("?(") {
+        parse_json_path_filter(&token)?
+    } else if token.contains(':') {
+        parse_json_path_slice(&token)?
+    } else if let Ok(signed) = token.parse::<isize>() {
+        if signed >= 0 {
+            JsonPathSegment::Index(signed as usize)
+        } else {
+            JsonPathSegment::IndexFromEnd((-signed) as usize)
+        }
     } else {
         return Err(format!("unsupported bracket segment `{token}`"));
     };
@@ -720,34 +867,294 @@ fn parse_json_path_bracket(
     Ok((segment, index + 1))
 }
 
+fn scan_json_path_bracket_token_end(chars: &[char], mut index: usize) -> Result<usize, String> {
+    let mut quote = None;
+    let mut escaped = false;
+    let mut paren_depth = 0usize;
+
+    while index < chars.len() {
+        let current = chars[index];
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if current == '\\' {
+                escaped = true;
+            } else if current == active_quote {
+                quote = None;
+            }
+            index += 1;
+            continue;
+        }
+
+        if current == '\'' || current == '"' {
+            quote = Some(current);
+            index += 1;
+            continue;
+        }
+
+        match current {
+            '(' => paren_depth += 1,
+            ')' => paren_depth = paren_depth.saturating_sub(1),
+            ']' if paren_depth == 0 => return Ok(index),
+            _ => {}
+        }
+        index += 1;
+    }
+
+    Err("unterminated `[` segment".to_string())
+}
+
+fn parse_json_path_filter(token: &str) -> Result<JsonPathSegment, String> {
+    let expression = token
+        .strip_prefix("?(")
+        .and_then(|value| value.strip_suffix(')'))
+        .ok_or_else(|| format!("invalid filter segment `{token}`"))?
+        .trim();
+
+    let Some((operator_index, operator_len, op)) = find_filter_operator(expression) else {
+        let path = parse_filter_path(expression)?;
+        return Ok(JsonPathSegment::Filter(JsonPathFilter::Exists(path)));
+    };
+    let lhs = expression[..operator_index].trim();
+    let rhs = expression[operator_index + operator_len..].trim();
+
+    let left = parse_filter_path(lhs)?;
+    let right = parse_filter_operand(rhs)?;
+
+    Ok(JsonPathSegment::Filter(JsonPathFilter::Compare(
+        JsonPathFilterComparison {
+            left,
+            op,
+            right,
+        },
+    )))
+}
+
+fn find_filter_operator(expression: &str) -> Option<(usize, usize, JsonPathFilterOp)> {
+    let mut quote = None;
+    let mut escaped = false;
+
+    for (index, value) in expression.char_indices() {
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            continue;
+        }
+
+        let remaining = &expression[index..];
+        if remaining.starts_with("==") {
+            return Some((index, 2, JsonPathFilterOp::Equal));
+        }
+        if remaining.starts_with("!=") {
+            return Some((index, 2, JsonPathFilterOp::NotEqual));
+        }
+        if remaining.starts_with(">=") {
+            return Some((index, 2, JsonPathFilterOp::GreaterThanOrEqual));
+        }
+        if remaining.starts_with("<=") {
+            return Some((index, 2, JsonPathFilterOp::LessThanOrEqual));
+        }
+        if remaining.starts_with('>') {
+            return Some((index, 1, JsonPathFilterOp::GreaterThan));
+        }
+        if remaining.starts_with('<') {
+            return Some((index, 1, JsonPathFilterOp::LessThan));
+        }
+    }
+
+    None
+}
+
+fn parse_filter_path(lhs: &str) -> Result<Vec<String>, String> {
+    let chars = lhs.trim().chars().collect::<Vec<_>>();
+    if chars.first() != Some(&'@') {
+        return Err(format!("filter field must start with `@` in `{lhs}`"));
+    }
+
+    let mut fields = Vec::new();
+    let mut index = 1;
+
+    while index < chars.len() {
+        match chars[index] {
+            '.' => {
+                index += 1;
+                let start = index;
+                while index < chars.len() && chars[index] != '.' && chars[index] != '[' {
+                    index += 1;
+                }
+                if start == index {
+                    return Err(format!("filter field path is empty in `{lhs}`"));
+                }
+                fields.push(chars[start..index].iter().collect());
+            }
+            '[' => {
+                fields.push(parse_filter_quoted_field(lhs, &chars, &mut index)?);
+            }
+            current => {
+                return Err(format!(
+                    "expected `.` or `[` in filter field path `{lhs}`, found `{current}`"
+                ));
+            }
+        }
+    }
+
+    if fields.is_empty() || fields.iter().any(String::is_empty) {
+        return Err(format!("filter field path is empty in `{lhs}`"));
+    }
+
+    Ok(fields)
+}
+
+fn parse_filter_quoted_field(
+    lhs: &str,
+    chars: &[char],
+    index: &mut usize,
+) -> Result<String, String> {
+    *index += 1;
+    if *index >= chars.len() {
+        return Err(format!("unterminated filter field bracket in `{lhs}`"));
+    }
+
+    let quote = chars[*index];
+    if quote != '\'' && quote != '"' {
+        return Err(format!("filter field bracket must contain a quoted key in `{lhs}`"));
+    }
+    *index += 1;
+
+    let mut field = String::new();
+    while *index < chars.len() {
+        match chars[*index] {
+            '\\' if *index + 1 < chars.len() => {
+                *index += 1;
+                field.push(chars[*index]);
+                *index += 1;
+            }
+            current if current == quote => {
+                *index += 1;
+                if chars.get(*index) != Some(&']') {
+                    return Err(format!("quoted filter field must close with `]` in `{lhs}`"));
+                }
+                *index += 1;
+                return Ok(field);
+            }
+            current => {
+                field.push(current);
+                *index += 1;
+            }
+        }
+    }
+
+    Err(format!("unterminated quoted filter field in `{lhs}`"))
+}
+
+fn parse_filter_operand(rhs: &str) -> Result<JsonPathFilterOperand, String> {
+    if rhs.trim().starts_with('@') {
+        return parse_filter_path(rhs).map(JsonPathFilterOperand::Path);
+    }
+
+    parse_filter_literal(rhs).map(JsonPathFilterOperand::Literal)
+}
+
+fn parse_filter_literal(rhs: &str) -> Result<JsonPathFilterLiteral, String> {
+    if rhs.starts_with('\'') || rhs.starts_with('"') {
+        return parse_filter_string_literal(rhs).map(JsonPathFilterLiteral::String);
+    }
+
+    match serde_json::from_str::<JsonValue>(rhs) {
+        Ok(JsonValue::Number(value)) => Ok(JsonPathFilterLiteral::Number(value.to_string())),
+        Ok(JsonValue::Bool(value)) => Ok(JsonPathFilterLiteral::Bool(value)),
+        Ok(JsonValue::Null) => Ok(JsonPathFilterLiteral::Null),
+        Ok(_) => Err(format!("unsupported filter comparison literal `{rhs}`")),
+        Err(_) => Err(format!("unsupported filter comparison literal `{rhs}`")),
+    }
+}
+
+fn parse_filter_string_literal(rhs: &str) -> Result<String, String> {
+    let mut chars = rhs.char_indices();
+    let Some((_, quote @ ('\'' | '"'))) = chars.next() else {
+        return Err(format!(
+            "filter comparison value must be a string literal in `{rhs}`"
+        ));
+    };
+
+    let mut output = String::new();
+    let mut escaped = false;
+    for (index, value) in chars {
+        if escaped {
+            output.push(value);
+            escaped = false;
+            continue;
+        }
+
+        if value == '\\' {
+            escaped = true;
+            continue;
+        }
+
+        if value == quote {
+            if !rhs[index + value.len_utf8()..].trim().is_empty() {
+                return Err(format!("unexpected trailing filter text in `{rhs}`"));
+            }
+            return Ok(output);
+        }
+
+        output.push(value);
+    }
+
+    Err(format!("unterminated filter string literal in `{rhs}`"))
+}
+
+fn parse_json_path_slice(token: &str) -> Result<JsonPathSegment, String> {
+    let parts: Vec<&str> = token.split(':').collect();
+    if parts.len() < 2 || parts.len() > 3 {
+        return Err(format!("invalid slice segment `{token}`"));
+    }
+
+    let parse_opt = |raw: &str| -> Result<Option<isize>, String> {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            Ok(None)
+        } else {
+            trimmed
+                .parse::<isize>()
+                .map(Some)
+                .map_err(|_| format!("invalid slice index `{trimmed}` in `{token}`"))
+        }
+    };
+
+    let start = parse_opt(parts[0])?;
+    let end = parse_opt(parts[1])?;
+    let step = if parts.len() == 3 {
+        parse_opt(parts[2])?
+    } else {
+        None
+    };
+
+    if matches!(step, Some(0)) {
+        return Err(format!("slice step cannot be zero in `{token}`"));
+    }
+
+    Ok(JsonPathSegment::Slice(JsonPathSlice { start, end, step }))
+}
+
 fn evaluate_json_path<'a>(root: &'a JsonValue, segments: &[JsonPathSegment]) -> Vec<&'a JsonValue> {
     let mut current = vec![root];
 
     for segment in segments {
         let mut next = Vec::new();
-
-        for value in current {
-            match (segment, value) {
-                (JsonPathSegment::Field(field), JsonValue::Object(object)) => {
-                    if let Some(value) = object.get(field) {
-                        next.push(value);
-                    }
-                }
-                (JsonPathSegment::Index(index), JsonValue::Array(array)) => {
-                    if let Some(value) = array.get(*index) {
-                        next.push(value);
-                    }
-                }
-                (JsonPathSegment::Wildcard, JsonValue::Array(array)) => {
-                    next.extend(array);
-                }
-                (JsonPathSegment::Wildcard, JsonValue::Object(object)) => {
-                    next.extend(object.values());
-                }
-                _ => {}
-            }
+        for value in &current {
+            apply_json_path_segment(segment, value, &mut next);
         }
-
         current = next;
         if current.is_empty() {
             break;
@@ -755,6 +1162,284 @@ fn evaluate_json_path<'a>(root: &'a JsonValue, segments: &[JsonPathSegment]) -> 
     }
 
     current
+}
+
+fn apply_json_path_segment<'a>(
+    segment: &JsonPathSegment,
+    value: &'a JsonValue,
+    output: &mut Vec<&'a JsonValue>,
+) {
+    match segment {
+        JsonPathSegment::Field(field) => {
+            if let JsonValue::Object(object) = value {
+                if let Some(child) = object.get(field) {
+                    output.push(child);
+                }
+            }
+        }
+        JsonPathSegment::Index(index) => {
+            if let JsonValue::Array(array) = value {
+                if let Some(child) = array.get(*index) {
+                    output.push(child);
+                }
+            }
+        }
+        JsonPathSegment::IndexFromEnd(offset) => {
+            if let JsonValue::Array(array) = value {
+                if let Some(child) = array.len().checked_sub(*offset).and_then(|i| array.get(i)) {
+                    output.push(child);
+                }
+            }
+        }
+        JsonPathSegment::Wildcard => match value {
+            JsonValue::Array(array) => output.extend(array.iter()),
+            JsonValue::Object(object) => output.extend(object.values()),
+            _ => {}
+        },
+        JsonPathSegment::RecursiveDescent(inner) => {
+            for descendant in collect_json_descendants(value) {
+                apply_json_path_segment(inner, descendant, output);
+            }
+        }
+        JsonPathSegment::Slice(slice) => {
+            if let JsonValue::Array(array) = value {
+                let len = array.len() as isize;
+                let step = slice.step.unwrap_or(1);
+                let (start, end) = resolve_slice_bounds(slice.start, slice.end, step, len);
+
+                let mut index = start;
+                if step > 0 {
+                    while index < end {
+                        if (0..len).contains(&index) {
+                            if let Some(child) = array.get(index as usize) {
+                                output.push(child);
+                            }
+                        }
+                        index += step;
+                    }
+                } else {
+                    while index > end {
+                        if (0..len).contains(&index) {
+                            if let Some(child) = array.get(index as usize) {
+                                output.push(child);
+                            }
+                        }
+                        index += step;
+                    }
+                }
+            }
+        }
+        JsonPathSegment::Filter(filter) => {
+            if let JsonValue::Array(array) = value {
+                output.extend(
+                    array
+                        .iter()
+                        .filter(|item| json_path_filter_matches(item, filter)),
+                );
+            }
+        }
+    }
+}
+
+fn json_path_filter_matches(value: &JsonValue, filter: &JsonPathFilter) -> bool {
+    match filter {
+        JsonPathFilter::Exists(path) => resolve_filter_path(value, path).is_some(),
+        JsonPathFilter::Compare(comparison) => {
+            let Some(actual) = resolve_filter_path(value, &comparison.left) else {
+                return false;
+            };
+
+            match comparison.op {
+                JsonPathFilterOp::Equal => {
+                    filter_values_equal(value, actual, &comparison.right)
+                }
+                JsonPathFilterOp::NotEqual => {
+                    filter_values_comparable(value, actual, &comparison.right)
+                        .is_some_and(|equal| !equal)
+                }
+                JsonPathFilterOp::GreaterThan => {
+                    compare_filter_numbers(value, actual, &comparison.right, |actual, expected| {
+                        actual > expected
+                    })
+                }
+                JsonPathFilterOp::GreaterThanOrEqual => {
+                    compare_filter_numbers(value, actual, &comparison.right, |actual, expected| {
+                        actual >= expected
+                    })
+                }
+                JsonPathFilterOp::LessThan => {
+                    compare_filter_numbers(value, actual, &comparison.right, |actual, expected| {
+                        actual < expected
+                    })
+                }
+                JsonPathFilterOp::LessThanOrEqual => {
+                    compare_filter_numbers(value, actual, &comparison.right, |actual, expected| {
+                        actual <= expected
+                    })
+                }
+            }
+        }
+    }
+}
+
+fn filter_values_equal(
+    context: &JsonValue,
+    actual: &JsonValue,
+    expected: &JsonPathFilterOperand,
+) -> bool {
+    filter_values_comparable(context, actual, expected).unwrap_or(false)
+}
+
+fn filter_values_comparable(
+    context: &JsonValue,
+    actual: &JsonValue,
+    expected: &JsonPathFilterOperand,
+) -> Option<bool> {
+    match expected {
+        JsonPathFilterOperand::Literal(expected) => {
+            filter_value_equals_literal(actual, expected)
+        }
+        JsonPathFilterOperand::Path(path) => {
+            let expected = resolve_filter_path(context, path)?;
+            filter_json_values_equal(actual, expected)
+        }
+    }
+}
+
+fn filter_value_equals_literal(
+    actual: &JsonValue,
+    expected: &JsonPathFilterLiteral,
+) -> Option<bool> {
+    match (actual, expected) {
+        (JsonValue::String(actual), JsonPathFilterLiteral::String(expected)) => {
+            Some(actual == expected)
+        }
+        (JsonValue::Number(actual), JsonPathFilterLiteral::Number(expected)) => {
+            let actual = actual.as_f64()?;
+            let expected = expected.parse::<f64>().ok()?;
+            Some(actual == expected)
+        }
+        (JsonValue::Bool(actual), JsonPathFilterLiteral::Bool(expected)) => {
+            Some(actual == expected)
+        }
+        (JsonValue::Null, JsonPathFilterLiteral::Null) => Some(true),
+        _ => None,
+    }
+}
+
+fn filter_json_values_equal(actual: &JsonValue, expected: &JsonValue) -> Option<bool> {
+    match (actual, expected) {
+        (JsonValue::String(actual), JsonValue::String(expected)) => Some(actual == expected),
+        (JsonValue::Number(actual), JsonValue::Number(expected)) => {
+            Some(actual.as_f64()? == expected.as_f64()?)
+        }
+        (JsonValue::Bool(actual), JsonValue::Bool(expected)) => Some(actual == expected),
+        (JsonValue::Null, JsonValue::Null) => Some(true),
+        _ => None,
+    }
+}
+
+fn compare_filter_numbers(
+    context: &JsonValue,
+    actual: &JsonValue,
+    expected: &JsonPathFilterOperand,
+    compare: impl FnOnce(f64, f64) -> bool,
+) -> bool {
+    let Some(expected) = resolve_filter_number_operand(context, expected) else {
+        return false;
+    };
+
+    let Some(actual) = actual.as_f64() else {
+        return false;
+    };
+
+    compare(actual, expected)
+}
+
+fn resolve_filter_number_operand(
+    context: &JsonValue,
+    expected: &JsonPathFilterOperand,
+) -> Option<f64> {
+    match expected {
+        JsonPathFilterOperand::Literal(JsonPathFilterLiteral::Number(expected)) => {
+            expected.parse::<f64>().ok()
+        }
+        JsonPathFilterOperand::Path(path) => {
+            resolve_filter_path(context, path)?.as_f64()
+        }
+        _ => None,
+    }
+}
+
+fn resolve_filter_path<'a>(value: &'a JsonValue, path: &[String]) -> Option<&'a JsonValue> {
+    let mut current = value;
+    for field in path {
+        let JsonValue::Object(object) = current else {
+            return None;
+        };
+        current = object.get(field)?;
+    }
+
+    Some(current)
+}
+
+/// Resolves optional, possibly-negative slice bounds against the array length.
+/// For positive `step`, defaults are `start=0` / `end=len`. For negative
+/// `step`, defaults are `start=len-1` / `end=-1` (so index 0 is still visited).
+/// Out-of-range values are clamped to the valid window.
+fn resolve_slice_bounds(
+    start: Option<isize>,
+    end: Option<isize>,
+    step: isize,
+    len: isize,
+) -> (isize, isize) {
+    if step > 0 {
+        let start = start.unwrap_or(0);
+        let start = if start < 0 {
+            (len + start).max(0)
+        } else {
+            start.min(len)
+        };
+        let end = end.unwrap_or(len);
+        let end = if end < 0 {
+            (len + end).max(0)
+        } else {
+            end.min(len)
+        };
+        (start, end)
+    } else {
+        let start = start.unwrap_or(len - 1);
+        let start = if start < 0 {
+            (len + start).max(-1)
+        } else {
+            start.min(len - 1)
+        };
+        let end = end.unwrap_or(-1);
+        let end = if end < 0 {
+            (len + end).max(-1)
+        } else {
+            end.min(len - 1)
+        };
+        (start, end)
+    }
+}
+
+fn collect_json_descendants<'a>(value: &'a JsonValue) -> Vec<&'a JsonValue> {
+    let mut result = vec![value];
+    match value {
+        JsonValue::Array(array) => {
+            for item in array {
+                result.extend(collect_json_descendants(item));
+            }
+        }
+        JsonValue::Object(object) => {
+            for child in object.values() {
+                result.extend(collect_json_descendants(child));
+            }
+        }
+        _ => {}
+    }
+    result
 }
 
 fn json_value_to_rule_text(value: &JsonValue) -> String {
