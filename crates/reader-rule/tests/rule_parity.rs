@@ -1017,6 +1017,109 @@ fn jsonpath_slice_on_non_array_returns_empty() {
 }
 
 // ---------------------------------------------------------------------------
+// JSONPath slice expressions
+// ---------------------------------------------------------------------------
+
+#[test]
+fn jsonpath_slice_extracts_inclusive_start_exclusive_end() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{"items": ["a", "b", "c", "d", "e"]}"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.items[1:3]"))
+        .unwrap();
+    assert_eq!(
+        output.values(),
+        &["b".to_string(), "c".to_string()]
+    );
+}
+
+#[test]
+fn jsonpath_slice_open_ended_end_goes_to_last() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{"items": ["a", "b", "c", "d", "e"]}"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.items[2:]"))
+        .unwrap();
+    assert_eq!(
+        output.values(),
+        &["c".to_string(), "d".to_string(), "e".to_string()]
+    );
+}
+
+#[test]
+fn jsonpath_slice_open_ended_start_begins_at_zero() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{"items": ["a", "b", "c", "d", "e"]}"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.items[:2]"))
+        .unwrap();
+    assert_eq!(
+        output.values(),
+        &["a".to_string(), "b".to_string()]
+    );
+}
+
+#[test]
+fn jsonpath_slice_negative_start_counts_from_end() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{"items": ["a", "b", "c", "d", "e"]}"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.items[-2:]"))
+        .unwrap();
+    assert_eq!(
+        output.values(),
+        &["d".to_string(), "e".to_string()]
+    );
+}
+
+#[test]
+fn jsonpath_slice_positive_step_skips_elements() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{"items": ["a", "b", "c", "d", "e"]}"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.items[::2]"))
+        .unwrap();
+    assert_eq!(
+        output.values(),
+        &["a".to_string(), "c".to_string(), "e".to_string()]
+    );
+}
+
+#[test]
+fn jsonpath_slice_out_of_range_returns_empty() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{"items": ["a", "b"]}"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.items[5:10]"))
+        .unwrap();
+    assert!(output.is_empty());
+}
+
+#[test]
+fn jsonpath_slice_on_non_array_returns_empty() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{"items": "not-an-array"}"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.items[0:2]"))
+        .unwrap();
+    assert!(output.is_empty());
+}
+
+// ---------------------------------------------------------------------------
 // Chain edge cases
 // ---------------------------------------------------------------------------
 
