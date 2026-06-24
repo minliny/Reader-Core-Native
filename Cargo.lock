@@ -693,6 +693,8 @@ name = "reader-rss"
 version = "0.1.0"
 dependencies = [
  "reader-domain",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -2,8 +2,14 @@
 
 use std::collections::{HashMap, HashSet};
 
+use serde::{Deserialize, Serialize};
+
+/// Current RSS library snapshot schema version.
+pub const RSS_LIBRARY_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
+
 /// Parsed RSS/Atom feed metadata plus entries.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RssFeed {
     pub title: String,
     pub feed_url: Option<String>,
@@ -13,7 +19,8 @@ pub struct RssFeed {
 }
 
 /// One item from an RSS channel or Atom feed.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RssEntry {
     /// Stable entry identity, derived from `guid`/`id`/`link`/`title`.
     pub id: String,
@@ -25,7 +32,8 @@ pub struct RssEntry {
 }
 
 /// Stored subscription state for a feed.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RssSubscription {
     pub subscription_id: String,
     pub feed_url: String,
@@ -38,14 +46,16 @@ pub struct RssSubscription {
 }
 
 /// Result of merging a newly fetched feed into subscription state.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RssRefreshResult {
     pub subscription: RssSubscription,
     pub new_entries: Vec<RssEntry>,
 }
 
 /// Stored state for one RSS entry.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RssEntryState {
     pub subscription_id: String,
     pub entry: RssEntry,
@@ -53,6 +63,68 @@ pub struct RssEntryState {
     pub read: bool,
     pub read_at: Option<i64>,
     pub starred: bool,
+}
+
+/// Complete export/import unit for RSS subscription and entry state.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RssLibrarySnapshot {
+    pub schema_version: u32,
+    pub exported_at: i64,
+    #[serde(default)]
+    pub subscriptions: Vec<RssSubscription>,
+    #[serde(default)]
+    pub entries: Vec<RssEntryState>,
+}
+
+impl RssLibrarySnapshot {
+    pub fn empty(exported_at: i64) -> Self {
+        Self {
+            schema_version: RSS_LIBRARY_SNAPSHOT_SCHEMA_VERSION,
+            exported_at,
+            subscriptions: Vec::new(),
+            entries: Vec::new(),
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), RssError> {
+        if self.schema_version != RSS_LIBRARY_SNAPSHOT_SCHEMA_VERSION {
+            return Err(RssError::InvalidSnapshot {
+                field: "schema_version".into(),
+            });
+        }
+
+        let mut subscription_ids = HashSet::new();
+        for subscription in &self.subscriptions {
+            validate_subscription(subscription)?;
+            if !subscription_ids.insert(subscription.subscription_id.clone()) {
+                return Err(RssError::InvalidSnapshot {
+                    field: "subscriptions".into(),
+                });
+            }
+        }
+
+        let mut entry_keys = HashSet::new();
+        for state in &self.entries {
+            validate_entry_state(state)?;
+            if !subscription_ids.contains(&state.subscription_id) {
+                return Err(RssError::InvalidSnapshot {
+                    field: "entries.subscription_id".into(),
+                });
+            }
+            let key = RssEntryKey {
+                subscription_id: state.subscription_id.clone(),
+                entry_id: state.entry.id.clone(),
+            };
+            if !entry_keys.insert(key) {
+                return Err(RssError::InvalidSnapshot {
+                    field: "entries".into(),
+                });
+            }
+        }
+
+        Ok(())
+    }
 }
 
 /// In-memory RSS subscription and entry state.
@@ -82,6 +154,9 @@ pub enum RssError {
     InvalidSubscription {
         field: String,
     },
+    InvalidSnapshot {
+        field: String,
+    },
     SubscriptionNotFound {
         subscription_id: String,
     },
@@ -99,6 +174,9 @@ impl std::fmt::Display for RssError {
             RssError::MissingField { field } => write!(f, "missing RSS field: {field}"),
             RssError::InvalidSubscription { field } => {
                 write!(f, "invalid RSS subscription field: {field}")
+            }
+            RssError::InvalidSnapshot { field } => {
+                write!(f, "invalid RSS snapshot field: {field}")
             }
             RssError::SubscriptionNotFound { subscription_id } => {
                 write!(f, "RSS subscription not found: {subscription_id}")
@@ -406,6 +484,76 @@ impl RssLibrary {
     }
 }
 
+/// Export/import surface for RSS library state.
+pub trait RssLibrarySnapshotStore {
+    fn export_snapshot(&self, exported_at: i64) -> Result<RssLibrarySnapshot, RssError>;
+
+    fn replace_with_snapshot(&mut self, snapshot: RssLibrarySnapshot) -> Result<(), RssError>;
+}
+
+impl RssLibrarySnapshotStore for RssLibrary {
+    fn export_snapshot(&self, exported_at: i64) -> Result<RssLibrarySnapshot, RssError> {
+        let mut snapshot = RssLibrarySnapshot {
+            schema_version: RSS_LIBRARY_SNAPSHOT_SCHEMA_VERSION,
+            exported_at,
+            subscriptions: self.subscriptions.values().cloned().collect(),
+            entries: self.entries.values().cloned().collect(),
+        };
+        sort_rss_snapshot(&mut snapshot);
+        snapshot.validate()?;
+        Ok(snapshot)
+    }
+
+    fn replace_with_snapshot(&mut self, snapshot: RssLibrarySnapshot) -> Result<(), RssError> {
+        snapshot.validate()?;
+        let RssLibrarySnapshot {
+            subscriptions: snapshot_subscriptions,
+            entries: snapshot_entries,
+            ..
+        } = snapshot;
+        let mut subscriptions = HashMap::new();
+        let mut entries = HashMap::new();
+
+        for mut subscription in snapshot_subscriptions {
+            subscription.unread_count = snapshot_unread_count(&snapshot_entries, &subscription);
+            subscriptions.insert(subscription.subscription_id.clone(), subscription);
+        }
+        for state in snapshot_entries {
+            entries.insert(
+                RssEntryKey {
+                    subscription_id: state.subscription_id.clone(),
+                    entry_id: state.entry.id.clone(),
+                },
+                state,
+            );
+        }
+
+        self.subscriptions = subscriptions;
+        self.entries = entries;
+        Ok(())
+    }
+}
+
+fn sort_rss_snapshot(snapshot: &mut RssLibrarySnapshot) {
+    snapshot.subscriptions.sort_by(|a, b| {
+        a.subscription_id
+            .cmp(&b.subscription_id)
+            .then_with(|| a.feed_url.cmp(&b.feed_url))
+    });
+    snapshot.entries.sort_by(|a, b| {
+        a.subscription_id
+            .cmp(&b.subscription_id)
+            .then_with(|| a.entry.id.cmp(&b.entry.id))
+    });
+}
+
+fn snapshot_unread_count(entries: &[RssEntryState], subscription: &RssSubscription) -> u32 {
+    entries
+        .iter()
+        .filter(|state| state.subscription_id == subscription.subscription_id && !state.read)
+        .count() as u32
+}
+
 /// Parse an RSS 2.0 or Atom feed from an already-fetched XML string.
 pub fn parse_feed(xml: &str) -> Result<RssFeed, RssError> {
     parse_feed_inner(xml, None)
@@ -555,6 +703,16 @@ fn validate_subscription_fields(subscription_id: &str, feed_url: &str) -> Result
     Ok(())
 }
 
+fn validate_subscription(subscription: &RssSubscription) -> Result<(), RssError> {
+    validate_subscription_fields(&subscription.subscription_id, &subscription.feed_url)?;
+    if subscription.title.trim().is_empty() {
+        return Err(RssError::InvalidSubscription {
+            field: "title".into(),
+        });
+    }
+    Ok(())
+}
+
 fn validate_subscription_id(subscription_id: &str) -> Result<(), RssError> {
     if subscription_id.trim().is_empty() {
         return Err(RssError::InvalidSubscription {
@@ -568,6 +726,21 @@ fn validate_entry_id(entry_id: &str) -> Result<(), RssError> {
     if entry_id.trim().is_empty() {
         return Err(RssError::InvalidSubscription {
             field: "entry_id".into(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_entry(entry: &RssEntry) -> Result<(), RssError> {
+    validate_entry_id(&entry.id)
+}
+
+fn validate_entry_state(state: &RssEntryState) -> Result<(), RssError> {
+    validate_subscription_id(&state.subscription_id)?;
+    validate_entry(&state.entry)?;
+    if !state.read && state.read_at.is_some() {
+        return Err(RssError::InvalidSnapshot {
+            field: "entries.read_at".into(),
         });
     }
     Ok(())
@@ -1080,6 +1253,193 @@ mod tests {
                 .map(|id| entry(id, &format!("Entry {id}")))
                 .collect(),
         }
+    }
+
+    fn populate_snapshot_library(library: &mut RssLibrary) {
+        library
+            .upsert_subscription(
+                RssSubscription::new("b", "https://example.test/b.xml", "Beta").unwrap(),
+            )
+            .unwrap();
+        library
+            .upsert_subscription(
+                RssSubscription::new("a", "https://example.test/a.xml", "Alpha").unwrap(),
+            )
+            .unwrap();
+        library
+            .refresh_subscription("b", &feed(&["2", "1"]), 1000)
+            .unwrap();
+        library
+            .refresh_subscription("a", &feed(&["9"]), 2000)
+            .unwrap();
+        library.mark_entry_read("b", "1", 1100).unwrap();
+        library.set_entry_starred("b", "1", true).unwrap();
+    }
+
+    #[test]
+    fn rss_snapshot_export_is_stable_and_json_round_trips() {
+        let mut library = RssLibrary::new();
+        populate_snapshot_library(&mut library);
+
+        let snapshot = library.export_snapshot(42).unwrap();
+
+        assert_eq!(snapshot.schema_version, RSS_LIBRARY_SNAPSHOT_SCHEMA_VERSION);
+        assert_eq!(snapshot.exported_at, 42);
+        assert_eq!(
+            snapshot
+                .subscriptions
+                .iter()
+                .map(|subscription| subscription.subscription_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["a", "b"]
+        );
+        assert_eq!(
+            snapshot
+                .entries
+                .iter()
+                .map(|state| {
+                    (
+                        state.subscription_id.as_str(),
+                        state.entry.id.as_str(),
+                        state.read,
+                        state.starred,
+                    )
+                })
+                .collect::<Vec<_>>(),
+            vec![
+                ("a", "9", false, false),
+                ("b", "1", true, true),
+                ("b", "2", false, false)
+            ]
+        );
+
+        let json = serde_json::to_string(&snapshot).unwrap();
+        assert!(json.contains(r#""schemaVersion":1"#));
+        let back: RssLibrarySnapshot = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, snapshot);
+    }
+
+    #[test]
+    fn rss_snapshot_replace_round_trips_state_and_recomputes_unread_count() {
+        let mut source = RssLibrary::new();
+        populate_snapshot_library(&mut source);
+        let mut snapshot = source.export_snapshot(77).unwrap();
+        for subscription in &mut snapshot.subscriptions {
+            subscription.unread_count = 999;
+        }
+
+        let mut restored = RssLibrary::new();
+        restored.replace_with_snapshot(snapshot).unwrap();
+
+        assert_eq!(
+            restored
+                .get_subscription("a")
+                .unwrap()
+                .unwrap()
+                .unread_count,
+            1
+        );
+        assert_eq!(
+            restored
+                .get_subscription("b")
+                .unwrap()
+                .unwrap()
+                .unread_count,
+            1
+        );
+        let b_entries = restored.list_entries("b").unwrap();
+        let one = b_entries
+            .iter()
+            .find(|state| state.entry.id == "1")
+            .unwrap();
+        assert!(one.read);
+        assert_eq!(one.read_at, Some(1100));
+        assert!(one.starred);
+    }
+
+    #[test]
+    fn rss_snapshot_empty_replace_clears_existing_library() {
+        let mut library = RssLibrary::new();
+        populate_snapshot_library(&mut library);
+
+        library
+            .replace_with_snapshot(RssLibrarySnapshot::empty(100))
+            .unwrap();
+
+        assert!(library.list_subscriptions().is_empty());
+        assert!(library.get_subscription("a").unwrap().is_none());
+    }
+
+    #[test]
+    fn rss_snapshot_rejects_schema_duplicates_orphans_and_unknown_fields() {
+        let mut wrong_schema = RssLibrarySnapshot::empty(1);
+        wrong_schema.schema_version = 2;
+        assert_eq!(
+            wrong_schema.validate().unwrap_err(),
+            RssError::InvalidSnapshot {
+                field: "schema_version".into()
+            }
+        );
+
+        let mut duplicate_subscription = RssLibrarySnapshot::empty(1);
+        duplicate_subscription
+            .subscriptions
+            .push(RssSubscription::new("sub", "https://example.test/a.xml", "A").unwrap());
+        duplicate_subscription
+            .subscriptions
+            .push(RssSubscription::new("sub", "https://example.test/b.xml", "B").unwrap());
+        assert_eq!(
+            duplicate_subscription.validate().unwrap_err(),
+            RssError::InvalidSnapshot {
+                field: "subscriptions".into()
+            }
+        );
+
+        let mut orphan_entry = RssLibrarySnapshot::empty(1);
+        orphan_entry.entries.push(RssEntryState {
+            subscription_id: "missing".into(),
+            entry: entry("1", "One"),
+            first_seen_at: 1000,
+            read: false,
+            read_at: None,
+            starred: false,
+        });
+        assert_eq!(
+            orphan_entry.validate().unwrap_err(),
+            RssError::InvalidSnapshot {
+                field: "entries.subscription_id".into()
+            }
+        );
+
+        let unknown =
+            r#"{"schemaVersion":1,"exportedAt":1,"subscriptions":[],"entries":[],"bogus":true}"#;
+        assert!(serde_json::from_str::<RssLibrarySnapshot>(unknown).is_err());
+    }
+
+    #[test]
+    fn rss_snapshot_replace_is_atomic_on_validation_failure() {
+        let mut library = RssLibrary::new();
+        populate_snapshot_library(&mut library);
+        let before = library.export_snapshot(1).unwrap();
+
+        let mut invalid = RssLibrarySnapshot::empty(2);
+        invalid
+            .subscriptions
+            .push(RssSubscription::new("sub", "https://example.test/feed.xml", "Feed").unwrap());
+        invalid.entries.push(RssEntryState {
+            subscription_id: "sub".into(),
+            entry: entry("", "Invalid"),
+            first_seen_at: 1,
+            read: false,
+            read_at: None,
+            starred: false,
+        });
+
+        assert!(matches!(
+            library.replace_with_snapshot(invalid),
+            Err(RssError::InvalidSubscription { .. })
+        ));
+        assert_eq!(library.export_snapshot(1).unwrap(), before);
     }
 
     #[test]
