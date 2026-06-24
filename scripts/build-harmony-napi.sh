@@ -57,6 +57,25 @@ else
   echo "bun not found; skipped bindings/harmony/sdk/reader_core.test.ts" > "$sdk_smoke_output"
 fi
 
+package_dir="$build_dir/package"
+package_manifest="$build_dir/harmony-package-manifest.sha256"
+rm -rf "$package_dir"
+mkdir -p "$package_dir/sdk" "$package_dir/libs/arm64-v8a"
+cp bindings/harmony/oh-package.json5 "$package_dir/"
+cp bindings/harmony/Index.ets "$package_dir/"
+cp bindings/harmony/README.md "$package_dir/"
+cp bindings/harmony/STATUS.md "$package_dir/"
+cp bindings/harmony/sdk/reader_core.ts "$package_dir/sdk/"
+cp "$output" "$package_dir/libs/arm64-v8a/"
+(
+  cd "$package_dir"
+  find . -type f | LC_ALL=C sort | while IFS= read -r file; do
+    sha="$(shasum -a 256 "$file" | awk '{print $1}')"
+    bytes="$(wc -c < "$file" | tr -d '[:space:]')"
+    printf '%s  %s  %s\n' "$sha" "$bytes" "${file#./}"
+  done
+) > "$package_manifest"
+
 reader_core_static="target/aarch64-unknown-linux-ohos/release/libreader_core.a"
 symbols_file="$build_dir/libreader_core_napi.symbols.txt"
 napi_symbols_file="$build_dir/libreader_core_napi.napi-symbols.txt"
@@ -85,6 +104,9 @@ evidence="$build_dir/harmony-napi-build-evidence.txt"
   echo "ohos_sdk_home=$sdk_root"
   echo "arkts_entry=bindings/harmony/Index.ets"
   echo "ohpm_package=bindings/harmony/oh-package.json5"
+  echo "package_dir=$package_dir"
+  echo "package_manifest=$package_manifest"
+  echo "package_manifest_sha256=$(artifact_sha256 "$package_manifest")"
   echo "exports=abiVersion,createRuntime,releaseRuntime,sendCommand,cancelRequest,readEvent,pendingEventCount,completeHostRequest,failHostRequest,pingSmoke,hostSmoke"
   echo "sdk_smoke=$sdk_smoke"
   echo "sdk_smoke_output=$sdk_smoke_output"

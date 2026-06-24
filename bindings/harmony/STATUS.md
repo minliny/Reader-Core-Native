@@ -25,7 +25,8 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
   `libreader_core_napi.so` and exposes `createReaderCoreRuntime` plus
   `runHarmonyNapiSmoke`.
 - Build evidence: OHOS and Harmony scripts emit deterministic artifact paths,
-  SHA-256 hashes, byte sizes, tool versions, and NAPI symbol evidence.
+  SHA-256 hashes, byte sizes, tool versions, NAPI symbol evidence, and a
+  package-ready Harmony directory manifest.
 
 ## Current SDK Surface
 
@@ -37,6 +38,9 @@ to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
   generic `request`, explicit `readEvent`, explicit `completeHostRequest`, and
   explicit `failHostRequest`.
 - Package entry: `bindings/harmony/oh-package.json5` points to `Index.ets`.
+- Package artifact: `scripts/build-harmony-napi.sh` assembles
+  `target/harmony-napi/arm64-v8a/package` with the `.so`, ArkTS entry, SDK, and
+  status/readme files, then emits `harmony-package-manifest.sha256`.
 
 ## ABI Constraints
 

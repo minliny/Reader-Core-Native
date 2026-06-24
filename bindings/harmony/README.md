@@ -12,6 +12,19 @@ This package is the Harmony-side wrapper for `libreader_core_napi.so`.
   exposes `createReaderCoreRuntime` plus `runHarmonyNapiSmoke`.
 - `STATUS.md`: current integration status and ABI constraints.
 
+## Build Output
+
+`scripts/build-harmony-napi.sh` emits a package-ready directory at:
+
+```text
+target/harmony-napi/arm64-v8a/package
+```
+
+The directory contains `oh-package.json5`, `Index.ets`, `sdk/reader_core.ts`,
+`README.md`, `STATUS.md`, and `libs/arm64-v8a/libreader_core_napi.so`. The same
+build also writes `target/harmony-napi/arm64-v8a/harmony-package-manifest.sha256`
+with a deterministic SHA-256 and byte-size line for every package file.
+
 ## Device Smoke Entry
 
 After packaging `libreader_core_napi.so` with the Harmony app, call:
