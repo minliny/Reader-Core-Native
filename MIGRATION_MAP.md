@@ -40,7 +40,7 @@ cache/progress smoke，SQLite 持久化和平台迁移仍在后续阶段。
 
 | 模块 | 状态 | 备注 |
 |------|:----:|------|
-| NativeCoreBridge (JNI) | ⬜ | Pending; no completed remote Android JNI integration branch is present on origin |
+| NativeCoreBridge (JNI) | 🟡 | Core-side JNI shim and build script added; local `.so` build still needs Android NDK validation; App-side Java/Kotlin loading pending |
 | HTTP Transport (OkHttp) | ⬜ | 保留为 transport |
 | WebView Adapter | ⬜ | 保留 |
 | TTS Adapter | ⬜ | 保留 |
