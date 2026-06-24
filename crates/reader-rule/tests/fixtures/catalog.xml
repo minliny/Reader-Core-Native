@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog xmlns:r="urn:reader:test">
+  <r:book id="1">
+    <r:title>Dune</r:title>
+    <r:author>Frank Herbert</r:author>
+  </r:book>
+  <r:book id="2">
+    <r:title>Foundation</r:title>
+    <r:author>Isaac Asimov</r:author>
+  </r:book>
+</catalog>
