@@ -130,6 +130,12 @@ mod tests {
                 ),
             ),
             (
+                "valid-runtime-status",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/valid-runtime-status.json"
+                ),
+            ),
+            (
                 "valid-core-info",
                 include_str!(
                     "../../../protocol/fixtures/conformance/commands/valid-core-info.json"

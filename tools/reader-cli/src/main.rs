@@ -31,6 +31,7 @@ impl EventSink for ChannelSink {
 enum Mode {
     Info,
     Ping,
+    Status,
     HostSmoke,
     Conformance,
     Json(String),
@@ -66,6 +67,11 @@ fn run() -> Result<(), CoreError> {
             &runtime,
             &rx,
             Command::new(1, methods::RUNTIME_PING, serde_json::json!({})),
+        ),
+        Mode::Status => run_command(
+            &runtime,
+            &rx,
+            Command::new(1, methods::RUNTIME_STATUS, serde_json::json!({})),
         ),
         Mode::Json(json) => {
             runtime.send_json(json.as_bytes())?;
@@ -109,6 +115,7 @@ where
         match arg.as_str() {
             "--info" => set_mode(&mut mode, Mode::Info)?,
             "--ping" => set_mode(&mut mode, Mode::Ping)?,
+            "--status" => set_mode(&mut mode, Mode::Status)?,
             "--host-smoke" => set_mode(&mut mode, Mode::HostSmoke)?,
             "--conformance" => set_mode(&mut mode, Mode::Conformance)?,
             "--stdin" => set_mode(&mut mode, Mode::Stdin)?,
@@ -154,7 +161,7 @@ where
 fn set_mode(slot: &mut Option<Mode>, mode: Mode) -> Result<(), CoreError> {
     if slot.is_some() {
         return Err(CoreError::invalid_message(
-            "only one of --info, --ping, --host-smoke, --conformance, --json, --stdin, or --fixture-vertical may be used",
+            "only one of --info, --ping, --status, --host-smoke, --conformance, --json, --stdin, or --fixture-vertical may be used",
         ));
     }
     *slot = Some(mode);
@@ -309,6 +316,7 @@ fn run_fixture_vertical(
             "operationId": operation_id,
             "result": {
                 "status": 200,
+                "headers": { "content-type": "application/json" },
                 "body": search_response
             }
         }),
@@ -408,6 +416,6 @@ fn print_event(event: &Event) {
 
 fn print_usage() {
     eprintln!(
-        "usage: reader-cli [--info|--ping|--host-smoke|--conformance|--json '<command>'|--stdin|--fixture-vertical <path>] [--config-json '<config>']"
+        "usage: reader-cli [--info|--ping|--status|--host-smoke|--conformance|--json '<command>'|--stdin|--fixture-vertical <path>] [--config-json '<config>']"
     );
 }
