@@ -315,6 +315,22 @@ int main(void) {
     return fail("malformed send did not record INVALID_MESSAGE");
   }
 
+  const char *params_not_object =
+      "{\"protocolVersion\":1,\"requestId\":8,\"method\":\"runtime.ping\","
+      "\"params\":[]}";
+  if (send_str(rt, params_not_object) != RC_SEND_INVALID_COMMAND) {
+    return fail("non-object params did not return RC_SEND_INVALID_COMMAND");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_PARAMS || !contains(msg, "params")) {
+    fprintf(stderr, "non-object params last_error: code=%d msg=%s\n", code,
+            msg);
+    return fail("non-object params did not record INVALID_PARAMS");
+  }
+  if (channel_count(&ch) != 0) {
+    return fail("non-object params emitted an async event");
+  }
+
   const char *proto_v2 =
       "{\"protocolVersion\":2,\"requestId\":9,\"method\":\"runtime.ping\","
       "\"params\":{}}";

@@ -282,6 +282,18 @@ int main() {
   if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "command JSON")) {
     return fail("malformed send did not record INVALID_MESSAGE");
   }
+  std::string params_not_object =
+      R"({"protocolVersion":1,"requestId":8,"method":"runtime.ping","params":[]})";
+  if (send_str(rt, params_not_object) != RC_SEND_INVALID_COMMAND) {
+    return fail("non-object params did not return RC_SEND_INVALID_COMMAND");
+  }
+  msg = last_error_message(&code);
+  if (code != RC_ERR_INVALID_PARAMS || !contains(msg, "params")) {
+    return fail("non-object params did not record INVALID_PARAMS");
+  }
+  if (channel_count(ch) != 0) {
+    return fail("non-object params emitted an async event");
+  }
   std::string proto_v2 =
       R"({"protocolVersion":2,"requestId":9,"method":"runtime.ping","params":{}})";
   if (send_str(rt, proto_v2) != RC_SEND_PROTOCOL_ERROR) {

@@ -76,9 +76,10 @@ pub unsafe fn send(
         ));
         return status::send::NULL_COMMAND;
     };
-    // Parse JSON + structure only. Protocol-version / duplicate-requestId /
-    // shutdown checks happen in `Runtime::send` so they map to status 4, not
-    // the parse-failure status 3 — keeping the documented status contract.
+    // Parse JSON + top-level message structure only. Protocol-version /
+    // duplicate-requestId / shutdown checks happen in `Runtime::send` so they
+    // map to status 4, not the parse/shape-failure status 3 — keeping the
+    // documented status contract.
     let command: Command = match serde_json::from_slice(bytes) {
         Ok(c) => c,
         Err(err) => {
@@ -89,6 +90,13 @@ pub unsafe fn send(
             return status::send::INVALID_COMMAND;
         }
     };
+    if !command.params.is_object() {
+        last_error::set(
+            CoreError::invalid_params("command params must be a JSON object")
+                .with_details(serde_json::json!({ "method": command.method.clone() })),
+        );
+        return status::send::INVALID_COMMAND;
+    }
     match handle.runtime.send(command) {
         Ok(()) => {
             last_error::clear();
@@ -358,6 +366,19 @@ mod tests {
             last_error_code(),
             last_error::code_of(ErrorCode::InvalidMessage)
         );
+
+        // Non-object params → status 3, structured INVALID_PARAMS.
+        let invalid_params =
+            br#"{"protocolVersion":1,"requestId":2,"method":"runtime.ping","params":[]}"#;
+        assert_eq!(
+            unsafe { send(handle, invalid_params.as_ptr(), invalid_params.len()) },
+            3
+        );
+        assert_eq!(
+            last_error_code(),
+            last_error::code_of(ErrorCode::InvalidParams)
+        );
+        assert!(last_error_message().contains("params"));
 
         // Protocol-version mismatch → status 4, INVALID_PROTOCOL_VERSION.
         let proto = br#"{"protocolVersion":2,"requestId":2,"method":"runtime.ping","params":{}}"#;

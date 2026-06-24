@@ -132,7 +132,10 @@ int32_t rc_runtime_create(
 /// Returns `RC_SEND_OK` on success, or one of:
 ///   `RC_SEND_NULL_RUNTIME` = `runtime` is NULL
 ///   `RC_SEND_NULL_COMMAND` = `command_json` is NULL with non-zero length
-///   `RC_SEND_INVALID_COMMAND` = malformed command JSON / message structure
+///   `RC_SEND_INVALID_COMMAND` = malformed command JSON or top-level message
+///       structure (including non-object `params`). The structured last-error
+///       code distinguishes `RC_ERR_INVALID_MESSAGE` from
+///       `RC_ERR_INVALID_PARAMS`.
 ///   `RC_SEND_PROTOCOL_ERROR` = protocol-version mismatch, duplicate active
 ///       requestId, or runtime shutting down.
 ///   `RC_SEND_PANIC` = an internal Rust panic was caught by the ABI guard
