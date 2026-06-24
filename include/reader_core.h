@@ -203,8 +203,10 @@ typedef enum rc_error_code {
 /// If `out_message` is non-NULL and `message_capacity` > 0, writes a
 /// NUL-terminated human-readable message into `out_message`, truncated to fit.
 /// When no error is pending, writes an empty NUL-terminated string so stale
-/// host-side text is cleared. `out_message` is owned by the caller; Core never
-/// aliases it.
+/// host-side text is cleared. If `out_message` is NULL, or if
+/// `message_capacity` is 0, Core returns only the code and writes nothing.
+/// Reading through any of these forms does not consume the slot.
+/// `out_message` is owned by the caller; Core never aliases it.
 ///
 /// Thread-safety: the slot is per-thread. Only the thread that issued the
 /// failing call can read its error.

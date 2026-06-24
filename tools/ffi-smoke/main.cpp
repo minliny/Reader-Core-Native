@@ -142,6 +142,15 @@ int main() {
       RC_SEND_NULL_RUNTIME) {
     return fail("null runtime send did not return RC_SEND_NULL_RUNTIME");
   }
+  code = rc_last_error(nullptr, 16);
+  if (code != RC_ERR_INVALID_MESSAGE) {
+    return fail("null-buffer last_error did not return INVALID_MESSAGE");
+  }
+  char zero_cap[] = "stale";
+  code = rc_last_error(zero_cap, 0);
+  if (code != RC_ERR_INVALID_MESSAGE || std::string(zero_cap) != "stale") {
+    return fail("zero-cap last_error wrote message or changed code");
+  }
   (void)rc_abi_version();
   msg = last_error_message(&code);
   if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "runtime handle")) {

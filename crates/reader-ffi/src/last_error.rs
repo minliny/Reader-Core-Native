@@ -132,9 +132,24 @@ mod tests {
         clear();
         set(CoreError::cancelled());
         let code1 = unsafe { read(std::ptr::null_mut(), 0) };
-        let code2 = unsafe { read(std::ptr::null_mut(), 0) };
+        let code2 = unsafe { read(std::ptr::null_mut(), 64) };
+        let mut buf = [0u8; 16];
+        let code3 = unsafe { read(buf.as_mut_ptr(), buf.len()) };
         assert_eq!(code1, code_of(ErrorCode::Cancelled));
         assert_eq!(code2, code_of(ErrorCode::Cancelled));
+        assert_eq!(code3, code_of(ErrorCode::Cancelled));
+        let end = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
+        assert!(end > 0);
+    }
+
+    #[test]
+    fn read_with_zero_capacity_writes_nothing() {
+        clear();
+        set(CoreError::internal("boom"));
+        let mut buf = *b"stale";
+        let code = unsafe { read(buf.as_mut_ptr(), 0) };
+        assert_eq!(code, code_of(ErrorCode::Internal));
+        assert_eq!(&buf, b"stale");
     }
 
     #[test]

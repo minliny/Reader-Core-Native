@@ -146,6 +146,17 @@ int main(void) {
       RC_SEND_NULL_RUNTIME) {
     return fail("null runtime send did not return RC_SEND_NULL_RUNTIME");
   }
+  code = rc_last_error(NULL, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE) {
+    fprintf(stderr, "null-buffer last_error code=%d\n", code);
+    return fail("null-buffer last_error did not return INVALID_MESSAGE");
+  }
+  strcpy(msg, "stale");
+  code = rc_last_error(msg, 0);
+  if (code != RC_ERR_INVALID_MESSAGE || strcmp(msg, "stale") != 0) {
+    fprintf(stderr, "zero-cap last_error: code=%d msg=%s\n", code, msg);
+    return fail("zero-cap last_error wrote message or changed code");
+  }
   (void)rc_abi_version();
   code = rc_last_error(msg, sizeof msg);
   if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "runtime handle")) {
