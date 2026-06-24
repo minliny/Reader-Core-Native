@@ -74,7 +74,7 @@ evidence="$build_dir/harmony-napi-build-evidence.txt"
   echo "ninja=$("$ninja_bin" --version)"
   echo "toolchain=$toolchain"
   echo "ohos_sdk_home=$sdk_root"
-  echo "exports=abiVersion,createRuntime,releaseRuntime,sendCommand,readEvent,pendingEventCount,completeHostRequest,pingSmoke,hostSmoke"
+  echo "exports=abiVersion,createRuntime,releaseRuntime,sendCommand,cancelRequest,readEvent,pendingEventCount,completeHostRequest,pingSmoke,hostSmoke"
   if [[ -f "$symbols_file" ]]; then
     echo "symbols=$symbols_file"
     echo "symbols_sha256=$(artifact_sha256 "$symbols_file")"

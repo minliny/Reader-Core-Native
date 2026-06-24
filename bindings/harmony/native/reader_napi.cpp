@@ -388,6 +388,43 @@ napi_value SendCommand(napi_env env, napi_callback_info info) {
   return Undefined(env);
 }
 
+napi_value CancelRequest(napi_env env, napi_callback_info info) {
+  size_t argc = 2;
+  napi_value args[2] = {nullptr, nullptr};
+  if (napi_get_cb_info(env, info, &argc, args, nullptr, nullptr) != napi_ok ||
+      argc < 2) {
+    return ThrowError(env, "cancelRequest requires runtime handle and requestId");
+  }
+
+  RuntimeState *state = GetRuntimeState(env, args[0], true);
+  if (state == nullptr) {
+    return nullptr;
+  }
+
+  int64_t request_id_signed = 0;
+  if (!GetInt64Value(env, args[1], &request_id_signed)) {
+    return nullptr;
+  }
+  if (request_id_signed < 0) {
+    return ThrowError(env, "requestId must be a non-negative integer");
+  }
+
+  rc_runtime_t *runtime = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(state->mutex);
+    runtime = state->runtime;
+  }
+  if (runtime == nullptr) {
+    return ThrowError(env, "runtime already released");
+  }
+
+  int32_t code = rc_runtime_cancel(runtime, static_cast<uint64_t>(request_id_signed));
+  if (code != 0) {
+    return ThrowError(env, "rc_runtime_cancel failed");
+  }
+  return Undefined(env);
+}
+
 napi_value ReadEvent(napi_env env, napi_callback_info info) {
   size_t argc = 2;
   napi_value args[2] = {nullptr, nullptr};
@@ -596,6 +633,8 @@ napi_value Init(napi_env env, napi_value exports) {
       {"releaseRuntime", nullptr, ReleaseRuntime, nullptr, nullptr, nullptr,
        napi_default, nullptr},
       {"sendCommand", nullptr, SendCommand, nullptr, nullptr, nullptr,
+       napi_default, nullptr},
+      {"cancelRequest", nullptr, CancelRequest, nullptr, nullptr, nullptr,
        napi_default, nullptr},
       {"readEvent", nullptr, ReadEvent, nullptr, nullptr, nullptr, napi_default,
        nullptr},
