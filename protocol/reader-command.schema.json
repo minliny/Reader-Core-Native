@@ -84,6 +84,17 @@
     },
     {
       "if": {
+        "properties": { "method": { "const": "runtime.hostSmoke" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/HostSmokeParams" }
+        }
+      }
+    },
+    {
+      "if": {
         "properties": { "method": { "const": "runtime.cancel" } },
         "required": ["method"]
       },
@@ -112,6 +123,28 @@
       "then": {
         "properties": {
           "params": { "$ref": "#/$defs/RuntimeShutdownParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "host.complete" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/HostCompleteParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "host.error" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/HostErrorParams" }
         }
       }
     }

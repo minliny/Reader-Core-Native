@@ -51,6 +51,8 @@ const INVALID_CONFIG_EMPTY_DATA_DIR: &str = include_str!(
 );
 
 const HOST_REQUEST: &str = include_str!("../../../protocol/fixtures/conformance/host/request.json");
+const HOST_REQUEST_UNKNOWN_FIELD: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/request-unknown-field.json");
 const HOST_REQUEST_INVALID_CAPABILITY_WHITESPACE: &str = include_str!(
     "../../../protocol/fixtures/conformance/host/request-invalid-capability-whitespace.json"
 );
@@ -62,10 +64,14 @@ const HOST_COMPLETE: &str =
 const HOST_ERROR: &str = include_str!("../../../protocol/fixtures/conformance/host/error.json");
 const HOST_UNKNOWN_COMPLETE: &str =
     include_str!("../../../protocol/fixtures/conformance/host/unknown-complete.json");
+const HOST_COMPLETE_UNKNOWN_FIELD: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/complete-unknown-field.json");
 const HOST_COMPLETE_OPERATION_ZERO: &str =
     include_str!("../../../protocol/fixtures/conformance/host/complete-operation-zero.json");
 const HOST_ERROR_OPERATION_ZERO: &str =
     include_str!("../../../protocol/fixtures/conformance/host/error-operation-zero.json");
+const HOST_ERROR_UNKNOWN_FIELD: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/error-unknown-field.json");
 const HOST_HTTP_COMPLETE_WITH_METADATA: &str =
     include_str!("../../../protocol/fixtures/conformance/host/http-complete-with-metadata.json");
 const HOST_HTTP_COMPLETE_INVALID_STATUS: &str =
@@ -302,6 +308,11 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         },
     );
 
+    record(&mut report, "host-request-rejects-unknown-params", || {
+        let (_runtime, rx) = send_to_fresh_runtime(HOST_REQUEST_UNKNOWN_FIELD)?;
+        expect_event_error(&rx, 309, ErrorCode::InvalidParams)
+    });
+
     record(&mut report, "host-complete-routes-result", || {
         let (runtime, rx) = send_to_fresh_runtime(HOST_REQUEST)?;
         expect_host_request(&rx)?;
@@ -337,6 +348,11 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         expect_event_error(&rx, 304, ErrorCode::InvalidParams)
     });
 
+    record(&mut report, "host-complete-rejects-unknown-params", || {
+        let (_runtime, rx) = send_to_fresh_runtime(HOST_COMPLETE_UNKNOWN_FIELD)?;
+        expect_event_error(&rx, 314, ErrorCode::InvalidParams)
+    });
+
     record(&mut report, "host-complete-zero-operation-id", || {
         let (_runtime, rx) = send_to_fresh_runtime(HOST_COMPLETE_OPERATION_ZERO)?;
         expect_event_error(&rx, 305, ErrorCode::InvalidParams)
@@ -345,6 +361,11 @@ pub(crate) fn run_conformance() -> ConformanceReport {
     record(&mut report, "host-error-zero-operation-id", || {
         let (_runtime, rx) = send_to_fresh_runtime(HOST_ERROR_OPERATION_ZERO)?;
         expect_event_error(&rx, 306, ErrorCode::InvalidParams)
+    });
+
+    record(&mut report, "host-error-rejects-unknown-params", || {
+        let (_runtime, rx) = send_to_fresh_runtime(HOST_ERROR_UNKNOWN_FIELD)?;
+        expect_event_error(&rx, 315, ErrorCode::InvalidParams)
     });
 
     record(

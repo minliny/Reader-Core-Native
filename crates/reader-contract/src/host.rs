@@ -198,10 +198,18 @@ mod tests {
             assert_eq!(err.code, ErrorCode::InvalidParams);
             assert!(err.message.contains("capability"));
         }
+
+        let command = crate::Command::from_json_bytes(
+            include_str!("../../../protocol/fixtures/conformance/host/request-unknown-field.json")
+                .as_bytes(),
+        )
+        .unwrap();
+        let err = serde_json::from_value::<HostSmokeParams>(command.params).unwrap_err();
+        assert!(err.to_string().contains("unknown field"));
     }
 
     #[test]
-    fn host_completion_params_reject_zero_operation_id() {
+    fn host_completion_params_reject_zero_operation_id_and_unknown_fields() {
         let complete_command: crate::Command = crate::Command::from_json_bytes(
             include_str!(
                 "../../../protocol/fixtures/conformance/host/complete-operation-zero.json"
@@ -223,6 +231,23 @@ mod tests {
         let err = error.validate().unwrap_err();
         assert_eq!(err.code, ErrorCode::InvalidParams);
         assert_eq!(err.details["operationId"], 0);
+
+        let complete_command: crate::Command = crate::Command::from_json_bytes(
+            include_str!("../../../protocol/fixtures/conformance/host/complete-unknown-field.json")
+                .as_bytes(),
+        )
+        .unwrap();
+        let err =
+            serde_json::from_value::<HostCompleteParams>(complete_command.params).unwrap_err();
+        assert!(err.to_string().contains("unknown field"));
+
+        let error_command: crate::Command = crate::Command::from_json_bytes(
+            include_str!("../../../protocol/fixtures/conformance/host/error-unknown-field.json")
+                .as_bytes(),
+        )
+        .unwrap();
+        let err = serde_json::from_value::<HostErrorParams>(error_command.params).unwrap_err();
+        assert!(err.to_string().contains("unknown field"));
     }
 
     #[test]

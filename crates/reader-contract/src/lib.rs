@@ -181,6 +181,25 @@ mod tests {
     }
 
     #[test]
+    fn command_schema_binds_host_bus_methods_to_param_defs() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+
+        for (method, params_ref) in [
+            (methods::RUNTIME_HOST_SMOKE, "#/$defs/HostSmokeParams"),
+            (methods::HOST_COMPLETE, "#/$defs/HostCompleteParams"),
+            (methods::HOST_ERROR, "#/$defs/HostErrorParams"),
+        ] {
+            assert_eq!(
+                params_ref_for_method(&schema, method),
+                Some(params_ref),
+                "{method} must use {params_ref} in command schema"
+            );
+        }
+    }
+
+    #[test]
     fn event_schema_error_codes_match_error_code_enum() {
         let schema: Value =
             serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))

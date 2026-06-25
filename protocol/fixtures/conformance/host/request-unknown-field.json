@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "requestId": 309,
+  "method": "runtime.hostSmoke",
+  "params": {
+    "capability": "host.smoke.echo",
+    "params": {
+      "message": "unexpected metadata"
+    },
+    "timeoutMs": 1000
+  }
+}
