@@ -64,6 +64,12 @@ const INVALID_BOOK_SEARCH_REQUEST_HEADERS_NOT_OBJECT: &str = include_str!(
 const INVALID_BOOK_SEARCH_REQUEST_URL_WHITESPACE: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-book-search-request-url-whitespace.json"
 );
+const INVALID_BOOK_SEARCH_REQUEST_RETRY_ZERO: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-book-search-request-retry-zero.json"
+);
+const INVALID_BOOK_SEARCH_REQUEST_SESSION_BLANK: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-book-search-request-session-blank.json"
+);
 const INVALID_BOOK_SEARCH_SOURCE_NOT_OBJECT: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-book-search-source-not-object.json"
 );
@@ -146,8 +152,8 @@ const HOST_ERROR_DETAILS_NOT_OBJECT: &str =
     include_str!("../../../protocol/fixtures/conformance/host/error-details-not-object.json");
 const HOST_ERROR_CORE_ERROR_UNKNOWN_FIELD: &str =
     include_str!("../../../protocol/fixtures/conformance/host/error-core-error-unknown-field.json");
-const HOST_HTTP_COMPLETE_WITH_METADATA: &str =
-    include_str!("../../../protocol/fixtures/conformance/host/http-complete-with-metadata.json");
+const HOST_HTTP_COMPLETE_SESSION_METADATA: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/http-complete-session-metadata.json");
 const HOST_HTTP_COMPLETE_INVALID_STATUS: &str =
     include_str!("../../../protocol/fixtures/conformance/host/http-complete-invalid-status.json");
 const HOST_HTTP_COMPLETE_INVALID_HEADERS: &str =
@@ -675,6 +681,20 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             expect_event_error(&rx, 416, ErrorCode::InvalidParams)
         },
     );
+
+    record(
+        &mut report,
+        "book-search-rejects-zero-retry-attempts",
+        || {
+            let (_runtime, rx) = send_to_fresh_runtime(INVALID_BOOK_SEARCH_REQUEST_RETRY_ZERO)?;
+            expect_event_error(&rx, 507, ErrorCode::InvalidParams)
+        },
+    );
+
+    record(&mut report, "book-search-rejects-blank-session-id", || {
+        let (_runtime, rx) = send_to_fresh_runtime(INVALID_BOOK_SEARCH_REQUEST_SESSION_BLANK)?;
+        expect_event_error(&rx, 508, ErrorCode::InvalidParams)
+    });
 
     record(&mut report, "book-search-rejects-non-object-source", || {
         let (_runtime, rx) = send_to_fresh_runtime(INVALID_BOOK_SEARCH_SOURCE_NOT_OBJECT)?;
@@ -1636,7 +1656,7 @@ pub(crate) fn run_conformance() -> ConformanceReport {
                 .map_err(|err| format!("remote http command send failed: {err:?}"))?;
             expect_http_host_request(&rx, 501)?;
             runtime
-                .send_json(HOST_HTTP_COMPLETE_WITH_METADATA.as_bytes())
+                .send_json(HOST_HTTP_COMPLETE_SESSION_METADATA.as_bytes())
                 .map_err(|err| format!("http host.complete send failed: {err:?}"))?;
 
             match recv_event(&rx)? {
@@ -1650,10 +1670,17 @@ pub(crate) fn run_conformance() -> ConformanceReport {
                         .ok_or_else(|| "missing book.search http diagnostics".to_string())?;
                     if data.books.is_empty()
                         && http.status == Some(200)
+                        && http.headers.as_ref().is_some_and(|headers| {
+                            headers["content-type"] == "application/json; charset=gbk"
+                                && headers["set-cookie"][0] == "sid=new; Path=/; HttpOnly"
+                        })
+                        && http.final_url.as_deref()
+                            == Some("https://books.example.test/search?q=empty")
+                        && http.charset_hint.as_deref() == Some("gbk")
                         && http
-                            .headers
+                            .session
                             .as_ref()
-                            .is_some_and(|headers| headers["content-type"] == "application/json")
+                            .is_some_and(|session| session.id == "core-session-main")
                     {
                         Ok(())
                     } else {
@@ -2241,7 +2268,21 @@ fn remote_http_search_command(request_id: u64) -> Command {
             "sourceId": "conformance-src",
             "searchRequest": {
                 "url": "https://books.example.test/search?q=empty",
-                "headers": { "Accept": "application/json" }
+                "headers": {
+                    "Accept": "application/json",
+                    "Cookie": "sid=old"
+                },
+                "charset": "gbk",
+                "followRedirects": false,
+                "maxRedirects": 0,
+                "retry": {
+                    "maxAttempts": 2,
+                    "backoffMillis": 50
+                },
+                "usePlatformCookieJar": false,
+                "session": {
+                    "id": "core-session-main"
+                }
             },
             "source": {
                 "sourceId": "conformance-src",
@@ -2270,7 +2311,15 @@ fn expect_http_host_request(rx: &Receiver<Event>, expected_request_id: u64) -> R
             && params.is_object()
             && params["url"] == "https://books.example.test/search?q=empty"
             && params["method"] == "GET"
-            && params["headers"]["Accept"] == "application/json" =>
+            && params["headers"]["Accept"] == "application/json"
+            && params["headers"]["Cookie"] == "sid=old"
+            && params["charset"] == "gbk"
+            && params["followRedirects"] == false
+            && params["maxRedirects"] == 0
+            && params["retry"]["maxAttempts"] == 2
+            && params["retry"]["backoffMillis"] == 50
+            && params["usePlatformCookieJar"] == false
+            && params["session"]["id"] == "core-session-main" =>
         {
             Ok(operation_id)
         }

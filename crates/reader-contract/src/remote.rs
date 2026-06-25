@@ -76,6 +76,14 @@ fn validate_http_headers_shape(value: &Value) -> Result<(), &'static str> {
     }
 }
 
+fn validate_optional_non_blank(value: Option<&str>, field: &'static str) -> Result<(), String> {
+    if value.is_some_and(|value| value.trim().is_empty()) {
+        Err(format!("http.execute {field} must not be blank"))
+    } else {
+        Ok(())
+    }
+}
+
 fn deserialize_non_blank_source_name<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: Deserializer<'de>,
@@ -347,6 +355,55 @@ pub struct HostHttpRequest {
     pub headers: Value,
     #[serde(default)]
     pub body: Option<String>,
+    #[serde(default)]
+    pub charset: Option<String>,
+    #[serde(default)]
+    pub follow_redirects: Option<bool>,
+    #[serde(default)]
+    pub max_redirects: Option<u32>,
+    #[serde(default)]
+    pub retry: Option<HostHttpRetryPolicy>,
+    #[serde(default)]
+    pub use_platform_cookie_jar: Option<bool>,
+    #[serde(default)]
+    pub session: Option<HostHttpSession>,
+}
+
+/// Retry policy requested by Core and executed by the host HTTP stack.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HostHttpRetryPolicy {
+    pub max_attempts: u32,
+    #[serde(default)]
+    pub backoff_millis: Option<u64>,
+}
+
+impl HostHttpRetryPolicy {
+    pub fn validate(&self) -> Result<(), CoreError> {
+        if self.max_attempts == 0 {
+            return Err(CoreError::invalid_params(
+                "http.execute request retry.maxAttempts must be greater than 0",
+            )
+            .with_details(serde_json::json!({ "retry": self })));
+        }
+        Ok(())
+    }
+}
+
+/// Session/cookie jar handle. The host must treat this as an opaque Core-owned
+/// session identifier unless a later platform contract says otherwise.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HostHttpSession {
+    pub id: String,
+}
+
+impl HostHttpSession {
+    pub fn validate(&self) -> Result<(), CoreError> {
+        validate_optional_non_blank(Some(&self.id), "session.id").map_err(|message| {
+            CoreError::invalid_params(message).with_details(serde_json::json!({ "session": self }))
+        })
+    }
 }
 
 impl HostHttpRequest {
@@ -374,7 +431,26 @@ impl HostHttpRequest {
                 "field": "headers",
                 "headers": self.headers,
             }))
-        })
+        })?;
+
+        validate_optional_non_blank(self.charset.as_deref(), "request charset").map_err(
+            |message| {
+                CoreError::invalid_params(message).with_details(serde_json::json!({
+                    "field": "charset",
+                    "charset": self.charset,
+                }))
+            },
+        )?;
+
+        if let Some(retry) = &self.retry {
+            retry.validate()?;
+        }
+
+        if let Some(session) = &self.session {
+            session.validate()?;
+        }
+
+        Ok(())
     }
 }
 
@@ -391,6 +467,14 @@ pub struct HostHttpResponse {
     pub status: Option<u16>,
     #[serde(default)]
     pub headers: Option<Value>,
+    #[serde(default)]
+    pub final_url: Option<String>,
+    #[serde(default)]
+    pub charset_hint: Option<String>,
+    #[serde(default)]
+    pub body_base64: Option<String>,
+    #[serde(default)]
+    pub session: Option<HostHttpSession>,
 }
 
 impl HostHttpResponse {
@@ -411,6 +495,34 @@ impl HostHttpResponse {
                 )
                 .with_details(serde_json::json!({ "headers": headers })));
             }
+        }
+
+        validate_optional_non_blank(self.final_url.as_deref(), "result finalUrl").map_err(
+            |message| {
+                CoreError::invalid_params(message).with_details(serde_json::json!({
+                    "finalUrl": self.final_url,
+                }))
+            },
+        )?;
+
+        validate_optional_non_blank(self.charset_hint.as_deref(), "result charsetHint").map_err(
+            |message| {
+                CoreError::invalid_params(message).with_details(serde_json::json!({
+                    "charsetHint": self.charset_hint,
+                }))
+            },
+        )?;
+
+        validate_optional_non_blank(self.body_base64.as_deref(), "result bodyBase64").map_err(
+            |message| {
+                CoreError::invalid_params(message).with_details(serde_json::json!({
+                    "bodyBase64": self.body_base64,
+                }))
+            },
+        )?;
+
+        if let Some(session) = &self.session {
+            session.validate()?;
         }
 
         Ok(())
@@ -482,6 +594,12 @@ pub struct RemoteHttpDiagnosticsData {
     pub status: Option<u16>,
     #[serde(default, deserialize_with = "deserialize_remote_http_headers")]
     pub headers: Option<Value>,
+    #[serde(default)]
+    pub final_url: Option<String>,
+    #[serde(default)]
+    pub charset_hint: Option<String>,
+    #[serde(default)]
+    pub session: Option<HostHttpSession>,
 }
 
 /// Minimal stable book shape returned by `book.search`.
@@ -704,7 +822,10 @@ mod tests {
             "status": 200,
             "headers": { "content-type": "application/json" },
             "body": "{\"books\":[]}",
-            "finalUrl": "https://books.example.test/search"
+            "finalUrl": "https://books.example.test/search",
+            "charsetHint": "gbk",
+            "bodyBase64": "eyJib29rcyI6W119",
+            "session": { "id": "core-session-main" }
         }))
         .unwrap();
 
@@ -714,16 +835,44 @@ mod tests {
             response.headers.unwrap()["content-type"],
             "application/json"
         );
+        assert_eq!(
+            response.final_url.as_deref(),
+            Some("https://books.example.test/search")
+        );
+        assert_eq!(response.charset_hint.as_deref(), Some("gbk"));
+        assert_eq!(response.body_base64.as_deref(), Some("eyJib29rcyI6W119"));
+        assert_eq!(
+            response.session.as_ref().map(|session| session.id.as_str()),
+            Some("core-session-main")
+        );
     }
 
     #[test]
     fn host_http_request_defaults_method_and_rejects_blank_method() {
         let request: HostHttpRequest = serde_json::from_value(serde_json::json!({
-            "url": "https://books.example.test/search"
+            "url": "https://books.example.test/search",
+            "charset": "gbk",
+            "followRedirects": false,
+            "maxRedirects": 0,
+            "retry": { "maxAttempts": 2, "backoffMillis": 50 },
+            "usePlatformCookieJar": false,
+            "session": { "id": "core-session-main" }
         }))
         .unwrap();
         assert_eq!(request.method, "GET");
         assert_eq!(request.headers, serde_json::json!({}));
+        assert_eq!(request.charset.as_deref(), Some("gbk"));
+        assert_eq!(request.follow_redirects, Some(false));
+        assert_eq!(request.max_redirects, Some(0));
+        assert_eq!(
+            request.retry.as_ref().map(|retry| retry.max_attempts),
+            Some(2)
+        );
+        assert_eq!(request.use_platform_cookie_jar, Some(false));
+        assert_eq!(
+            request.session.as_ref().map(|session| session.id.as_str()),
+            Some("core-session-main")
+        );
         request.validate().unwrap();
 
         for method in ["", "   "] {
@@ -737,6 +886,27 @@ mod tests {
                 "unexpected parse error: {err}"
             );
         }
+    }
+
+    #[test]
+    fn host_http_request_rejects_invalid_retry_and_session() {
+        let request: HostHttpRequest = serde_json::from_value(serde_json::json!({
+            "url": "https://books.example.test/search",
+            "retry": { "maxAttempts": 0 }
+        }))
+        .unwrap();
+        let err = request.validate().unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert!(err.message.contains("retry.maxAttempts"));
+
+        let request: HostHttpRequest = serde_json::from_value(serde_json::json!({
+            "url": "https://books.example.test/search",
+            "session": { "id": "   " }
+        }))
+        .unwrap();
+        let err = request.validate().unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert!(err.message.contains("session.id"));
     }
 
     #[test]

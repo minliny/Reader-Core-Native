@@ -253,6 +253,28 @@
           "type": ["object", "null"],
           "default": {},
           "description": "Optional HTTP response headers accepted by Core for diagnostics."
+        },
+        "finalUrl": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Final URL observed by the host after redirect handling. Diagnostic in V1."
+        },
+        "charsetHint": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Optional host-observed charset hint. Core owns final decoding policy."
+        },
+        "bodyBase64": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Optional raw response body bytes encoded as Base64. V1 still requires body for compatibility."
+        },
+        "session": {
+          "$ref": "#/$defs/HostHttpSession",
+          "description": "Opaque Core-owned session/cookie-jar handle associated with the response."
         }
       }
     },
@@ -284,6 +306,63 @@
           "type": ["string", "null"],
           "default": null,
           "description": "Optional request body."
+        },
+        "charset": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Optional response charset expectation or hint supplied by Core."
+        },
+        "followRedirects": {
+          "type": "boolean",
+          "description": "Whether the host may follow redirects for this request. Defaults are host-contract defined; hosts must not infer platform defaults."
+        },
+        "maxRedirects": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum redirect hops the host may follow when followRedirects is true."
+        },
+        "retry": {
+          "$ref": "#/$defs/HostHttpRetryPolicy",
+          "description": "Core-owned retry policy executed by the host transport."
+        },
+        "usePlatformCookieJar": {
+          "type": "boolean",
+          "description": "Whether the host may use its platform cookie jar. False keeps cookie state Core-owned."
+        },
+        "session": {
+          "$ref": "#/$defs/HostHttpSession",
+          "description": "Opaque Core-owned session/cookie-jar handle for this request."
+        }
+      }
+    },
+    "HostHttpRetryPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxAttempts"],
+      "properties": {
+        "maxAttempts": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of transport attempts including the first attempt."
+        },
+        "backoffMillis": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Optional base retry backoff in milliseconds."
+        }
+      }
+    },
+    "HostHttpSession": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Opaque session/cookie-jar identifier owned by Core."
         }
       }
     },

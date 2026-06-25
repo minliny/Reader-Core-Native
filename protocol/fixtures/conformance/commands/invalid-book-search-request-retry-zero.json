@@ -1,0 +1,30 @@
+{
+  "protocolVersion": 1,
+  "requestId": 507,
+  "method": "book.search",
+  "params": {
+    "sourceId": "conformance-source",
+    "searchRequest": {
+      "url": "https://books.example.test/search?q=empty",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "retry": {
+        "maxAttempts": 0
+      }
+    },
+    "source": {
+      "sourceId": "conformance-source",
+      "name": "Conformance Source",
+      "baseUrl": "https://books.example.test",
+      "rules": {
+        "search": [
+          {
+            "kind": "jsonPath",
+            "path": "$.books[*]"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -230,6 +230,35 @@
         "headers": {
           "type": "object",
           "description": "HTTP headers supplied by the host completion."
+        },
+        "finalUrl": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Final URL observed by the host after redirect handling."
+        },
+        "charsetHint": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Host-observed charset hint. Core owns final decoding policy."
+        },
+        "session": {
+          "$ref": "#/$defs/HostHttpSession",
+          "description": "Opaque Core-owned session/cookie-jar handle associated with this response."
+        }
+      }
+    },
+    "HostHttpSession": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Opaque session/cookie-jar identifier owned by Core."
         }
       }
     },

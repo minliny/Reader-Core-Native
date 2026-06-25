@@ -213,28 +213,50 @@ fn pending_http_request(
     request: HostHttpRequest,
     continuation: RemoteHostContinuation,
 ) -> Result<PendingHostRequest, CoreError> {
-    if request.url.trim().is_empty() {
-        return Err(CoreError::invalid_params(
-            "http.execute request url must be non-empty",
-        ));
-    }
+    request.validate()?;
     let headers = if request.headers.is_null() {
         serde_json::json!({})
-    } else if request.headers.is_object() {
-        request.headers
     } else {
-        return Err(CoreError::invalid_params(
-            "http.execute request headers must be an object",
-        ));
+        request.headers
     };
+    let mut params = serde_json::json!({
+        "url": request.url,
+        "method": request.method,
+        "headers": headers,
+        "body": request.body,
+    });
+    if let Some(object) = params.as_object_mut() {
+        if let Some(charset) = request.charset {
+            object.insert("charset".to_string(), serde_json::json!(charset));
+        }
+        if let Some(follow_redirects) = request.follow_redirects {
+            object.insert(
+                "followRedirects".to_string(),
+                serde_json::json!(follow_redirects),
+            );
+        }
+        if let Some(max_redirects) = request.max_redirects {
+            object.insert("maxRedirects".to_string(), serde_json::json!(max_redirects));
+        }
+        if let Some(retry) = request.retry {
+            object.insert("retry".to_string(), serde_json::to_value(retry).unwrap());
+        }
+        if let Some(use_platform_cookie_jar) = request.use_platform_cookie_jar {
+            object.insert(
+                "usePlatformCookieJar".to_string(),
+                serde_json::json!(use_platform_cookie_jar),
+            );
+        }
+        if let Some(session) = request.session {
+            object.insert(
+                "session".to_string(),
+                serde_json::to_value(session).unwrap(),
+            );
+        }
+    }
     Ok(PendingHostRequest {
         capability: contract::capabilities::HTTP_EXECUTE.to_string(),
-        params: serde_json::json!({
-            "url": request.url,
-            "method": request.method,
-            "headers": headers,
-            "body": request.body,
-        }),
+        params,
         continuation,
     })
 }
@@ -270,6 +292,18 @@ fn http_response_diagnostics(response: &HostHttpResponse) -> Option<serde_json::
         .filter(|headers| headers.is_object())
     {
         diagnostics.insert("headers".to_string(), headers.clone());
+    }
+    if let Some(final_url) = &response.final_url {
+        diagnostics.insert("finalUrl".to_string(), serde_json::json!(final_url));
+    }
+    if let Some(charset_hint) = &response.charset_hint {
+        diagnostics.insert("charsetHint".to_string(), serde_json::json!(charset_hint));
+    }
+    if let Some(session) = &response.session {
+        diagnostics.insert(
+            "session".to_string(),
+            serde_json::to_value(session).unwrap(),
+        );
     }
     if diagnostics.is_empty() {
         None
