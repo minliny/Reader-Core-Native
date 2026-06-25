@@ -1,5 +1,8 @@
 # Android JNI SDK 集成状态
 
+> 当前最高优先级文档是 `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`。本文只记录 JNI
+> wrapper 状态，不代表 Android App 迁移完成。
+
 最后更新：2026-06-25
 
 基线：由 `codex/reader-core-runtime-protocol`、

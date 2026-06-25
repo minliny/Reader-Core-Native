@@ -1,5 +1,8 @@
 # 02：本地存储 / 同步
 
+> 当前最高优先级文档是 `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`。本文只定义
+> 本地存储/同步 adapter 契约；业务数据语义必须回到 Rust Reader-Core。
+
 > 主题域：SQLite schema、缓存、阅读进度、下载队列、最近历史、WebDAV、
 > 备份/恢复、同步/冲突解决。
 > 状态：🟡 契约已立（未实现）。本文件不声明任何实现完成。

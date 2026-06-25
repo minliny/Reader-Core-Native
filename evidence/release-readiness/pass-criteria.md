@@ -1,5 +1,8 @@
 # 通过标准与 release gate 定义
 
+> 当前最高优先级文档是 `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`。本文为历史 gate
+> 定义；当前发布标准必须补充三端共用同一 Rust Core 的可运行证据。
+
 > 区分两类 gate：**Core-side smoke gate**（Core 产物+host smoke）与 **App/device gate**
 > （真机/模拟器 App）。smoke 通过不得记为 App/device 通过。
 

@@ -1,5 +1,8 @@
 # 平台矩阵
 
+> 当前最高优先级文档是 `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`。本文保留历史平台
+> 证据；不能用旧 smoke 结果替代当前三端 Rust Core 迁移证明。
+
 > 基线 `fb4c3a7`。区分三层：**Core-side 产物构建**、**host smoke**、**App/device 真机**。
 > smoke 通过 ≠ App/device 通过。
 

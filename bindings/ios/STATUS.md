@@ -1,5 +1,8 @@
 # iOS Swift Wrapper 集成状态
 
+> 当前最高优先级文档是 `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`。本文只记录 wrapper
+> 状态，不代表 iOS App 迁移完成。
+
 最后更新：2026-06-24
 
 分支：`codex/reader-core-runtime-protocol`

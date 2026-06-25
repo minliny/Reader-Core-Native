@@ -1,5 +1,8 @@
 # 阻塞项
 
+> 当前最高优先级文档是 `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`。本文记录历史阻塞项；
+> 后续 blocker 必须按本地仓库实际代码重新审计。
+
 > 基线 `fb4c3a7`，round-01。阻塞项 = 阻止某级 release readiness 声明的事项。
 
 ## Core-side smoke release（V1 Core）

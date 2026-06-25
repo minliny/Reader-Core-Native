@@ -1,5 +1,8 @@
 # 发布 readiness 证据
 
+> 当前最高优先级文档是 `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`。本文是历史
+> release evidence 记录，不覆盖当前“以 Rust 为唯一业务内核”的迁移路线。
+
 > 长期 goal 分支：`codex/goal-release-evidence`
 > 基线：`origin/codex/core-product-integration`（首轮回采 sha `fb4c3a7`）
 > 目的：为 Reader-Core-Native 建立**发布 readiness 证据包**，覆盖命令矩阵、

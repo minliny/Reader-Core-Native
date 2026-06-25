@@ -1,5 +1,8 @@
 # Reader-Core 协议兼容性
 
+> 当前最高优先级文档是 `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`。本文只定义 Rust
+> Core 的 protocol/C ABI 兼容规则；业务迁移路线以本地仓库迁移指令为准。
+
 - **Protocol version:** 1
 - **C ABI version:** 1
 - **Runtime config schema 版本：** 1
@@ -160,5 +163,5 @@ wrapper 不应通过硬编码推断能力，而应优先读取 `core.info`。
 
 - Core-side conformance 通过不等于 App/device proof。
 - wrapper smoke 不等于 corpus parity。
-- 只有通过 `docs/FULL_DEVELOPMENT_ROADMAP.md` 定义的 corpus benchmark，才能声明
-  Legado parity 或 production readiness。
+- 只有通过 `docs/FULL_DEVELOPMENT_ROADMAP.md` 定义的 CLI + 三端 benchmark，才能声明
+  三端 Rust Core 迁移完成或 production readiness。

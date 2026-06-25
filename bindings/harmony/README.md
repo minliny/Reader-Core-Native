@@ -1,5 +1,8 @@
 # Reader-Core Harmony Binding
 
+> 当前最高优先级文档是 `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`。本文只说明 HarmonyOS
+> Node-API wrapper；HarmonyOS App 迁移必须以本地 `Reader for HarmonyOS` 代码为事实来源。
+
 该 package 是 `libreader_core_napi.so` 的 Harmony 侧 wrapper。
 
 ## 文件

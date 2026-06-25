@@ -1,4 +1,7 @@
-# Host App Contracts
+# 宿主 App 契约
+
+> 当前最高优先级文档是 `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`。本文只定义
+> 平台 adapter 与 Rust Core 的职责边界；业务语义必须回到 Rust Reader-Core。
 
 > 沉淀 Rust Core 与 iOS / Android / HarmonyOS host app 之间的责任边界。
 > 本目录是 **契约文档**，不是实现状态报告。任何条目都不代表对应能力已经

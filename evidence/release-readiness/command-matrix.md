@@ -1,5 +1,8 @@
 # 命令矩阵
 
+> 当前最高优先级文档是 `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`。本文保留历史命令
+> 证据；后续 gate 必须基于本地仓库实际代码和三端迁移目标更新。
+
 > 基线 `fb4c3a7`。所有命令在 macOS host 执行（除非另注）。
 > “gate”列：该命令是否适合作为 release gate（即 CI/发布前必跑且结果可判定）。
 > round-01 全部命令在本轮实跑并记录（见 [rounds/2026-06-25-round-01.md](rounds/2026-06-25-round-01.md)）。

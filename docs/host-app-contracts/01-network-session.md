@@ -1,4 +1,7 @@
-# 01 — Network / Session
+# 01：网络 / Session
+
+> 当前最高优先级文档是 `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`。本文只定义
+> 网络/session adapter 契约；真实实现必须以本地 iOS/Android/HarmonyOS 仓库代码为准。
 
 > 主题域：HTTP transport、重定向、Cookie 策略与持久化、响应编码、响应体解析归属。
 > 状态：🟡 契约已立（未实现）。本文件不声明任何实现完成。

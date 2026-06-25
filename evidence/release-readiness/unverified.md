@@ -1,5 +1,8 @@
 # 未验证项
 
+> 当前最高优先级文档是 `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`。本文是历史未验证
+> 清单；当前未验证项必须围绕旧 `Reader-Core` 到 Rust Core、再到三端 App 的迁移链路更新。
+
 > 基线 `fb4c3a7`，round-01。列出“尚未跑/无法跑”的项，避免被误读为“已通过”。
 
 ## 平台产物 / App / device

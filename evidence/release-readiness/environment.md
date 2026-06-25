@@ -1,5 +1,8 @@
 # 环境依赖
 
+> 当前最高优先级文档是 `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`。本文保留历史环境
+> 采集记录；每次开发仍必须重新执行本地仓库安全检查。
+
 > round-01 实采环境（macOS host）。验证日期 2026-06-25（Asia/Shanghai）。
 
 ## 工具链

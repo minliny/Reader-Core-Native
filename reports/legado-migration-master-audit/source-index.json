@@ -6,47 +6,48 @@
     "commit": "fb4c3a7"
   },
   "project_definition": {
-    "primary_goal": "将 Reader-Core-Native 重建为兼容 Legado、迁移旧 Reader-Core 行为、可通过 C ABI 被 iOS、Android、HarmonyOS、CLI 和未来宿主加载的 Native Core。",
+    "primary_goal": "把现有 Reader 项目迁移为以 Rust Reader-Core 为唯一业务内核、由 iOS、Android、HarmonyOS 三端共用的统一架构。",
     "source_of_truth_order": [
-      "Legado 定义必须兼容的行为。",
-      "已有 Reader-Core 定义迁移资产和期望行为证据。",
-      "Reader-Core-Native 加 C ABI 定义跨平台接入面。",
-      "Corpus benchmark 证明各平台产出一致的 canonical 阅读结果。"
+      "本地仓库是唯一事实来源。",
+      "Reader-Core 定义旧业务能力、迁移资产和期望行为证据。",
+      "Reader for iOS、Reader for Android、Reader for HarmonyOS 定义真实宿主接入方式。",
+      "目标 Rust 仓库默认查找 Reader-Core-Rust；当前本机实际定位为 Reader-Core-Native。",
+      "构建、测试和三端可运行结果证明迁移完成。"
     ],
     "guardrails": [
-      "Legado 只读。",
-      "不复制、翻译或改写 Legado 的 GPL 实现代码。",
-      "Native 审计期间不修改 dirty 的旧 Reader-Core 仓库。",
-      "除非任务明确指向宿主仓库，否则将宿主 App 仓库视为集成证据来源。",
-      "不得把 Core 侧 smoke 报告为 App/device parity。"
+      "开始前必须扫描本地仓库并检查 status、branch、log。",
+      "不得优先依赖远程 GitHub 或历史讨论覆盖本地代码。",
+      "不得修改 dirty 仓库中的非任务拥有文件。",
+      "平台 wrapper 不定义业务语义，业务语义必须回到 Rust Core。",
+      "不得把 wrapper smoke 或静态报告声明为 App/device 完成。"
     ]
   },
   "sources": [
-    {
-      "name": "legado",
-      "path": "/Users/minliny/Documents/legado",
-      "branch": "master",
-      "head": "da17bb2be",
-      "status": "clean",
-      "role": "只读兼容基线"
-    },
     {
       "name": "Reader-Core",
       "path": "/Users/minliny/Documents/Reader-Core",
       "branch": "main",
       "head": "cc7ae849",
       "status": "dirty，观测到 815 个 status entry",
-      "role": "迁移资产和行为证据",
+      "role": "旧业务核心、迁移资产和行为证据",
       "important_archive": "/Users/minliny/Documents/Reader-Core/_archived_planning_2026-06-24",
       "important_archive_file_count_observed": 522
     },
     {
-      "name": "Reader-Core-Native-main",
+      "name": "Reader-Core-Native",
       "path": "/Users/minliny/Documents/Reader-Core-Native",
-      "branch": "codex/reader-core-runtime-protocol",
-      "head": "fc626d7",
-      "status": "审计时 clean",
-      "role": "活跃 Native Core worktree"
+      "branch": "codex/full-branch-directory-consolidation",
+      "head": "86ecfc4",
+      "status": "当前轮次 clean，与远端同步",
+      "role": "当前本机定位的 Rust 目标仓库"
+    },
+    {
+      "name": "legado",
+      "path": "/Users/minliny/Documents/legado",
+      "branch": "master",
+      "head": "da17bb2be",
+      "status": "clean",
+      "role": "历史兼容审计参考，不是当前迁移路线主事实源"
     },
     {
       "name": "Reader-Core-Native-c-abi-worktree",

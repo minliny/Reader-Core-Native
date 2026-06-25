@@ -1,5 +1,8 @@
 # Corpus 审计报告：第 1 轮
 
+> 当前最高优先级文档是 `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`。本文是历史 corpus
+> seed 记录，后续 benchmark 必须围绕本地旧 Core 到 Rust Core、再到三端一致性更新。
+
 - **分支：** `codex/goal-sanitized-corpus`
 - **基线：** `origin/codex/core-product-integration` at `fb4c3a7`
 - **轮次：** 1，初始 batch

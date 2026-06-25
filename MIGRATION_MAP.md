@@ -1,65 +1,74 @@
-# 迁移地图
+# 三端迁移地图
 
-> 记录各平台从独立实现迁移到 Rust Core 的进度。
-> 旧迁移/roadmap/handoff 文档均已归档至各仓库 `_archived_planning_2026-06-24/`。
+最高优先级入口：`docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`
 
-## 整体状态
+本文记录 iOS、Android、HarmonyOS 从现有实现迁移到统一 Rust Reader-Core 的路线。
 
-| 阶段 | 描述 | 状态 | 开始 | 完成 |
-|------|------|:----:|------|------|
-| 0 | 冻结方向与建立迁移清单 | ✅ | 2026-06-24 | 2026-06-24 |
-| 1 | HarmonyOS Rust 地基 | 🟡 | 2026-06-24 | |
-| 2 | 统一 C ABI 和三端空壳接入 | 🟡 | 2026-06-24 | |
-| 3 | 规则内核和 QuickJS | 🟡 | 2026-06-24 | |
-| 4 | 远程阅读 Core 侧纵切 | ✅ | 2026-06-24 | 2026-06-24 |
-| 5 | 统一数据库、缓存和进度 | 🟡 | 2026-06-24 | |
-| 6 | 补齐规则兼容面 | ⬜ | | |
-| 7 | 本地书和扩展能力 | ⬜ | | |
-| 8 | 退役重复后端和发布 | ⬜ | | |
+## 当前本地仓库状态
 
-阶段 4 的完成范围仅限 Core 侧 smoke：`remote.reading.v1` 覆盖
-`source.import` → `book.search` → `book.detail` → `book.toc` →
-`chapter.content` → `reading.progress.update`，支持 fixture/inline response
-以及 `http.execute` host request/complete 回路。它不代表任何平台 App 已完成
-真实网络、WebView 或真机阅读链路。阶段 5 当前只有 in-memory
-cache/progress smoke，SQLite 持久化和平台迁移仍在后续阶段。
+| 仓库 | 当前分支 | 状态 |
+| --- | --- | --- |
+| `Reader-Core` | `main` | dirty，旧核心迁移源 |
+| `Reader for iOS` | `main` | dirty，iOS 宿主迁移目标 |
+| `Reader for Android` | `main` | clean，Android 宿主迁移目标 |
+| `Reader for HarmonyOS` | `codex/harmony-napi-runtime` | dirty，HarmonyOS 宿主迁移目标 |
+| Rust 目标仓库 | `codex/full-branch-directory-consolidation` | 当前为 `Reader-Core-Native` |
 
-## 平台迁移进度
+## 阶段状态
 
-### HarmonyOS
+| 阶段 | 描述 | 状态 |
+| --- | --- | :---: |
+| 0 | 本地仓库定位、安全检查、dirty 状态记录 | 已完成本轮检查 |
+| 1 | 旧 `Reader-Core` 实际代码审计 | 待系统化 |
+| 2 | Rust C ABI / protocol / runtime 边界冻结 | 部分完成 |
+| 3 | Rule/JS/request/reading 核心能力迁移 | 部分完成 |
+| 4 | SQLite/cache/sync/local/RSS/TTS 契约迁移 | 部分完成 |
+| 5 | iOS strangler migration | 待 App-side 验证 |
+| 6 | Android strangler migration | 待 App-side 验证 |
+| 7 | HarmonyOS strangler migration | 待 HAP/device 验证 |
+| 8 | 三端 corpus/fixture 一致性 benchmark | 待建设 |
+| 9 | 退役旧业务核心路径 | 未开始 |
 
-| 模块 | 状态 | 备注 |
-|------|:----:|------|
-| NAPI C++ Shim | 🟡 | Core 侧 `.so` smoke 已通过；App 侧 HAP 集成在 `codex/harmony-napi-runtime`，本文不声明完成 |
-| ArkTS Wrapper | 🟡 | App 侧 bridge 独立验证中；本文不声明 device/runtime 完成 |
-| HTTP 宿主 Adapter | ⬜ | |
-| WebView 宿主 Adapter | ⬜ | |
-| TTS 宿主 Adapter | ⬜ | |
+## iOS 迁移
 
-### Android
+| 模块 | 迁移方向 | 状态 |
+| --- | --- | --- |
+| Swift 旧 Core 调用 | 切到 Rust C ABI + Swift wrapper | 部分完成 |
+| URLSession transport | 作为 `http.execute` host adapter | 待 App-side 验证 |
+| WKWebView 登录/Cookie | 保留在 iOS adapter，结果回传 Core | 待迁移 |
+| Keychain | 平台 credential store | 待契约化 |
+| File picker / sandbox | 平台 adapter | 待迁移 |
+| TTS | 平台播放，Core 提供数据/指令契约 | 待迁移 |
+| Reader UI | 保留 SwiftUI | 不进入 Rust Core |
 
-| 模块 | 状态 | 备注 |
-|------|:----:|------|
-| NativeCoreBridge (JNI) | 🟡 | 已新增 Core 侧 JNI shim 和构建脚本；本地 `.so` 仍需 Android NDK 验证；App 侧 Java/Kotlin loading 待完成 |
-| HTTP Transport (OkHttp) | ⬜ | 保留为 transport |
-| WebView Adapter | ⬜ | 保留 |
-| TTS Adapter | ⬜ | 保留 |
-| Room → Rust DB | ⬜ | Core V1 只有 in-memory smoke；durable SQLite/platform migration 待完成 |
-| Parser → Rust | ⬜ | |
-| RSS → Rust | ⬜ | |
-| WebDAV/Sync → Rust | ⬜ | |
+## Android 迁移
 
-### iOS
+| 模块 | 迁移方向 | 状态 |
+| --- | --- | --- |
+| JNI/Kotlin wrapper | 消费 Rust C ABI | 部分完成 |
+| OkHttp transport | 作为 `http.execute` host adapter | 待 App-side 验证 |
+| WebView/CookieManager | 平台 adapter | 待迁移 |
+| Keystore | 平台 credential store | 待契约化 |
+| SAF/File | 平台 adapter | 待迁移 |
+| Room/本地数据 | 业务语义迁到 Rust SQLite，平台只提供目录/权限 | 待迁移 |
+| TTS/UI | 平台负责 | 待接入契约 |
 
-| 模块 | 状态 | 备注 |
-|------|:----:|------|
-| XCFramework | 🟡 | Core 侧 staticlib + header smoke 已通过；不声明 App runtime integration |
-| ReaderCoreClient.swift | 🟡 | Minimal ABI lifecycle + `core.info` / `runtime.ping` compile/link/runtime smoke 已通过；host adapter 与 App integration 待完成 |
-| HTTP Transport (URLSession) | ⬜ | 保留为 transport |
-| WebView Login Adapter | ⬜ | 保留 |
-| TTS Adapter | ⬜ | 保留 |
-| Swift Core → Rust | ⬜ | 最终移除 Swift Core 依赖 |
+## HarmonyOS 迁移
 
----
+| 模块 | 迁移方向 | 状态 |
+| --- | --- | --- |
+| Node-API/ArkTS wrapper | 消费 Rust C ABI | 部分完成 |
+| Harmony HTTP | 作为 `http.execute` host adapter | 待验证 |
+| WebView/session | 平台 adapter | 待迁移 |
+| Credential store | 平台 adapter | 待契约化 |
+| 文件/目录权限 | 平台 adapter | 待迁移 |
+| HAP/device smoke | 证明真实平台可加载 Rust Core | 待完成 |
+| UI/TTS | 平台负责 | 待接入契约 |
 
-*最后更新: 2026-06-24 | 以 `ARCHITECTURE.md` 为准*
+## 迁移完成标准
+
+- 三端创建同一个 Rust runtime。
+- 三端使用同一 C ABI/protocol。
+- 三端同一 fixture/corpus 输出同一 canonical result。
+- 旧 `Reader-Core` 对应能力已迁移、废弃或标注为平台 adapter。
+- 旧业务核心路径从发布链路中退役。

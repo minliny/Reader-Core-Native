@@ -1,5 +1,8 @@
 # CI Gates 落地清单（待落地项规格）
 
+> 当前最高优先级文档是 `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`。本文是历史 gate
+> 落地清单，不覆盖当前本地仓库迁移路线。
+
 > 本文件是 [README.md](./README.md) 第 3 节「待落地」项的细化，供后续分支
 > 作为规格输入。本分支（`codex/goal-ci-gate-design`）只产出设计文档，不落地
 > 任何 workflow 或脚本。每个 gap 标注：现状、fail-closed 要求、建议归属分支、

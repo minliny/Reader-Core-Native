@@ -1,5 +1,8 @@
 # CI Gates 设计（长期目标）
 
+> 当前最高优先级文档是 `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`。本文只描述
+> gate 设计；若与本地仓库迁移指令冲突，以迁移指令为准。
+
 > 本分支 `codex/goal-ci-gate-design` 基线为 `origin/codex/core-product-integration`
 > （commit `fb4c3a7`）。本文档只做 **gate 设计**，不直接改 GitHub Actions
 > 或脚本。所有命令清单均以基线代码树为准核实，不臆造未来命令。

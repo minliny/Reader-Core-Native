@@ -1,5 +1,8 @@
 # ReaderCore iOS Binding
 
+> 当前最高优先级文档是 `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`。本文只说明 iOS
+> wrapper；iOS App 迁移必须以本地 `Reader for iOS` 代码为事实来源。
+
 该 binding lane 将 C ABI 静态库和 `reader_core.h` 打包成 XCFramework，并提供 Swift
 wrapper `ReaderCoreClient`。wrapper 通过 runtime lifecycle、command/event polling、
 host HTTP request completion 和 typed async error event 驱动 Core。

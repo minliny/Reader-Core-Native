@@ -1,91 +1,101 @@
 # Reader-Core-Native
 
-> **Reader 三平台统一内核 — Rust 实现**
+> Reader 三端统一 Rust 业务内核。
 >
-> 全量开发目标与路线以
-> [docs/FULL_DEVELOPMENT_ROADMAP.md](./docs/FULL_DEVELOPMENT_ROADMAP.md)
-> 为准；当前代码架构以 [ARCHITECTURE.md](./ARCHITECTURE.md) 为准。
+> 当前最高优先级文档是
+> [docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md](./docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md)。
+> 全量开发路线见
+> [docs/FULL_DEVELOPMENT_ROADMAP.md](./docs/FULL_DEVELOPMENT_ROADMAP.md)。
 
-## 快速开始
+## 当前定位
+
+目标 Rust 仓库默认应优先查找 `Reader-Core-Rust`。当前本机扫描未发现该目录，实际
+Rust 目标仓库定位为：
+
+```text
+/Users/minliny/Documents/Reader-Core-Native
+```
+
+相关本地仓库：
+
+- `/Users/minliny/Documents/Reader-Core`
+- `/Users/minliny/Documents/Reader for iOS`
+- `/Users/minliny/Documents/Reader for Android`
+- `/Users/minliny/Documents/Reader for HarmonyOS`
+
+本地仓库是唯一事实来源。远程 README、历史讨论、旧规划文档只能作为补充。
+
+## 快速验证
 
 ```bash
-# 安装 Rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# 本机验证
+# 本机检查
 ./scripts/check-local.sh
 
-# 本机构建 Rust workspace、FFI release 产物，并运行 Rust/C ABI smoke
+# 本机构建 Rust workspace、FFI release 产物，并运行 C/C++ ABI smoke
 ./scripts/build-local.sh
 
-# 阶段 1：仅构建 OHOS Rust staticlib
-rustup target add aarch64-unknown-linux-ohos
-./scripts/build-ohos.sh
+# 协议一致性
+cargo run -p reader-cli -- --conformance
 
-# 阶段 1：构建 HarmonyOS NAPI smoke module（需要 DevEco/OHOS SDK）
-./scripts/build-harmony-napi.sh
-
-# 阶段 1：构建 iOS XCFramework smoke 产物（需要 Xcode）
+# iOS XCFramework / Swift wrapper smoke（需要 Xcode）
 rustup target add aarch64-apple-ios aarch64-apple-ios-sim
-./scripts/build-ios-xcframework.sh
-
-# 阶段 1：Swift wrapper 编译/链接/runtime smoke（需要 Xcode）
 ./scripts/check-ios-swift-wrapper.sh
 
-# 阶段 2：构建 Android JNI smoke module（需要 Android NDK）
+# Android JNI smoke module（需要 Android NDK）
 rustup target add aarch64-linux-android
 ./scripts/build-android-jni.sh
 
-# 滚动集成：把已完成 agent 分支接入独立 integration worktree
-scripts/integration-queue.sh \
-  codex/android-integration \
-  origin/codex/core-product-integration \
-  origin/codex/<android-jni-branch>
+# HarmonyOS NAPI smoke module（需要 DevEco/OHOS SDK）
+rustup target add aarch64-unknown-linux-ohos
+./scripts/build-harmony-napi.sh
 ```
 
-`build-local.sh` 会同时运行 C 和 C++ host ABI smoke。C++ smoke 是
-JNI、NAPI、Objective-C++ shim 的头文件/链接基线。
+## 开工前必须执行
 
-## 当前 Core 侧状态
+```bash
+pwd
+find .. -maxdepth 2 -type d -name .git
+git -C <repo> status --short
+git -C <repo> branch --show-current
+git -C <repo> log -5 --oneline
+```
 
-`origin/codex/core-product-integration` 已接入 Core 侧
-`remote.reading.v1` 纵切 smoke：`source.import`、`book.search`、
-`book.detail`、`book.toc`、`chapter.content`、`reading.progress.update` 可在
-fixture/inline response 下跑通，并覆盖 content pipeline、in-memory cache
-和 progress 写入；同时支持 `http.execute` host request/complete 回路。V1
-不在 Core 内打开 socket；HTTP/TLS/WebView 等实际平台能力仍由平台 adapter 提供。
+至少检查：
 
-OHOS、Android、iOS 平台产物脚本会按 [ARCHITECTURE.md](./ARCHITECTURE.md)
-阶段 1/2 补齐；当前 `build-harmony-napi.sh` 验证 Rust staticlib 能链接为
-HarmonyOS NAPI `.so`，HAP 集成和真机加载仍需在 HarmonyOS App 仓库完成。
-当前 iOS 证据覆盖 Core 侧 XCFramework / Swift wrapper 编译-链接-runtime
-smoke（`core.info` / `runtime.ping`）；URLSession/WebView/App 侧接入仍是后续
-滚动接入项。Android lane 已新增 Core 侧 JNI shim 和
-`build-android-jni.sh`，但当前机器缺 Android NDK，`.so` 交叉构建仍需在 NDK
-环境验证；App 仓库侧加载和真机集成仍需完成。
+- 旧核心：`Reader-Core`
+- iOS：`Reader for iOS`
+- Android：`Reader for Android`
+- HarmonyOS：`Reader for HarmonyOS`
+- Rust 目标仓库：优先 `Reader-Core-Rust`，当前本机为 `Reader-Core-Native`
 
 ## 目录
 
-- [docs/FULL_DEVELOPMENT_ROADMAP.md](./docs/FULL_DEVELOPMENT_ROADMAP.md) — Legado 兼容、旧 Reader-Core 迁移、Native/C ABI、corpus benchmark 的全量目标与路线
-- [ARCHITECTURE.md](./ARCHITECTURE.md) — 当前代码架构与 Core/Host 边界
-- [FEATURE_MATRIX.md](./FEATURE_MATRIX.md) — 能力归属表
-- [MIGRATION_MAP.md](./MIGRATION_MAP.md) — 各平台迁移进度
-- [docs/ROLLING_INTEGRATION.md](./docs/ROLLING_INTEGRATION.md) — 并行 agent 滚动集成队列
+- [docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md](./docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md) — 当前迁移指令和安全要求
+- [docs/FULL_DEVELOPMENT_ROADMAP.md](./docs/FULL_DEVELOPMENT_ROADMAP.md) — 全量开发路线
+- [ARCHITECTURE.md](./ARCHITECTURE.md) — 当前 Rust Core 架构
+- [FEATURE_MATRIX.md](./FEATURE_MATRIX.md) — 能力状态矩阵
+- [MIGRATION_MAP.md](./MIGRATION_MAP.md) — 三端迁移地图
+- [docs/ROLLING_INTEGRATION.md](./docs/ROLLING_INTEGRATION.md) — 并行分支和滚动集成规则
 - [include/reader_core.h](./include/reader_core.h) — C ABI 头文件
-- [protocol/](./protocol/) — JSON 消息协议 schema
-- [bindings/android/README.md](./bindings/android/README.md) — Android JNI smoke 产物说明
-- [bindings/ios/README.md](./bindings/ios/README.md) — iOS XCFramework smoke 产物说明
+- [protocol/](./protocol/) — JSON command/event schema
+- [bindings/ios/README.md](./bindings/ios/README.md) — iOS Swift wrapper
+- [bindings/android/README.md](./bindings/android/README.md) — Android JNI wrapper
+- [bindings/harmony/README.md](./bindings/harmony/README.md) — HarmonyOS Node-API wrapper
 
-## 仓库关系
+## 架构边界
 
-```
-Reader-Core-Native          ← 此仓库：唯一业务内核（Rust）
-Reader-for-iOS              ← UI + Apple 宿主 adapter
-Reader-for-Android          ← UI + Android 宿主 adapter
-Reader-for-HarmonyOS        ← UI + Harmony 宿主 adapter（首个平台验收目标）
-Reader-Core (Swift)         ← 归档参考（冻结新功能）
-```
+Rust Reader-Core 是唯一业务内核，负责规则、JS、书源、阅读链路、数据模型、缓存、
+同步、恢复、diff 和跨平台协议。
 
-## 旧规划文档
+iOS、Android、HarmonyOS 只负责平台能力：
 
-各平台仓库中的旧规划/架构/开发计划等文档已在 2026-06-24 统一归档至各自 `_archived_planning_2026-06-24/` 目录，不再作为实施依据。
+- UI / navigation / theme
+- HTTP 实际执行
+- WebView 登录、Cookie、captcha、DOM
+- Keychain / Keystore / credential store
+- 文件权限和系统目录
+- TTS、通知、后台任务
+- 打包、签名、分发
+
+wrapper smoke 不等于 App/device 完成。三端一致性必须由同一个 Rust Core commit 和
+相同 fixture/corpus 的 canonical result 证明。

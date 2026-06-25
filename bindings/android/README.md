@@ -1,5 +1,8 @@
 # ReaderCore Android JNI Binding
 
+> 当前最高优先级文档是 `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`。本文只说明 Android
+> JNI wrapper；Android App 迁移必须以本地 `Reader for Android` 代码为事实来源。
+
 该 binding lane 将 C ABI 静态库和 `reader_core.h` 打包成 Android JNI shared
 library，并提供一个最小 Java wrapper。wrapper 可以驱动 Core runtime 生命周期、
 发送 JSON command、轮询 callback 传回的 event、取消 request，并用 `host.complete`
