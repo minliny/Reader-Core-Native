@@ -30,8 +30,8 @@ green。`--swift-only` 路径：wrapper typecheck + macOS host inline wrapper sm
 `ShellSmokeTests/run.sh`（分区证据）。完整路径额外重建 `target/ios/ReaderCore.xcframework`
 并对 simulator slice 做 wrapper typecheck。
 
-最新一轮 ShellSmokeTests 结果（`ShellSmokeTests/report.txt`）：`[core] pass=8 fail=0`、
-`[app-side] pass=7 fail=0`、`host adapter shell smoke passed`。
+最新一轮 ShellSmokeTests 结果（`ShellSmokeTests/report.txt`）：`[core] pass=9 fail=0`、
+`[app-side] pass=11 fail=0`、`host adapter shell smoke passed`（共 20 用例）。
 
 ## 能力分区
 
@@ -64,6 +64,12 @@ green。`--swift-only` 路径：wrapper typecheck + macOS host inline wrapper sm
 分配（避免 requestId `1001` 碰撞）、`book.search` host HTTP loop 返回 books、malformed
 JSON send failure。这些用例尚未迁移到分区 runner，作为全量 wrapper 回归保留。
 
+> 注：round 2 已将上述三类用例迁入分区 runner（分别记为 `[app-side] internal command ID
+> collision avoidance`、`[app-side] book.search host HTTP loop returns books`、
+> `[core] malformed JSON send fails with non-zero status`），并新增
+> `[app-side] manual host.error resumes original request as error`。inline smoke 仍保留
+> 作为全量回归。
+
 ## 未验证（不得由 smoke 推断）
 
 - iOS App 构建/启动、模拟器/真机运行。
@@ -84,6 +90,23 @@ accessor。因此 Swift wrapper 对 `rc_runtime_create`、`rc_runtime_send`、
 `sendFailed` / `cancelFailed`，且不改变 host command/event flow。
 
 当前无新增 ABI/protocol gap。
+
+### 已记录 gap
+
+- **`host.error` 的 `code` 必须是合法 `ErrorCode` 枚举变体（protocol 约束，非 ABI）。**
+  `ReaderCoreClient.sendHostError(code:message:retryable:requestId:)` 接受任意 `String`
+  作为 `code`，但 Rust Core 的 `HostErrorParams.error: CoreError` 通过 serde 反序列化
+  `code: ErrorCode`（`SCREAMING_SNAKE_CASE` 枚举，变体见 `crates/reader-contract/src/error.rs`：
+  `UNKNOWN_METHOD` / `INVALID_PARAMS` / `INVALID_PROTOCOL_VERSION` / `CANCELLED` /
+  `INVALID_MESSAGE` / `INTERNAL`）。若 host 传入未知 code 字符串，`host.error` params
+  解析失败，Core 把 error 发到 `host.error` 命令自身的 requestId（adapter 内部 auto-allocated），
+  **原 pending 请求永不恢复** —— 表现为调用方超时。
+  - ShellSmokeTests 用 `[app-side] manual host.error resumes original request as error`
+    覆盖合法 code 路径；非法 code 路径未覆盖（会超时，不作为断言用例）。
+  - 处理方向（待定，不在本轮）：adapter 侧可增加 `code` 白名单校验或改为强类型
+    `ReaderCoreErrorCode` 枚举，避免 host 误传未知 code。此为 **app-side 增强**，不需要
+    改 ABI/protocol；若要扩 `ErrorCode` 变体则属 protocol lane（[[c-abi-stable-boundary-goal]]），
+    本 lane 不处理。
 
 ## 线程说明
 

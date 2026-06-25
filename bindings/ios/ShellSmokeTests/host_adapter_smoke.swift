@@ -51,6 +51,21 @@ final class FailingHostTransport: ReaderCoreHostTransport {
     }
 }
 
+final class BooksHostTransport: ReaderCoreHostTransport {
+    var lastRequest: ReaderCoreHostRequest?
+    func perform(_ request: ReaderCoreHostRequest) throws -> ReaderCoreHostResponse {
+        lastRequest = request
+        guard request.capability == "http.execute" else {
+            throw SmokeFailure("BooksHostTransport only handles http.execute, got \(request.capability)")
+        }
+        return ReaderCoreHostResponse(
+            status: 200,
+            headers: ["Content-Type": "application/json"],
+            body: "{\"books\":[{\"bookId\":\"1\",\"title\":\"Dune\",\"author\":\"Herbert\"}]}"
+        )
+    }
+}
+
 final class SmokeURLProtocol: URLProtocol {
     static var lastRequest: URLRequest?
     override class func canInit(with request: URLRequest) -> Bool {
@@ -257,6 +272,99 @@ struct HostAdapterSmoke {
                   client.pollEvent(requestId: 300) == nil)
         } catch {
             check("[app-side]", "pollEvent drain + consumed", false, "\(error)")
+        }
+
+        // ---- [core] malformed JSON send fails with non-zero status ----
+        do {
+            let rawRuntime = try ReaderCoreRuntime(onEvent: { _ in })
+            defer { rawRuntime.destroy() }
+            do {
+                try rawRuntime.send(jsonString: "{not valid json")
+                check("[core]", "malformed JSON send fails with non-zero status", false, "expected throw")
+            } catch ReaderCoreClientError.sendFailed(let status) {
+                check("[core]", "malformed JSON send fails with non-zero status", status != 0, "status=\(status)")
+            } catch {
+                check("[core]", "malformed JSON send fails with non-zero status", false, "\(error)")
+            }
+        } catch {
+            check("[core]", "malformed JSON send fails with non-zero status", false, "rawRuntime init threw: \(error)")
+        }
+
+        // ---- [app-side] internal command ID collision avoidance ----
+        // host.complete with auto-allocated requestId must not collide with the user's
+        // hostSmoke requestId (1001); the original request must still resume.
+        do {
+            try client.send(method: "runtime.hostSmoke", requestId: 1001, params: [
+                "capability": "host.smoke.echo", "params": ["collision": true],
+            ])
+            let hostReq = try pollUntil(client: client, requestId: 1001)
+            guard let opId = hostReq.operationId, opId > 0 else {
+                check("[app-side]", "internal command ID collision avoidance", false, "no operationId")
+                exit(1)
+            }
+            _ = try client.sendHostComplete(operationId: opId, result: ["collision": "avoided"])
+            let resumed = try pollUntil(client: client, requestId: 1001)
+            check("[app-side]", "internal command ID collision avoidance",
+                  resumed.type == "result" && (resumed.data?["collision"] as? String) == "avoided")
+        } catch {
+            check("[app-side]", "internal command ID collision avoidance", false, "\(error)")
+        }
+
+        // ---- [app-side] manual host.error resumes original request as error ----
+        do {
+            try client.send(method: "runtime.hostSmoke", requestId: 1100, params: [
+                "capability": "host.smoke.echo", "params": ["fail": true],
+            ])
+            let hostReq = try pollUntil(client: client, requestId: 1100)
+            guard let opId = hostReq.operationId, opId > 0 else {
+                check("[app-side]", "manual host.error resumes as error", false, "no operationId")
+                exit(1)
+            }
+            _ = try client.sendHostError(
+                operationId: opId, code: "INTERNAL", message: "manual host error",
+                retryable: true
+            )
+            let resumed = try pollUntil(client: client, requestId: 1100)
+            check("[app-side]", "manual host.error resumes original request as error",
+                  resumed.type == "error" && resumed.coreError?.code == "INTERNAL"
+                  && resumed.coreError?.message == "manual host error",
+                  "type=\(resumed.type) code=\(resumed.coreError?.code ?? "nil")")
+        } catch {
+            check("[app-side]", "manual host.error resumes original request as error", false, "\(error)")
+        }
+
+        // ---- [app-side] book.search host HTTP loop returns books ----
+        let booksStub = BooksHostTransport()
+        guard let booksClient = try? ReaderCoreClient(hostTransport: booksStub) else {
+            check("[app-side]", "book.search host HTTP loop returns books", false, "client init threw")
+            exit(1)
+        }
+        defer { booksClient.destroy() }
+        do {
+            let searchSource: [String: Any] = [
+                "sourceId": "vtest-src",
+                "name": "Vertical Test Source",
+                "baseUrl": "https://books.example.test",
+                "rules": ["search": [["kind": "jsonPath", "path": "$.books[*]"]]],
+            ]
+            let search = try booksClient.request(method: "book.search", requestId: 1200, params: [
+                "sourceId": "vtest-src",
+                "searchRequest": [
+                    "url": "https://books.example.test/search?q=dune",
+                    "headers": ["Accept": "application/json"],
+                ],
+                "source": searchSource,
+            ], timeout: 5)
+            let books = search.data?["books"] as? [Any]
+            check("[app-side]", "book.search host HTTP loop returns books",
+                  search.type == "result" && books?.count == 1,
+                  "type=\(search.type) count=\(books?.count ?? -1)")
+            check("[app-side]", "book.search invoked host transport with operationId",
+                  (booksStub.lastRequest?.operationId ?? 0) > 0
+                  && booksStub.lastRequest?.capability == "http.execute",
+                  "opId=\(booksStub.lastRequest?.operationId ?? 0)")
+        } catch {
+            check("[app-side]", "book.search host HTTP loop returns books", false, "\(error)")
         }
 
         // ---- summary ----
