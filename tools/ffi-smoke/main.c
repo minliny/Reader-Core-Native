@@ -913,6 +913,35 @@ int main(void) {
     return fail("host.error invalid params left synchronous last_error");
   }
 
+  // --- invalid remote http.execute request method -> async INVALID_PARAMS
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":316,\"method\":\"book."
+               "search\",\"params\":{\"sourceId\":\"ffi-http-src\","
+               "\"searchRequest\":{\"url\":\"https://books.example.test/"
+               "search?q=empty-method\",\"method\":\"\"},"
+               "\"source\":{\"sourceId\":\"ffi-http-src\",\"name\":\"FFI HTTP "
+               "Source\",\"baseUrl\":\"https://books.example.test\",\"rules\":{"
+               "\"search\":[{\"kind\":\"jsonPath\",\"path\":\"$.books[*]\"}]}}"
+               "}}") != RC_SEND_OK) {
+    return fail("book.search empty http method send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for empty http method");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":316") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "method")) {
+    fprintf(stderr, "empty http method error: %s\n", event);
+    return fail("empty http method error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("empty http method left synchronous last_error");
+  }
+
   // --- remote http.execute completion carries metadata ------------------
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":68,\"method\":\"book."

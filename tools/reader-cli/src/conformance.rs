@@ -38,6 +38,9 @@ const INVALID_SOURCE_IMPORT_UNKNOWN_FIELD: &str = include_str!(
 const INVALID_BOOK_SEARCH_UNKNOWN_FIELD: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-book-search-unknown-field.json"
 );
+const INVALID_BOOK_SEARCH_REQUEST_METHOD_EMPTY: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-book-search-request-method-empty.json"
+);
 const INVALID_BOOK_DETAIL_UNKNOWN_FIELD: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-book-detail-unknown-field.json"
 );
@@ -264,6 +267,11 @@ pub(crate) fn run_conformance() -> ConformanceReport {
     record(&mut report, "book-search-rejects-unknown-params", || {
         let (_runtime, rx) = send_to_fresh_runtime(INVALID_BOOK_SEARCH_UNKNOWN_FIELD)?;
         expect_event_error(&rx, 404, ErrorCode::InvalidParams)
+    });
+
+    record(&mut report, "book-search-rejects-empty-http-method", || {
+        let (_runtime, rx) = send_to_fresh_runtime(INVALID_BOOK_SEARCH_REQUEST_METHOD_EMPTY)?;
+        expect_event_error(&rx, 414, ErrorCode::InvalidParams)
     });
 
     record(&mut report, "valid-command-book-detail", || {

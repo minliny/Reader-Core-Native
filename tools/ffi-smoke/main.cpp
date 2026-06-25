@@ -724,6 +724,25 @@ int main() {
     return fail("host.error invalid params left synchronous last_error");
   }
 
+  // --- invalid remote http.execute request method -> async INVALID_PARAMS
+  std::string empty_http_method =
+      R"({"protocolVersion":1,"requestId":316,"method":"book.search","params":{"sourceId":"ffi-http-src","searchRequest":{"url":"https://books.example.test/search?q=empty-method","method":""},"source":{"sourceId":"ffi-http-src","name":"FFI HTTP Source","baseUrl":"https://books.example.test","rules":{"search":[{"kind":"jsonPath","path":"$.books[*]"}]}}}})";
+  if (send_str(rt, empty_http_method) != RC_SEND_OK) {
+    return fail("book.search empty http method send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":316") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "method")) {
+    std::cerr << "empty http method error: " << event << '\n';
+    return fail("empty http method error shape");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("empty http method left synchronous last_error");
+  }
+
   // --- remote http.execute completion carries metadata ------------------
   std::string http_search =
       R"({"protocolVersion":1,"requestId":27,"method":"book.search","params":{"sourceId":"ffi-http-src","searchRequest":{"url":"https://books.example.test/search?q=abi","headers":{"Accept":"application/json"}},"source":{"sourceId":"ffi-http-src","name":"FFI HTTP Source","baseUrl":"https://books.example.test","rules":{"search":[{"kind":"jsonPath","path":"$.books[*]"}]}}}})";

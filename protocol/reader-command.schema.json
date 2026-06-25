@@ -269,8 +269,10 @@
         },
         "method": {
           "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
           "default": "GET",
-          "description": "HTTP method. Defaults to GET."
+          "description": "HTTP method. Defaults to GET and must not be empty or whitespace-only."
         },
         "headers": {
           "type": "object",

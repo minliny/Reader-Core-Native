@@ -19,6 +19,23 @@ fn default_http_method() -> String {
     "GET".to_string()
 }
 
+fn deserialize_http_method<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = String::deserialize(deserializer)?;
+    validate_http_method_scalar(&value).map_err(de::Error::custom)?;
+    Ok(value)
+}
+
+fn validate_http_method_scalar(value: &str) -> Result<(), &'static str> {
+    if value.trim().is_empty() {
+        Err("http.execute request method must be non-empty")
+    } else {
+        Ok(())
+    }
+}
+
 fn deserialize_chapter_progress<'de, D>(deserializer: D) -> Result<f64, D::Error>
 where
     D: Deserializer<'de>,
@@ -44,12 +61,26 @@ fn validate_chapter_progress_scalar(value: f64) -> Result<(), &'static str> {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostHttpRequest {
     pub url: String,
-    #[serde(default = "default_http_method")]
+    #[serde(
+        default = "default_http_method",
+        deserialize_with = "deserialize_http_method"
+    )]
     pub method: String,
     #[serde(default)]
     pub headers: Value,
     #[serde(default)]
     pub body: Option<String>,
+}
+
+impl HostHttpRequest {
+    pub fn validate(&self) -> Result<(), CoreError> {
+        validate_http_method_scalar(&self.method).map_err(|message| {
+            CoreError::invalid_params(message).with_details(serde_json::json!({
+                "field": "method",
+                "method": self.method,
+            }))
+        })
+    }
 }
 
 /// Host HTTP response accepted for `http.execute` completion.
@@ -245,6 +276,28 @@ mod tests {
     }
 
     #[test]
+    fn host_http_request_defaults_method_and_rejects_blank_method() {
+        let request: HostHttpRequest = serde_json::from_value(serde_json::json!({
+            "url": "https://books.example.test/search"
+        }))
+        .unwrap();
+        assert_eq!(request.method, "GET");
+        request.validate().unwrap();
+
+        for method in ["", "   "] {
+            let err = serde_json::from_value::<HostHttpRequest>(serde_json::json!({
+                "url": "https://books.example.test/search",
+                "method": method
+            }))
+            .unwrap_err();
+            assert!(
+                err.to_string().contains("method"),
+                "unexpected parse error: {err}"
+            );
+        }
+    }
+
+    #[test]
     fn host_http_response_rejects_invalid_status() {
         let response: HostHttpResponse = serde_json::from_value(serde_json::json!({
             "status": 99,
@@ -341,6 +394,25 @@ mod tests {
             err.details["source"]
                 .as_str()
                 .is_some_and(|source| source.contains("unknown field")),
+            "unexpected source detail: {}",
+            err.details["source"]
+        );
+
+        let command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/invalid-book-search-request-method-empty.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let err = parse_params::<BookSearchParams>(crate::methods::BOOK_SEARCH, &command.params)
+            .unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert_eq!(err.details["method"], crate::methods::BOOK_SEARCH);
+        assert!(
+            err.details["source"]
+                .as_str()
+                .is_some_and(|source| source.contains("method")),
             "unexpected source detail: {}",
             err.details["source"]
         );
