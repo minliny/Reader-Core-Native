@@ -608,15 +608,17 @@ impl RemoteContentPipeline {
     }
 
     /// Extract chapter body text. Returns the joined output of the rule chain,
-    /// normalized via [`normalization::normalize_content`] (line endings
-    /// unified, excessive blank lines collapsed, edges trimmed).
+    /// normalized via [`normalization::normalize_extracted_content`] so raw HTML
+    /// fragments and plain text both become stable chapter text.
     pub fn chapter_content(
         &self,
         source: &Source,
         chapter_response: &str,
     ) -> Result<String, ContentError> {
         let out = self.run_chain(chapter_response, &source.rules.chapter)?;
-        Ok(normalization::normalize_content(&out.values().join("\n")))
+        Ok(normalization::normalize_extracted_content(
+            &out.values().join("\n"),
+        ))
     }
 
     /// Extract and normalize one chapter body for cache/storage.
@@ -668,6 +670,7 @@ pub fn normalize_chapter(
     validate_non_empty("source_id", &source.source_id)?;
     validate_non_empty("book_id", &book.book_id)?;
     let content = normalize_chapter_content(raw_content);
+    let content = remove_leading_duplicate_chapter_title(&content, &book.title, &toc_entry.title);
     if content.trim().is_empty() {
         return Err(ContentError::InvalidChapter {
             field: "content".into(),
@@ -999,6 +1002,123 @@ fn normalize_chapter_content(raw: &str) -> String {
     output.join("\n")
 }
 
+fn remove_leading_duplicate_chapter_title(
+    content: &str,
+    book_title: &str,
+    chapter_title: &str,
+) -> String {
+    let Some(prefix_end) = leading_duplicate_chapter_title_end(content, book_title, chapter_title)
+    else {
+        return content.to_string();
+    };
+    normalize_chapter_content(&content[prefix_end..])
+}
+
+fn leading_duplicate_chapter_title_end(
+    content: &str,
+    book_title: &str,
+    chapter_title: &str,
+) -> Option<usize> {
+    let chapter_title = chapter_title.trim();
+    if chapter_title.is_empty() {
+        return None;
+    }
+
+    let mut cursor = 0usize;
+    let book_title = book_title.trim();
+    loop {
+        let next = skip_duplicate_title_prefix_tokens(content, cursor, book_title);
+        if next == cursor {
+            break;
+        }
+        cursor = next;
+    }
+
+    let mut cursor = match_flexible_title_at(content, cursor, chapter_title)?;
+    if let Some(next) = content[cursor..].chars().next() {
+        if !next.is_whitespace() {
+            return None;
+        }
+    }
+    while cursor < content.len() {
+        let next = content[cursor..].chars().next()?;
+        if !next.is_whitespace() {
+            break;
+        }
+        cursor += next.len_utf8();
+    }
+    Some(cursor)
+}
+
+fn skip_duplicate_title_prefix_tokens(content: &str, mut cursor: usize, book_title: &str) -> usize {
+    while cursor < content.len() {
+        let Some(next) = content[cursor..].chars().next() else {
+            break;
+        };
+        if !is_duplicate_title_prefix_separator(next) {
+            break;
+        }
+        cursor += next.len_utf8();
+    }
+
+    if !book_title.is_empty() && content[cursor..].starts_with(book_title) {
+        cursor + book_title.len()
+    } else {
+        cursor
+    }
+}
+
+fn match_flexible_title_at(content: &str, mut cursor: usize, title: &str) -> Option<usize> {
+    for expected in title.chars() {
+        if expected.is_whitespace() {
+            while cursor < content.len() {
+                let next = content[cursor..].chars().next()?;
+                if !next.is_whitespace() {
+                    break;
+                }
+                cursor += next.len_utf8();
+            }
+            continue;
+        }
+
+        let actual = content[cursor..].chars().next()?;
+        if actual != expected {
+            return None;
+        }
+        cursor += actual.len_utf8();
+    }
+    Some(cursor)
+}
+
+fn is_duplicate_title_prefix_separator(value: char) -> bool {
+    value.is_whitespace()
+        || value.is_ascii_punctuation()
+        || matches!(
+            value,
+            '　' | '。'
+                | '，'
+                | '：'
+                | '；'
+                | '、'
+                | '！'
+                | '？'
+                | '《'
+                | '》'
+                | '「'
+                | '」'
+                | '『'
+                | '』'
+                | '（'
+                | '）'
+                | '【'
+                | '】'
+                | '—'
+                | '–'
+                | '…'
+                | '·'
+        )
+}
+
 fn split_paragraphs(content: &str) -> Vec<String> {
     content
         .split("\n\n")
@@ -1314,6 +1434,32 @@ mod tests {
         assert_eq!(content, "Para one.\nPara two.");
     }
 
+    #[test]
+    fn chapter_content_formats_raw_html_fragment_like_legado() {
+        let mut source = sample_source();
+        source.rules.chapter = serde_json::json!([
+            {
+                "kind": "regexExtract",
+                "pattern": "(?s)<article id=\"chapter\">(.*?)</article>",
+                "group": { "index": 1 }
+            }
+        ]);
+        let pipeline = RemoteContentPipeline::new();
+        let resp = r#"
+            <html>
+                <article id="chapter">
+                    <p>First&nbsp;&amp; <em>bold</em> line.</p>
+                    <p>Second<br/>line.</p>
+                    <!-- remove me -->
+                </article>
+            </html>
+        "#;
+
+        let content = pipeline.chapter_content(&source, resp).unwrap();
+
+        assert_eq!(content, "First & bold line.\nSecond\nline.");
+    }
+
     fn sample_book() -> Book {
         Book {
             book_id: "book-1".into(),
@@ -1555,6 +1701,20 @@ mod tests {
         assert_eq!(chapter.char_len, "Para one.\n\nPara two.".chars().count());
         assert!(chapter.cache_key.starts_with("src1:book-1:2:"));
         assert_eq!(chapter.content_fingerprint.len(), 16);
+    }
+
+    #[test]
+    fn normalize_chapter_removes_leading_duplicate_chapter_title() {
+        let source = sample_source();
+        let book = sample_book();
+        let toc = toc_entry(2, "Chapter 3", "/c/3");
+
+        let chapter =
+            normalize_chapter(&source, &book, &toc, "Dune: Chapter 3\n\nPara one.").unwrap();
+
+        assert_eq!(chapter.content, "Para one.");
+        assert_eq!(chapter.paragraphs, vec!["Para one."]);
+        assert_eq!(chapter.char_len, "Para one.".chars().count());
     }
 
     #[test]

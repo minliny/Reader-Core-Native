@@ -8,5 +8,6 @@ authors.workspace = true
 
 [dependencies]
 reader-domain = { path = "../reader-domain" }
+regex = "1"
 serde.workspace = true
 serde_json.workspace = true

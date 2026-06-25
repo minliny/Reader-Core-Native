@@ -25,7 +25,29 @@ public enum ReaderCoreClientError: Error, Equatable {
     case requestTimedOut(UInt64)
     case missingHostTransport
     case hostTransportFailed(String)
+    case invalidHostErrorCode(String)
     case coreError(ReaderCoreCoreError)
+}
+
+/// Machine-readable error codes accepted by Core's `host.error` command.
+///
+/// Core deserializes `host.error`'s `error.code` as the `ErrorCode` enum
+/// (`crates/reader-contract/src/error.rs`, `SCREAMING_SNAKE_CASE`). Passing an
+/// unknown code makes `host.error` parsing fail on the Core side: the error is
+/// routed to the `host.error` command's own request id (adapter-internal) and
+/// the original pending request never resumes — surfacing as a caller timeout.
+/// Validate against this set on the adapter side to fail fast instead.
+public enum ReaderCoreHostErrorCode: String, CaseIterable {
+    case unknownMethod = "UNKNOWN_METHOD"
+    case invalidParams = "INVALID_PARAMS"
+    case invalidProtocolVersion = "INVALID_PROTOCOL_VERSION"
+    case cancelled = "CANCELLED"
+    case invalidMessage = "INVALID_MESSAGE"
+    case internal_ = "INTERNAL"
+
+    public static func isValid(_ rawValue: String) -> Bool {
+        ReaderCoreHostErrorCode(rawValue: rawValue) != nil
+    }
 }
 
 public struct ReaderCoreEvent {
@@ -481,6 +503,12 @@ public final class ReaderCoreClient {
         retryable: Bool,
         requestId: UInt64? = nil
     ) throws -> UInt64 {
+        // Fail fast: Core's host.error deserializes code as the ErrorCode enum.
+        // An unknown code would make host.error parsing fail and the original
+        // pending request would never resume (silent caller timeout).
+        guard ReaderCoreHostErrorCode.isValid(code) else {
+            throw ReaderCoreClientError.invalidHostErrorCode(code)
+        }
         let commandId = requestId ?? nextCommandId()
         try sendCommand(
             method: "host.error",

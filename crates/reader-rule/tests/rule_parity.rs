@@ -393,6 +393,94 @@ fn css_selector_preserves_duplicate_text_values() {
 }
 
 #[test]
+fn css_result_set_pseudos_filter_in_rule_order_like_old_core() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <section class="rank-list">
+            <a class="pt-rank-detail" href="/book/1">Rank 1</a>
+            <a class="pt-rank-detail" href="/book/2">Rank 2</a>
+            <a class="pt-rank-detail" href="/book/3">Rank 3</a>
+            <a class="pt-rank-detail" href="/book/4">Rank 4</a>
+            <a class="pt-rank-detail" href="/book/5">Rank 5</a>
+            <a class="pt-rank-detail" href="/book/6">Rank 6</a>
+        </section>
+    "#;
+
+    let first_four = engine
+        .execute_step(html, &RuleStep::css_text(".pt-rank-detail:lt(4)"))
+        .unwrap();
+    let drop_last = engine
+        .execute_step(html, &RuleStep::css_attr(".pt-rank-detail:lt(-1)", "href"))
+        .unwrap();
+    let chained_eq = engine
+        .execute_step(html, &RuleStep::css_text(".pt-rank-detail:gt(1):eq(2)"))
+        .unwrap();
+
+    assert_eq!(
+        first_four.values(),
+        &[
+            "Rank 1".to_string(),
+            "Rank 2".to_string(),
+            "Rank 3".to_string(),
+            "Rank 4".to_string()
+        ]
+    );
+    assert_eq!(
+        drop_last.values(),
+        &[
+            "/book/1".to_string(),
+            "/book/2".to_string(),
+            "/book/3".to_string(),
+            "/book/4".to_string(),
+            "/book/5".to_string()
+        ]
+    );
+    assert_eq!(chained_eq.values(), &["Rank 5".to_string()]);
+}
+
+#[test]
+fn css_comma_selector_applies_result_pseudos_per_group_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <main>
+            <p>1</p>
+            <p>2</p>
+            <p>3</p>
+            <div>4</div>
+            <div>5</div>
+        </main>
+    "#;
+
+    let output = engine
+        .execute_step(html, &RuleStep::css_text("p:eq(0),div:eq(1)"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["1".to_string(), "5".to_string()]);
+}
+
+#[test]
+fn css_comma_selector_applies_first_last_per_group_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <main>
+            <p>1</p>
+            <p>2</p>
+            <div>3</div>
+            <div>4</div>
+        </main>
+    "#;
+
+    let output = engine
+        .execute_step(html, &RuleStep::css_text("p:first,div:last"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["1".to_string(), "4".to_string()]);
+}
+
+#[test]
 fn css_selector_contains_filters_by_text() {
     let engine = RuleEngine::new();
 
@@ -453,6 +541,434 @@ fn css_selector_contains_own_ignores_descendant_text() {
         .unwrap();
 
     assert_eq!(output.values(), &["Dune Appendix".to_string()]);
+}
+
+#[test]
+fn css_own_text_extraction_returns_direct_text_like_legado() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <section>
+            <p><span>nested</span> Direct <b>child</b> Tail</p>
+        </section>
+    "#;
+
+    let output = engine
+        .execute_step(html, &RuleStep::css_attr("p", "ownText"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["Direct Tail".to_string()]);
+}
+
+#[test]
+fn css_text_nodes_extraction_returns_plain_text_like_old_core() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <div class="content"><p>Nested chapter text</p></div>
+    "#;
+
+    let output = engine
+        .execute_step(html, &RuleStep::css_attr(".content", "textNodes"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["Nested chapter text".to_string()]);
+}
+
+#[test]
+fn css_html_extraction_returns_inner_html_like_old_core() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <div id="nr1"><blockquote><p>正文</p></blockquote></div>
+    "#;
+
+    let output = engine
+        .execute_step(html, &RuleStep::css_attr("#nr1", "html"))
+        .unwrap();
+
+    assert_eq!(
+        output.values(),
+        &["<blockquote><p>正文</p></blockquote>".to_string()]
+    );
+}
+
+#[test]
+fn css_selector_contains_own_middle_segment_filters_parent_before_child_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <dl class="info">
+            <dd>AUTHOR：<a href="/alice">Alice</a></dd>
+            <dd><span>AUTHOR：</span><a href="/nested">Nested</a></dd>
+        </dl>
+    "#;
+
+    let output = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr("dd:containsOwn(author：)>a", "href"),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["/alice".to_string()]);
+}
+
+#[test]
+fn css_selector_not_contains_own_middle_segment_excludes_direct_text_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <dl class="chapters">
+            <dd>VIP<a href="/vip">Locked</a></dd>
+            <dd><span>VIP</span><a href="/nested-vip">Nested label</a></dd>
+            <dd>Free<a href="/free">Free</a></dd>
+        </dl>
+    "#;
+
+    let output = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(".chapters>dd:not(:containsOwn(VIP))>a", "href"),
+        )
+        .unwrap();
+
+    assert_eq!(
+        output.values(),
+        &["/nested-vip".to_string(), "/free".to_string()]
+    );
+}
+
+#[test]
+fn css_selector_matches_filters_by_regex_text_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <ul>
+            <li>Dune Messiah</li>
+            <li>Foundation</li>
+            <li>Children of Dune</li>
+        </ul>
+    "#;
+
+    let output = engine
+        .execute_step(html, &RuleStep::css_text("li:matches((?i)^dune)"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["Dune Messiah".to_string()]);
+}
+
+#[test]
+fn css_selector_not_matches_own_excludes_direct_text_regex_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <div class="chapters">
+            <a>正文<span>最新</span></a>
+            <a>最新<span>正文</span></a>
+            <a>旧章</a>
+        </div>
+    "#;
+
+    let output = engine
+        .execute_step(
+            html,
+            &RuleStep::css_text(".chapters>a:not(:matchesOwn(最新))"),
+        )
+        .unwrap();
+
+    assert_eq!(
+        output.values(),
+        &["正文最新".to_string(), "旧章".to_string()]
+    );
+}
+
+#[test]
+fn css_selector_contains_whole_text_preserves_whitespace_and_case_like_old_core() {
+    let engine = RuleEngine::new();
+
+    let html = "<section class=\"whole\"><p data-id=\"first\"> jsoup\n The <i>HTML</i> Parser</p><p data-id=\"second\">jsoup The <i>HTML</i> Parser</p></section>";
+
+    let output = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(
+                ".whole>p:containsWholeText( jsoup\n The HTML Parser)",
+                "data-id",
+            ),
+        )
+        .unwrap();
+    let case_sensitive = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(
+                ".whole>p:containsWholeText( jsoup\n The html Parser)",
+                "data-id",
+            ),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["first".to_string()]);
+    assert!(case_sensitive.is_empty());
+}
+
+#[test]
+fn css_selector_whole_own_text_uses_direct_non_normalized_text_like_old_core() {
+    let engine = RuleEngine::new();
+
+    let html = "<section><p data-id=\"own\">Prefix\n<span>child</span>\tSuffix</p><p data-id=\"desc\"><span>Prefix\n\tSuffix</span></p></section>";
+
+    let output = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr("p:containsWholeOwnText(Prefix\n\tSuffix)", "data-id"),
+        )
+        .unwrap();
+    let descendant_only = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr("p:containsWholeOwnText(child)", "data-id"),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["own".to_string()]);
+    assert!(descendant_only.is_empty());
+}
+
+#[test]
+fn css_selector_matches_whole_text_regex_uses_non_normalized_text_like_old_core() {
+    let engine = RuleEngine::new();
+
+    let html = "<section><div data-id=\"ssn\">AA\n  123-45-6789\nZZ</div><div data-id=\"flat\">AA 123-45-6789 ZZ</div><p data-id=\"own\">Line\n<span>child</span>\tTail</p><p data-id=\"desc\"><span>Line\n\tTail</span></p></section>";
+
+    let whole_text = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr("div:matchesWholeText(AA\\n\\s+123-45-6789\\nZZ)", "data-id"),
+        )
+        .unwrap();
+    let whole_own_text = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr("p:matchesWholeOwnText(^Line\\n\\tTail$)", "data-id"),
+        )
+        .unwrap();
+    let descendant_only = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr("p:matchesWholeOwnText(child)", "data-id"),
+        )
+        .unwrap();
+
+    assert_eq!(whole_text.values(), &["ssn".to_string()]);
+    assert_eq!(whole_own_text.values(), &["own".to_string()]);
+    assert!(descendant_only.is_empty());
+}
+
+#[test]
+fn css_selector_whole_text_filters_compose_with_has_and_not_like_old_core() {
+    let engine = RuleEngine::new();
+
+    let html = "<section class=\"cards\"><article data-id=\"a\"><p>Line\n  Alpha<span>!</span></p></article><article data-id=\"b\"><p>Line Alpha</p></article></section>";
+
+    let has_output = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(
+                ".cards>article:has(> p:containsWholeText(Line\n  Alpha!))",
+                "data-id",
+            ),
+        )
+        .unwrap();
+    let not_output = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(
+                ".cards>article:not(:containsWholeText(Line\n  Alpha!))",
+                "data-id",
+            ),
+        )
+        .unwrap();
+
+    assert_eq!(has_output.values(), &["a".to_string()]);
+    assert_eq!(not_output.values(), &["b".to_string()]);
+}
+
+#[test]
+fn css_selector_parent_matches_elements_with_children_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <div class="links">
+            <a href="/empty"></a>
+            <a href="/blank-text"> </a>
+            <a href="/child"><span></span></a>
+            <a href="/text">Text</a>
+            <a href="/second-empty"></a>
+        </div>
+    "#;
+
+    let output = engine
+        .execute_step(html, &RuleStep::css_attr(".links > a:parent", "href"))
+        .unwrap();
+
+    assert_eq!(
+        output.values(),
+        &[
+            "/blank-text".to_string(),
+            "/child".to_string(),
+            "/text".to_string()
+        ]
+    );
+}
+
+#[test]
+fn css_selector_not_parent_matches_elements_without_children_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <div class="links">
+            <a href="/empty"></a>
+            <a href="/blank-text"> </a>
+            <a href="/child"><span></span></a>
+            <a href="/text">Text</a>
+            <a href="/second-empty"></a>
+        </div>
+    "#;
+
+    let output = engine
+        .execute_step(html, &RuleStep::css_attr(".links > a:not(:parent)", "href"))
+        .unwrap();
+
+    assert_eq!(
+        output.values(),
+        &["/empty".to_string(), "/second-empty".to_string()]
+    );
+}
+
+#[test]
+fn css_selector_has_parent_matches_child_parent_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <section class="cards">
+            <article><a href="/empty"></a></article>
+            <article><a href="/text">Text</a></article>
+            <article><span>None</span></article>
+        </section>
+    "#;
+
+    let output = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(".cards > article:has(> a:parent) > a:parent", "href"),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["/text".to_string()]);
+}
+
+#[test]
+fn css_selector_has_contains_own_matches_direct_child_own_text_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <section class="cards">
+            <article data-id="a"><p>Flag <span>child</span></p></article>
+            <article data-id="b"><p><span>Flag</span></p></article>
+            <article data-id="c"><p>Plain</p></article>
+        </section>
+    "#;
+
+    let output = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(".cards>article:has(> p:containsOwn(Flag))", "data-id"),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["a".to_string()]);
+}
+
+#[test]
+fn css_selector_contains_data_matches_script_data_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <section>
+            <script data-id="script">BookData = { chapter: 1 };</script>
+            <p data-id="visible">BookData visible text</p>
+        </section>
+    "#;
+
+    let output = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr("script:containsData(bookdata)", "data-id"),
+        )
+        .unwrap();
+    let visible_text_output = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr("p:containsData(BookData)", "data-id"),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["script".to_string()]);
+    assert!(visible_text_output.is_empty());
+}
+
+#[test]
+fn css_selector_not_contains_data_excludes_script_data_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <section class="cards">
+            <article data-id="article">
+                <script>BookData = { chapter: 1 };</script>
+            </article>
+            <article data-id="plain">
+                <p>Plain text</p>
+            </article>
+        </section>
+    "#;
+
+    let output = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(".cards>article:not(:containsData(BookData))", "data-id"),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["plain".to_string()]);
+}
+
+#[test]
+fn css_selector_has_contains_data_matches_descendant_data_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <section class="cards">
+            <article data-id="article">
+                <script>BookData = { chapter: 1 };</script>
+            </article>
+            <article data-id="plain">
+                <p>Plain text</p>
+            </article>
+        </section>
+    "#;
+
+    let output = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(
+                ".cards>article:has(script:containsData(BookData))",
+                "data-id",
+            ),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["article".to_string()]);
 }
 
 #[test]
@@ -700,6 +1216,74 @@ fn jsonpath_scalar_values_convert_to_text() {
 }
 
 #[test]
+fn jsonpath_top_level_or_uses_first_non_empty_branch_like_legado() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune" },
+            { "title": "Foundation" }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.missing[*]||$.books[*].title"))
+        .unwrap();
+
+    assert_eq!(
+        output.values(),
+        &["Dune".to_string(), "Foundation".to_string()]
+    );
+}
+
+#[test]
+fn jsonpath_top_level_and_merges_non_empty_branches_like_legado() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "book": { "title": "Dune", "author": "Frank Herbert" }
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.book.title&&$.book.author"))
+        .unwrap();
+
+    assert_eq!(
+        output.values(),
+        &["Dune".to_string(), "Frank Herbert".to_string()]
+    );
+}
+
+#[test]
+fn jsonpath_top_level_percent_zips_branches_like_legado() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune", "author": "Frank Herbert" },
+            { "title": "Foundation", "author": "Isaac Asimov" }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("$.books[*].title%%$.books[*].author"),
+        )
+        .unwrap();
+
+    assert_eq!(
+        output.values(),
+        &[
+            "Dune".to_string(),
+            "Frank Herbert".to_string(),
+            "Foundation".to_string(),
+            "Isaac Asimov".to_string()
+        ]
+    );
+}
+
+#[test]
 fn jsonpath_filter_by_string_field_keeps_matching_array_items() {
     let engine = RuleEngine::new();
 
@@ -722,6 +1306,703 @@ fn jsonpath_filter_by_string_field_keeps_matching_array_items() {
         output.values(),
         &["Dune".to_string(), "Foundation".to_string()]
     );
+}
+
+#[test]
+fn jsonpath_filter_matches_regex_literal_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune" },
+            { "title": "dune appendix" },
+            { "title": "Foundation" }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("$.books[?(@.title =~ /^dune/i)].title"),
+        )
+        .unwrap();
+
+    assert_eq!(
+        output.values(),
+        &["Dune".to_string(), "dune appendix".to_string()]
+    );
+}
+
+#[test]
+fn jsonpath_filter_supports_in_operator_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune", "category": "novel" },
+            { "title": "Notes", "category": "essay" },
+            { "title": "Index", "category": "metadata" }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("$.books[?(@.category in ['novel','essay'])].title"),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["Dune".to_string(), "Notes".to_string()]);
+}
+
+#[test]
+fn jsonpath_filter_supports_nin_operator_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune", "category": "novel" },
+            { "title": "Notes", "category": "essay" },
+            { "title": "Index", "category": "metadata" }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("$.books[?(@.category nin ['metadata'])].title"),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["Dune".to_string(), "Notes".to_string()]);
+}
+
+#[test]
+fn jsonpath_filter_supports_anyof_operator_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune", "tags": ["novel", "space"] },
+            { "title": "Notes", "tags": ["essay"] },
+            { "title": "Index", "tags": ["metadata"] }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("$.books[?(@.tags anyof ['space','classic'])].title"),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["Dune".to_string()]);
+}
+
+#[test]
+fn jsonpath_filter_supports_noneof_operator_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune", "tags": ["novel", "space"] },
+            { "title": "Notes", "tags": ["essay"] },
+            { "title": "Index", "tags": ["metadata"] }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("$.books[?(@.tags noneof ['metadata'])].title"),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["Dune".to_string(), "Notes".to_string()]);
+}
+
+#[test]
+fn jsonpath_filter_supports_subsetof_operator_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune", "tags": ["novel", "space"] },
+            { "title": "Notes", "tags": ["essay"] },
+            { "title": "Index", "tags": ["metadata"] }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("$.books[?(@.tags subsetof ['novel','space','classic'])].title"),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["Dune".to_string()]);
+}
+
+#[test]
+fn jsonpath_filter_supports_size_operator_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune", "tags": ["novel", "space"] },
+            { "title": "Notes", "tags": ["essay"] },
+            { "title": "Index", "tags": [] }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("$.books[?(@.tags size 2)].title"),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["Dune".to_string()]);
+}
+
+#[test]
+fn jsonpath_filter_supports_empty_operator_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune", "tags": ["novel", "space"] },
+            { "title": "Notes", "tags": ["essay"] },
+            { "title": "Index", "tags": [] }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.books[?(@.tags empty)].title"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["Index".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_length_function_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune" },
+            { "title": "Notes" },
+            { "title": "Index" }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.books.length()"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["3".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_string_length_function_like_old_core() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "title": "Dune"
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.title.length()"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["4".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_length_path_parameter_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune" },
+            { "title": "Notes" },
+            { "title": "Index" }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.length($.books)"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["3".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_object_length_function_like_jayway_and_old_core() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "book": {
+            "title": "Dune",
+            "author": "Frank Herbert"
+        }
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.book.length()"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["2".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_size_alias_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "book": {
+            "title": "Dune",
+            "author": "Frank Herbert"
+        }
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.book.size()"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["2".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_size_path_parameter_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "book": {
+            "title": "Dune",
+            "author": "Frank Herbert"
+        }
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.size($.book)"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["2".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_first_function_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune" },
+            { "title": "Notes" }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.books.first()"))
+        .unwrap();
+
+    assert_eq!(output.values(), &[r#"{"title":"Dune"}"#.to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_path_after_first_function_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune" },
+            { "title": "Notes" }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.books.first().title"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["Dune".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_last_function_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune" },
+            { "title": "Notes" }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.books.last()"))
+        .unwrap();
+
+    assert_eq!(output.values(), &[r#"{"title":"Notes"}"#.to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_index_function_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune" },
+            { "title": "Notes" },
+            { "title": "Index" }
+        ]
+    }"#;
+
+    let second = engine
+        .execute_step(json, &RuleStep::json_path("$.books.index(1)"))
+        .unwrap();
+    let last = engine
+        .execute_step(json, &RuleStep::json_path("$.books.index(-1)"))
+        .unwrap();
+
+    assert_eq!(second.values(), &[r#"{"title":"Notes"}"#.to_string()]);
+    assert_eq!(last.values(), &[r#"{"title":"Index"}"#.to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_index_path_parameter_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune" },
+            { "title": "Notes" },
+            { "title": "Index" }
+        ],
+        "selected": 1
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.books.index($.selected)"))
+        .unwrap();
+
+    assert_eq!(output.values(), &[r#"{"title":"Notes"}"#.to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_sum_function_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "scores": [1.5, 2.25]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.scores.sum()"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["3.75".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_sum_numeric_parameter_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "scores": [1.5, 2.25]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.scores.sum(3)"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["6.75".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_min_function_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "scores": [2.25, 1.5, 3.75]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.scores.min()"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["1.5".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_min_numeric_parameter_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "scores": [2.25, 3.75]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.scores.min(1.5)"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["1.5".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_max_function_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "scores": [2.25, 1.5, 3.75]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.scores.max()"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["3.75".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_max_numeric_parameter_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "scores": [2.25, 1.5]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.scores.max(3.75)"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["3.75".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_avg_function_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "scores": [1.5, 2.25]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.scores.avg()"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["1.875".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_avg_numeric_parameter_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "scores": [1.5, 2.25]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.scores.avg(3)"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["2.25".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_stddev_function_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "scores": [1.5, 2.25]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.scores.stddev()"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["0.375".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_stddev_numeric_parameter_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "scores": [1]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.scores.stddev(3)"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["1.0".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_keys_function_like_jayway_and_old_core() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "book": {
+            "title": "Dune",
+            "author": "Frank Herbert"
+        }
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.book.keys()"))
+        .unwrap();
+
+    assert_eq!(
+        output.values(),
+        &["author".to_string(), "title".to_string()]
+    );
+}
+
+#[test]
+fn jsonpath_supports_values_function_like_old_core() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "book": {
+            "title": "Dune",
+            "author": "Frank Herbert"
+        }
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.book.values()"))
+        .unwrap();
+
+    assert_eq!(
+        output.values(),
+        &["Frank Herbert".to_string(), "Dune".to_string()]
+    );
+}
+
+#[test]
+fn jsonpath_supports_concat_function_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "parts": ["Read", "er", 7]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.parts.concat('-Core')"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["Reader-Core".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_concat_multiple_parameters_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "parts": ["Read", "er", 7]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.parts.concat('-','Core')"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["Reader-Core".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_concat_root_path_parameter_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "parts": ["Read", "er"],
+        "suffix": "Core"
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.parts.concat($.suffix)"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["ReaderCore".to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_append_function_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "items": ["a", "b"]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.items.append('c')"))
+        .unwrap();
+
+    assert_eq!(output.values(), &[r#"["a","b","c"]"#.to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_append_multiple_parameters_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "items": ["a", "b"]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.items.append('c','d')"))
+        .unwrap();
+
+    assert_eq!(output.values(), &[r#"["a","b","c","d"]"#.to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_append_numeric_parameter_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "items": ["a", "b"]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.items.append(3)"))
+        .unwrap();
+
+    assert_eq!(output.values(), &[r#"["a","b",3]"#.to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_append_json_object_parameter_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "items": ["a"]
+    }"#;
+
+    let output = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("$.items.append({\"x\":1,\"y\":2})"),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &[r#"["a",{"x":1,"y":2}]"#.to_string()]);
+}
+
+#[test]
+fn jsonpath_supports_append_root_path_parameter_like_jayway() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "items": ["a"],
+        "extra": { "x": 1 }
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.items.append($.extra)"))
+        .unwrap();
+
+    assert_eq!(output.values(), &[r#"["a",{"x":1}]"#.to_string()]);
 }
 
 #[test]
@@ -793,6 +2074,21 @@ fn jsonpath_filter_compares_against_current_item_field() {
 }
 
 #[test]
+fn jsonpath_filter_compares_current_scalar_item_like_old_core() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "tags": ["novel", "essay", "metadata"]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.tags[?(@ == 'novel')]"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["novel".to_string()]);
+}
+
+#[test]
 fn jsonpath_filter_keeps_items_where_field_exists() {
     let engine = RuleEngine::new();
 
@@ -861,6 +2157,30 @@ fn jsonpath_filter_supports_or_conditions() {
 }
 
 #[test]
+fn jsonpath_filter_supports_textual_or_conditions_like_old_core() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune", "category": "novel" },
+            { "title": "Notes", "category": "essay" },
+            { "title": "Index", "category": "metadata" }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path(
+                "$.books[?(@.category == 'novel' or @.category == 'essay')].title",
+            ),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["Dune".to_string(), "Notes".to_string()]);
+}
+
+#[test]
 fn jsonpath_filter_supports_grouped_boolean_conditions() {
     let engine = RuleEngine::new();
 
@@ -905,6 +2225,25 @@ fn jsonpath_filter_supports_not_conditions() {
         .unwrap();
 
     assert_eq!(output.values(), &["Dune".to_string(), "Notes".to_string()]);
+}
+
+#[test]
+fn jsonpath_filter_supports_not_existence_function_like_old_core() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "books": [
+            { "title": "Dune", "cover": "dune.jpg" },
+            { "title": "Notes" },
+            { "title": "Index", "cover": "index.jpg" }
+        ]
+    }"#;
+
+    let output = engine
+        .execute_step(json, &RuleStep::json_path("$.books[?(not(@.cover))].title"))
+        .unwrap();
+
+    assert_eq!(output.values(), &["Notes".to_string()]);
 }
 
 #[test]

@@ -686,6 +686,7 @@ name = "reader-local-book"
 version = "0.1.0"
 dependencies = [
  "reader-domain",
+ "regex",
  "serde",
  "serde_json",
 ]
@@ -695,6 +696,8 @@ name = "reader-rss"
 version = "0.1.0"
 dependencies = [
  "reader-domain",
+ "regex",
+ "scraper",
  "serde",
  "serde_json",
 ]
