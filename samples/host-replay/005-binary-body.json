@@ -1,0 +1,18 @@
+{
+  "format": "reader-host-replay/1",
+  "description": "Binary cover image response via base64 bodyFile",
+  "request": {
+    "capability": "http.execute",
+    "url": "https://covers.example.test/cover/1.png",
+    "method": "GET",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "headers": { "content-type": "image/png" },
+    "bodyFile": "005-cover.png",
+    "bodyEncoding": "base64"
+  },
+  "tags": ["binary", "base64"]
+}

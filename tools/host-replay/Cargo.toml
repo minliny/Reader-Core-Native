@@ -1,0 +1,28 @@
+[package]
+name = "host-replay"
+description = "Offline replay tool for host.request (HTTP/Cookie/Redirect/WebView) responses — dev-time only, no network."
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+rust-version = "1.75"
+authors = ["minliny"]
+publish = false
+
+# Standalone workspace root so this tool builds in isolation, independent of the
+# top-level Reader-Core-Native workspace (and of concurrent agent edits to
+# reader-contract / reader-runtime). The tool deliberately does NOT depend on
+# any reader-* crate: it only emits JSON shaped like the host.complete /
+# host.error protocol commands. It never touches the protocol schema.
+[workspace]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[[bin]]
+name = "host-replay"
+path = "src/main.rs"
+
+[lib]
+name = "host_replay"
+path = "src/lib.rs"

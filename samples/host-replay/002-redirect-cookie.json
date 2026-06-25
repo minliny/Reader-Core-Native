@@ -1,0 +1,41 @@
+{
+  "format": "reader-host-replay/1",
+  "description": "302 redirect with cookie capture",
+  "request": {
+    "capability": "http.execute",
+    "url": "https://login.example.test/auth",
+    "method": "GET",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/html",
+      "set-cookie": ["sid=abc123; Path=/; HttpOnly; Secure", "lang=en; Path=/"]
+    },
+    "body": "<html><body>Welcome</body></html>",
+    "finalUrl": "https://login.example.test/dashboard"
+  },
+  "redirectChain": [
+    {
+      "status": 302,
+      "location": "https://login.example.test/dashboard",
+      "headers": { "set-cookie": ["sid=abc123; Path=/; HttpOnly; Secure"] },
+      "setCookies": ["sid=abc123; Path=/; HttpOnly; Secure"]
+    }
+  ],
+  "cookieJar": {
+    "https://login.example.test": [
+      {
+        "name": "sid",
+        "value": "abc123",
+        "domain": "login.example.test",
+        "path": "/",
+        "secure": true,
+        "httpOnly": true
+      }
+    ]
+  },
+  "tags": ["redirect", "cookie"]
+}
