@@ -18,13 +18,19 @@ Core (Rust) --rc_event_callback--> ReaderCoreRuntime.pollEvent (现有 Java wrap
    |                                   |
    |  host.request event bytes         |
    v                                   v
+HostEventLoop.tick  -->  HostTransport.pollEventJson
+   |                         |
+   v                         v
 HostRequest.parse  -->  HostAdapter.dispatch(capability)  -->  CapabilityHandler
                                                                    |
                                                                    v
                                           HostReply  <--  HostReplyCodec.encode
                                                                    |
                                                                    v
-                                          ReaderCoreRuntime.send  -->  rc_runtime_send --> Core
+                                          HostTransport.sendCommand  -->  ReaderCoreRuntime.send
+                                                                   |
+                                                                   v
+                                                            rc_runtime_send --> Core
 ```
 
 本模块**不触碰 C ABI**：它消费协议（`host.request` / `host.complete` /
@@ -34,6 +40,9 @@ HostRequest.parse  -->  HostAdapter.dispatch(capability)  -->  CapabilityHandler
 
 | 类 | 职责 |
 | --- | --- |
+| `HostEventLoop` | 闭环：poll → 过滤 `host.request` → dispatch → encode → send；忽略 result/error event。 |
+| `HostTransport` | poll/send 抽象接口，使 loop 纯 JVM 可单测。 |
+| `ReaderCoreHostTransport` | 生产 wiring：把 `HostTransport` 接到现有 `ReaderCoreRuntime`（JNI → C ABI）。 |
 | `HostRequest` | 解析并校验 `host.request` event（operationId≥1、dotted capability、params）。 |
 | `HostReply` | host 回复：`complete(resultJson)` 或 `error(code, message, retryable)`。 |
 | `CapabilityHandler` | 单个 capability 的 host 侧实现接口。 |
@@ -54,15 +63,19 @@ JAVA_HOME=<jdk17> gradle --offline test # 依赖已缓存，可离线复跑
 ## Contract evidence
 
 `src/test/resources/conformance/host/` 复制自 `protocol/fixtures/conformance/host/`。
-单测断言 `HostReplyCodec` 输出与这些 fixture 在 canonical 形式下逐字节一致：
 
-- `complete.json` ← `host.complete` 编码
-- `error.json` ← `host.error` 编码
-- `http-complete-with-metadata.json` ← 带 HTTP status/headers/body 的完成
+- `HostReplyCodecTest` 断言 `HostReplyCodec` 输出与这些 fixture 在 canonical 形式下
+  逐字节一致：`complete.json` ← `host.complete`，`error.json` ← `host.error`，
+  `http-complete-with-metadata.json` ← 带 HTTP status/headers/body 的完成。
+- `HostEventLoopTest` 用 fake `HostTransport` 端到端验证
+  poll → parse → dispatch → encode → send 闭环，断言发出的 command 与 fixture 一致
+  （modulo host 选择的 outbound requestId）；覆盖 result/error event 过滤、超时、
+  malformed 请求、drain 多事件、outbound requestId 递增。
+- `HostAdapterTest` 覆盖 dispatch → encode 端到端与各失败模式。
 
-`HostAdapterTest` 进一步做端到端：解析 `host.request` → `dispatch` → `encode`，
-结果与 fixture 对齐。这是本 lane 每轮提交的可验证 contract evidence
-（Gradle `test` task，纯 JVM，无需 NDK/设备）。
+这是本 lane 每轮提交的可验证 contract evidence（Gradle `test` task，纯 JVM，无需
+NDK/设备）。模块通过 `sourceSets` 编译引用现有 Java JNI wrapper（`ReaderCoreRuntime`
+等），不修改 wrapper 源。
 
 ## 不在此 lane
 

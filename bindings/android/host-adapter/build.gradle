@@ -10,6 +10,18 @@ java {
     targetCompatibility = JavaVersion.VERSION_17
 }
 
+sourceSets {
+    // Compile against the existing Java JNI wrapper (ReaderCoreRuntime /
+    // NativeCoreBridge / ReaderCoreException) so ReaderCoreHostTransport — the
+    // production wiring from the host adapter to the C ABI surface — type-checks
+    // under a plain JVM. We do not modify those sources; we only reference them.
+    main {
+        java {
+            srcDir '../src/main/java'
+        }
+    }
+}
+
 repositories {
     mavenCentral()
 }

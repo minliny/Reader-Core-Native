@@ -63,13 +63,18 @@
 `host.request` event 到 host capability，并编码 `host.complete` / `host.error`
 command 经现有 `rc_runtime_send` 通道回 Core。**不触碰 C ABI**，只消费协议。
 
-- 组件：`HostRequest` / `HostReply` / `CapabilityHandler` / `HostAdapter` /
+- 组件：`HostEventLoop` / `HostTransport` / `ReaderCoreHostTransport` /
+  `HostRequest` / `HostReply` / `CapabilityHandler` / `HostAdapter` /
   `HostReplyCodec` / 零依赖 `Json`。
+- 闭环：`HostEventLoop.tick` 做 poll → 过滤 `host.request` → dispatch → encode →
+  send；`ReaderCoreHostTransport` 把 loop 接到现有 `ReaderCoreRuntime`（JNI → C ABI）。
 - Gradle gate：`bindings/android/host-adapter` 下 `gradle test`（JDK 17、
-  Gradle 9.5.1 验证；`--offline` 可复跑）。
-- Contract evidence：单测断言 `HostReplyCodec` 输出与
+  Gradle 9.5.1 验证；`--offline` 可复跑）。模块通过 `sourceSets` 编译引用现有
+  Java JNI wrapper，不修改 wrapper 源。27 tests pass。
+- Contract evidence：`HostReplyCodecTest` 断言编码输出与
   `protocol/fixtures/conformance/host/{complete,error,http-complete-with-metadata}.json`
-  在 canonical 形式下逐字节一致；`HostAdapterTest` 覆盖 dispatch → encode 端到端。
+  在 canonical 形式下逐字节一致；`HostEventLoopTest` 用 fake transport 端到端验证
+  闭环（覆盖 result/error 过滤、超时、malformed、drain、requestId 递增）。
 - 模块详情见 `bindings/android/host-adapter/README.md`。
 
 ## ABI gap 记录
