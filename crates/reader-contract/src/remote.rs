@@ -127,6 +127,18 @@ fn validate_inline_source_shape(value: &Value) -> Result<(), &'static str> {
     }
 }
 
+fn deserialize_book_detail_book<'de, D>(deserializer: D) -> Result<Value, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+    if value.is_object() {
+        Ok(value)
+    } else {
+        Err(de::Error::custom("book.detail book must be an object"))
+    }
+}
+
 fn deserialize_chapter_progress<'de, D>(deserializer: D) -> Result<f64, D::Error>
 where
     D: Deserializer<'de>,
@@ -277,6 +289,7 @@ pub struct BookSearchParams {
 pub struct BookDetailParams {
     pub source_id: String,
     /// Base book to merge metadata into (must contain at least `bookId`).
+    #[serde(deserialize_with = "deserialize_book_detail_book")]
     pub book: Value,
     /// Pre-fetched detail response body.
     #[serde(default = "empty_string")]
@@ -695,6 +708,25 @@ mod tests {
             err.details["source"]
                 .as_str()
                 .is_some_and(|source| source.contains("unknown field")),
+            "unexpected source detail: {}",
+            err.details["source"]
+        );
+
+        let command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/invalid-book-detail-book-not-object.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let err = parse_params::<BookDetailParams>(crate::methods::BOOK_DETAIL, &command.params)
+            .unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert_eq!(err.details["method"], crate::methods::BOOK_DETAIL);
+        assert!(
+            err.details["source"]
+                .as_str()
+                .is_some_and(|source| source.contains("book.detail book")),
             "unexpected source detail: {}",
             err.details["source"]
         );

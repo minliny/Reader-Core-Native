@@ -59,6 +59,9 @@ const INVALID_BOOK_SEARCH_SOURCE_NOT_OBJECT: &str = include_str!(
 const INVALID_BOOK_DETAIL_UNKNOWN_FIELD: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-book-detail-unknown-field.json"
 );
+const INVALID_BOOK_DETAIL_BOOK_NOT_OBJECT: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-book-detail-book-not-object.json"
+);
 const INVALID_BOOK_TOC_UNKNOWN_FIELD: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-book-toc-unknown-field.json"
 );
@@ -347,6 +350,11 @@ pub(crate) fn run_conformance() -> ConformanceReport {
     record(&mut report, "book-detail-rejects-unknown-params", || {
         let (_runtime, rx) = send_to_fresh_runtime(INVALID_BOOK_DETAIL_UNKNOWN_FIELD)?;
         expect_event_error(&rx, 406, ErrorCode::InvalidParams)
+    });
+
+    record(&mut report, "book-detail-rejects-non-object-book", || {
+        let (_runtime, rx) = send_to_fresh_runtime(INVALID_BOOK_DETAIL_BOOK_NOT_OBJECT)?;
+        expect_event_error(&rx, 421, ErrorCode::InvalidParams)
     });
 
     record(&mut report, "valid-command-book-toc", || {

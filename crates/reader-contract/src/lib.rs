@@ -250,6 +250,16 @@ mod tests {
     }
 
     #[test]
+    fn command_schema_requires_book_detail_book_object() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+        let book = &schema["$defs"]["BookDetailParams"]["properties"]["book"];
+
+        assert_eq!(book["type"], serde_json::json!("object"));
+    }
+
+    #[test]
     fn command_schema_binds_book_toc_to_param_def() {
         let schema: Value =
             serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))

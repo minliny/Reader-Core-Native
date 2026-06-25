@@ -783,6 +783,25 @@ int main() {
     return fail("bad inline source left synchronous last_error");
   }
 
+  // --- invalid book.detail book shape -> async INVALID_PARAMS -----------
+  std::string invalid_book_detail_book =
+      R"({"protocolVersion":1,"requestId":421,"method":"book.detail","params":{"sourceId":"ffi-http-src","book":[{"bookId":"1"}],"detailResponse":"{\"detail\":{\"bookId\":\"1\",\"title\":\"Dune\"}}","source":{"sourceId":"ffi-http-src","name":"FFI HTTP Source","baseUrl":"https://books.example.test","rules":{"detail":[{"kind":"jsonPath","path":"$.detail"}]}}}})";
+  if (send_str(rt, invalid_book_detail_book) != RC_SEND_OK) {
+    return fail("book.detail bad book send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":421") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "book.detail book")) {
+    std::cerr << "bad book.detail book error: " << event << '\n';
+    return fail("bad book.detail book error shape");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("bad book.detail book left synchronous last_error");
+  }
+
   // --- invalid remote http.execute request method -> async INVALID_PARAMS
   std::string empty_http_method =
       R"({"protocolVersion":1,"requestId":316,"method":"book.search","params":{"sourceId":"ffi-http-src","searchRequest":{"url":"https://books.example.test/search?q=empty-method","method":""},"source":{"sourceId":"ffi-http-src","name":"FFI HTTP Source","baseUrl":"https://books.example.test","rules":{"search":[{"kind":"jsonPath","path":"$.books[*]"}]}}}})";
