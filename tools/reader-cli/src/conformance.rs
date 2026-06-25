@@ -3,8 +3,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use reader_contract::{
-    methods, Command, CoreError, ErrorCode, Event, PendingHostOperationStatus, RuntimeConfig,
-    RuntimeShutdownData, RuntimeStatus,
+    methods, Command, CoreError, ErrorCode, Event, PendingHostOperationStatus,
+    ReadingProgressUpdateData, RuntimeConfig, RuntimeShutdownData, RuntimeStatus,
 };
 use reader_runtime::{EventSink, Runtime};
 use serde_json::{json, Value};
@@ -423,20 +423,82 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         match recv_event(&rx)? {
             Event::Result {
                 request_id, data, ..
-            } if request_id == 411
-                && data["bookId"] == "1"
-                && data["chapterIndex"] == 2
-                && data["chapterOffset"] == 128
-                && data["chapterProgress"] == 0.5
-                && data["stored"] == true =>
-            {
-                Ok(())
+            } if request_id == 411 => {
+                let data =
+                    serde_json::from_value::<ReadingProgressUpdateData>(data).map_err(|err| {
+                        format!("reading.progress.update data contract parse failed: {err}")
+                    })?;
+                if data.book_id == "1"
+                    && data.chapter_index == 2
+                    && data.chapter_offset == 128
+                    && data.chapter_progress == 0.5
+                    && data.stored
+                {
+                    Ok(())
+                } else {
+                    Err(format!("unexpected reading.progress.update data {data:?}"))
+                }
             }
             other => Err(format!(
                 "unexpected reading.progress.update result {other:?}"
             )),
         }
     });
+
+    record(
+        &mut report,
+        "reading-progress-update-data-rejects-invalid-result-shape",
+        || {
+            for (label, data, expected) in [
+                (
+                    "chapterProgress",
+                    json!({
+                        "bookId": "1",
+                        "chapterIndex": 2,
+                        "chapterOffset": 128,
+                        "chapterProgress": 1.5,
+                        "stored": true
+                    }),
+                    "chapterProgress",
+                ),
+                (
+                    "stored",
+                    json!({
+                        "bookId": "1",
+                        "chapterIndex": 2,
+                        "chapterOffset": 128,
+                        "chapterProgress": 0.5,
+                        "stored": false
+                    }),
+                    "stored",
+                ),
+                (
+                    "unknown field",
+                    json!({
+                        "bookId": "1",
+                        "chapterIndex": 2,
+                        "chapterOffset": 128,
+                        "chapterProgress": 0.5,
+                        "stored": true,
+                        "extra": true
+                    }),
+                    "unknown field",
+                ),
+            ] {
+                let err = serde_json::from_value::<ReadingProgressUpdateData>(data)
+                    .err()
+                    .ok_or_else(|| {
+                        format!("expected reading.progress.update data rejection for {label}")
+                    })?;
+                if !err.to_string().contains(expected) {
+                    return Err(format!(
+                        "unexpected reading.progress.update data error for {label}: {err}"
+                    ));
+                }
+            }
+            Ok(())
+        },
+    );
 
     record(
         &mut report,

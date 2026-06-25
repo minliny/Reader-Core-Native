@@ -156,6 +156,20 @@ fn validate_chapter_progress_scalar(value: f64) -> Result<(), &'static str> {
     }
 }
 
+fn deserialize_reading_progress_stored<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = bool::deserialize(deserializer)?;
+    if value {
+        Ok(value)
+    } else {
+        Err(de::Error::custom(
+            "reading.progress.update stored must be true",
+        ))
+    }
+}
+
 /// Host HTTP request description emitted as `capability: "http.execute"`.
 ///
 /// Core owns request semantics; platform hosts own the actual socket/TLS stack
@@ -361,6 +375,19 @@ impl ReadingProgressUpdateParams {
             }))
         })
     }
+}
+
+/// Result data for `reading.progress.update`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReadingProgressUpdateData {
+    pub book_id: String,
+    pub chapter_index: u32,
+    pub chapter_offset: u64,
+    #[serde(deserialize_with = "deserialize_chapter_progress")]
+    pub chapter_progress: f64,
+    #[serde(deserialize_with = "deserialize_reading_progress_stored")]
+    pub stored: bool,
 }
 
 /// Helper: parse a typed params object from a `Command`'s free-form params,
@@ -880,5 +907,67 @@ mod tests {
             "unexpected source detail: {}",
             err.details["source"]
         );
+    }
+
+    #[test]
+    fn reading_progress_update_data_parses_result_and_rejects_invalid_shape() {
+        let data: ReadingProgressUpdateData = serde_json::from_value(serde_json::json!({
+            "bookId": "1",
+            "chapterIndex": 2,
+            "chapterOffset": 128,
+            "chapterProgress": 0.5,
+            "stored": true
+        }))
+        .unwrap();
+        assert_eq!(data.book_id, "1");
+        assert_eq!(data.chapter_index, 2);
+        assert_eq!(data.chapter_offset, 128);
+        assert_eq!(data.chapter_progress, 0.5);
+        assert!(data.stored);
+
+        for (label, value, expected) in [
+            (
+                "unknown field",
+                serde_json::json!({
+                    "bookId": "1",
+                    "chapterIndex": 2,
+                    "chapterOffset": 128,
+                    "chapterProgress": 0.5,
+                    "stored": true,
+                    "extra": true
+                }),
+                "unknown field",
+            ),
+            (
+                "progress",
+                serde_json::json!({
+                    "bookId": "1",
+                    "chapterIndex": 2,
+                    "chapterOffset": 128,
+                    "chapterProgress": 1.5,
+                    "stored": true
+                }),
+                "chapterProgress",
+            ),
+            (
+                "stored",
+                serde_json::json!({
+                    "bookId": "1",
+                    "chapterIndex": 2,
+                    "chapterOffset": 128,
+                    "chapterProgress": 0.5,
+                    "stored": false
+                }),
+                "stored",
+            ),
+        ] {
+            let err = serde_json::from_value::<ReadingProgressUpdateData>(value)
+                .err()
+                .unwrap_or_else(|| panic!("expected rejection for {label}"));
+            assert!(
+                err.to_string().contains(expected),
+                "unexpected reading.progress.update data error for {label}: {err}"
+            );
+        }
     }
 }

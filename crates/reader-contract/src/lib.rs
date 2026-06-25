@@ -27,7 +27,7 @@ pub use host::{
 };
 pub use remote::{
     BookDetailParams, BookSearchParams, BookTocParams, ChapterContentParams, HostHttpRequest,
-    HostHttpResponse, ReadingProgressUpdateParams, SourceImportParams,
+    HostHttpResponse, ReadingProgressUpdateData, ReadingProgressUpdateParams, SourceImportParams,
 };
 
 /// JSON protocol version. Bumped on non-backward-compatible schema changes.
@@ -598,6 +598,39 @@ mod tests {
             properties["cancelledRequestIds"]["items"]["minimum"],
             serde_json::json!(1)
         );
+    }
+
+    #[test]
+    fn event_schema_defines_reading_progress_update_data_contract() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+        let data = &schema["$defs"]["ReadingProgressUpdateData"];
+        let required = strings_at(data, "required");
+        let properties = &data["properties"];
+
+        assert_eq!(data["additionalProperties"], serde_json::json!(false));
+        assert_eq!(
+            required,
+            vec![
+                "bookId",
+                "chapterIndex",
+                "chapterOffset",
+                "chapterProgress",
+                "stored"
+            ]
+        );
+        assert_eq!(properties["chapterIndex"]["minimum"], serde_json::json!(0));
+        assert_eq!(properties["chapterOffset"]["minimum"], serde_json::json!(0));
+        assert_eq!(
+            properties["chapterProgress"]["minimum"],
+            serde_json::json!(0)
+        );
+        assert_eq!(
+            properties["chapterProgress"]["maximum"],
+            serde_json::json!(1)
+        );
+        assert_eq!(properties["stored"]["const"], serde_json::json!(true));
     }
 
     fn strings_at<'a>(value: &'a Value, key: &str) -> Vec<&'a str> {

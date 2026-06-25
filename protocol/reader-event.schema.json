@@ -118,6 +118,45 @@
         }
       }
     },
+    "ReadingProgressUpdateData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bookId",
+        "chapterIndex",
+        "chapterOffset",
+        "chapterProgress",
+        "stored"
+      ],
+      "description": "Result data for reading.progress.update.",
+      "properties": {
+        "bookId": {
+          "type": "string",
+          "description": "Book identifier whose reading progress was stored."
+        },
+        "chapterIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based chapter index that was stored."
+        },
+        "chapterOffset": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Character or byte offset stored for the current chapter."
+        },
+        "chapterProgress": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Fractional chapter progress stored by Core."
+        },
+        "stored": {
+          "type": "boolean",
+          "const": true,
+          "description": "Successful result marker. A failed store is reported as an error event."
+        }
+      }
+    },
     "PendingHostOperationStatus": {
       "type": "object",
       "additionalProperties": false,
