@@ -95,7 +95,8 @@ JAVA_HOME=<jdk17> gradle --offline test # 依赖已缓存，可离线复跑
 - `CredentialResolveHandlerTest` 用 fake `CredentialProvider` 验证 `credential.resolve`
   草案契约（填补 host-app-contracts Gap D）：解析 → `{username,password}`，未知 handle →
   非重试 INTERNAL，provider 抛异常 → 可重试 INTERNAL，并经 `HostEventLoop` 端到端发命令。
-- `compileSample` Gradle task 编译 gate `HostBusSample`：把 `HostBus` 经
+- `compileSample` Gradle task 编译 gate `HostBusSample`（answer-only 接入）与
+  `HostRuntimeSample`（统一 facade，含 `sendAndAwait`）：把 `HostRuntime` 经
   `ReaderCoreHostTransport` 接到真实 C ABI surface 并注册三个 capability handler，
   在纯 JVM 下 type-check 完整接入路径 wiring（运行需 `.so`，编译即 evidence）。
 - `HostCommanderTest` 用 fake transport 验证命令/响应关联：按 `requestId` 匹配
