@@ -215,6 +215,12 @@ mod tests {
                 ),
             ),
             (
+                "valid-source-import-legado-booksource",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/valid-source-import-legado-booksource.json"
+                ),
+            ),
+            (
                 "valid-book-search",
                 include_str!(
                     "../../../protocol/fixtures/conformance/commands/valid-book-search.json"

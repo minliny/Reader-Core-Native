@@ -242,6 +242,20 @@ where
     Ok(value)
 }
 
+fn deserialize_book_source_object_or_null<'de, D>(deserializer: D) -> Result<Value, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+    if value.is_object() || value.is_null() {
+        Ok(value)
+    } else {
+        Err(de::Error::custom(
+            "source.import bookSource must be an object or null",
+        ))
+    }
+}
+
 fn validate_object_or_null(value: &Value) -> Result<(), &'static str> {
     if value.is_object() || value.is_null() {
         Ok(())
@@ -419,6 +433,14 @@ pub struct SourceImportParams {
     /// `reader-content`.
     #[serde(default, deserialize_with = "deserialize_object_or_null")]
     pub rules: Value,
+    /// Optional raw Legado BookSource payload. Core preserves this separately
+    /// from V1 `rules` so DSL migration can happen without losing source data.
+    #[serde(
+        default,
+        rename = "bookSource",
+        deserialize_with = "deserialize_book_source_object_or_null"
+    )]
+    pub book_source: Value,
 }
 
 /// Result data for `source.import`.
@@ -792,6 +814,34 @@ mod tests {
         assert_eq!(params.name, "Conformance Source");
         assert_eq!(params.base_url, "https://books.example.test");
         assert_eq!(params.rules, serde_json::json!({}));
+        assert_eq!(params.book_source, serde_json::Value::Null);
+
+        let command: crate::Command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/valid-source-import-legado-booksource.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let params: SourceImportParams =
+            parse_params(crate::methods::SOURCE_IMPORT, &command.params)
+                .expect("valid Legado source.import params should parse");
+        assert_eq!(params.source_id, "legado-compat-source");
+        assert_eq!(
+            params.book_source["ruleSearch"],
+            serde_json::json!("div.list&&div.item;div.name&&a@text")
+        );
+        assert_eq!(
+            params.book_source["enabledCookieJar"],
+            serde_json::json!(true)
+        );
+        assert_eq!(
+            params.book_source["futureLegadoField"],
+            serde_json::json!({
+                "nested": true,
+                "rawRule": "span.future@text"
+            })
+        );
 
         let command = crate::Command::from_json_bytes(
             include_str!(
@@ -849,6 +899,26 @@ mod tests {
             err.details["source"]
                 .as_str()
                 .is_some_and(|source| source.contains("rules") || source.contains("object")),
+            "unexpected source detail: {}",
+            err.details["source"]
+        );
+
+        let command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/invalid-source-import-booksource-not-object.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let err =
+            parse_params::<SourceImportParams>(crate::methods::SOURCE_IMPORT, &command.params)
+                .unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert_eq!(err.details["method"], crate::methods::SOURCE_IMPORT);
+        assert!(
+            err.details["source"]
+                .as_str()
+                .is_some_and(|source| source.contains("bookSource")),
             "unexpected source detail: {}",
             err.details["source"]
         );

@@ -1314,6 +1314,7 @@ mod tests {
             name: "Sample".into(),
             base_url: "https://example.test".into(),
             rules: SourceRules::default(),
+            book_source: serde_json::Value::Null,
         }
     }
 
@@ -1330,6 +1331,17 @@ mod tests {
             )
             .unwrap();
         assert_eq!(out.values(), &["Dune", "Foundation"]);
+    }
+
+    #[test]
+    fn rule_step_spec_rejects_raw_legado_dsl_strings() {
+        let err = serde_json::from_str::<RuleStepSpec>(r#""div.list&&div.item;div.name&&a@text""#)
+            .expect_err("raw Legado DSL must stay outside RuleStepSpec");
+
+        assert!(
+            err.to_string().contains("invalid type"),
+            "unexpected raw DSL parse error: {err}"
+        );
     }
 
     #[test]

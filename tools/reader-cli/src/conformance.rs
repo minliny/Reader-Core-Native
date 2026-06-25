@@ -20,6 +20,9 @@ const VALID_CORE_INFO: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-core-info.json");
 const VALID_SOURCE_IMPORT: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-source-import.json");
+const VALID_SOURCE_IMPORT_LEGADO_BOOKSOURCE: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/valid-source-import-legado-booksource.json"
+);
 const VALID_BOOK_SEARCH: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-book-search.json");
 const VALID_BOOK_DETAIL: &str =
@@ -45,6 +48,9 @@ const INVALID_SOURCE_IMPORT_NAME_WHITESPACE: &str = include_str!(
 );
 const INVALID_SOURCE_IMPORT_RULES_NOT_OBJECT: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-source-import-rules-not-object.json"
+);
+const INVALID_SOURCE_IMPORT_BOOKSOURCE_NOT_OBJECT: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-source-import-booksource-not-object.json"
 );
 const INVALID_BOOK_SEARCH_UNKNOWN_FIELD: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-book-search-unknown-field.json"
@@ -401,6 +407,57 @@ pub(crate) fn run_conformance() -> ConformanceReport {
 
     record(
         &mut report,
+        "valid-command-source-import-legado-booksource",
+        || {
+            let (runtime, rx) = send_to_fresh_runtime(VALID_SOURCE_IMPORT_LEGADO_BOOKSOURCE)?;
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 411 => {
+                    let data = serde_json::from_value::<SourceImportData>(data).map_err(|err| {
+                        format!("source.import Legado data contract parse failed: {err}")
+                    })?;
+                    if data.source_id == "legado-compat-source"
+                        && data.name == "Legado Compat Source"
+                        && data.imported
+                    {
+                        Ok(())
+                    } else {
+                        Err(format!("unexpected Legado source.import data {data:?}"))
+                    }
+                }
+                other => Err(format!("unexpected Legado source.import result {other:?}")),
+            }?;
+
+            let stored = runtime
+                .remote_state()
+                .storage()
+                .get_source("legado-compat-source")
+                .map_err(|err| format!("source.import storage read failed: {err}"))?
+                .ok_or_else(|| "Legado source.import did not store source".to_string())?;
+            if stored.book_source["ruleSearch"] != json!("div.list&&div.item;div.name&&a@text") {
+                return Err(format!(
+                    "Legado source.import rewrote raw rule: {}",
+                    stored.book_source["ruleSearch"]
+                ));
+            }
+            if stored.book_source["futureLegadoField"]
+                != json!({
+                    "nested": true,
+                    "rawRule": "span.future@text"
+                })
+            {
+                return Err(format!(
+                    "Legado source.import dropped unknown field: {}",
+                    stored.book_source["futureLegadoField"]
+                ));
+            }
+            Ok(())
+        },
+    );
+
+    record(
+        &mut report,
         "source-import-data-rejects-invalid-result-shape",
         || {
             for (label, data, expected) in [
@@ -471,6 +528,16 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         || {
             let (_runtime, rx) = send_to_fresh_runtime(INVALID_SOURCE_IMPORT_RULES_NOT_OBJECT)?;
             expect_event_error(&rx, 418, ErrorCode::InvalidParams)
+        },
+    );
+
+    record(
+        &mut report,
+        "source-import-rejects-non-object-booksource",
+        || {
+            let (_runtime, rx) =
+                send_to_fresh_runtime(INVALID_SOURCE_IMPORT_BOOKSOURCE_NOT_OBJECT)?;
+            expect_event_error(&rx, 321, ErrorCode::InvalidParams)
         },
     );
 

@@ -350,6 +350,7 @@ fn source_import(
         name: params.name,
         base_url: params.base_url,
         rules,
+        book_source: params.book_source,
     };
     let stored = state
         .storage()

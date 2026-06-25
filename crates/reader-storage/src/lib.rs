@@ -4296,6 +4296,7 @@ mod tests {
             name: id.into(),
             base_url: String::new(),
             rules: SourceRules::default(),
+            book_source: serde_json::Value::Null,
         }
     }
 

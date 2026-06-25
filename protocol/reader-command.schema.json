@@ -360,6 +360,11 @@
           "type": ["object", "null"],
           "default": null,
           "description": "Optional extraction rules object keyed by remote-reading stage."
+        },
+        "bookSource": {
+          "type": ["object", "null"],
+          "default": null,
+          "description": "Optional raw Legado BookSource object preserved separately from V1 rules."
         }
       }
     },
