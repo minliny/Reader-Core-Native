@@ -393,9 +393,17 @@ EOF
   "$smoke_bin"
 )
 
+run_partitioned_shell_smoke() {
+  # Host-adapter ShellSmokeTests: partitioned [core] / [app-side] evidence
+  # against the real Core. Wrapper/host smoke, NOT iOS App/device proof.
+  # See bindings/ios/ShellSmokeTests/README.md.
+  ./bindings/ios/ShellSmokeTests/run.sh
+}
+
 if (( swift_only == 1 )); then
   typecheck_wrapper_with_repo_headers
   run_macos_swift_smoke "$host_lib"
+  run_partitioned_shell_smoke
   echo "swift-only wrapper checks passed using existing $host_lib"
   exit 0
 fi
@@ -418,3 +426,4 @@ if ! cargo build -p reader-ffi; then
 fi
 
 run_macos_swift_smoke "$host_lib"
+run_partitioned_shell_smoke
