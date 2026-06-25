@@ -445,6 +445,32 @@ struct HostAdapterSmoke {
             check("[app-side]", "concurrent requests route to correct requestId", false, "\(error)")
         }
 
+        // ---- [core] host.complete with unknown operationId → INVALID_PARAMS ----
+        do {
+            _ = try client.sendHostComplete(
+                operationId: 4_000_000_000, result: ["x": true], requestId: 1700
+            )
+            let ev = try pollUntil(client: client, requestId: 1700)
+            check("[core]", "host.complete unknown operationId surfaces INVALID_PARAMS",
+                  ev.type == "error" && ev.coreError?.code == "INVALID_PARAMS",
+                  "type=\(ev.type) code=\(ev.coreError?.code ?? "nil")")
+        } catch {
+            check("[core]", "host.complete unknown operationId surfaces INVALID_PARAMS", false, "\(error)")
+        }
+
+        // ---- [core] runtime.hostSmoke rejects malformed capability ----
+        do {
+            try client.send(method: "runtime.hostSmoke", requestId: 1701, params: [
+                "capability": "bad capability", "params": [:],
+            ])
+            let ev = try pollUntil(client: client, requestId: 1701)
+            check("[core]", "runtime.hostSmoke rejects malformed capability",
+                  ev.type == "error" && ev.coreError?.code == "INVALID_PARAMS",
+                  "type=\(ev.type) code=\(ev.coreError?.code ?? "nil")")
+        } catch {
+            check("[core]", "runtime.hostSmoke rejects malformed capability", false, "\(error)")
+        }
+
         // ---- summary ----
         print("---")
         print("[core]     pass=\(corePass) fail=\(coreFail)")
