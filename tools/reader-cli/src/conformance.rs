@@ -41,6 +41,9 @@ const INVALID_BOOK_SEARCH_UNKNOWN_FIELD: &str = include_str!(
 const INVALID_BOOK_SEARCH_REQUEST_METHOD_EMPTY: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-book-search-request-method-empty.json"
 );
+const INVALID_BOOK_SEARCH_REQUEST_HEADERS_NOT_OBJECT: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-book-search-request-headers-not-object.json"
+);
 const INVALID_BOOK_DETAIL_UNKNOWN_FIELD: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-book-detail-unknown-field.json"
 );
@@ -273,6 +276,16 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         let (_runtime, rx) = send_to_fresh_runtime(INVALID_BOOK_SEARCH_REQUEST_METHOD_EMPTY)?;
         expect_event_error(&rx, 414, ErrorCode::InvalidParams)
     });
+
+    record(
+        &mut report,
+        "book-search-rejects-non-object-http-headers",
+        || {
+            let (_runtime, rx) =
+                send_to_fresh_runtime(INVALID_BOOK_SEARCH_REQUEST_HEADERS_NOT_OBJECT)?;
+            expect_event_error(&rx, 415, ErrorCode::InvalidParams)
+        },
+    );
 
     record(&mut report, "valid-command-book-detail", || {
         let (_runtime, rx) = send_to_fresh_runtime(VALID_BOOK_DETAIL)?;

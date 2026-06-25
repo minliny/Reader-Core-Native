@@ -15,6 +15,10 @@ fn empty_string() -> String {
     String::new()
 }
 
+fn empty_object() -> Value {
+    Value::Object(Default::default())
+}
+
 fn default_http_method() -> String {
     "GET".to_string()
 }
@@ -33,6 +37,23 @@ fn validate_http_method_scalar(value: &str) -> Result<(), &'static str> {
         Err("http.execute request method must be non-empty")
     } else {
         Ok(())
+    }
+}
+
+fn deserialize_http_headers<'de, D>(deserializer: D) -> Result<Value, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+    validate_http_headers_shape(&value).map_err(de::Error::custom)?;
+    Ok(value)
+}
+
+fn validate_http_headers_shape(value: &Value) -> Result<(), &'static str> {
+    if value.is_object() {
+        Ok(())
+    } else {
+        Err("http.execute request headers must be an object")
     }
 }
 
@@ -66,7 +87,10 @@ pub struct HostHttpRequest {
         deserialize_with = "deserialize_http_method"
     )]
     pub method: String,
-    #[serde(default)]
+    #[serde(
+        default = "empty_object",
+        deserialize_with = "deserialize_http_headers"
+    )]
     pub headers: Value,
     #[serde(default)]
     pub body: Option<String>,
@@ -74,10 +98,19 @@ pub struct HostHttpRequest {
 
 impl HostHttpRequest {
     pub fn validate(&self) -> Result<(), CoreError> {
-        validate_http_method_scalar(&self.method).map_err(|message| {
+        if let Err(message) = validate_http_method_scalar(&self.method) {
+            return Err(
+                CoreError::invalid_params(message).with_details(serde_json::json!({
+                    "field": "method",
+                    "method": self.method,
+                })),
+            );
+        }
+
+        validate_http_headers_shape(&self.headers).map_err(|message| {
             CoreError::invalid_params(message).with_details(serde_json::json!({
-                "field": "method",
-                "method": self.method,
+                "field": "headers",
+                "headers": self.headers,
             }))
         })
     }
@@ -282,6 +315,7 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(request.method, "GET");
+        assert_eq!(request.headers, serde_json::json!({}));
         request.validate().unwrap();
 
         for method in ["", "   "] {
@@ -292,6 +326,24 @@ mod tests {
             .unwrap_err();
             assert!(
                 err.to_string().contains("method"),
+                "unexpected parse error: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn host_http_request_rejects_non_object_headers() {
+        for headers in [
+            serde_json::json!(["Accept", "application/json"]),
+            serde_json::json!(null),
+        ] {
+            let err = serde_json::from_value::<HostHttpRequest>(serde_json::json!({
+                "url": "https://books.example.test/search",
+                "headers": headers
+            }))
+            .unwrap_err();
+            assert!(
+                err.to_string().contains("headers"),
                 "unexpected parse error: {err}"
             );
         }
@@ -413,6 +465,25 @@ mod tests {
             err.details["source"]
                 .as_str()
                 .is_some_and(|source| source.contains("method")),
+            "unexpected source detail: {}",
+            err.details["source"]
+        );
+
+        let command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/invalid-book-search-request-headers-not-object.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let err = parse_params::<BookSearchParams>(crate::methods::BOOK_SEARCH, &command.params)
+            .unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert_eq!(err.details["method"], crate::methods::BOOK_SEARCH);
+        assert!(
+            err.details["source"]
+                .as_str()
+                .is_some_and(|source| source.contains("headers")),
             "unexpected source detail: {}",
             err.details["source"]
         );

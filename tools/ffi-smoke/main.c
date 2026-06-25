@@ -942,6 +942,36 @@ int main(void) {
     return fail("empty http method left synchronous last_error");
   }
 
+  // --- invalid remote http.execute request headers -> async INVALID_PARAMS
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":317,\"method\":\"book."
+               "search\",\"params\":{\"sourceId\":\"ffi-http-src\","
+               "\"searchRequest\":{\"url\":\"https://books.example.test/"
+               "search?q=bad-headers\",\"headers\":[\"Accept\",\"application/"
+               "json\"]},"
+               "\"source\":{\"sourceId\":\"ffi-http-src\",\"name\":\"FFI HTTP "
+               "Source\",\"baseUrl\":\"https://books.example.test\",\"rules\":{"
+               "\"search\":[{\"kind\":\"jsonPath\",\"path\":\"$.books[*]\"}]}}"
+               "}}") != RC_SEND_OK) {
+    return fail("book.search bad http headers send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for bad http headers");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":317") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "headers")) {
+    fprintf(stderr, "bad http headers error: %s\n", event);
+    return fail("bad http headers error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("bad http headers left synchronous last_error");
+  }
+
   // --- remote http.execute completion carries metadata ------------------
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":68,\"method\":\"book."
