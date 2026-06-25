@@ -30,8 +30,8 @@ green。`--swift-only` 路径：wrapper typecheck + macOS host inline wrapper sm
 `ShellSmokeTests/run.sh`（分区证据）。完整路径额外重建 `target/ios/ReaderCore.xcframework`
 并对 simulator slice 做 wrapper typecheck。
 
-最新一轮 ShellSmokeTests 结果（`ShellSmokeTests/report.txt`）：`[core] pass=9 fail=0`、
-`[app-side] pass=12 fail=0`、`host adapter shell smoke passed`（共 21 用例）。
+最新一轮 ShellSmokeTests 结果（`ShellSmokeTests/report.txt`）：`[core] pass=11 fail=0`、
+`[app-side] pass=14 fail=0`、`host adapter shell smoke passed`（共 25 用例）。
 
 ## 能力分区
 

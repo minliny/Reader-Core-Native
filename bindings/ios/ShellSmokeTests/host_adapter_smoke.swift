@@ -383,6 +383,68 @@ struct HostAdapterSmoke {
             check("[app-side]", "sendHostError rejects unknown ErrorCode", false, "\(error)")
         }
 
+        // ---- [core] runtime create with valid config ----
+        do {
+            let config = try JSONSerialization.data(withJSONObject: [
+                "dataDirectory": "/tmp/reader-smoke-data",
+                "cacheDirectory": "/tmp/reader-smoke-cache",
+            ])
+            let cfgClient = try ReaderCoreClient(configJSON: config, hostTransport: EchoHostTransport())
+            defer { cfgClient.destroy() }
+            let info = try cfgClient.coreInfo(requestId: 1400, timeout: 5)
+            check("[core]", "runtime create with valid config + core.info",
+                  info.type == "result"
+                  && (info.data?["abiVersion"] as? NSNumber)?.uint32Value == ReaderCoreRuntime.abiVersion)
+        } catch {
+            check("[core]", "runtime create with valid config + core.info", false, "\(error)")
+        }
+
+        // ---- [core] runtime create with invalid config fails ----
+        do {
+            let badConfig = try JSONSerialization.data(withJSONObject: [
+                "dataDirectory": "/tmp/x", "bogusField": true,
+            ])
+            _ = try ReaderCoreClient(configJSON: badConfig, hostTransport: EchoHostTransport())
+            check("[core]", "runtime create rejects unknown config field", false, "expected throw")
+        } catch ReaderCoreClientError.createFailed(let status) {
+            check("[core]", "runtime create rejects unknown config field", status != 0, "status=\(status)")
+        } catch {
+            check("[core]", "runtime create rejects unknown config field", false, "\(error)")
+        }
+
+        // ---- [app-side] missing host transport surfaces missingHostTransport ----
+        do {
+            let noTransportClient = try ReaderCoreClient(hostTransport: nil)
+            defer { noTransportClient.destroy() }
+            do {
+                _ = try noTransportClient.request(method: "runtime.hostSmoke", requestId: 1500, params: [
+                    "capability": "host.smoke.echo", "params": [:],
+                ], timeout: 2)
+                check("[app-side]", "missing host transport surfaces missingHostTransport", false, "expected throw")
+            } catch ReaderCoreClientError.missingHostTransport {
+                check("[app-side]", "missing host transport surfaces missingHostTransport", true)
+            } catch {
+                check("[app-side]", "missing host transport surfaces missingHostTransport", false, "\(error)")
+            }
+        } catch {
+            check("[app-side]", "missing host transport surfaces missingHostTransport", false, "client init threw: \(error)")
+        }
+
+        // ---- [app-side] concurrent requests route to correct requestId ----
+        do {
+            try client.send(method: "core.info", requestId: 1600)
+            try client.send(method: "runtime.ping", requestId: 1601)
+            let info = try pollUntil(client: client, requestId: 1600)
+            let ping = try pollUntil(client: client, requestId: 1601)
+            check("[app-side]", "concurrent requests route to correct requestId",
+                  info.type == "result" && (info.data?["abiVersion"] as? NSNumber)?.uint32Value != nil
+                  && ping.type == "result" && (ping.data?["pong"] as? Bool) == true
+                  && info.requestId == 1600 && ping.requestId == 1601,
+                  "info.type=\(info.type) ping.type=\(ping.type)")
+        } catch {
+            check("[app-side]", "concurrent requests route to correct requestId", false, "\(error)")
+        }
+
         // ---- summary ----
         print("---")
         print("[core]     pass=\(corePass) fail=\(coreFail)")
