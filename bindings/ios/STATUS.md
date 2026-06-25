@@ -35,6 +35,9 @@ green。`--swift-only` 路径：wrapper typecheck + macOS host inline wrapper sm
 
 ## 能力分区
 
+> 每条能力标注 ShellSmokeTests 中对应的 `[core]` / `[app-side]` 用例。完整用例清单与
+> 最新结果见 `ShellSmokeTests/report.txt`。
+
 ### Core 能力（Rust Core 通过 ABI/protocol 执行，host build 上验证）
 
 | 能力 | 实现 | ShellSmoke 覆盖 |
@@ -44,8 +47,13 @@ green。`--swift-only` 路径：wrapper typecheck + macOS host inline wrapper sm
 | `runtime.ping` | Core 返回 `pong=true` | `[core] runtime.ping pong=true` |
 | `host.request` 发射 | `runtime.hostSmoke` 触发 `host.request` + operationId | `[core] Core emits host.request with operationId` |
 | `host.complete` 恢复 | operationId 关联，恢复原 request | `[core] host.complete resumes original request` |
+| `host.complete` 未知 operationId | Core 返回 `INVALID_PARAMS` | `[core] host.complete unknown operationId surfaces INVALID_PARAMS` |
+| `runtime.hostSmoke` 拒绝 malformed capability | Core 校验 capability token path | `[core] runtime.hostSmoke rejects malformed capability` |
 | cancel | pending host op cancel → `CANCELLED` | `[core] cancel surfaces CANCELLED` |
-| 结构化 error | unknown method → `UNKNOWN_METHOD` | `[core] unknown method surfaces UNKNOWN_METHOD` |
+| 结构化 error（unknown method） | unknown method → `UNKNOWN_METHOD` | `[core] unknown method surfaces UNKNOWN_METHOD` |
+| malformed JSON send | `rc_runtime_send` 返回非零 status | `[core] malformed JSON send fails with non-zero status` |
+| runtime create with config | `deny_unknown_fields`，合法 config 可创建 | `[core] runtime create with valid config + core.info` |
+| runtime create 拒绝未知 config 字段 | unknown config field → create 失败 | `[core] runtime create rejects unknown config field` |
 
 ### app-side 能力（iOS Swift adapter 执行，host build 上验证）
 
@@ -56,19 +64,20 @@ green。`--swift-only` 路径：wrapper typecheck + macOS host inline wrapper sm
 | `URLSessionHostTransport` 成功 | method/headers/status/body 映射 | `[app-side] URLSessionHostTransport maps ...` |
 | `URLSessionHostTransport` 超时 | timeout → `hostTransportFailed` | `[app-side] ... timeout → hostTransportFailed` |
 | transport failure → core error | 走 `host.error` → 结构化 core error | `[app-side] transport failure surfaces core error` |
+| manual `host.error` 恢复 | 合法 code 的 `host.error` 恢复原请求为 error | `[app-side] manual host.error resumes original request as error` |
+| `sendHostError` 校验 ErrorCode | 未知 code 立即抛 `invalidHostErrorCode` | `[app-side] sendHostError rejects unknown ErrorCode` |
+| internal command ID 防碰撞 | auto-allocated host command ID 不与用户 requestId 碰撞 | `[app-side] internal command ID collision avoidance` |
+| `book.search` host HTTP loop | transport 返回 books，adapter 自动 complete | `[app-side] book.search host HTTP loop returns books`、`invoked host transport with operationId` |
+| missing host transport | 无 transport 时抛 `missingHostTransport` | `[app-side] missing host transport surfaces missingHostTransport` |
 | `pollEvent` drain/consumed | 非阻塞 drain + 已消费事件返回 nil | `[app-side] pollEvent drains ...`、`returns nil for consumed` |
+| 并发请求路由 | 多 requestId 并发，event 路由到正确 requestId | `[app-side] concurrent requests route to correct requestId` |
 
-### 既有 wrapper smoke 覆盖（全量 inline smoke，未分区）
+### 全量 inline wrapper smoke（回归）
 
-`check-ios-swift-wrapper.sh` 内的 inline macOS Swift smoke 额外覆盖：internal command ID
-分配（避免 requestId `1001` 碰撞）、`book.search` host HTTP loop 返回 books、malformed
-JSON send failure。这些用例尚未迁移到分区 runner，作为全量 wrapper 回归保留。
-
-> 注：round 2 已将上述三类用例迁入分区 runner（分别记为 `[app-side] internal command ID
-> collision avoidance`、`[app-side] book.search host HTTP loop returns books`、
-> `[core] malformed JSON send fails with non-zero status`），并新增
-> `[app-side] manual host.error resumes original request as error`。inline smoke 仍保留
-> 作为全量回归。
+`check-ios-swift-wrapper.sh` 内的 inline macOS Swift smoke 是全量回归基线，覆盖与上述
+分区 runner 重叠的契约面（含 internal command ID 分配、`book.search` host loop、
+malformed JSON send failure 等）。分区 runner（`ShellSmokeTests/`）是带 `[core]` /
+`[app-side]` 标签的证据子集；inline smoke 不分区，作为全量回归保留。
 
 ## 未验证（不得由 smoke 推断）
 
