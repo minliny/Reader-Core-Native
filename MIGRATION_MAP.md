@@ -2,6 +2,8 @@
 
 最高优先级入口：`docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`
 
+主线执行计划：`docs/MAINLINE_EXECUTION_PLAN.md`
+
 本文记录 iOS、Android、HarmonyOS 从现有实现迁移到统一 Rust Reader-Core 的路线。
 
 ## 当前本地仓库状态
@@ -25,13 +27,14 @@
 | 0 | 本地仓库定位、安全检查、dirty 状态记录 | 已完成本轮检查 |
 | 1 | 旧 `Reader-Core` 实际代码审计 | 待系统化 |
 | 2 | Rust C ABI / protocol / runtime 边界冻结 | 部分完成 |
-| 3 | Rule/JS/request/reading 核心能力迁移 | 部分完成 |
-| 4 | SQLite/cache/sync/local/RSS/TTS 契约迁移 | 部分完成 |
-| 5 | iOS strangler migration | 待 App-side 验证 |
-| 6 | Android strangler migration | 待 App-side 验证 |
-| 7 | HarmonyOS strangler migration | 待 HAP/device 验证 |
-| 8 | 三端 corpus/fixture 一致性 benchmark | 待建设 |
-| 9 | 退役旧业务核心路径 | 未开始 |
+| 3 | Legado BookSource 兼容入口与 raw rule 保真 | 进行中 |
+| 4 | Legado DSL executor 与 JS/request/reading 核心能力迁移 | 部分完成 |
+| 5 | SQLite/cache/sync/local/RSS/TTS 契约迁移 | 部分完成 |
+| 6 | iOS strangler migration | 待 App-side 验证 |
+| 7 | Android strangler migration | 待 App-side 验证 |
+| 8 | HarmonyOS strangler migration | 待 HAP/device 验证 |
+| 9 | 三端 corpus/fixture 一致性 benchmark | 待建设 |
+| 10 | 退役旧业务核心路径 | 未开始 |
 
 ## iOS 迁移
 

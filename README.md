@@ -4,6 +4,8 @@
 >
 > 当前最高优先级文档是
 > [docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md](./docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md)。
+> 主线执行计划见
+> [docs/MAINLINE_EXECUTION_PLAN.md](./docs/MAINLINE_EXECUTION_PLAN.md)。
 > 全量开发路线见
 > [docs/FULL_DEVELOPMENT_ROADMAP.md](./docs/FULL_DEVELOPMENT_ROADMAP.md)。
 
@@ -70,6 +72,7 @@ git -C <repo> log -5 --oneline
 ## 目录
 
 - [docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md](./docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md) — 当前迁移指令和安全要求
+- [docs/MAINLINE_EXECUTION_PLAN.md](./docs/MAINLINE_EXECUTION_PLAN.md) — 防偏离主线、阶段顺序和分支边界
 - [docs/FULL_DEVELOPMENT_ROADMAP.md](./docs/FULL_DEVELOPMENT_ROADMAP.md) — 全量开发路线
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — 当前 Rust Core 架构
 - [FEATURE_MATRIX.md](./FEATURE_MATRIX.md) — 能力状态矩阵
