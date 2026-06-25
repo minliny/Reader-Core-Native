@@ -835,6 +835,13 @@ mod tests {
             params.book_source["enabledCookieJar"],
             serde_json::json!(true)
         );
+        assert_eq!(
+            params.book_source["futureLegadoField"],
+            serde_json::json!({
+                "nested": true,
+                "rawRule": "span.future@text"
+            })
+        );
 
         let command = crate::Command::from_json_bytes(
             include_str!(

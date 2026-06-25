@@ -409,7 +409,7 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         &mut report,
         "valid-command-source-import-legado-booksource",
         || {
-            let (_runtime, rx) = send_to_fresh_runtime(VALID_SOURCE_IMPORT_LEGADO_BOOKSOURCE)?;
+            let (runtime, rx) = send_to_fresh_runtime(VALID_SOURCE_IMPORT_LEGADO_BOOKSOURCE)?;
             match recv_event(&rx)? {
                 Event::Result {
                     request_id, data, ..
@@ -427,7 +427,32 @@ pub(crate) fn run_conformance() -> ConformanceReport {
                     }
                 }
                 other => Err(format!("unexpected Legado source.import result {other:?}")),
+            }?;
+
+            let stored = runtime
+                .remote_state()
+                .storage()
+                .get_source("legado-compat-source")
+                .map_err(|err| format!("source.import storage read failed: {err}"))?
+                .ok_or_else(|| "Legado source.import did not store source".to_string())?;
+            if stored.book_source["ruleSearch"] != json!("div.list&&div.item;div.name&&a@text") {
+                return Err(format!(
+                    "Legado source.import rewrote raw rule: {}",
+                    stored.book_source["ruleSearch"]
+                ));
             }
+            if stored.book_source["futureLegadoField"]
+                != json!({
+                    "nested": true,
+                    "rawRule": "span.future@text"
+                })
+            {
+                return Err(format!(
+                    "Legado source.import dropped unknown field: {}",
+                    stored.book_source["futureLegadoField"]
+                ));
+            }
+            Ok(())
         },
     );
 

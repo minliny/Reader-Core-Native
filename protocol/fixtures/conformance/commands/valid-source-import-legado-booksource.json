@@ -19,6 +19,10 @@
       "enabledCookieJar": true,
       "header": {
         "User-Agent": "ReaderCoreTest"
+      },
+      "futureLegadoField": {
+        "nested": true,
+        "rawRule": "span.future@text"
       }
     }
   }

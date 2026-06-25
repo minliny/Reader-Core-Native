@@ -2063,7 +2063,11 @@ mod tests {
                     "bookSource": {
                         "bookSourceName": "Vertical Test Source",
                         "bookSourceUrl": "https://books.example.test",
-                        "ruleSearch": "div.list&&div.item;div.name&&a@text"
+                        "ruleSearch": "div.list&&div.item;div.name&&a@text",
+                        "futureLegadoField": {
+                            "nested": true,
+                            "rawRule": "span.future@text"
+                        }
                     },
                 }),
             ),
@@ -2086,6 +2090,13 @@ mod tests {
         assert_eq!(
             stored.book_source["ruleSearch"],
             "div.list&&div.item;div.name&&a@text"
+        );
+        assert_eq!(
+            stored.book_source["futureLegadoField"],
+            serde_json::json!({
+                "nested": true,
+                "rawRule": "span.future@text"
+            })
         );
     }
 
