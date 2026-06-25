@@ -367,6 +367,22 @@ struct HostAdapterSmoke {
             check("[app-side]", "book.search host HTTP loop returns books", false, "\(error)")
         }
 
+        // ---- [app-side] sendHostError rejects unknown ErrorCode ----
+        // Core's host.error deserializes code as the ErrorCode enum; an unknown
+        // code would silently break the host.error path. The adapter validates
+        // up front and throws invalidHostErrorCode instead.
+        do {
+            _ = try client.sendHostError(
+                operationId: 9999, code: "BOGUS_CODE", message: "x", retryable: false
+            )
+            check("[app-side]", "sendHostError rejects unknown ErrorCode", false, "expected throw")
+        } catch ReaderCoreClientError.invalidHostErrorCode(let code) {
+            check("[app-side]", "sendHostError rejects unknown ErrorCode", code == "BOGUS_CODE",
+                  "code=\(code)")
+        } catch {
+            check("[app-side]", "sendHostError rejects unknown ErrorCode", false, "\(error)")
+        }
+
         // ---- summary ----
         print("---")
         print("[core]     pass=\(corePass) fail=\(coreFail)")

@@ -31,7 +31,7 @@ green。`--swift-only` 路径：wrapper typecheck + macOS host inline wrapper sm
 并对 simulator slice 做 wrapper typecheck。
 
 最新一轮 ShellSmokeTests 结果（`ShellSmokeTests/report.txt`）：`[core] pass=9 fail=0`、
-`[app-side] pass=11 fail=0`、`host adapter shell smoke passed`（共 20 用例）。
+`[app-side] pass=12 fail=0`、`host adapter shell smoke passed`（共 21 用例）。
 
 ## 能力分区
 
@@ -103,10 +103,12 @@ accessor。因此 Swift wrapper 对 `rc_runtime_create`、`rc_runtime_send`、
   **原 pending 请求永不恢复** —— 表现为调用方超时。
   - ShellSmokeTests 用 `[app-side] manual host.error resumes original request as error`
     覆盖合法 code 路径；非法 code 路径未覆盖（会超时，不作为断言用例）。
-  - 处理方向（待定，不在本轮）：adapter 侧可增加 `code` 白名单校验或改为强类型
-    `ReaderCoreErrorCode` 枚举，避免 host 误传未知 code。此为 **app-side 增强**，不需要
-    改 ABI/protocol；若要扩 `ErrorCode` 变体则属 protocol lane（[[c-abi-stable-boundary-goal]]），
-    本 lane 不处理。
+  - 处理方向（已在 round 3 落地）：adapter 侧增加 `ReaderCoreHostErrorCode` 枚举（变体与
+    Core `ErrorCode` 一一对应），`sendHostError` 在发送前校验 `code`，未知 code 立即抛
+    `ReaderCoreClientError.invalidHostErrorCode`，避免 host 误传未知 code 导致原请求静默
+    超时。ShellSmokeTests 用 `[app-side] sendHostError rejects unknown ErrorCode` 覆盖。
+    此为 **app-side 增强**，未改 ABI/protocol；若要扩 `ErrorCode` 变体则属 protocol lane
+    （[[c-abi-stable-boundary-goal]]），本 lane 不处理。
 
 ## 线程说明
 
