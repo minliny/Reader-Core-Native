@@ -345,6 +345,24 @@ mod tests {
     }
 
     #[test]
+    fn command_schema_requires_remote_inline_source_object_or_null() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+
+        for params in [
+            "BookSearchParams",
+            "BookDetailParams",
+            "BookTocParams",
+            "ChapterContentParams",
+        ] {
+            let source = &schema["$defs"][params]["properties"]["source"];
+            assert_eq!(source["type"], serde_json::json!(["object", "null"]));
+            assert_eq!(source["default"], serde_json::json!(null));
+        }
+    }
+
+    #[test]
     fn event_schema_error_codes_match_error_code_enum() {
         let schema: Value =
             serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))

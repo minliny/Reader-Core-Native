@@ -760,6 +760,25 @@ int main() {
     return fail("source.import bad rules left synchronous last_error");
   }
 
+  // --- invalid inline source shape -> async INVALID_PARAMS --------------
+  std::string invalid_inline_source =
+      R"({"protocolVersion":1,"requestId":321,"method":"book.search","params":{"sourceId":"ffi-http-src","searchResponse":"{\"books\":[]}","source":["ffi-http-src"]}})";
+  if (send_str(rt, invalid_inline_source) != RC_SEND_OK) {
+    return fail("book.search bad inline source send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":321") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "inline source")) {
+    std::cerr << "bad inline source error: " << event << '\n';
+    return fail("bad inline source error shape");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("bad inline source left synchronous last_error");
+  }
+
   // --- invalid remote http.execute request method -> async INVALID_PARAMS
   std::string empty_http_method =
       R"({"protocolVersion":1,"requestId":316,"method":"book.search","params":{"sourceId":"ffi-http-src","searchRequest":{"url":"https://books.example.test/search?q=empty-method","method":""},"source":{"sourceId":"ffi-http-src","name":"FFI HTTP Source","baseUrl":"https://books.example.test","rules":{"search":[{"kind":"jsonPath","path":"$.books[*]"}]}}}})";

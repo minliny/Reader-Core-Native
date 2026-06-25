@@ -108,6 +108,25 @@ fn validate_object_or_null(value: &Value) -> Result<(), &'static str> {
     }
 }
 
+fn deserialize_inline_source<'de, D>(deserializer: D) -> Result<Option<Value>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<Value>::deserialize(deserializer)?;
+    if let Some(source) = &value {
+        validate_inline_source_shape(source).map_err(de::Error::custom)?;
+    }
+    Ok(value)
+}
+
+fn validate_inline_source_shape(value: &Value) -> Result<(), &'static str> {
+    if value.is_object() {
+        Ok(())
+    } else {
+        Err("inline source must be an object or null")
+    }
+}
+
 fn deserialize_chapter_progress<'de, D>(deserializer: D) -> Result<f64, D::Error>
 where
     D: Deserializer<'de>,
@@ -248,7 +267,7 @@ pub struct BookSearchParams {
     pub search_request: Option<HostHttpRequest>,
     /// Optional inline source definition. If present, it is used instead of
     /// looking up `source_id` in storage (useful for smoke tests).
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_inline_source")]
     pub source: Option<Value>,
 }
 
@@ -264,7 +283,7 @@ pub struct BookDetailParams {
     pub detail_response: String,
     #[serde(default)]
     pub detail_request: Option<HostHttpRequest>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_inline_source")]
     pub source: Option<Value>,
 }
 
@@ -279,7 +298,7 @@ pub struct BookTocParams {
     pub toc_response: String,
     #[serde(default)]
     pub toc_request: Option<HostHttpRequest>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_inline_source")]
     pub source: Option<Value>,
 }
 
@@ -303,7 +322,7 @@ pub struct ChapterContentParams {
     /// network call happened.
     #[serde(default)]
     pub js_rule: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_inline_source")]
     pub source: Option<Value>,
 }
 
@@ -619,6 +638,25 @@ mod tests {
             err.details["source"]
                 .as_str()
                 .is_some_and(|source| source.contains("url")),
+            "unexpected source detail: {}",
+            err.details["source"]
+        );
+
+        let command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/invalid-book-search-source-not-object.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let err = parse_params::<BookSearchParams>(crate::methods::BOOK_SEARCH, &command.params)
+            .unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert_eq!(err.details["method"], crate::methods::BOOK_SEARCH);
+        assert!(
+            err.details["source"]
+                .as_str()
+                .is_some_and(|source| source.contains("inline source")),
             "unexpected source detail: {}",
             err.details["source"]
         );

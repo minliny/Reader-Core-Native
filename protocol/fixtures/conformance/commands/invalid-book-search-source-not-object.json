@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "requestId": 419,
+  "method": "book.search",
+  "params": {
+    "sourceId": "conformance-source",
+    "searchResponse": "{\"books\":[]}",
+    "source": [
+      "conformance-source"
+    ]
+  }
+}
