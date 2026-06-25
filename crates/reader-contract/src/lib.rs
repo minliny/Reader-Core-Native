@@ -466,6 +466,19 @@ mod tests {
         assert_eq!(operation_id["minimum"], serde_json::json!(1));
     }
 
+    #[test]
+    fn event_schema_requires_host_request_capability_token_path() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+        let capability = &schema["$defs"]["HostRequestEvent"]["properties"]["capability"];
+
+        assert_eq!(
+            capability["pattern"],
+            serde_json::json!("^[^\\s.]+(\\.[^\\s.]+)+$")
+        );
+    }
+
     fn strings_at<'a>(value: &'a Value, key: &str) -> Vec<&'a str> {
         value[key]
             .as_array()

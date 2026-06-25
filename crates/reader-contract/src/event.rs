@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::command::is_valid_token_path;
 use crate::error::CoreError;
 use crate::PROTOCOL_VERSION;
 
@@ -10,6 +11,13 @@ fn assert_object_payload(field: &str, value: &Value) {
 
 fn assert_positive_id(field: &str, value: u64) {
     assert!(value > 0, "{field} must be greater than 0");
+}
+
+fn assert_token_path(field: &str, value: &str) {
+    assert!(
+        is_valid_token_path(value),
+        "{field} must be dot-separated non-empty tokens without whitespace"
+    );
 }
 
 /// Core → platform event. Mirrors `reader-event.schema.json`.
@@ -76,13 +84,15 @@ impl Event {
         capability: impl Into<String>,
         params: Value,
     ) -> Self {
+        let capability = capability.into();
         assert_positive_id("host.request operationId", operation_id);
+        assert_token_path("host.request capability", &capability);
         assert_object_payload("host.request params", &params);
         Event::HostRequest {
             protocol_version: PROTOCOL_VERSION,
             request_id,
             operation_id,
-            capability: capability.into(),
+            capability,
             params,
         }
     }
@@ -115,6 +125,7 @@ mod tests {
 
         assert_eq!(json["type"], "host.request");
         assert_eq!(json["operationId"], 2);
+        assert_eq!(json["capability"], "host.smoke.echo");
         assert!(json["params"].is_object());
         assert_eq!(json["params"]["ok"], true);
     }
@@ -123,6 +134,25 @@ mod tests {
     #[should_panic(expected = "host.request operationId must be greater than 0")]
     fn host_request_event_rejects_zero_operation_id() {
         let _event = Event::host_request(1, 0, "host.smoke.echo", serde_json::json!({}));
+    }
+
+    #[test]
+    fn host_request_event_rejects_malformed_capability() {
+        for capability in ["", "host. smoke.echo", "host..echo", "host"] {
+            let panic = std::panic::catch_unwind(|| {
+                Event::host_request(1, 2, capability, serde_json::json!({}))
+            })
+            .expect_err("malformed capability should panic");
+            let message = panic
+                .downcast_ref::<String>()
+                .map(String::as_str)
+                .or_else(|| panic.downcast_ref::<&str>().copied())
+                .unwrap_or("");
+            assert!(
+                message.contains("host.request capability"),
+                "unexpected panic for {capability:?}: {message}"
+            );
+        }
     }
 
     #[test]

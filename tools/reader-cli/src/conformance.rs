@@ -552,6 +552,9 @@ pub(crate) fn run_conformance() -> ConformanceReport {
                     .as_u64()
                     .is_some_and(|operation_id| operation_id > 0)
                 && capability == "host.smoke.echo"
+                && event_json["capability"]
+                    .as_str()
+                    .is_some_and(is_valid_token_path)
                 && params["message"] == "conformance host request"
                 && event_json["params"].is_object() =>
             {
@@ -1084,7 +1087,12 @@ fn expect_no_event(rx: &Receiver<Event>) -> Result<(), String> {
 
 fn expect_host_request(rx: &Receiver<Event>) -> Result<(), String> {
     match recv_event(rx)? {
-        Event::HostRequest { .. } => Ok(()),
+        Event::HostRequest {
+            operation_id,
+            capability,
+            params,
+            ..
+        } if operation_id > 0 && is_valid_token_path(&capability) && params.is_object() => Ok(()),
         other => Err(format!("expected host.request, got {other:?}")),
     }
 }
@@ -1122,6 +1130,8 @@ fn expect_http_host_request(rx: &Receiver<Event>, expected_request_id: u64) -> R
         } if request_id == expected_request_id
             && operation_id == 1
             && capability == "http.execute"
+            && is_valid_token_path(&capability)
+            && params.is_object()
             && params["url"] == "https://books.example.test/search?q=empty"
             && params["method"] == "GET"
             && params["headers"]["Accept"] == "application/json" =>
@@ -1130,6 +1140,12 @@ fn expect_http_host_request(rx: &Receiver<Event>, expected_request_id: u64) -> R
         }
         other => Err(format!("unexpected http host.request event {other:?}")),
     }
+}
+
+fn is_valid_token_path(value: &str) -> bool {
+    value.contains('.')
+        && !value.chars().any(char::is_whitespace)
+        && value.split('.').all(|segment| !segment.is_empty())
 }
 
 fn expect_event_error(
