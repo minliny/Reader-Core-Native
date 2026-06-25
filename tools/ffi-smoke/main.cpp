@@ -44,7 +44,7 @@ static_assert(RC_ERR_INTERNAL == 6, "RC_ERR_INTERNAL changed");
 
 namespace {
 
-constexpr size_t kMaxEvents = 32;
+constexpr size_t kMaxEvents = 40;
 
 struct Channel {
   std::mutex mutex;
@@ -491,6 +491,40 @@ int main() {
   }
   if (!last_error_clears_message_when_ok()) {
     return fail("host.complete invalid params left synchronous last_error");
+  }
+
+  // --- host.error invalid params -> async INVALID_PARAMS ----------------
+  std::string zero_error =
+      R"({"protocolVersion":1,"requestId":306,"method":"host.error","params":{"operationId":0,"error":{"code":"INTERNAL","message":"invalid operation id","retryable":false}}})";
+  if (send_str(rt, zero_error) != RC_SEND_OK) {
+    return fail("zero operation host.error send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":306") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "\"operationId\":0")) {
+    std::cerr << "zero operation host.error error: " << event << '\n';
+    return fail("zero operation host.error error shape");
+  }
+  std::string unknown_field_error =
+      R"({"protocolVersion":1,"requestId":315,"method":"host.error","params":{"operationId":1,"error":{"code":"INTERNAL","message":"host failed","retryable":true},"failedAt":123}})";
+  if (send_str(rt, unknown_field_error) != RC_SEND_OK) {
+    return fail("unknown field host.error send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":315") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "host.error") ||
+      !contains(event, "unknown field")) {
+    std::cerr << "unknown field host.error error: " << event << '\n';
+    return fail("unknown field host.error error shape");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("host.error invalid params left synchronous last_error");
   }
 
   // --- remote http.execute completion carries metadata ------------------

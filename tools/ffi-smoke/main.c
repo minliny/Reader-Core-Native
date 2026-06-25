@@ -14,7 +14,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define MAX_EVENTS 32
+#define MAX_EVENTS 40
 #define EVENT_BUF 8192
 #define MSG_BUF 256
 
@@ -639,6 +639,51 @@ int main(void) {
   strcpy(msg, "stale");
   if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
     return fail("host.complete invalid params left synchronous last_error");
+  }
+
+  // --- host.error invalid params -> async INVALID_PARAMS ----------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":306,\"method\":\"host."
+               "error\",\"params\":{\"operationId\":0,\"error\":{\"code\":"
+               "\"INTERNAL\",\"message\":\"invalid operation id\","
+               "\"retryable\":false}}}") != RC_SEND_OK) {
+    return fail("zero operation host.error send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for zero operation host.error");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":306") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "\"operationId\":0")) {
+    fprintf(stderr, "zero operation host.error error: %s\n", event);
+    return fail("zero operation host.error error shape");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":315,\"method\":\"host."
+               "error\",\"params\":{\"operationId\":1,\"error\":{\"code\":"
+               "\"INTERNAL\",\"message\":\"host failed\",\"retryable\":true},"
+               "\"failedAt\":123}}") != RC_SEND_OK) {
+    return fail("unknown field host.error send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for unknown field host.error");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":315") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "host.error") ||
+      !contains(event, "unknown field")) {
+    fprintf(stderr, "unknown field host.error error: %s\n", event);
+    return fail("unknown field host.error error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("host.error invalid params left synchronous last_error");
   }
 
   // --- remote http.execute completion carries metadata ------------------

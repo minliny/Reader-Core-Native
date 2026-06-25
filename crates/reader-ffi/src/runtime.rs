@@ -1076,4 +1076,50 @@ mod tests {
 
         assert_eq!(unsafe { destroy(handle) }, 0);
     }
+
+    #[test]
+    fn host_error_invalid_params_emit_error_events_via_c_abi() {
+        let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
+        let handle = make_runtime(&events);
+
+        let zero_operation =
+            include_bytes!("../../../protocol/fixtures/conformance/host/error-operation-zero.json");
+        assert_eq!(
+            unsafe { send(handle, zero_operation.as_ptr(), zero_operation.len()) },
+            0
+        );
+        assert_eq!(last_error_code(), 0);
+
+        let evs = wait_events(&events, 1);
+        let err: serde_json::Value = serde_json::from_slice(&evs[0]).unwrap();
+        assert_eq!(err["type"], "error");
+        assert_eq!(err["protocolVersion"], 1);
+        assert_eq!(err["requestId"], 306);
+        assert_eq!(err["error"]["code"], "INVALID_PARAMS");
+        assert_eq!(err["error"]["details"]["operationId"], 0);
+
+        let unknown_field =
+            include_bytes!("../../../protocol/fixtures/conformance/host/error-unknown-field.json");
+        assert_eq!(
+            unsafe { send(handle, unknown_field.as_ptr(), unknown_field.len()) },
+            0
+        );
+        assert_eq!(last_error_code(), 0);
+
+        let evs = wait_events(&events, 2);
+        let err: serde_json::Value = serde_json::from_slice(&evs[1]).unwrap();
+        assert_eq!(err["type"], "error");
+        assert_eq!(err["protocolVersion"], 1);
+        assert_eq!(err["requestId"], 315);
+        assert_eq!(err["error"]["code"], "INVALID_PARAMS");
+        assert_eq!(err["error"]["details"]["method"], "host.error");
+        assert!(
+            err["error"]["details"]["source"]
+                .as_str()
+                .is_some_and(|source| source.contains("unknown field")),
+            "unexpected error event: {err}"
+        );
+
+        assert_eq!(unsafe { destroy(handle) }, 0);
+    }
 }
