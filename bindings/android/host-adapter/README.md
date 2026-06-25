@@ -41,6 +41,8 @@ HostRequest.parse  -->  HostAdapter.dispatch(capability)  -->  CapabilityHandler
 | 类 | 职责 |
 | --- | --- |
 | `HostBus` | host app 一站式接入点：`over(transport).register(...).start()/stop()`，含 daemon 轮询线程与同步 `tick`/`drain`。 |
+| `HostCommander` | host 发起命令的协议入口：`sendAndAwait(method, params, timeout)` 按 `requestId` 关联 `result`/`error` event。 |
+| `CommandResult` | 命令结果：success（data JSON）/ error（error JSON）/ timeout。 |
 | `HostEventLoop` | 闭环：poll → 过滤 `host.request` → dispatch → encode → send；忽略 result/error event。 |
 | `HostTransport` | poll/send 抽象接口，使 loop 纯 JVM 可单测。 |
 | `ReaderCoreHostTransport` | 生产 wiring：把 `HostTransport` 接到现有 `ReaderCoreRuntime`（JNI → C ABI）。 |
@@ -95,6 +97,9 @@ JAVA_HOME=<jdk17> gradle --offline test # 依赖已缓存，可离线复跑
 - `compileSample` Gradle task 编译 gate `HostBusSample`：把 `HostBus` 经
   `ReaderCoreHostTransport` 接到真实 C ABI surface 并注册三个 capability handler，
   在纯 JVM 下 type-check 完整接入路径 wiring（运行需 `.so`，编译即 evidence）。
+- `HostCommanderTest` 用 fake transport 验证命令/响应关联：按 `requestId` 匹配
+  `result`/`error` event、忽略他 id 的事件、超时返回 timeout、requestId 跨调用递增、
+  method 字符串经 `Json.stringify` 转义。
 
 这是本 lane 每轮提交的可验证 contract evidence（Gradle `test` task，纯 JVM，无需
 NDK/设备）。模块通过 `sourceSets` 编译引用现有 Java JNI wrapper（`ReaderCoreRuntime`
