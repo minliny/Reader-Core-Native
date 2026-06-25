@@ -104,6 +104,10 @@ JAVA_HOME=<jdk17> gradle --offline test # 依赖已缓存，可离线复跑
 - `HostRuntimeTest` 验证统一 facade：单一 poll 线程把命令 `result`/`error` 路由到
   `sendAndAwait` future，同时把 `host.request` 派发给 adapter 应答（异步证明双向共流），
   超时清理 pending，`start`/`stop` 幂等。
+- `HostRuntimeIntegrationTest` 全栈集成：`HostRuntime` 注册全部三个真实 handler
+  （http.execute + host.smoke.echo + credential.resolve），脚本化混合事件序列
+  （两个 host.request + 一个命令 result）经单一 poll 线程处理，断言各自 host.complete
+  形状，证明整 adapter 组合工作。
 
 这是本 lane 每轮提交的可验证 contract evidence（Gradle `test` task，纯 JVM，无需
 NDK/设备）。模块通过 `sourceSets` 编译引用现有 Java JNI wrapper（`ReaderCoreRuntime`
