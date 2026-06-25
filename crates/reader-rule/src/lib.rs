@@ -68,6 +68,31 @@ impl RuleEngine {
 
         Ok(RuleOutput::new(values))
     }
+
+    pub fn execute_legado_css(&self, input: &str, rule: &str) -> RuleResult<RuleOutput> {
+        let rule = LegadoCssRule::parse(rule)?;
+        self.execute_legado_css_rule(input, &rule)
+    }
+
+    pub fn execute_optional_legado_css(
+        &self,
+        input: &str,
+        rule: Option<&str>,
+    ) -> RuleResult<RuleOutput> {
+        let Some(rule) = rule else {
+            return Ok(RuleOutput::new(Vec::new()));
+        };
+
+        self.execute_legado_css(input, rule)
+    }
+
+    pub fn execute_legado_css_rule(
+        &self,
+        input: &str,
+        rule: &LegadoCssRule,
+    ) -> RuleResult<RuleOutput> {
+        Ok(RuleOutput::new(apply_legado_css(input, rule)?))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -277,6 +302,48 @@ pub enum CssExtraction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LegadoCssRule {
+    steps: Vec<LegadoCssStep>,
+}
+
+impl LegadoCssRule {
+    pub fn parse(rule: &str) -> RuleResult<Self> {
+        parse_legado_css_rule(rule).map_err(|message| RuleError::LegadoCssSyntax {
+            rule: rule.to_string(),
+            message,
+        })
+    }
+
+    pub fn missing() -> Self {
+        Self { steps: Vec::new() }
+    }
+
+    pub fn steps(&self) -> &[LegadoCssStep] {
+        &self.steps
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.steps.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LegadoCssStep {
+    Select(String),
+    Extract {
+        selector: Option<String>,
+        extraction: LegadoCssExtraction,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LegadoCssExtraction {
+    Text,
+    Html,
+    Attr(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XPathRule {
     pub expression: String,
     pub namespaces: Vec<(String, String)>,
@@ -348,6 +415,10 @@ pub enum RuleError {
         selector: String,
         message: String,
     },
+    LegadoCssSyntax {
+        rule: String,
+        message: String,
+    },
     XPathInputParse {
         message: String,
     },
@@ -389,6 +460,9 @@ impl fmt::Display for RuleError {
             }
             RuleError::CssSelectorSyntax { selector, message } => {
                 write!(f, "invalid CSS selector `{selector}`: {message}")
+            }
+            RuleError::LegadoCssSyntax { rule, message } => {
+                write!(f, "invalid Legado CSS rule `{rule}`: {message}")
             }
             RuleError::XPathInputParse { message } => {
                 write!(f, "invalid XML input for XPath: {message}")
@@ -3095,6 +3169,322 @@ fn json_value_to_rule_text(value: &JsonValue) -> String {
             serde_json::to_string(value).unwrap_or_else(|_| String::new())
         }
     }
+}
+
+fn parse_legado_css_rule(rule: &str) -> Result<LegadoCssRule, String> {
+    if rule.trim().is_empty() {
+        return Ok(LegadoCssRule { steps: Vec::new() });
+    }
+
+    let parts = split_legado_css_pipeline(rule)?;
+    let mut steps = Vec::with_capacity(parts.len());
+
+    for (index, part) in parts.iter().enumerate() {
+        let step = parse_legado_css_step(part)?;
+        if matches!(step, LegadoCssStep::Extract { .. }) && index + 1 != parts.len() {
+            return Err("extraction step must be the final pipeline segment".to_string());
+        }
+        steps.push(step);
+    }
+
+    Ok(LegadoCssRule { steps })
+}
+
+fn split_legado_css_pipeline(rule: &str) -> Result<Vec<&str>, String> {
+    let mut parts = Vec::new();
+    let mut quote = None;
+    let mut escaped = false;
+    let mut bracket_depth = 0usize;
+    let mut paren_depth = 0usize;
+    let mut start = 0usize;
+    let mut index = 0usize;
+
+    while index < rule.len() {
+        let value = rule[index..]
+            .chars()
+            .next()
+            .ok_or_else(|| "invalid Legado CSS rule".to_string())?;
+
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            index += value.len_utf8();
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            index += value.len_utf8();
+            continue;
+        }
+
+        if bracket_depth == 0 && paren_depth == 0 {
+            if value == ';' {
+                parts.push(&rule[start..index]);
+                index += value.len_utf8();
+                start = index;
+                continue;
+            }
+
+            if rule[index..].starts_with("&&") {
+                parts.push(&rule[start..index]);
+                index += "&&".len();
+                start = index;
+                continue;
+            }
+        }
+
+        match value {
+            '[' => bracket_depth += 1,
+            ']' => {
+                if bracket_depth == 0 {
+                    return Err("unmatched `]` in selector".to_string());
+                }
+                bracket_depth -= 1;
+            }
+            '(' => paren_depth += 1,
+            ')' => {
+                if paren_depth == 0 {
+                    return Err("unmatched `)` in selector".to_string());
+                }
+                paren_depth -= 1;
+            }
+            _ => {}
+        }
+
+        index += value.len_utf8();
+    }
+
+    if quote.is_some() {
+        return Err("unterminated quoted selector segment".to_string());
+    }
+    if bracket_depth != 0 {
+        return Err("unterminated attribute selector".to_string());
+    }
+    if paren_depth != 0 {
+        return Err("unterminated selector function".to_string());
+    }
+
+    parts.push(&rule[start..]);
+    Ok(parts)
+}
+
+fn parse_legado_css_step(part: &str) -> Result<LegadoCssStep, String> {
+    let part = part.trim();
+    if part.is_empty() {
+        return Err("empty pipeline segment".to_string());
+    }
+
+    if let Some(separator) = find_legado_css_extraction_separator(part)? {
+        let selector = part[..separator].trim();
+        let extraction = part[separator + '@'.len_utf8()..].trim();
+        if extraction.is_empty() {
+            return Err("missing extraction after `@`".to_string());
+        }
+
+        return Ok(LegadoCssStep::Extract {
+            selector: if selector.is_empty() {
+                None
+            } else {
+                Some(selector.to_string())
+            },
+            extraction: parse_legado_css_extraction(extraction),
+        });
+    }
+
+    Ok(LegadoCssStep::Select(part.to_string()))
+}
+
+fn parse_legado_css_extraction(extraction: &str) -> LegadoCssExtraction {
+    if extraction.eq_ignore_ascii_case("text") {
+        LegadoCssExtraction::Text
+    } else if extraction.eq_ignore_ascii_case("html") {
+        LegadoCssExtraction::Html
+    } else {
+        LegadoCssExtraction::Attr(extraction.to_string())
+    }
+}
+
+fn find_legado_css_extraction_separator(part: &str) -> Result<Option<usize>, String> {
+    let mut quote = None;
+    let mut escaped = false;
+    let mut bracket_depth = 0usize;
+    let mut paren_depth = 0usize;
+
+    for (index, value) in part.char_indices() {
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            continue;
+        }
+
+        if value == '@' && bracket_depth == 0 && paren_depth == 0 {
+            return Ok(Some(index));
+        }
+
+        match value {
+            '[' => bracket_depth += 1,
+            ']' => {
+                if bracket_depth == 0 {
+                    return Err("unmatched `]` in selector".to_string());
+                }
+                bracket_depth -= 1;
+            }
+            '(' => paren_depth += 1,
+            ')' => {
+                if paren_depth == 0 {
+                    return Err("unmatched `)` in selector".to_string());
+                }
+                paren_depth -= 1;
+            }
+            _ => {}
+        }
+    }
+
+    if quote.is_some() {
+        return Err("unterminated quoted selector segment".to_string());
+    }
+    if bracket_depth != 0 {
+        return Err("unterminated attribute selector".to_string());
+    }
+    if paren_depth != 0 {
+        return Err("unterminated selector function".to_string());
+    }
+
+    Ok(None)
+}
+
+#[derive(Clone, Copy)]
+enum LegadoCssContext<'a> {
+    Document(&'a Html),
+    Element(ElementRef<'a>),
+}
+
+fn apply_legado_css(input: &str, rule: &LegadoCssRule) -> RuleResult<Vec<String>> {
+    if rule.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let document = Html::parse_document(input);
+    let mut contexts = vec![LegadoCssContext::Document(&document)];
+
+    for step in rule.steps() {
+        match step {
+            LegadoCssStep::Select(selector) => {
+                contexts = legado_css_select_contexts(&contexts, selector)?;
+                if contexts.is_empty() {
+                    return Ok(Vec::new());
+                }
+            }
+            LegadoCssStep::Extract {
+                selector,
+                extraction,
+            } => {
+                let elements = if let Some(selector) = selector {
+                    legado_css_select_elements(&contexts, selector)?
+                } else {
+                    legado_css_context_elements(&contexts)
+                };
+                return Ok(extract_legado_css_values(elements, extraction));
+            }
+        }
+    }
+
+    Ok(extract_legado_css_values(
+        legado_css_context_elements(&contexts),
+        &LegadoCssExtraction::Text,
+    ))
+}
+
+fn legado_css_select_contexts<'a>(
+    contexts: &[LegadoCssContext<'a>],
+    selector: &str,
+) -> RuleResult<Vec<LegadoCssContext<'a>>> {
+    Ok(legado_css_select_elements(contexts, selector)?
+        .into_iter()
+        .map(LegadoCssContext::Element)
+        .collect())
+}
+
+fn legado_css_select_elements<'a>(
+    contexts: &[LegadoCssContext<'a>],
+    selector: &str,
+) -> RuleResult<Vec<ElementRef<'a>>> {
+    let compiled = compile_legado_css_selector(selector)?;
+    let mut elements = Vec::new();
+
+    for context in contexts {
+        match context {
+            LegadoCssContext::Document(document) => {
+                elements.extend(document.select(&compiled));
+            }
+            LegadoCssContext::Element(element) => {
+                elements.extend(element.select(&compiled));
+            }
+        }
+    }
+
+    Ok(elements)
+}
+
+fn compile_legado_css_selector(selector: &str) -> RuleResult<Selector> {
+    Selector::parse(selector).map_err(|err| RuleError::CssSelectorSyntax {
+        selector: selector.to_string(),
+        message: format!("{err:?}"),
+    })
+}
+
+fn legado_css_context_elements<'a>(contexts: &[LegadoCssContext<'a>]) -> Vec<ElementRef<'a>> {
+    contexts
+        .iter()
+        .filter_map(|context| match context {
+            LegadoCssContext::Document(_) => None,
+            LegadoCssContext::Element(element) => Some(*element),
+        })
+        .collect()
+}
+
+fn extract_legado_css_values(
+    elements: Vec<ElementRef<'_>>,
+    extraction: &LegadoCssExtraction,
+) -> Vec<String> {
+    let mut output = Vec::new();
+
+    for element in elements {
+        match extraction {
+            LegadoCssExtraction::Text => {
+                output.push(element_text(&element));
+            }
+            LegadoCssExtraction::Html => {
+                let value = element.inner_html();
+                if !value.is_empty() {
+                    output.push(value);
+                }
+            }
+            LegadoCssExtraction::Attr(attr) => {
+                if let Some(value) = element.value().attr(attr) {
+                    output.push(value.to_string());
+                }
+            }
+        }
+    }
+
+    output
 }
 
 fn apply_css(input: &str, rule: &CssRule) -> RuleResult<Vec<String>> {

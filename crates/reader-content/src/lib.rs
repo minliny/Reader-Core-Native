@@ -500,6 +500,10 @@ impl RemoteContentPipeline {
         input: &str,
         rule_spec: &serde_json::Value,
     ) -> Result<RuleOutput, ContentError> {
+        if let Some(rule) = rule_spec.as_str() {
+            return Ok(self.engine.execute_legado_css(input, rule)?);
+        }
+
         let steps = Self::parse_steps(rule_spec)?;
         if steps.is_empty() {
             return Ok(RuleOutput::new(Vec::new()));
@@ -1371,6 +1375,27 @@ mod tests {
     }
 
     #[test]
+    fn search_accepts_raw_legado_css_rule_string() {
+        let mut source = sample_source();
+        source.rules.search = serde_json::json!("div.list&&div.item;div.name&&a@text");
+        let pipeline = RemoteContentPipeline::new();
+        let resp = r#"
+            <main>
+                <div class="list">
+                    <div class="item"><div class="name"><a href="/b/1">Dune</a></div></div>
+                    <div class="item"><div class="name"><a href="/b/2">Foundation</a></div></div>
+                </div>
+            </main>
+        "#;
+
+        let books = pipeline.search(&source, resp).unwrap();
+
+        assert_eq!(books.len(), 2);
+        assert_eq!(books[0].title, "Dune");
+        assert_eq!(books[1].title, "Foundation");
+    }
+
+    #[test]
     fn detail_merges_metadata_from_json_object() {
         let mut source = sample_source();
         source.rules.detail = serde_json::json!([{ "kind": "cssText", "selector": "meta.detail" }]);
@@ -1421,6 +1446,35 @@ mod tests {
     }
 
     #[test]
+    fn detail_accepts_raw_legado_css_rule_string() {
+        let mut source = sample_source();
+        source.rules.detail = serde_json::json!(".detail span@text");
+        let pipeline = RemoteContentPipeline::new();
+        let base = Book {
+            book_id: "1".into(),
+            title: "Dune".into(),
+            author: String::new(),
+            cover_url: None,
+            intro: None,
+            kind: None,
+            last_chapter: None,
+        };
+        let resp = r#"
+            <section class="detail">
+                <span>author</span><span>Herbert</span>
+                <span>intro</span><span>A spice novel</span>
+                <span>lastChapter</span><span>Arrakis</span>
+            </section>
+        "#;
+
+        let merged = pipeline.detail(&source, &base, resp).unwrap();
+
+        assert_eq!(merged.author, "Herbert");
+        assert_eq!(merged.intro.as_deref(), Some("A spice novel"));
+        assert_eq!(merged.last_chapter.as_deref(), Some("Arrakis"));
+    }
+
+    #[test]
     fn toc_extracts_from_json_array() {
         let mut source = sample_source();
         source.rules.toc = serde_json::json!([{ "kind": "jsonPath", "path": "$.chapters" }]);
@@ -1437,6 +1491,30 @@ mod tests {
     }
 
     #[test]
+    fn toc_accepts_raw_legado_css_rule_string() {
+        let mut source = sample_source();
+        source.rules.toc = serde_json::json!("script.toc@html");
+        let pipeline = RemoteContentPipeline::new();
+        let resp = r#"
+            <html>
+                <script class="toc" type="application/json">
+                    [
+                        {"title":"Ch 1","url":"/c/1"},
+                        {"title":"Ch 2","url":"/c/2"}
+                    ]
+                </script>
+            </html>
+        "#;
+
+        let toc = pipeline.toc(&source, resp).unwrap();
+
+        assert_eq!(toc.len(), 2);
+        assert_eq!(toc[0].title, "Ch 1");
+        assert_eq!(toc[0].url, "/c/1");
+        assert_eq!(toc[1].index, 1);
+    }
+
+    #[test]
     fn chapter_content_extracts_text() {
         let mut source = sample_source();
         source.rules.chapter = serde_json::json!([{ "kind": "cssText", "selector": "p.body" }]);
@@ -1444,6 +1522,25 @@ mod tests {
         let resp = "<html><body><p class=\"body\">Para one.</p><p class=\"body\">Para two.</p></body></html>";
         let content = pipeline.chapter_content(&source, resp).unwrap();
         assert_eq!(content, "Para one.\nPara two.");
+    }
+
+    #[test]
+    fn chapter_content_accepts_raw_legado_css_rule_string() {
+        let mut source = sample_source();
+        source.rules.chapter = serde_json::json!("article.chapter@html");
+        let pipeline = RemoteContentPipeline::new();
+        let resp = r#"
+            <html>
+                <article class="chapter">
+                    <p>First&nbsp;&amp; <em>bold</em> line.</p>
+                    <p>Second<br/>line.</p>
+                </article>
+            </html>
+        "#;
+
+        let content = pipeline.chapter_content(&source, resp).unwrap();
+
+        assert_eq!(content, "First & bold line.\nSecond\nline.");
     }
 
     #[test]

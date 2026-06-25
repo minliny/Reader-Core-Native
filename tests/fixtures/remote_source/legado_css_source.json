@@ -1,0 +1,20 @@
+{
+  "source": {
+    "sourceId": "legado-css-src",
+    "name": "Legado CSS Test Source",
+    "baseUrl": "https://books.example.test",
+    "rules": {
+      "search": "div.list&&div.item;div.name&&a@text",
+      "detail": ".detail span@text",
+      "toc": "script.toc@html",
+      "chapter": "article.chapter@html"
+    }
+  },
+  "searchResponse": "<main><div class=\"list\"><div class=\"item\"><div class=\"name\"><a href=\"/b/1\">Dune</a></div></div><div class=\"item\"><div class=\"name\"><a href=\"/b/2\">Foundation</a></div></div></div></main>",
+  "detailResponse": "<section class=\"detail\"><span>author</span><span>Frank Herbert</span><span>intro</span><span>A desert planet.</span><span>coverUrl</span><span>https://img.example.test/dune.png</span></section>",
+  "tocResponse": "<html><script class=\"toc\" type=\"application/json\">[{\"title\":\"Chapter 1\",\"url\":\"https://books.example.test/c1\"},{\"title\":\"Chapter 2\",\"url\":\"https://books.example.test/c2\"}]</script></html>",
+  "chapterResponse": "<html><article class=\"chapter\"><p>First&nbsp;&amp; <em>bold</em> line.</p><p>Second<br/>line.</p></article></html>",
+  "bookId": "1",
+  "chapterTitle": "Chapter 1",
+  "jsRuleUnsupported": "java.get(\"https://books.example.test/protected\")"
+}

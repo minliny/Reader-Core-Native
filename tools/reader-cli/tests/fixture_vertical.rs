@@ -8,17 +8,49 @@ use std::process::Command;
 
 const BIN: &str = env!("CARGO_BIN_EXE_reader-cli");
 
-fn fixture_path() -> PathBuf {
+fn fixture_path(name: &str) -> PathBuf {
     let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    p.push("../../tests/fixtures/remote_source/basic_source.json");
+    p.push("../../tests/fixtures/remote_source");
+    p.push(name);
     p.canonicalize().unwrap_or(p)
 }
 
 #[test]
 fn fixture_vertical_runs_full_pipeline() {
+    let events = run_fixture("basic_source.json");
+
+    assert_eq!(events[0]["data"]["imported"], true);
+    assert_eq!(events[0]["data"]["sourceId"], "basic-src");
+
+    assert_basic_pipeline_events(&events);
+    assert_eq!(events[4]["data"]["book"]["author"], "Frank Herbert");
+    assert_eq!(events[4]["data"]["book"]["intro"], "A desert planet.");
+    assert!(events[6]["data"]["content"]
+        .as_str()
+        .unwrap()
+        .contains("First paragraph"));
+}
+
+#[test]
+fn fixture_vertical_runs_legado_css_dsl_pipeline() {
+    let events = run_fixture("legado_css_source.json");
+
+    assert_eq!(events[0]["data"]["imported"], true);
+    assert_eq!(events[0]["data"]["sourceId"], "legado-css-src");
+
+    assert_basic_pipeline_events(&events);
+    assert_eq!(events[4]["data"]["book"]["author"], "Frank Herbert");
+    assert_eq!(events[4]["data"]["book"]["intro"], "A desert planet.");
+    assert!(events[6]["data"]["content"]
+        .as_str()
+        .unwrap()
+        .contains("First & bold line."));
+}
+
+fn run_fixture(name: &str) -> Vec<serde_json::Value> {
     let output = Command::new(BIN)
         .arg("--fixture-vertical")
-        .arg(fixture_path())
+        .arg(fixture_path(name))
         .output()
         .expect("reader-cli binary");
 
@@ -34,12 +66,13 @@ fn fixture_vertical_runs_full_pipeline() {
         .map(|line| serde_json::from_str(line).expect("each line is a JSON event"))
         .collect();
 
+    events
+}
+
+fn assert_basic_pipeline_events(events: &[serde_json::Value]) {
     // 9 events: import, search(inline), host.request(http), search(host body),
     // detail, toc, chapter(rule), progress, js(unsupported).
     assert_eq!(events.len(), 9, "expected 9 events, got {events:?}");
-
-    assert_eq!(events[0]["data"]["imported"], true);
-    assert_eq!(events[0]["data"]["sourceId"], "basic-src");
 
     let books = events[1]["data"]["books"].as_array().unwrap();
     assert_eq!(books.len(), 2);
@@ -68,10 +101,6 @@ fn fixture_vertical_runs_full_pipeline() {
     assert_eq!(toc.len(), 2);
 
     assert_eq!(events[6]["data"]["via"], "rule");
-    assert!(events[6]["data"]["content"]
-        .as_str()
-        .unwrap()
-        .contains("First paragraph"));
 
     assert_eq!(events[7]["data"]["stored"], true);
 
