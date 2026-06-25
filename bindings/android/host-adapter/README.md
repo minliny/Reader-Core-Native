@@ -112,6 +112,10 @@ JAVA_HOME=<jdk17> gradle --offline test # 依赖已缓存，可离线复跑
 - `HostRuntimeExecutorTest` 验证 `dispatchExecutor` 卸载：慢 capability handler 不阻塞
   poll 线程对并发命令 result 的关联（sendAndAwait 在慢 handler 完成前返回）；无 executor
   时同步 dispatch 仍工作。
+- `HostFixturesSweepTest` 动态扫描整个上游 `protocol/fixtures/conformance/host/` 目录，
+  对每个 fixture 分类断言（reply fixture 重编码后 canonical 等价 / operationId==0 负 fixture
+  被 codec 拒绝 / request fixture 的 capability 被 HostRequest 接受或拒绝）—— 新增 fixture
+  自动获覆盖，无需改测试。
 
 这是本 lane 每轮提交的可验证 contract evidence（Gradle `test` task，纯 JVM，无需
 NDK/设备）。模块通过 `sourceSets` 编译引用现有 Java JNI wrapper（`ReaderCoreRuntime`
