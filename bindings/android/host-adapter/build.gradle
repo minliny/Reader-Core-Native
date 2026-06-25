@@ -1,0 +1,107 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.reader.core'
+version = '0.1.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+sourceSets {
+    // Compile against the existing Java JNI wrapper (ReaderCoreRuntime /
+    // NativeCoreBridge / ReaderCoreException) so ReaderCoreHostTransport — the
+    // production wiring from the host adapter to the C ABI surface — type-checks
+    // under a plain JVM. We do not modify those sources; we only reference them.
+    main {
+        java {
+            srcDir '../src/main/java'
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    // JSON Schema validator (draft 2020-12) — validates the adapter's encoded
+    // commands/events directly against protocol/reader-{command,event}.schema.json,
+    // the strongest contract evidence. Fetched once online; --offline reproduces.
+    testImplementation 'com.networknt:json-schema-validator:1.5.1'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+    }
+    // Point ProtocolConformanceTest at the upstream protocol fixtures dir (the
+    // source of truth) so a protocol change breaks the test, instead of relying
+    // on copied fixtures under src/test/resources. Resolved relative to this
+    // module's project dir: bindings/android/host-adapter -> repo root.
+    systemProperty 'reader.protocol.fixtures.host',
+            new File(rootProject.projectDir, '../../../protocol/fixtures/conformance/host').absolutePath
+    // Path to the upstream protocol JSON schemas (source of truth) for
+    // JsonSchemaValidationTest. Resolved relative to this module's project dir.
+    systemProperty 'reader.protocol.schema.dir',
+            new File(rootProject.projectDir, '../../../protocol').absolutePath
+}
+
+// Compile-gate the runnable wiring sample (HostBusSample). Running it needs the
+// JNI .so (System.loadLibrary in NativeCoreBridge's static init), so it is not
+// unit-tested; but compiling it type-checks the full access-path wiring —
+// host-adapter + JNI wrapper + capability handlers — under a plain JVM. This is
+// the verifiable contract evidence for the access path's concrete wiring.
+sourceSets {
+    samples {
+        java {
+            srcDir 'src/samples/java'
+        }
+        compileClasspath += sourceSets.main.output
+    }
+}
+
+dependencies {
+    samplesCompileOnly sourceSets.main.output
+}
+
+tasks.register('compileSample', JavaCompile) {
+    source = sourceSets.samples.java
+    classpath = sourceSets.main.compileClasspath + sourceSets.main.output
+    destinationDirectory = layout.buildDirectory.dir('classes/java/sample')
+}
+
+// Packaging prep: a sources jar and a javadoc jar, so the host-adapter ships as
+// a consumable Maven/Gradle artifact (documentation + sources for IDEs). Pure
+// JVM — does not pull the Android Gradle plugin (AAR packaging is host-app
+// work per STATUS.md). Wired into `assemble` and `check`.
+tasks.register('sourcesJar', Jar) {
+    archiveClassifier = 'sources'
+    from sourceSets.main.allJava
+}
+
+tasks.register('javadocJar', Jar) {
+    archiveClassifier = 'javadoc'
+    from tasks.named('javadoc')
+}
+
+tasks.named('jar') {
+    dependsOn sourcesJar, javadocJar
+}
+
+artifacts {
+    archives sourcesJar, javadocJar
+}
+
+tasks.named('assemble') {
+    dependsOn sourcesJar, javadocJar
+}
+
+tasks.named('check') {
+    dependsOn 'compileSample'
+}

@@ -57,6 +57,48 @@
 - Android NDK `26.3.11579264`
 - Rust target：`aarch64-linux-android`、`x86_64-linux-android`
 
+## Host adapter 接入路径（2026-06-25 新增）
+
+`bindings/android/host-adapter/` 是纯 JVM host 适配器模块，桥接 Core
+`host.request` event 到 host capability，并编码 `host.complete` / `host.error`
+command 经现有 `rc_runtime_send` 通道回 Core。**不触碰 C ABI**，只消费协议。
+
+- 组件：`HostBus` / `HostEventLoop` / `HostTransport` / `ReaderCoreHostTransport` /
+  `HostRequest` / `HostReply` / `CapabilityHandler` / `HostAdapter` /
+  `HostReplyCodec` / `HttpExecuteHandler` / `HttpFetch` / `HttpRequest` /
+  `HttpResponse` / `HostSmokeEchoHandler` / `CredentialResolveHandler` /
+  `CredentialProvider` / `Credential` / 零依赖 `Json`。
+- 闭环：`HostEventLoop.tick` 做 poll → 过滤 `host.request` → dispatch → encode →
+  send；`ReaderCoreHostTransport` 把 loop 接到现有 `ReaderCoreRuntime`（JNI → C ABI）。
+- 产品 surface：`HostBus.over(transport).register(cap, handler).start()/stop()` 把
+  transport + adapter + loop 打包成 host app 的一站式接入点，含 daemon 轮询线程与
+  同步 `tick`/`drain` 脚本入口。
+- 真实 capability：`HttpExecuteHandler`（`http.execute` shared-contract）、
+  `HostSmokeEchoHandler`（`host.smoke.echo` conformance smoke）、
+  `CredentialResolveHandler`（`credential.resolve`，填补 host-app-contracts Gap D）。
+  host-owned 机制（`HttpFetch` / `CredentialProvider`）可注入，TLS/socket/keystore 留 host 侧。
+- 命令/响应半边：`HostCommander` 发送 Core command 并按 `requestId` 关联等待
+  `result`/`error` event，返回 `CommandResult`（success/error/timeout）——host app
+  发起命令的协议入口，与 `HostEventLoop`（应答 host.request）互补。
+- 统一 facade：`HostRuntime` 单一 poll 线程 demultiplex 事件流——`host.request` →
+  adapter 应答，`result`/`error` → pending `sendAndAwait` future，解决 HostCommander
+  的 demultiplexing caveat，给 host app 一个并发安全双向入口。
+- Gradle gate：`bindings/android/host-adapter` 下 `gradle check`（JDK 17、
+  Gradle 9.5.1 验证；`--offline` 可复跑）。模块通过 `sourceSets` 编译引用现有
+  Java JNI wrapper，不修改 wrapper 源。81 unit tests pass（含 10 个上游 fixture 动态扫描 + 5 个 JSON Schema 校验）+ `compileSample` gate。
+- Packaging：`gradle assemble` 产出 `reader-android-host-adapter-0.1.0{,-sources,-javadoc}.jar`
+  （纯 JVM，未引入 Android 插件；AAR packaging 仍属 host-app 工作）。
+- Contract evidence（由弱到强）：
+  - `HostReplyCodecTest` / `HostEventLoopTest` / `HttpExecuteHandlerTest` /
+    `HostBusTest` 用拷贝/上游 fixture 做单元级与端到端验证。
+  - `ProtocolConformanceTest` **直接读取上游 `protocol/fixtures/conformance/host/`**，
+    协议变更即断测。
+  - `HostFixturesSweepTest` 动态扫描整个 host fixtures 目录，新增 fixture 自动获覆盖。
+  - `JsonSchemaValidationTest` 用 draft 2020-12 validator 直接校验 adapter 编码输出对
+    `protocol/reader-{command,event}.schema.json`（最强 evidence）。
+  - `CredentialResolveHandlerTest` 用 fake `CredentialProvider` 验证 Gap D 草案契约。
+- 模块详情见 `bindings/android/host-adapter/README.md`。
+
 ## ABI gap 记录
 
 1. **Event 只通过 callback 传递。** ABI v1 没有 `rc_runtime_poll`，因此 JNI 层拥有
