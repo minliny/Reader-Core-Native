@@ -243,6 +243,22 @@ int main(void) {
     fprintf(stderr, "invalid config last_error: code=%d msg=%s\n", code, msg);
     return fail("invalid config did not record INVALID_MESSAGE");
   }
+  const char *unknown_field_config =
+      "{\"dataDirectory\":\"/tmp/reader-core-native/data\","
+      "\"extraDirectory\":\"/tmp/reader-core-native/extra\"}";
+  sentinel = (rc_runtime_t *)(uintptr_t)1;
+  if (rc_runtime_create((const uint8_t *)unknown_field_config,
+                        strlen(unknown_field_config), capture_event, NULL,
+                        &sentinel) != RC_CREATE_INVALID_CONFIG ||
+      sentinel != NULL) {
+    return fail("unknown field config did not return RC_CREATE_INVALID_CONFIG");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "runtime config")) {
+    fprintf(stderr, "unknown field config last_error: code=%d msg=%s\n", code,
+            msg);
+    return fail("unknown field config did not record INVALID_MESSAGE");
+  }
   const char *empty_data_dir_config = "{\"dataDirectory\":\"\"}";
   sentinel = (rc_runtime_t *)(uintptr_t)1;
   if (rc_runtime_create((const uint8_t *)empty_data_dir_config,

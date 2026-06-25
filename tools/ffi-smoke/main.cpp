@@ -227,6 +227,22 @@ int main() {
               << '\n';
     return fail("invalid config did not record INVALID_MESSAGE");
   }
+  std::string unknown_field_config =
+      R"({"dataDirectory":"/tmp/reader-core-native/data","extraDirectory":"/tmp/reader-core-native/extra"})";
+  sentinel = reinterpret_cast<rc_runtime_t *>(static_cast<uintptr_t>(1));
+  if (rc_runtime_create(
+          reinterpret_cast<const uint8_t *>(unknown_field_config.data()),
+          unknown_field_config.size(), capture_event, nullptr, &sentinel) !=
+          RC_CREATE_INVALID_CONFIG ||
+      sentinel != nullptr) {
+    return fail("unknown field config did not return RC_CREATE_INVALID_CONFIG");
+  }
+  msg = last_error_message(&code);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "runtime config")) {
+    std::cerr << "unknown field config last_error: code=" << code
+              << " msg=" << msg << '\n';
+    return fail("unknown field config did not record INVALID_MESSAGE");
+  }
   std::string empty_data_dir_config = R"({"dataDirectory":""})";
   sentinel = reinterpret_cast<rc_runtime_t *>(static_cast<uintptr_t>(1));
   if (rc_runtime_create(
