@@ -59,6 +59,23 @@ HostRequest.parse  -->  HostAdapter.dispatch(capability)  -->  CapabilityHandler
 | `CredentialProvider` / `Credential` | host-owned 凭据存储机制抽象与值对象（Keychain/Keystore）。 |
 | `Json` | 零依赖最小 JSON codec，供纯 JVM 单测与 Android 嵌入。 |
 
+## Adapter capability 表
+
+每个 `host.request` capability 的 host 侧实现、所属契约、JVM 单测证据与运行时
+（`.so` / NDK / 设备）验证状态。本 lane 的 per-round 证据是纯 JVM Gradle `test`；
+运行时 `.so` 集成明确**未验证**（运行 `HostRuntimeSample` 需 `System.loadLibrary`
+加载真实 JNI `.so`，属 out-of-lane 的设备/AAR 工作）。
+
+| Capability | Handler | Host 契约 | JVM 单测证据 | 运行时 (.so / NDK) |
+| --- | --- | --- | --- | --- |
+| `http.execute` | `HttpExecuteHandler` → `HttpFetch` | shared-contract 网络抓取 | `HttpExecuteHandlerTest`、`HostEventLoopTest`、`ProtocolConformanceTest`、`JsonSchemaValidationTest` | ⬜ 未验证 |
+| `host.smoke.echo` | `HostSmokeEchoHandler` | conformance smoke 回显 | `HostEventLoopTest`、`HostAdapterTest`、`ProtocolConformanceTest` | ⬜ 未验证 |
+| `credential.resolve` | `CredentialResolveHandler` → `CredentialProvider` | host-app-contracts Gap D | `CredentialResolveHandlerTest`、`HostRuntimeIntegrationTest` | ⬜ 未验证 |
+| `04 local-book`（未注册） | — | 待定 | — | ⬜ 待协议 owner 定义 |
+
+未注册的 capability 一律经 `HostAdapter` 走 `host.error`（非重试 `INTERNAL`，
+"unsupported capability: ..."），由 `HostAdapterTest` / `HostBusTest` 覆盖。
+
 ## 构建 / 测试
 
 需要 JDK 17 与 Gradle（已用 Gradle 9.5.1 验证）。
