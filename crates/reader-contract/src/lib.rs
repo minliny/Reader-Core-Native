@@ -334,6 +334,17 @@ mod tests {
     }
 
     #[test]
+    fn command_schema_requires_source_import_rules_object_or_null() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+        let rules = &schema["$defs"]["SourceImportParams"]["properties"]["rules"];
+
+        assert_eq!(rules["type"], serde_json::json!(["object", "null"]));
+        assert_eq!(rules["default"], serde_json::json!(null));
+    }
+
+    #[test]
     fn event_schema_error_codes_match_error_code_enum() {
         let schema: Value =
             serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))

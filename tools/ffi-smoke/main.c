@@ -937,6 +937,29 @@ int main(void) {
   if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
     return fail("source.import whitespace name left synchronous last_error");
   }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":320,\"method\":\"source."
+               "import\",\"params\":{\"sourceId\":\"ffi-source\","
+               "\"name\":\"FFI Source\",\"baseUrl\":\"https://books.example."
+               "test\",\"rules\":[\"search\",\"detail\"]}}") != RC_SEND_OK) {
+    return fail("source.import bad rules send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for source.import bad rules");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":320") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "rules")) {
+    fprintf(stderr, "source.import bad rules error: %s\n", event);
+    return fail("source.import bad rules error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("source.import bad rules left synchronous last_error");
+  }
 
   // --- invalid remote http.execute request method -> async INVALID_PARAMS
   if (send_str(rt,

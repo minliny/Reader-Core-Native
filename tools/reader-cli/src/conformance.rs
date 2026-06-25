@@ -38,6 +38,9 @@ const INVALID_SOURCE_IMPORT_UNKNOWN_FIELD: &str = include_str!(
 const INVALID_SOURCE_IMPORT_NAME_WHITESPACE: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-source-import-name-whitespace.json"
 );
+const INVALID_SOURCE_IMPORT_RULES_NOT_OBJECT: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-source-import-rules-not-object.json"
+);
 const INVALID_BOOK_SEARCH_UNKNOWN_FIELD: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-book-search-unknown-field.json"
 );
@@ -260,6 +263,15 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         let (_runtime, rx) = send_to_fresh_runtime(INVALID_SOURCE_IMPORT_NAME_WHITESPACE)?;
         expect_event_error(&rx, 417, ErrorCode::InvalidParams)
     });
+
+    record(
+        &mut report,
+        "source-import-rejects-non-object-rules",
+        || {
+            let (_runtime, rx) = send_to_fresh_runtime(INVALID_SOURCE_IMPORT_RULES_NOT_OBJECT)?;
+            expect_event_error(&rx, 418, ErrorCode::InvalidParams)
+        },
+    );
 
     record(&mut report, "valid-command-book-search", || {
         let (_runtime, rx) = send_to_fresh_runtime(VALID_BOOK_SEARCH)?;

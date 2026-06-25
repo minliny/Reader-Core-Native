@@ -91,6 +91,23 @@ fn validate_source_name_scalar(value: &str) -> Result<(), &'static str> {
     }
 }
 
+fn deserialize_object_or_null<'de, D>(deserializer: D) -> Result<Value, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+    validate_object_or_null(&value).map_err(de::Error::custom)?;
+    Ok(value)
+}
+
+fn validate_object_or_null(value: &Value) -> Result<(), &'static str> {
+    if value.is_object() || value.is_null() {
+        Ok(())
+    } else {
+        Err("source.import rules must be an object or null")
+    }
+}
+
 fn deserialize_chapter_progress<'de, D>(deserializer: D) -> Result<f64, D::Error>
 where
     D: Deserializer<'de>,
@@ -213,7 +230,7 @@ pub struct SourceImportParams {
     /// Extraction rules keyed by stage (`search`/`detail`/`toc`/`chapter`).
     /// Each value is a JSON array of rule-step specs understood by
     /// `reader-content`.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_object_or_null")]
     pub rules: Value,
 }
 
@@ -488,6 +505,26 @@ mod tests {
             err.details["source"]
                 .as_str()
                 .is_some_and(|source| source.contains("name")),
+            "unexpected source detail: {}",
+            err.details["source"]
+        );
+
+        let command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/invalid-source-import-rules-not-object.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let err =
+            parse_params::<SourceImportParams>(crate::methods::SOURCE_IMPORT, &command.params)
+                .unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert_eq!(err.details["method"], crate::methods::SOURCE_IMPORT);
+        assert!(
+            err.details["source"]
+                .as_str()
+                .is_some_and(|source| source.contains("rules") || source.contains("object")),
             "unexpected source detail: {}",
             err.details["source"]
         );

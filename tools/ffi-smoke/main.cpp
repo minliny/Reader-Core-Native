@@ -742,6 +742,23 @@ int main() {
   if (!last_error_clears_message_when_ok()) {
     return fail("source.import whitespace name left synchronous last_error");
   }
+  std::string invalid_source_rules =
+      R"({"protocolVersion":1,"requestId":320,"method":"source.import","params":{"sourceId":"ffi-source","name":"FFI Source","baseUrl":"https://books.example.test","rules":["search","detail"]}})";
+  if (send_str(rt, invalid_source_rules) != RC_SEND_OK) {
+    return fail("source.import bad rules send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":320") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "rules")) {
+    std::cerr << "source.import bad rules error: " << event << '\n';
+    return fail("source.import bad rules error shape");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("source.import bad rules left synchronous last_error");
+  }
 
   // --- invalid remote http.execute request method -> async INVALID_PARAMS
   std::string empty_http_method =
