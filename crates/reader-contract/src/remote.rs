@@ -437,4 +437,47 @@ mod tests {
             err.details["source"]
         );
     }
+
+    #[test]
+    fn reading_progress_update_params_parse_fixture_and_reject_unknown_fields() {
+        let command: crate::Command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/valid-reading-progress-update.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let params: ReadingProgressUpdateParams =
+            parse_params(crate::methods::READING_PROGRESS_UPDATE, &command.params)
+                .expect("valid reading.progress.update params should parse");
+        assert_eq!(params.book_id, "1");
+        assert_eq!(params.chapter_index, 2);
+        assert_eq!(params.chapter_offset, 128);
+        assert_eq!(params.chapter_progress, 0.5);
+
+        let command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/invalid-reading-progress-update-unknown-field.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let err = parse_params::<ReadingProgressUpdateParams>(
+            crate::methods::READING_PROGRESS_UPDATE,
+            &command.params,
+        )
+        .unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert_eq!(
+            err.details["method"],
+            crate::methods::READING_PROGRESS_UPDATE
+        );
+        assert!(
+            err.details["source"]
+                .as_str()
+                .is_some_and(|source| source.contains("unknown field")),
+            "unexpected source detail: {}",
+            err.details["source"]
+        );
+    }
 }

@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "requestId": 411,
+  "method": "reading.progress.update",
+  "params": {
+    "bookId": "1",
+    "chapterIndex": 2,
+    "chapterOffset": 128,
+    "chapterProgress": 0.5
+  }
+}

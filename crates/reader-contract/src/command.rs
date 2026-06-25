@@ -236,6 +236,12 @@ mod tests {
                     "../../../protocol/fixtures/conformance/commands/valid-chapter-content.json"
                 ),
             ),
+            (
+                "valid-reading-progress-update",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/valid-reading-progress-update.json"
+                ),
+            ),
         ] {
             Command::from_json_bytes(json.as_bytes())
                 .unwrap_or_else(|err| panic!("{name} should parse, got {err:?}"));

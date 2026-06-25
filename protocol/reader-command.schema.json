@@ -202,6 +202,17 @@
           "params": { "$ref": "#/$defs/ChapterContentParams" }
         }
       }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "reading.progress.update" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/ReadingProgressUpdateParams" }
+        }
+      }
     }
   ],
   "$defs": {
@@ -487,6 +498,35 @@
           "type": ["object", "null"],
           "default": null,
           "description": "Optional inline source definition used instead of storage lookup."
+        }
+      }
+    },
+    "ReadingProgressUpdateParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bookId"],
+      "description": "Parameters for reading.progress.update. Stores the current reading position for one book.",
+      "properties": {
+        "bookId": {
+          "type": "string",
+          "description": "Book identifier whose reading progress is being updated."
+        },
+        "chapterIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Zero-based chapter index."
+        },
+        "chapterOffset": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Character or byte offset inside the current chapter, depending on host reader mapping."
+        },
+        "chapterProgress": {
+          "type": "number",
+          "default": 0,
+          "description": "Fractional progress reported by the host reader for the current chapter."
         }
       }
     }

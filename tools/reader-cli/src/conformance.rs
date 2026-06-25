@@ -23,6 +23,9 @@ const VALID_BOOK_TOC: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-book-toc.json");
 const VALID_CHAPTER_CONTENT: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-chapter-content.json");
+const VALID_READING_PROGRESS_UPDATE: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/valid-reading-progress-update.json"
+);
 const INVALID_RUNTIME_PING_UNKNOWN_FIELD: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-runtime-ping-unknown-field.json"
 );
@@ -43,6 +46,9 @@ const INVALID_BOOK_TOC_UNKNOWN_FIELD: &str = include_str!(
 );
 const INVALID_CHAPTER_CONTENT_UNKNOWN_FIELD: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-chapter-content-unknown-field.json"
+);
+const INVALID_READING_PROGRESS_UPDATE_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-reading-progress-update-unknown-field.json"
 );
 const INVALID_MALFORMED_COMMAND: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/invalid-malformed-json.json");
@@ -319,6 +325,36 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         || {
             let (_runtime, rx) = send_to_fresh_runtime(INVALID_CHAPTER_CONTENT_UNKNOWN_FIELD)?;
             expect_event_error(&rx, 410, ErrorCode::InvalidParams)
+        },
+    );
+
+    record(&mut report, "valid-command-reading-progress-update", || {
+        let (_runtime, rx) = send_to_fresh_runtime(VALID_READING_PROGRESS_UPDATE)?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 411
+                && data["bookId"] == "1"
+                && data["chapterIndex"] == 2
+                && data["chapterOffset"] == 128
+                && data["chapterProgress"] == 0.5
+                && data["stored"] == true =>
+            {
+                Ok(())
+            }
+            other => Err(format!(
+                "unexpected reading.progress.update result {other:?}"
+            )),
+        }
+    });
+
+    record(
+        &mut report,
+        "reading-progress-update-rejects-unknown-params",
+        || {
+            let (_runtime, rx) =
+                send_to_fresh_runtime(INVALID_READING_PROGRESS_UPDATE_UNKNOWN_FIELD)?;
+            expect_event_error(&rx, 412, ErrorCode::InvalidParams)
         },
     );
 
