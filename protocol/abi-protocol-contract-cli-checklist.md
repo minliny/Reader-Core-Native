@@ -28,7 +28,7 @@ Current scan date: 2026-06-25.
 | --- | --- | --- | --- | --- |
 | `core.info` | `EmptyParams` | Generic JSON result | Capabilities assertion | Open: no typed result DTO |
 | `runtime.ping` | `EmptyParams` | Generic JSON result | `pong` assertion | Open: no typed result DTO |
-| `runtime.cancel` | `RuntimeCancelParams` | Generic JSON result | `cancelled` assertion | Open: no typed result DTO |
+| `runtime.cancel` | `RuntimeCancelParams` | `RuntimeCancelData` | Typed parse and negative result-shape cases | Covered in current pass |
 | `runtime.status` | `RuntimeStatusParams` | `RuntimeStatusData` / `RuntimeStatus` | Typed parse and negative result-shape cases | Covered |
 | `runtime.shutdown` | `RuntimeShutdownParams` | `RuntimeShutdownData` | Typed parse and negative result-shape cases | Covered |
 | `runtime.hostSmoke` | `HostSmokeParams` | Generic echo result | Host request/complete route cases | Covered as generic host bus |
@@ -48,7 +48,7 @@ Current scan date: 2026-06-25.
    `bookId`, `chapterIndex`, `chapterOffset`, `chapterProgress`, `stored`.
    This is the smallest result-data gap to close without touching runtime,
    content, storage, or host code.
-2. `runtime.cancel` result data contract.
+2. `runtime.cancel` result data contract. Closed in this pass.
    Result is small (`cancelled`) but belongs to runtime lifecycle rather than
    remote-reading vertical.
 3. `source.import` result data contract.

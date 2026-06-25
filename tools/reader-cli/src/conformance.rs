@@ -4,7 +4,8 @@ use std::time::Duration;
 
 use reader_contract::{
     methods, Command, CoreError, ErrorCode, Event, PendingHostOperationStatus,
-    ReadingProgressUpdateData, RuntimeConfig, RuntimeShutdownData, RuntimeStatus,
+    ReadingProgressUpdateData, RuntimeCancelData, RuntimeConfig, RuntimeShutdownData,
+    RuntimeStatus,
 };
 use reader_runtime::{EventSink, Runtime};
 use serde_json::{json, Value};
@@ -1057,7 +1058,17 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             match recv_event(&rx)? {
                 Event::Result {
                     request_id, data, ..
-                } if request_id == 310 && data["cancelled"] == true => Ok(()),
+                } if request_id == 310 => {
+                    let data =
+                        serde_json::from_value::<RuntimeCancelData>(data).map_err(|err| {
+                            format!("runtime.cancel data contract parse failed: {err}")
+                        })?;
+                    if data.cancelled {
+                        Ok(())
+                    } else {
+                        Err(format!("expected cancel result true, got {data:?}"))
+                    }
+                }
                 other => Err(format!("expected cancel result true, got {other:?}")),
             }
         },
@@ -1071,9 +1082,47 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             match recv_event(&rx)? {
                 Event::Result {
                     request_id, data, ..
-                } if request_id == 310 && data["cancelled"] == false => Ok(()),
+                } if request_id == 310 => {
+                    let data =
+                        serde_json::from_value::<RuntimeCancelData>(data).map_err(|err| {
+                            format!("runtime.cancel data contract parse failed: {err}")
+                        })?;
+                    if !data.cancelled {
+                        Ok(())
+                    } else {
+                        Err(format!("expected cancelled:false result, got {data:?}"))
+                    }
+                }
                 other => Err(format!("expected cancelled:false result, got {other:?}")),
             }
+        },
+    );
+
+    record(
+        &mut report,
+        "runtime-cancel-data-rejects-invalid-result-shape",
+        || {
+            for (label, data, expected) in [
+                ("cancelled", json!({ "cancelled": "yes" }), "boolean"),
+                (
+                    "unknown field",
+                    json!({
+                        "cancelled": true,
+                        "requestId": 301
+                    }),
+                    "unknown field",
+                ),
+            ] {
+                let err = serde_json::from_value::<RuntimeCancelData>(data)
+                    .err()
+                    .ok_or_else(|| format!("expected runtime.cancel data rejection for {label}"))?;
+                if !err.to_string().contains(expected) {
+                    return Err(format!(
+                        "unexpected runtime.cancel data error for {label}: {err}"
+                    ));
+                }
+            }
+            Ok(())
         },
     );
 

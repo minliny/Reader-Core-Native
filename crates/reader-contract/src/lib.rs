@@ -22,8 +22,8 @@ pub use error::{CoreError, ErrorCode};
 pub use event::Event;
 pub use host::{
     HostCompleteParams, HostErrorParams, HostSmokeParams, PendingHostOperationStatus,
-    RuntimeCancelParams, RuntimeShutdownData, RuntimeShutdownParams, RuntimeStatus,
-    RuntimeStatusParams,
+    RuntimeCancelData, RuntimeCancelParams, RuntimeShutdownData, RuntimeShutdownParams,
+    RuntimeStatus, RuntimeStatusParams,
 };
 pub use remote::{
     BookDetailParams, BookSearchParams, BookTocParams, ChapterContentParams, HostHttpRequest,
@@ -597,6 +597,23 @@ mod tests {
         assert_eq!(
             properties["cancelledRequestIds"]["items"]["minimum"],
             serde_json::json!(1)
+        );
+    }
+
+    #[test]
+    fn event_schema_defines_runtime_cancel_data_contract() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+        let data = &schema["$defs"]["RuntimeCancelData"];
+        let required = strings_at(data, "required");
+        let properties = &data["properties"];
+
+        assert_eq!(data["additionalProperties"], serde_json::json!(false));
+        assert_eq!(required, vec!["cancelled"]);
+        assert_eq!(
+            properties["cancelled"]["type"],
+            serde_json::json!("boolean")
         );
     }
 

@@ -184,6 +184,13 @@ impl RuntimeCancelParams {
     }
 }
 
+/// Result data for `runtime.cancel`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeCancelData {
+    pub cancelled: bool,
+}
+
 /// Parameters for `runtime.status`.
 ///
 /// The command is read-only and accepts no method-specific fields. It gives
@@ -452,6 +459,41 @@ mod tests {
 
         assert_eq!(err.code, ErrorCode::InvalidParams);
         assert_eq!(err.details["requestId"], 0);
+    }
+
+    #[test]
+    fn runtime_cancel_data_accepts_boolean_result_and_rejects_invalid_shape() {
+        for cancelled in [false, true] {
+            let data: RuntimeCancelData = serde_json::from_value(serde_json::json!({
+                "cancelled": cancelled
+            }))
+            .unwrap();
+            assert_eq!(data.cancelled, cancelled);
+        }
+
+        for (label, value, expected) in [
+            (
+                "non-boolean",
+                serde_json::json!({ "cancelled": "yes" }),
+                "boolean",
+            ),
+            (
+                "unknown field",
+                serde_json::json!({
+                    "cancelled": true,
+                    "requestId": 301
+                }),
+                "unknown field",
+            ),
+        ] {
+            let err = serde_json::from_value::<RuntimeCancelData>(value)
+                .err()
+                .unwrap_or_else(|| panic!("expected rejection for {label}"));
+            assert!(
+                err.to_string().contains(expected),
+                "unexpected runtime.cancel data error for {label}: {err}"
+            );
+        }
     }
 
     #[test]

@@ -80,6 +80,18 @@
         "details": { "type": "object" }
       }
     },
+    "RuntimeCancelData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cancelled"],
+      "description": "Result data for runtime.cancel.",
+      "properties": {
+        "cancelled": {
+          "type": "boolean",
+          "description": "True when the target request was active and was cancelled; false when it was unknown or already completed."
+        }
+      }
+    },
     "RuntimeStatusData": {
       "type": "object",
       "additionalProperties": false,
