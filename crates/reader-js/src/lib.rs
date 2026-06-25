@@ -1675,9 +1675,7 @@ fn make_html_format_callback<'js>(ctx: Ctx<'js>) -> Result<rquickjs::Function<'j
 fn make_to_url_callback<'js>(ctx: Ctx<'js>) -> Result<rquickjs::Function<'js>, QuickJsError> {
     rquickjs::Function::new(
         ctx,
-        |ctx: Ctx<'js>,
-         args: Rest<QuickJsValue<'js>>|
-         -> Result<rquickjs::Object<'js>, QuickJsError> {
+        |ctx: Ctx<'js>, args: Rest<QuickJsValue<'js>>| -> Result<QuickJsValue<'js>, QuickJsError> {
             let Some(url_value) = args.0.first() else {
                 return Err(Exception::throw_type(
                     &ctx,
@@ -1695,15 +1693,26 @@ fn make_to_url_callback<'js>(ctx: Ctx<'js>) -> Result<rquickjs::Function<'js>, Q
                 }
             };
             let url = url.trim().to_string();
+            if url.is_empty() {
+                return json_to_quickjs(&ctx, &JsonValue::String(String::new()));
+            }
             let base_url = args
                 .0
                 .get(1)
                 .and_then(|value| quickjs_value_to_json(value, 0).ok())
                 .and_then(|value| value.as_str().map(ToOwned::to_owned));
+            if !is_absolute_url(&url) {
+                let Some(base_url) = base_url.as_deref().filter(|value| !value.is_empty()) else {
+                    return json_to_quickjs(&ctx, &JsonValue::String(url));
+                };
+                if parse_absolute_url(base_url).is_err() {
+                    return json_to_quickjs(&ctx, &JsonValue::String(url));
+                }
+            }
             let parts = resolve_js_url(&url, base_url.as_deref()).map_err(|message| {
                 Exception::throw_type(&ctx, format!("toURL failed: {message}").as_str())
             })?;
-            js_url_to_object(&ctx, parts)
+            Ok(js_url_to_object(&ctx, parts)?.into_value())
         },
     )
 }
@@ -4633,6 +4642,11 @@ fn resolve_js_url(url: &str, base_url: Option<&str>) -> Result<JsUrlParts, Strin
     let (path, suffix) = split_url_path_suffix(url);
     let resolved_path = if path.is_empty() && suffix.starts_with('?') {
         base.pathname.clone()
+    } else if path.is_empty() && suffix.starts_with('#') {
+        match base.query.as_deref() {
+            Some(query) if !query.is_empty() => format!("{}?{}", base.pathname, query),
+            _ => base.pathname.clone(),
+        }
     } else if path.starts_with('/') {
         normalize_url_path(path)
     } else {

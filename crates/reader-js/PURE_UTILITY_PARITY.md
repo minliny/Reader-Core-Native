@@ -28,7 +28,7 @@ cargo test -p reader-js --quiet
 Observed result at save time:
 
 - `reader-js`: 94 unit tests passed
-- `reader-js` integration tests: 32 passed
+- `reader-js` integration tests: 36 passed
 
 ## Saved Audit Snapshot
 
@@ -111,7 +111,7 @@ without changing storage or host contracts.
 | Time UTC formatting | `timeFormatUTC`, `java.timeFormatUTC` | Closed for fixture path | Covers `yyyy`, `MM`, `dd`, `HH`, `mm`, `ss` token set and offset millis. |
 | Chapter-number normalization | `toNumChapter` and `java.toNumChapter` | Closed for tested paths | Covers Legado `(第)(.+?)(章)` extraction, full-width digits, Chinese numerals, and pass-through when no title-number pattern matches. |
 | HTML text formatting | `htmlFormat`, `java.htmlFormat` | Closed for fixture path | Covers tag stripping, block line breaks, and common HTML entities for the old Core fixture. |
-| URL resolution | `toURL`, `java.toURL` | Closed for fixture paths | Covers `String(toURL(...))`, `host`, `origin`, `pathname`, basic `searchParams`, trimmed absolute inputs, root-relative paths, and Foundation/Java-style query-only relative URLs preserving the base file path. |
+| URL resolution | `toURL`, `java.toURL` | Closed for fixture paths | Covers `String(toURL(...))`, `host`, `origin`, `pathname`, basic `searchParams`, blank input returning an empty string, trimmed absolute inputs, no-base and invalid-base relative URL fallback, root-relative paths, and Foundation/Java-style query-only and fragment-only relative URLs preserving the base file path. |
 | Debug log helper | `log` and `java.log` | Closed for Core log-capture path | Returns the input message and records it through reader-js console capture. No stdout or host UI side effect is claimed. |
 | Toast intent helpers | `toast`, `longToast`, and `java.*` variants | Closed for Core intent-marker path | Returns empty string and records marker/message/duration through reader-js console capture. No host UI side effect is claimed. |
 | Refresh TOC intent helper | `refreshTocUrl` and `java.refreshTocUrl` | Closed for Core intent-marker path | Returns empty string and records `java.refreshTocUrl() requested` through reader-js console capture. No host refresh side effect is claimed. |
@@ -129,7 +129,7 @@ without changing storage or host contracts.
 | Base64 charset | ISO-8859-1 fixture plus GBK `小说`, `鬼吹灯`, `搜索`, and `提交` fixture keywords covered | Full GBK/GB18030 table is not implemented; current GBK path is fixture-sample level. |
 | Symmetric crypto | AES/CBC, AES/ECB, DES/CBC, DES/ECB, DESede/3DES CBC, DESede/3DES ECB, SM4/CBC, and SM4/ECB with PKCS5/PKCS7/ZeroPadding/NoPadding are implemented for string/Base64/hex fixture paths; object `encryptBase64(...)` is covered for the old Core AES/CBC search URL fixture; object `encryptHex(...)` / `decryptHex(...)` are covered for the object API fixture; `java.desEncodeToBase64String(...)` is covered for the old source Yueyou DES/ECB `_p` fixture; `java.tripleDESEncodeBase64Str(...)` is covered for the old source QDSign fixture; AES/CBC byte-array key/IV is covered for the old source Base64 key/IV fixture; `java.aesBase64DecodeToString` is covered for AES/CBC, DES/CBC, DESede/CBC, and SM4/CBC fixtures; `java.aesEncodeToBase64String` is covered for the guarded-corpus AES/ECB fixture; AES/CBC byte-array `decrypt(...)` / `decryptStr(...)` and `Buffer.concat(...)` are covered for imageDecode-style byte-array boundary fixtures | Global `tripleDESEncodeBase64Str`, non-UTF-8 plaintext decoding through `decryptStr(...)`, DES/3DES decode or alternate aliases, and broader transformation behavior remain unclaimed. |
 | HTML formatting | Old Core text fixture covered | Full Legado `HtmlFormatter.formatKeepImg` behavior, especially image-preserving details, is not fully reproduced. |
-| URL parsing | Old Core trimmed absolute, root-relative, and query-only relative fixtures covered | Full Java `URL(base, relative)` equivalence is not proven for every edge case. |
+| URL parsing | Old Core blank input, trimmed absolute, no-base and invalid-base relative fallback, root-relative, query-only relative, and fragment-only relative fixtures covered | Full Java `URL(base, relative)` equivalence is not proven for every edge case. |
 | Traditional/simplified Chinese conversion | `t2s`, `s2t`, and `java.*` variants cover a deterministic common-character subset plus the old Core postprocessor fixture path | Full Legado quick-transfer/OpenCC-style dictionary parity is not implemented. |
 
 ## Missing Pure Utility Closures

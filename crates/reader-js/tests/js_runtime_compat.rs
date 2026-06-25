@@ -481,6 +481,108 @@ fn to_url_trims_absolute_input_like_old_core() {
 }
 
 #[test]
+fn to_url_blank_input_returns_empty_string_like_old_core() {
+    let sandbox = QuickJsSandbox::default();
+
+    let result = sandbox
+        .evaluate(
+            r#"
+            ({
+                globalBlank: toURL("   \n\t  "),
+                javaBlank: java.toURL("")
+            })
+            "#,
+        )
+        .unwrap();
+
+    assert_eq!(
+        result.value,
+        json!({
+            "globalBlank": "",
+            "javaBlank": ""
+        })
+    );
+}
+
+#[test]
+fn to_url_relative_input_without_base_returns_trimmed_input_like_old_core() {
+    let sandbox = QuickJsSandbox::default();
+
+    let result = sandbox
+        .evaluate(
+            r#"
+            ({
+                relative: String(toURL("  ../chapter.html?x=1  ")),
+                javaRelative: String(java.toURL("/book/1"))
+            })
+            "#,
+        )
+        .unwrap();
+
+    assert_eq!(
+        result.value,
+        json!({
+            "relative": "../chapter.html?x=1",
+            "javaRelative": "/book/1"
+        })
+    );
+}
+
+#[test]
+fn to_url_invalid_base_returns_trimmed_input_like_old_core() {
+    let sandbox = QuickJsSandbox::default();
+
+    let result = sandbox
+        .evaluate(
+            r#"
+            ({
+                relative: String(toURL("  ../chapter.html?x=1  ", "not a url")),
+                javaRelative: String(java.toURL("/book/1", "bad base"))
+            })
+            "#,
+        )
+        .unwrap();
+
+    assert_eq!(
+        result.value,
+        json!({
+            "relative": "../chapter.html?x=1",
+            "javaRelative": "/book/1"
+        })
+    );
+}
+
+#[test]
+fn to_url_fragment_only_relative_preserves_base_path_and_query_like_old_core() {
+    let sandbox = QuickJsSandbox::default();
+
+    let result = sandbox
+        .evaluate(
+            r##"
+            var resolved = toURL("#frag", "https://owned.example/root/index.html?old=1");
+            var javaResolved = java.toURL("#frag", "https://owned.example/root/index.html?old=1");
+            ({
+                text: String(resolved),
+                javaText: String(javaResolved),
+                pathname: resolved.pathname,
+                old: resolved.searchParams.old
+            })
+            "##,
+        )
+        .unwrap();
+
+    assert_eq!(
+        result.value,
+        json!({
+            "text": "https://owned.example/root/index.html?old=1#frag",
+            "javaText": "https://owned.example/root/index.html?old=1#frag",
+            "pathname": "/root/index.html",
+            "old": "1"
+        })
+    );
+}
+
+#[test]
 fn hmac_sha1_base64_matches_old_source_qidian_key_fixture() {
     let sandbox = QuickJsSandbox::default();
 
