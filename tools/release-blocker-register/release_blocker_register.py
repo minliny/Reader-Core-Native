@@ -15,9 +15,9 @@ covers the repository working tree); override with ``--register PATH``.
 This tool deliberately does **not** certify a release. The ``gate``
 subcommand reports how many blockers are still open and sets a non-zero exit
 code when any remain — it never declares a release "ready". Reporting
-three-platform consistency requires diff-result documents that carry
-candidates from all three platforms; a single-platform CLI result does not
-satisfy that and the register will not pretend otherwise.
+four-endpoint consistency requires diff-result documents that carry named
+``cli``, ``ios``, ``android``, and ``harmony`` candidates; a single-platform
+CLI result does not satisfy that and the register will not pretend otherwise.
 
 No network access. No remote data. No Core business logic.
 

@@ -1,0 +1,21 @@
+{
+  "type": "search",
+  "keyword": "sky archive",
+  "inputId": "corpus-four-platform-search-001",
+  "results": [
+    {
+      "name": "Sky Archive",
+      "author": "Lin Q",
+      "bookUrl": "https://fixture.test/books/sky-archive",
+      "intro": "Line one\nLine two"
+    },
+    {
+      "name": "River Note",
+      "author": "Mo Chen",
+      "bookUrl": "https://fixture.test/books/river-notes",
+      "intro": "A calm record"
+    }
+  ],
+  "timestamp": 1719300456,
+  "traceId": "android-trace"
+}

@@ -16,8 +16,26 @@ import unittest
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.abspath(os.path.join(_HERE, "..", ".."))
 sys.path.insert(0, os.path.join(_ROOT, "tools", "release-blocker-register"))
+sys.path.insert(0, os.path.join(_ROOT, "tools", "cross-platform-diff"))
 
 import release_blocker_register as rbr  # noqa: E402
+import cross_platform_diff as cpd  # noqa: E402
+
+
+FOUR_PLATFORM_CANDIDATES = ("cli", "ios", "android", "harmony")
+
+
+def _fixture_diff_inputs(name):
+    fixture = os.path.join(_ROOT, "samples", "corpus-release-gate", name)
+    canonical = os.path.join(fixture, "canonical-result.json")
+    candidates = [
+        (
+            platform,
+            os.path.join(fixture, "candidates", "{0}-result.json".format(platform)),
+        )
+        for platform in FOUR_PLATFORM_CANDIDATES
+    ]
+    return canonical, candidates
 
 
 def _diff_result(matching=("ios",), mismatching=("android",)):
@@ -88,6 +106,24 @@ class TestBlockersFromDiff(unittest.TestCase):
             rbr.blockers_from_diff([], "run-1", "medium")
         with self.assertRaises(rbr.RegisterError):
             rbr.blockers_from_diff({}, "run-1", "medium")
+
+    def test_four_platform_mismatch_fixture_yields_android_blocker(self):
+        canonical, candidates = _fixture_diff_inputs("four-platform-mismatch")
+        diff = cpd.build_diff_result(canonical, candidates)
+
+        entries = rbr.blockers_from_diff(
+            diff,
+            run_id="fixture-four-platform-mismatch",
+            severity="high",
+        )
+
+        self.assertEqual(len(entries), 1)
+        blocker = entries[0]
+        self.assertEqual(blocker["platform"], "android")
+        self.assertEqual(blocker["fieldPath"], "results[1].name")
+        self.assertEqual(blocker["kind"], "value-mismatch")
+        self.assertEqual(blocker["severity"], "high")
+        self.assertEqual(blocker["status"], rbr.STATUS_OPEN)
 
 
 class TestRegisterLifecycle(unittest.TestCase):
