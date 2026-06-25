@@ -898,6 +898,57 @@ int main(void) {
     return fail("http completion left synchronous last_error");
   }
 
+  // --- remote http.execute invalid status -> async INVALID_PARAMS -------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":70,\"method\":\"book."
+               "search\",\"params\":{\"sourceId\":\"ffi-http-src\","
+               "\"searchRequest\":{\"url\":\"https://books.example.test/"
+               "search?q=invalid-status\"},\"source\":{\"sourceId\":\"ffi-http-"
+               "src\",\"name\":\"FFI HTTP Source\",\"baseUrl\":\"https://books."
+               "example.test\",\"rules\":{\"search\":[{\"kind\":\"jsonPath\","
+               "\"path\":\"$.books[*]\"}]}}}}") != RC_SEND_OK) {
+    return fail("book.search invalid-status request send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no invalid-status http.execute host.request event");
+  }
+  ev++;
+  uint64_t invalid_http_op = 0;
+  if (!json_u64(event, "operationId", &invalid_http_op) ||
+      !contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":70") ||
+      !contains(event, "\"capability\":\"http.execute\"") ||
+      !contains(event, "search?q=invalid-status")) {
+    fprintf(stderr, "invalid-status http.execute request: %s\n", event);
+    return fail("invalid-status http.execute request shape");
+  }
+  char invalid_http_complete[512];
+  snprintf(invalid_http_complete, sizeof invalid_http_complete,
+           "{\"protocolVersion\":1,\"requestId\":71,\"method\":\"host."
+           "complete\",\"params\":{\"operationId\":%llu,\"result\":{\"status\":"
+           "99,\"body\":\"{\\\"books\\\":[]}\"}}}",
+           (unsigned long long)invalid_http_op);
+  if (send_str(rt, invalid_http_complete) != RC_SEND_OK) {
+    return fail("invalid-status http host.complete send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for invalid http status");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":70") ||
+      !contains(event, "\"code\":\"INVALID_PARAMS\"") ||
+      !contains(event, "status") || !contains(event, "\"status\":99")) {
+    fprintf(stderr, "invalid http status error: %s\n", event);
+    return fail("invalid http status error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("invalid http status left synchronous last_error");
+  }
+
   // --- method-specific invalid params -> async INVALID_PARAMS ------------
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":67,\"method\":\"reading."

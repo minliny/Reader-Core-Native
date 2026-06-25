@@ -700,6 +700,43 @@ int main() {
     return fail("http completion left synchronous last_error");
   }
 
+  // --- remote http.execute invalid status -> async INVALID_PARAMS -------
+  std::string invalid_http_search =
+      R"({"protocolVersion":1,"requestId":29,"method":"book.search","params":{"sourceId":"ffi-http-src","searchRequest":{"url":"https://books.example.test/search?q=invalid-status"},"source":{"sourceId":"ffi-http-src","name":"FFI HTTP Source","baseUrl":"https://books.example.test","rules":{"search":[{"kind":"jsonPath","path":"$.books[*]"}]}}}})";
+  if (send_str(rt, invalid_http_search) != RC_SEND_OK) {
+    return fail("book.search invalid-status request send failed");
+  }
+  event = wait_event(ch, ev++);
+  uint64_t invalid_http_op = 0;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":29") ||
+      !contains(event, "\"capability\":\"http.execute\"") ||
+      !contains(event, "search?q=invalid-status") ||
+      !json_u64(event, "operationId", &invalid_http_op)) {
+    std::cerr << "invalid-status http.execute request: " << event << '\n';
+    return fail("invalid-status http.execute request shape");
+  }
+  std::string invalid_http_complete =
+      R"({"protocolVersion":1,"requestId":30,"method":"host.complete","params":{"operationId":)" +
+      std::to_string(invalid_http_op) +
+      R"(,"result":{"status":99,"body":"{\"books\":[]}"}}})";
+  if (send_str(rt, invalid_http_complete) != RC_SEND_OK) {
+    return fail("invalid-status http host.complete send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":29") ||
+      !contains(event, "\"code\":\"INVALID_PARAMS\"") ||
+      !contains(event, "status") || !contains(event, "\"status\":99")) {
+    std::cerr << "invalid http status error: " << event << '\n';
+    return fail("invalid http status error shape");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("invalid http status left synchronous last_error");
+  }
+
   // --- method-specific invalid params -> async INVALID_PARAMS ------------
   std::string invalid_progress =
       R"({"protocolVersion":1,"requestId":26,"method":"reading.progress.update","params":{"bookId":"1","chapterIndex":2,"chapterOffset":128,"chapterProgress":0.5,"syncToken":"host-owned"}})";
