@@ -279,6 +279,107 @@ fn host_record_suite_outputs_replayable_comparison_fixture() {
     assert_eq!(events[7]["data"], steps[3]["expectResult"]);
 }
 
+#[test]
+fn host_replay_suite_runs_legado_desensitized_corpus() {
+    let events = run_host_replay_fixture(
+        "--host-replay-suite",
+        "legado_desensitized_corpus_suite.json",
+    );
+
+    assert_eq!(
+        events.len(),
+        12,
+        "expected six host.request/result pairs: {events:?}"
+    );
+
+    assert_eq!(events[0]["type"], "host.request");
+    assert_eq!(events[0]["requestId"], 3000);
+    assert_eq!(
+        events[0]["params"]["url"],
+        "https://alpha.example.test/search.php?key=mirror"
+    );
+    assert_eq!(events[0]["params"]["method"], "POST");
+    assert_eq!(events[0]["params"]["headers"]["Cookie"], "REDACTED_BOOT=1");
+    assert_eq!(events[0]["params"]["charset"], "gbk");
+    assert_eq!(events[0]["params"]["followRedirects"], false);
+    assert_eq!(events[0]["params"]["usePlatformCookieJar"], false);
+    assert_eq!(events[0]["params"]["session"]["id"], "legado-alpha-session");
+    assert_result(&events[1], 3000);
+    assert_eq!(events[1]["data"]["books"].as_array().unwrap().len(), 2);
+    assert_eq!(events[1]["data"]["books"][0]["title"], "Mirror City");
+    assert_eq!(
+        events[1]["data"]["http"]["headers"]["set-cookie"][0],
+        "REDACTED_SEARCH=1; Path=/; HttpOnly"
+    );
+
+    assert_eq!(events[2]["type"], "host.request");
+    assert_eq!(events[2]["requestId"], 3010);
+    assert_eq!(events[2]["params"]["followRedirects"], true);
+    assert_eq!(events[2]["params"]["maxRedirects"], 5);
+    assert_eq!(
+        events[3]["data"]["http"]["finalUrl"],
+        "https://alpha.example.test/mobile/book/alpha-1001"
+    );
+    assert_eq!(
+        events[3]["data"]["book"]["intro"],
+        "Desensitized detail synopsis from a real Legado-style source."
+    );
+
+    assert_eq!(events[4]["type"], "host.request");
+    assert_eq!(events[4]["requestId"], 3020);
+    assert_eq!(events[4]["params"]["charset"], "gb18030");
+    assert_eq!(
+        events[4]["params"]["headers"]["Cookie"],
+        "REDACTED_DETAIL=1"
+    );
+    assert_result(&events[5], 3020);
+    assert_eq!(events[5]["data"]["toc"].as_array().unwrap().len(), 3);
+    assert_eq!(events[5]["data"]["toc"][0]["title"], "Volume 1 - Awakening");
+    assert_eq!(events[5]["data"]["http"]["charsetHint"], "gb18030");
+
+    assert_eq!(events[6]["type"], "host.request");
+    assert_eq!(events[6]["requestId"], 3030);
+    assert_eq!(events[6]["params"]["headers"]["Cookie"], "REDACTED_TOC=1");
+    assert_eq!(events[6]["params"]["charset"], "gb18030");
+    assert_eq!(events[6]["params"]["retry"]["maxAttempts"], 3);
+    assert_result(&events[7], 3030);
+    assert_eq!(
+        events[7]["data"]["content"],
+        "First line from the desensitized chapter.\nSecond line after a redirected mobile view."
+    );
+    assert_eq!(
+        events[7]["data"]["http"]["finalUrl"],
+        "https://alpha.example.test/amp/book/alpha-1001/chapter/1"
+    );
+
+    assert_eq!(events[8]["type"], "host.request");
+    assert_eq!(events[8]["requestId"], 3100);
+    assert_eq!(
+        events[8]["params"]["url"],
+        "https://beta.example.test/modules/article/search.php?searchkey=nebula"
+    );
+    assert_eq!(events[8]["params"]["charset"], "gbk");
+    assert_eq!(events[8]["params"]["session"]["id"], "legado-beta-session");
+    assert_result(&events[9], 3100);
+    assert_eq!(events[9]["data"]["books"][0]["bookId"], "");
+    assert_eq!(events[9]["data"]["books"][0]["title"], "Nebula Archive");
+    assert_eq!(events[9]["data"]["books"][1]["title"], "Silent Harbor");
+
+    assert_eq!(events[10]["type"], "host.request");
+    assert_eq!(events[10]["requestId"], 3110);
+    assert_eq!(
+        events[10]["params"]["headers"]["Cookie"],
+        "REDACTED_BETA_SEARCH=1"
+    );
+    assert_eq!(events[10]["params"]["session"]["id"], "legado-beta-session");
+    assert_result(&events[11], 3110);
+    assert_eq!(events[11]["data"]["book"]["author"], "Author C");
+    assert_eq!(
+        events[11]["data"]["http"]["headers"]["set-cookie"][0],
+        "REDACTED_BETA_DETAIL=1; Path=/; HttpOnly"
+    );
+}
+
 fn run_host_replay_fixture(mode: &str, name: &str) -> Vec<Value> {
     run_host_replay_path(mode, &fixture_path(name))
 }
