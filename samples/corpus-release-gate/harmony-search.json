@@ -1,0 +1,9 @@
+{
+  "results": [
+    {"author": "A B", "bookUrl": "https://demo.test/b1", "name": "Brown Fox"},
+    {"author": "C D", "bookUrl": "https://demo.test/b2", "name": "Lazy Dog"}
+  ],
+  "keyword": "fox",
+  "type": "search",
+  "timestamp": 1700000005
+}
