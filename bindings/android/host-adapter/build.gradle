@@ -43,3 +43,31 @@ tasks.named('test') {
     systemProperty 'reader.protocol.fixtures.host',
             new File(rootProject.projectDir, '../../../protocol/fixtures/conformance/host').absolutePath
 }
+
+// Compile-gate the runnable wiring sample (HostBusSample). Running it needs the
+// JNI .so (System.loadLibrary in NativeCoreBridge's static init), so it is not
+// unit-tested; but compiling it type-checks the full access-path wiring —
+// host-adapter + JNI wrapper + capability handlers — under a plain JVM. This is
+// the verifiable contract evidence for the access path's concrete wiring.
+sourceSets {
+    samples {
+        java {
+            srcDir 'src/samples/java'
+        }
+        compileClasspath += sourceSets.main.output
+    }
+}
+
+dependencies {
+    samplesCompileOnly sourceSets.main.output
+}
+
+tasks.register('compileSample', JavaCompile) {
+    source = sourceSets.samples.java
+    classpath = sourceSets.main.compileClasspath + sourceSets.main.output
+    destinationDirectory = layout.buildDirectory.dir('classes/java/sample')
+}
+
+tasks.named('check') {
+    dependsOn 'compileSample'
+}
