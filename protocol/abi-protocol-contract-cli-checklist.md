@@ -21,6 +21,24 @@ Current scan date: 2026-06-25.
 | Event envelope | `reader-event.schema.json`, `Event`, event deserialization tests | Covered for envelope invariants |
 | Runtime config | `reader-runtime-config.schema.json`, `RuntimeConfig`, CLI config cases | Covered |
 | Host bus | host request/complete/error DTOs, schema refs, CLI cases | Covered for generic host bus |
+| Stateful runtime protocol | active `requestId` registry, cancel idempotency, shutdown latch | Duplicate active `requestId` CLI evidence selected this pass |
+
+## Full Scan Matrix
+
+| Area | Protocol / ABI source | Contract / CLI / smoke evidence | Scan result |
+| --- | --- | --- | --- |
+| C ABI version and status codes | `include/reader_core.h` enums and `rc_abi_version` | `crates/reader-ffi`, C/C++ `ffi-smoke` static asserts | Covered |
+| C ABI last-error slot | `rc_last_error` docs and error enum | `reader-ffi` tests, C/C++ `ffi-smoke` null/zero-capacity/clear cases | Covered |
+| C ABI lifecycle | `rc_runtime_create`, `rc_runtime_destroy` docs | `reader-ffi` tests, C/C++ create failure/default config/destroy cases | Covered |
+| C ABI send envelope failures | `rc_runtime_send` docs | `reader-ffi` tests, C/C++ malformed JSON, protocolVersion, requestId, method, params cases | Covered |
+| C ABI cancel semantics | `rc_runtime_cancel` docs | `reader-ffi` tests, C/C++ missing/completed/pending cancel cases | Covered |
+| Command schema methods | `reader-command.schema.json` examples and method refs | `Command`, params DTO tests, CLI valid/invalid fixtures | Covered |
+| Event schema result data | `reader-event.schema.json` `$defs/*Data` | Contract DTO parse/reject tests, CLI typed result parse/reject cases | Covered |
+| Runtime config schema | `reader-runtime-config.schema.json` | `RuntimeConfig`, CLI valid/invalid config cases, C/C++ create config failures | Covered |
+| Host bus protocol | host request/complete/error schema and DTOs | Contract host DTO tests, CLI routing/error cases, C/C++ host bus smoke | Covered |
+| Remote HTTP continuation | `HostHttpRequest` / `HostHttpResponse` defs | Contract DTO tests, CLI metadata/error cases, C/C++ http.execute smoke | Covered |
+| Runtime status/shutdown | `RuntimeStatusData`, `RuntimeShutdownData` | Contract DTO tests, CLI lifecycle cases, C/C++ shutdown/status smoke | Covered |
+| Stateful duplicate `requestId` | `rc_runtime_send` protocol-error doc and runtime active registry | ABI/Rust/C evidence existed; CLI conformance fixture was missing | Closed in this pass |
 
 ## Method Checklist
 
@@ -72,3 +90,7 @@ Current scan date: 2026-06-25.
    The result now has a typed top-level `sourceId`/`bookId`/`chapterTitle`/
    `content`/`via` contract, accepts JS JSON output, and carries optional host
    HTTP diagnostics.
+10. Duplicate active `requestId` stateful protocol evidence. Closed in this
+    pass. The invariant already existed in ABI docs and Rust/C smoke, but the
+    CLI conformance suite now has a protocol fixture proving the duplicate send
+    is rejected synchronously with `INVALID_MESSAGE` and emits no async event.

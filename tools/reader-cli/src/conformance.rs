@@ -170,6 +170,8 @@ const CANCEL_UNKNOWN: &str =
     include_str!("../../../protocol/fixtures/conformance/cancel/unknown.json");
 const CANCEL_COMPLETED: &str =
     include_str!("../../../protocol/fixtures/conformance/cancel/completed.json");
+const DUPLICATE_ACTIVE_REQUEST_ID: &str =
+    include_str!("../../../protocol/fixtures/conformance/runtime/duplicate-active-request-id.json");
 
 struct ChannelSink {
     tx: mpsc::Sender<Event>,
@@ -1151,6 +1153,53 @@ pub(crate) fn run_conformance() -> ConformanceReport {
     ] {
         record(&mut report, name, || expect_send_json_error(json, expected));
     }
+
+    record(
+        &mut report,
+        "duplicate-active-request-id-rejected-synchronously",
+        || {
+            let fixture = serde_json::from_str::<Value>(DUPLICATE_ACTIVE_REQUEST_ID)
+                .map_err(|err| format!("duplicate requestId fixture parse failed: {err}"))?;
+            let pending_json = fixture["pendingCommand"].to_string();
+            let duplicate = &fixture["duplicateCommand"];
+            let duplicate_json = duplicate.to_string();
+            let request_id = duplicate["requestId"]
+                .as_u64()
+                .ok_or_else(|| "duplicate fixture missing requestId".to_string())?;
+
+            let (runtime, rx) = fresh_runtime();
+            runtime
+                .send_json(pending_json.as_bytes())
+                .map_err(|err| format!("pending command send failed: {err:?}"))?;
+            expect_host_request(&rx)?;
+
+            let err = runtime
+                .send_json(duplicate_json.as_bytes())
+                .err()
+                .ok_or_else(|| "expected duplicate active requestId error".to_string())?;
+            if err.code != ErrorCode::InvalidMessage {
+                return Err(format!(
+                    "expected duplicate active requestId INVALID_MESSAGE, got {err:?}"
+                ));
+            }
+            if !err.message.contains("duplicate active requestId") {
+                return Err(format!(
+                    "unexpected duplicate active requestId message: {}",
+                    err.message
+                ));
+            }
+            if err.details["requestId"] != json!(request_id) {
+                return Err(format!(
+                    "unexpected duplicate active requestId details: {:?}",
+                    err.details
+                ));
+            }
+            expect_no_event(&rx)?;
+
+            runtime.cancel(request_id);
+            expect_event_error(&rx, request_id, ErrorCode::Cancelled)
+        },
+    );
 
     for (name, json) in [
         ("valid-config-empty", VALID_CONFIG_EMPTY),
