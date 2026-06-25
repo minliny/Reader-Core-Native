@@ -1,0 +1,13 @@
+{
+  "protocolVersion": 1,
+  "requestId": 422,
+  "method": "host.complete",
+  "params": {
+    "operationId": 1,
+    "result": [
+      "not",
+      "an",
+      "object"
+    ]
+  }
+}

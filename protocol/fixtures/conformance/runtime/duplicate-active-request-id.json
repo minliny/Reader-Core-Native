@@ -1,0 +1,19 @@
+{
+  "pendingCommand": {
+    "protocolVersion": 1,
+    "requestId": 701,
+    "method": "runtime.hostSmoke",
+    "params": {
+      "capability": "host.smoke.echo",
+      "params": {
+        "message": "duplicate active requestId guard"
+      }
+    }
+  },
+  "duplicateCommand": {
+    "protocolVersion": 1,
+    "requestId": 701,
+    "method": "runtime.ping",
+    "params": {}
+  }
+}

@@ -8,3 +8,8 @@ authors.workspace = true
 
 [dependencies]
 reader-domain = { path = "../reader-domain" }
+regex = "1"
+scraper = "0.19"
+serde_json.workspace = true
+sxd-document = "0.3"
+sxd-xpath = "0.4"

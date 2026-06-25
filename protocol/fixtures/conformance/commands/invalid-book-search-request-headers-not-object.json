@@ -1,0 +1,28 @@
+{
+  "protocolVersion": 1,
+  "requestId": 415,
+  "method": "book.search",
+  "params": {
+    "sourceId": "conformance-src",
+    "searchRequest": {
+      "url": "https://books.example.test/search?q=bad-headers",
+      "headers": [
+        "Accept",
+        "application/json"
+      ]
+    },
+    "source": {
+      "sourceId": "conformance-src",
+      "name": "Conformance Source",
+      "baseUrl": "https://books.example.test",
+      "rules": {
+        "search": [
+          {
+            "kind": "jsonPath",
+            "path": "$.books[*]"
+          }
+        ]
+      }
+    }
+  }
+}

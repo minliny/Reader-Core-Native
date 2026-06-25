@@ -1,0 +1,33 @@
+{
+  "id": "ja-001",
+  "source_type": "json-api",
+  "format": "json",
+  "source_description": "Sanitized JSON search API response. Designed to exercise JSONPath features: root/descendant access ($.results[*]), array indexing ($.results[0]), slice expressions ($.results[0:2]), wildcard fields ($.results[*].title), nested objects ($.results[*].meta.year), and future filter expressions ($.results[?(@.meta.rating>4.0)]). Includes a facets object for union/recursive-descent paths.",
+  "sanitization": "All values are synthetic placeholders. No real API endpoint, no auth headers, no real user data. Titles/authors are fictional ('Sample Volume One', 'Author Alpha'). No copyrighted text.",
+  "capability_tags": [
+    "rule-engine",
+    "jsonpath",
+    "json-parsing",
+    "array-slice",
+    "recursive-descent",
+    "filter-expression-future"
+  ],
+  "privacy_check": {
+    "passed": true,
+    "checked_for": [
+      "real-tokens",
+      "cookies",
+      "account-credentials",
+      "private-content",
+      "copyrighted-long-text",
+      "api-keys"
+    ],
+    "notes": "Synthetic response body only; no headers, credentials, or real user data."
+  },
+  "consumer_branch": {
+    "primary": "codex/rule-engine-parity",
+    "secondary": ["codex/remote-reading-vertical"]
+  },
+  "fixture_file": "ja-001-fixture.json",
+  "added_in_round": 1
+}

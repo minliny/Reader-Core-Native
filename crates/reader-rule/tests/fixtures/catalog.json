@@ -1,0 +1,29 @@
+{
+  "meta": {
+    "source.name": "fixture-source"
+  },
+  "sections": [
+    {
+      "name": "featured",
+      "books": [
+        {
+          "title": "Dune",
+          "tags": ["sci-fi", "classic"]
+        },
+        {
+          "title": "Foundation",
+          "tags": ["sci-fi"]
+        }
+      ]
+    },
+    {
+      "name": "new",
+      "books": [
+        {
+          "title": "The Left Hand of Darkness",
+          "tags": []
+        }
+      ]
+    }
+  ]
+}

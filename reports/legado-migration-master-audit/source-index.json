@@ -1,0 +1,215 @@
+{
+  "date": "2026-06-25",
+  "audit_branch": "codex/legado-migration-master-audit",
+  "baseline": {
+    "remote_ref": "origin/codex/core-product-integration",
+    "commit": "fb4c3a7"
+  },
+  "project_definition": {
+    "primary_goal": "把现有 Reader 项目迁移为以 Rust Reader-Core 为唯一业务内核、由 iOS、Android、HarmonyOS 三端共用的统一架构。",
+    "source_of_truth_order": [
+      "本地仓库是唯一事实来源。",
+      "Reader-Core 定义旧业务能力、迁移资产和期望行为证据。",
+      "Reader for iOS、Reader for Android、Reader for HarmonyOS 定义真实宿主接入方式。",
+      "目标 Rust 仓库统一使用 Reader-Core-Native。",
+      "构建、测试和三端可运行结果证明迁移完成。"
+    ],
+    "guardrails": [
+      "开始前必须扫描本地仓库并检查 status、branch、log。",
+      "不得优先依赖远程 GitHub 或历史讨论覆盖本地代码。",
+      "不得修改 dirty 仓库中的非任务拥有文件。",
+      "平台 wrapper 不定义业务语义，业务语义必须回到 Rust Core。",
+      "不得把 wrapper smoke 或静态报告声明为 App/device 完成。"
+    ]
+  },
+  "sources": [
+    {
+      "name": "Reader-Core",
+      "path": "/Users/minliny/Documents/Reader-Core",
+      "branch": "main",
+      "head": "cc7ae849",
+      "status": "dirty，观测到 815 个 status entry",
+      "role": "旧业务核心、迁移资产和行为证据",
+      "important_archive": "/Users/minliny/Documents/Reader-Core/_archived_planning_2026-06-24",
+      "important_archive_file_count_observed": 522
+    },
+    {
+      "name": "Reader-Core-Native",
+      "path": "/Users/minliny/Documents/Reader-Core-Native",
+      "branch": "codex/full-branch-directory-consolidation",
+      "head": "86ecfc4",
+      "status": "当前轮次 clean，与远端同步",
+      "role": "当前本机定位的 Rust 目标仓库"
+    },
+    {
+      "name": "legado",
+      "path": "/Users/minliny/Documents/legado",
+      "branch": "master",
+      "head": "da17bb2be",
+      "status": "clean",
+      "role": "历史兼容审计参考，不是当前迁移路线主事实源"
+    },
+    {
+      "name": "Reader-Core-Native-c-abi-worktree",
+      "path": "/Users/minliny/Documents/Reader-Core-Native-c-abi-worktree",
+      "branch": "codex/reader-core-c-abi-stable-boundary",
+      "head": "45aaec4",
+      "status": "clean",
+      "role": "C ABI 稳定边界实现"
+    },
+    {
+      "name": "Reader-Core-Native-data-subsystem-storage",
+      "path": "/Users/minliny/Documents/Reader-Core-Native-data-subsystem-storage",
+      "branch": "codex/data-subsystem-storage-cache-coverage",
+      "head": "3628055",
+      "status": "clean",
+      "role": "content、local-book、RSS、storage、sync subsystem 工作"
+    },
+    {
+      "name": "Reader-Core-Native-harmony-napi-integration",
+      "path": "/Users/minliny/Documents/Reader-Core-Native-harmony-napi-integration",
+      "branch": "codex/harmony-napi-integration",
+      "head": "4b9f9aa",
+      "status": "clean，ahead 13",
+      "role": "Harmony NAPI 和 ArkTS integration lane"
+    },
+    {
+      "name": "Reader-Core-Native-rule-js-compat-clean",
+      "path": "/Users/minliny/Documents/Reader-Core-Native-rule-js-compat-clean",
+      "branch": "codex/reader-rule-js-compat-clean",
+      "head": "66e8151",
+      "status": "dirty",
+      "dirty_files": [
+        "crates/reader-rule/src/lib.rs",
+        "crates/reader-rule/tests/rule_parity.rs"
+      ],
+      "role": "rule 和 JS compatibility lane"
+    },
+    {
+      "name": "android-jni-sdk",
+      "path": "/Users/minliny/Documents/Reader-Core-Native/.claude/worktrees/android-jni-sdk",
+      "branch": "codex/android-jni-sdk",
+      "head": "8eb7b99",
+      "status": "clean，ahead 1",
+      "role": "Android JNI SDK integration lane"
+    },
+    {
+      "name": "goal-sanitized-corpus",
+      "path": "/Users/minliny/Documents/Reader-Core-Native/.wt-goal-sanitized-corpus",
+      "branch": "codex/goal-sanitized-corpus",
+      "head": "87b8983",
+      "status": "clean，ahead 1",
+      "role": "sanitized corpus seed fixture 和审计"
+    },
+    {
+      "name": "goal-ci-gate-design",
+      "path": "/private/tmp/ci-gate-design-wt",
+      "branch": "codex/goal-ci-gate-design",
+      "head": "d5d1b08",
+      "status": "clean，ahead 2",
+      "role": "CI gate 设计"
+    },
+    {
+      "name": "goal-host-app-contracts",
+      "path": "/private/tmp/goal-host-app-contracts-wt",
+      "branch": "codex/goal-host-app-contracts",
+      "head": "ee44979",
+      "status": "clean",
+      "role": "host/Core 职责契约"
+    },
+    {
+      "name": "goal-release-evidence",
+      "path": "/private/tmp/release-evidence-wt",
+      "branch": "codex/goal-release-evidence",
+      "head": "f3e3d4d",
+      "status": "clean，ahead 1",
+      "role": "release readiness 证据"
+    },
+    {
+      "name": "Reader for iOS",
+      "path": "/Users/minliny/Documents/Reader for iOS",
+      "status": "此前观测为 dirty",
+      "role": "iOS 宿主 App 集成证据"
+    },
+    {
+      "name": "Reader for Android",
+      "path": "/Users/minliny/Documents/Reader for Android",
+      "status": "此前观测为 clean main",
+      "role": "Android 宿主 App 集成目标"
+    },
+    {
+      "name": "Reader for HarmonyOS",
+      "path": "/Users/minliny/Documents/Reader for HarmonyOS",
+      "status": "此前观测为 dirty codex/harmony-napi-runtime",
+      "role": "Harmony 宿主 App 集成证据"
+    }
+  ],
+  "legado_baseline_paths": {
+    "rule_engine": [
+      "app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeRule.kt",
+      "app/src/main/java/io/legado/app/model/analyzeRule/RuleAnalyzer.kt",
+      "app/src/main/java/io/legado/app/model/analyzeRule/RuleData.kt",
+      "app/src/main/java/io/legado/app/model/analyzeRule/RuleDataInterface.kt"
+    ],
+    "selector_families": [
+      "app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeByJSonPath.kt",
+      "app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeByJSoup.kt",
+      "app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeByXPath.kt",
+      "app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeByRegex.kt"
+    ],
+    "request_dsl": [
+      "app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt",
+      "app/src/main/java/io/legado/app/model/analyzeRule/CustomUrl.kt",
+      "app/src/main/java/io/legado/app/help/http"
+    ],
+    "web_book": [
+      "app/src/main/java/io/legado/app/model/webBook"
+    ],
+    "rss": [
+      "app/src/main/java/io/legado/app/model/rss"
+    ],
+    "local_book": [
+      "app/src/main/java/io/legado/app/model/localBook",
+      "modules/book"
+    ],
+    "sync_webdav": [
+      "app/src/main/java/io/legado/app/lib/webdav"
+    ],
+    "api_and_web": [
+      "api.md",
+      "app/src/main/java/io/legado/app/api",
+      "modules/web/src"
+    ]
+  },
+  "reader_core_migration_inputs": {
+    "critical_archived_reports": [
+      "LEGADO_FULL_CAPABILITY_MATRIX_V2_SOURCE_BACKED_SUMMARY.md",
+      "LEGADO-COMPAT-1_CAPABILITY_GAP_MATRIX_SUMMARY.md",
+      "LEGADO-COMPAT-11_EXTERNAL_APPROVAL_ATTESTATION_RESPONSE_GAP_AUDIT_SUMMARY.md",
+      "RECOVERY-29_*",
+      "RECOVERY-30_*",
+      "RECOVERY-31_*",
+      "RECOVERY-32_*",
+      "RECOVERY-33_*"
+    ],
+    "test_asset_roots": [
+      "Tests/ReaderCoreParserTests",
+      "Tests/ReaderCoreNetworkTests",
+      "Tests/ReaderPlatformAdaptersTests",
+      "Tests/ReaderCoreModelsTests",
+      "Tests/ReaderCoreJSRendererTests",
+      "samples/reports/latest"
+    ],
+    "adapter_roots": [
+      "Adapters/Apple",
+      "Adapters/HTTP"
+    ]
+  },
+  "required_long_running_goals": [
+    "codex/goal-legado-capability-ledger",
+    "codex/goal-reader-core-migration-ledger",
+    "codex/goal-legado-rule-chain-benchmark",
+    "codex/goal-network-session-compat",
+    "codex/goal-webdav-backup-webapi-parity"
+  ]
+}

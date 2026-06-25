@@ -8,3 +8,9 @@ authors.workspace = true
 
 [dependencies]
 reader-contract = { path = "../reader-contract" }
+# `bindgen` generates QuickJS FFI bindings at build time. rquickjs-sys 0.8.1
+# ships no prebuilt bindings for `aarch64-unknown-linux-ohos`, so without this
+# feature the OHOS cross-build (scripts/build-ohos.sh) cannot compile. On
+# native targets the generated bindings are equivalent to the shipped ones.
+rquickjs = { version = "=0.8.1", features = ["bindgen"] }
+serde_json.workspace = true

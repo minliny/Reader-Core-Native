@@ -1,0 +1,8 @@
+{
+  "name": "@reader/core-harmony",
+  "version": "0.1.0",
+  "description": "Harmony ArkTS wrapper for the Reader-Core NAPI runtime.",
+  "main": "Index.ets",
+  "types": "sdk/reader_core.ts",
+  "dependencies": {}
+}

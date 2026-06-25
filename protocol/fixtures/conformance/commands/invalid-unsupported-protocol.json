@@ -1,0 +1,6 @@
+{
+  "protocolVersion": 2,
+  "requestId": 202,
+  "method": "runtime.ping",
+  "params": {}
+}

@@ -1,0 +1,23 @@
+{
+  "protocolVersion": 1,
+  "requestId": 407,
+  "method": "book.toc",
+  "params": {
+    "sourceId": "conformance-source",
+    "bookId": "1",
+    "tocResponse": "{\"toc\":[{\"title\":\"C1\",\"url\":\"u1\"},{\"title\":\"C2\",\"url\":\"u2\"}]}",
+    "source": {
+      "sourceId": "conformance-source",
+      "name": "Conformance Source",
+      "baseUrl": "https://books.example.test",
+      "rules": {
+        "toc": [
+          {
+            "kind": "jsonPath",
+            "path": "$.toc"
+          }
+        ]
+      }
+    }
+  }
+}

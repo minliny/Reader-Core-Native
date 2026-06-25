@@ -1,0 +1,6 @@
+{
+  "protocolVersion": 1,
+  "requestId": 320,
+  "method": "runtime.status",
+  "params": {}
+}

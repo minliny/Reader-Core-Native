@@ -1,0 +1,41 @@
+{
+  "apiVersion": "1.0",
+  "query": "sample",
+  "total": 4,
+  "results": [
+    {
+      "id": 1,
+      "title": "Sample Volume One",
+      "author": "Author Alpha",
+      "tags": ["alpha", "classic"],
+      "meta": { "year": 2020, "rating": 4.5 }
+    },
+    {
+      "id": 2,
+      "title": "Placeholder Tale",
+      "author": "Author Beta",
+      "tags": ["beta"],
+      "meta": { "year": 2021, "rating": 4.0 }
+    },
+    {
+      "id": 3,
+      "title": "Test Novel Gamma",
+      "author": "Author Gamma",
+      "tags": ["alpha", "beta"],
+      "meta": { "year": 2022, "rating": 3.5 }
+    },
+    {
+      "id": 4,
+      "title": "Demo Anthology",
+      "author": "Author Delta",
+      "tags": [],
+      "meta": { "year": 2023, "rating": 5.0 }
+    }
+  ],
+  "facets": {
+    "tags": [
+      { "name": "alpha", "count": 2 },
+      { "name": "beta", "count": 2 }
+    ]
+  }
+}

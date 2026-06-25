@@ -3,7 +3,22 @@
   "$id": "https://reader-core-native/reader-command.schema.json",
   "title": "Reader Core Command Protocol",
   "description": "JSON message protocol for platform → Core commands.",
+  "x-reader-core-v1-capabilities": [
+    "core.info",
+    "runtime.ping",
+    "runtime.hostSmoke",
+    "runtime.cancel",
+    "runtime.status",
+    "runtime.shutdown",
+    "host.complete",
+    "host.error",
+    "host.bus.v1",
+    "http.execute",
+    "runtime.config.v1",
+    "remote.reading.v1"
+  ],
   "type": "object",
+  "additionalProperties": false,
   "required": ["protocolVersion", "requestId", "method"],
   "properties": {
     "protocolVersion": {
@@ -13,29 +28,513 @@
     },
     "requestId": {
       "type": "integer",
-      "description": "Unique request identifier for correlation."
+      "minimum": 1,
+      "description": "Unique positive request identifier for correlation. Value 0 is reserved for process-level errors emitted outside a host command."
     },
     "method": {
       "type": "string",
-      "description": "Command method name, dot-separated.",
+      "minLength": 1,
+      "pattern": "^[^\\s.]+(\\.[^\\s.]+)+$",
+      "description": "Command method name, dot-separated. Must contain two or more non-empty tokens and no whitespace.",
       "examples": [
         "core.info",
-        "core.ping",
+        "runtime.ping",
+        "runtime.hostSmoke",
+        "runtime.cancel",
+        "runtime.status",
+        "runtime.shutdown",
+        "host.complete",
+        "host.error",
+        "source.import",
         "book.search",
         "book.detail",
         "book.toc",
         "chapter.content",
-        "source.import",
-        "source.list",
-        "progress.get",
-        "progress.set",
-        "host.complete",
-        "host.error"
+        "reading.progress.update"
       ]
     },
     "params": {
       "type": "object",
+      "default": {},
       "description": "Method-specific parameters."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "method": { "const": "core.info" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/EmptyParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "runtime.ping" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/EmptyParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "runtime.hostSmoke" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/HostSmokeParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "runtime.cancel" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/RuntimeCancelParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "runtime.status" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/RuntimeStatusParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "runtime.shutdown" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/RuntimeShutdownParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "host.complete" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/HostCompleteParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "host.error" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/HostErrorParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "source.import" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/SourceImportParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "book.search" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/BookSearchParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "book.detail" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/BookDetailParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "book.toc" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/BookTocParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "chapter.content" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/ChapterContentParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "reading.progress.update" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/ReadingProgressUpdateParams" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "EmptyParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Parameters for no-argument control commands. Must be an empty object."
+    },
+    "HostCompleteParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operationId", "result"],
+      "properties": {
+        "operationId": { "type": "integer", "minimum": 1 },
+        "result": {
+          "description": "Host capability result payload. For http.execute remote-reading continuations, see #/$defs/HostHttpResponse.",
+          "type": "object"
+        }
+      }
+    },
+    "HostHttpResponse": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["body"],
+      "description": "Result payload accepted when completing a host.request with capability http.execute.",
+      "properties": {
+        "body": {
+          "type": "string",
+          "description": "HTTP response body consumed by Core remote-reading rules."
+        },
+        "status": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599,
+          "description": "Optional HTTP status code accepted by Core for diagnostics."
+        },
+        "headers": {
+          "type": ["object", "null"],
+          "default": {},
+          "description": "Optional HTTP response headers accepted by Core for diagnostics."
+        }
+      }
+    },
+    "HostHttpRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url"],
+      "description": "Host HTTP request descriptor emitted for remote-reading commands.",
+      "properties": {
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Absolute or host-resolvable URL to fetch. Must not be empty or whitespace-only."
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "default": "GET",
+          "description": "HTTP method. Defaults to GET and must not be empty or whitespace-only."
+        },
+        "headers": {
+          "type": "object",
+          "default": {},
+          "description": "HTTP request headers."
+        },
+        "body": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "Optional request body."
+        }
+      }
+    },
+    "HostErrorParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operationId", "error"],
+      "properties": {
+        "operationId": { "type": "integer", "minimum": 1 },
+        "error": { "$ref": "reader-event.schema.json#/$defs/CoreError" }
+      }
+    },
+    "HostSmokeParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "capability": {
+          "type": "string",
+          "pattern": "^[^\\s.]+(\\.[^\\s.]+)+$",
+          "default": "host.smoke.echo"
+        },
+        "params": {
+          "type": "object",
+          "default": {}
+        }
+      }
+    },
+    "RuntimeCancelParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId"],
+      "description": "Parameters for runtime.cancel. Cancels an in-flight request by its requestId.",
+      "properties": {
+        "requestId": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The requestId to cancel. Must differ from the runtime.cancel command's own requestId."
+        }
+      }
+    },
+    "RuntimeStatusParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Parameters for runtime.status. Must be an empty object."
+    },
+    "RuntimeShutdownParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Parameters for runtime.shutdown. Must be an empty object."
+    },
+    "SourceImportParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "description": "Parameters for source.import. Imports one remote-reading source definition into Core runtime state.",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "default": "",
+          "description": "Stable source identifier. If omitted or blank, Core assigns one."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Human-readable source name. Runtime validation rejects blank or whitespace-only names."
+        },
+        "baseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Optional source base URL."
+        },
+        "rules": {
+          "type": ["object", "null"],
+          "default": null,
+          "description": "Optional extraction rules object keyed by remote-reading stage."
+        }
+      }
+    },
+    "BookSearchParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId"],
+      "description": "Parameters for book.search. Uses a prefetched response or emits http.execute via searchRequest.",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "description": "Source identifier used for storage lookup and result correlation."
+        },
+        "searchResponse": {
+          "type": "string",
+          "default": "",
+          "description": "Prefetched search response body."
+        },
+        "searchRequest": {
+          "anyOf": [
+            { "$ref": "#/$defs/HostHttpRequest" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Optional host HTTP request descriptor when searchResponse is empty."
+        },
+        "source": {
+          "type": ["object", "null"],
+          "default": null,
+          "description": "Optional inline source definition used instead of storage lookup."
+        }
+      }
+    },
+    "BookDetailParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "book"],
+      "description": "Parameters for book.detail. Merges fetched detail metadata into a base book.",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "description": "Source identifier used for storage lookup and result correlation."
+        },
+        "book": {
+          "type": "object",
+          "description": "Base book object to merge detail metadata into. Must contain at least bookId at runtime."
+        },
+        "detailResponse": {
+          "type": "string",
+          "default": "",
+          "description": "Prefetched detail response body."
+        },
+        "detailRequest": {
+          "anyOf": [
+            { "$ref": "#/$defs/HostHttpRequest" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Optional host HTTP request descriptor when detailResponse is empty."
+        },
+        "source": {
+          "type": ["object", "null"],
+          "default": null,
+          "description": "Optional inline source definition used instead of storage lookup."
+        }
+      }
+    },
+    "BookTocParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "bookId"],
+      "description": "Parameters for book.toc. Extracts a table of contents for one book.",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "description": "Source identifier used for storage lookup and result correlation."
+        },
+        "bookId": {
+          "type": "string",
+          "description": "Book identifier whose table of contents is being fetched."
+        },
+        "tocResponse": {
+          "type": "string",
+          "default": "",
+          "description": "Prefetched TOC response body."
+        },
+        "tocRequest": {
+          "anyOf": [
+            { "$ref": "#/$defs/HostHttpRequest" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Optional host HTTP request descriptor when tocResponse is empty."
+        },
+        "source": {
+          "type": ["object", "null"],
+          "default": null,
+          "description": "Optional inline source definition used instead of storage lookup."
+        }
+      }
+    },
+    "ChapterContentParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "bookId"],
+      "description": "Parameters for chapter.content. Extracts chapter body content for one book chapter.",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "description": "Source identifier used for storage lookup and result correlation."
+        },
+        "bookId": {
+          "type": "string",
+          "description": "Book identifier whose chapter content is being fetched."
+        },
+        "chapterTitle": {
+          "type": "string",
+          "default": "",
+          "description": "Optional chapter title surfaced in the result and cache key."
+        },
+        "chapterResponse": {
+          "type": "string",
+          "default": "",
+          "description": "Prefetched chapter response body."
+        },
+        "chapterRequest": {
+          "anyOf": [
+            { "$ref": "#/$defs/HostHttpRequest" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Optional host HTTP request descriptor when chapterResponse is empty."
+        },
+        "jsRule": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "Optional JS rule script for chapter extraction."
+        },
+        "source": {
+          "type": ["object", "null"],
+          "default": null,
+          "description": "Optional inline source definition used instead of storage lookup."
+        }
+      }
+    },
+    "ReadingProgressUpdateParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bookId"],
+      "description": "Parameters for reading.progress.update. Stores the current reading position for one book.",
+      "properties": {
+        "bookId": {
+          "type": "string",
+          "description": "Book identifier whose reading progress is being updated."
+        },
+        "chapterIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Zero-based chapter index."
+        },
+        "chapterOffset": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Character or byte offset inside the current chapter, depending on host reader mapping."
+        },
+        "chapterProgress": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0,
+          "description": "Fractional progress reported by the host reader for the current chapter."
+        }
+      }
     }
   }
 }

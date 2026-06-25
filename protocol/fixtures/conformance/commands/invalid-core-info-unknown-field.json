@@ -1,0 +1,8 @@
+{
+  "protocolVersion": 1,
+  "requestId": 212,
+  "method": "core.info",
+  "params": {
+    "includeExperimental": true
+  }
+}

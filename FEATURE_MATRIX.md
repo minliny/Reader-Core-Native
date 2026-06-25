@@ -1,92 +1,90 @@
-# Reader-Core-Native Feature Matrix
+# 能力状态矩阵
 
-> 唯一来源：所有能力分配以此文档为准。
-> 旧 `FEATURE_MATRIX`、`CAPABILITY_MATRIX`、`LEGADO_*`、`ANDROID_*_CAPABILITY*` 等文档均已归档至各仓库 `_archived_planning_2026-06-24/`。
+最高优先级入口：`docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`
 
-## 能力归属总表
+状态定义：
 
-| 能力 | Rust Core | Platform Adapter | 暂缓 | 退役 |
-|------|:---------:|:----------------:|:----:|:----:|
-| Book/Chapter/Source 数据模型 | ✅ | | | |
-| CSS Selector 规则 | ✅ | | | |
-| XPath 规则 | ✅ | | | |
-| JSONPath 规则 | ✅ | | | |
-| 正则规则 | ✅ | | | |
-| `@` 链规则 | ✅ | | | |
-| 变量作用域 | ✅ | | | |
-| 多字段规则 | ✅ | | | |
-| 替换规则 | ✅ | | | |
-| bookList scoping | ✅ | | | |
-| tag.index | ✅ | | | |
-| JS 执行 (QuickJS) | ✅ | | | |
-| JS host API (console, fetch, crypto, etc.) | ✅ | | | |
-| 请求参数构建 | ✅ | | | |
-| 重定向策略控制 | ✅ | | | |
-| Cookie 策略控制 | ✅ | | | |
-| TLS / 实际网络 socket | | ✅ | | |
-| HTTP Transport | | ✅ | | |
-| 响应编码检测和转换 | ✅ | | | |
-| HTML 解析 | ✅ | | | |
-| XML 解析 | ✅ | | | |
-| JSON 解析 | ✅ | | | |
-| 内容清洗和标准化 | ✅ | | | |
-| 搜索规则 | ✅ | | | |
-| 书籍详情规则 | ✅ | | | |
-| 目录规则 | ✅ | | | |
-| 正文规则 | ✅ | | | |
-| 书源导入/导出 | ✅ | | | |
-| SQLite schema 管理 | ✅ | | | |
-| 数据库迁移 | ✅ | | | |
-| 章节内容缓存 | ✅ | | | |
-| 阅读进度 | ✅ | | | |
-| 下载队列 | ✅ | | | |
-| 最近历史 | ✅ | | | |
-| Cookie/Session 持久化 | ✅ | | | |
-| Recovery/校验/Diff | ✅ | | | |
-| TXT 解析 | ✅ | | | |
-| EPUB 解析 | ✅ | | | |
-| RSS 解析和订阅状态 | ✅ | | | |
-| WebDAV 协议和冲突策略 | ✅ | | | |
-| 备份/恢复 | ✅ | | | |
-| 同步/冲突解决 | ✅ | | | |
-| TTS 文本切片和播放队列 | ✅ | | | |
-| 系统 TTS 发声 | | ✅ | | |
-| 登录 WebView 交互 | | ✅ | | |
-| WebView Cookie 获取 | | ✅ | | |
-| 安全凭据存储 (Keychain/Keystore/etc) | | ✅ | | |
-| 文件选择和沙箱授权 | | ✅ | | |
-| UI 组件和导航 | | ✅ | | |
-| 主题和字体 | | ✅ | | |
-| 后台任务和通知 | | ✅ | | |
-| 包体签名和分发 | | ✅ | | |
+- 已完成：当前 Rust 目标仓库有实现路径和验证命令。
+- 部分完成：已有基础，但不能声明迁移完成。
+- Gap：尚未实现，或缺少本地旧 Core/三端验证证据。
+- 平台负责：不进入 Rust 业务内核，由 iOS/Android/HarmonyOS adapter 实现。
 
-## V1 功能边界
+## Core / ABI / Protocol
 
-V1 交付物（搜索→详情→目录→正文 完整链）：
+| 能力 | Owner | 状态 | 证据 |
+| --- | --- | --- | --- |
+| C ABI lifecycle | Rust Core | 已完成 | `include/reader_core.h`、`crates/reader-ffi`、`./scripts/ffi-smoke.sh` |
+| JSON command/event protocol | Rust Core | 已完成 | `crates/reader-contract`、`protocol/*.schema.json` |
+| Runtime worker / request dispatch | Rust Core | 已完成 | `crates/reader-runtime` |
+| Host operation bus | Rust Core + 平台 adapter | 已完成路由 | `host.request`、`host.complete`、`host.error` |
+| Runtime config | Rust Core | 部分完成 | `protocol/reader-runtime-config.schema.json` |
+| Structured error / last error | Rust Core | 部分完成 | C ABI 已有基础，wrapper 暴露需继续补齐 |
 
-- [ ] 书源导入
-- [ ] 搜索
-- [ ] 书籍详情
-- [ ] 目录
-- [ ] 正文阅读
-- [ ] 章节缓存
-- [ ] 阅读进度
-- [ ] TXT 基础支持
-- [ ] EPUB 基础支持
+## 规则、JS、请求描述
 
-## 退役清单
+| 能力 | Owner | 状态 | 证据 |
+| --- | --- | --- | --- |
+| Regex | Rust Core | 部分完成 | `crates/reader-rule` |
+| JSONPath | Rust Core | 部分完成 | `crates/reader-rule` |
+| CSS selector | Rust Core | 部分完成 | `crates/reader-rule` |
+| XPath | Rust Core | 部分完成 | `crates/reader-rule` |
+| 链式规则 / fallback | Rust Core | 部分完成 | `crates/reader-rule` |
+| QuickJS sandbox | Rust Core | 部分完成 | `crates/reader-js` |
+| JS host callback | Rust Core + 平台 adapter | 部分完成 | sandbox 有基础，需接通平台能力 |
+| HTTP request descriptor | Rust Core | 部分完成 | `http.execute` contract |
+| Cookie / Session / Redirect | Rust Core + 平台 adapter | Gap | 需从旧 `Reader-Core` 代码迁移和验证 |
 
-各平台独立实现将在 Rust Core 对应模块完成后退役：
+## 阅读链路
 
-- [ ] Android: Room 内容数据库 → Rust SQLite
-- [ ] Android: HTML/XML parser → Rust parser
-- [ ] Android: RSS parser → Rust RSS
-- [ ] Android: TXT/EPUB parser → Rust local-book
-- [ ] Android: WebDAV/sync 逻辑 → Rust sync
-- [ ] Android: remote cache/offline → Rust storage
-- [ ] iOS: Swift Reader-Core 运行依赖 → Rust Core
-- [ ] HarmonyOS: 独立非 UI 实现 → Rust Core
+| 能力 | Owner | 状态 | 证据 |
+| --- | --- | --- | --- |
+| Source import | Rust Core | 部分完成 | remote reading V1 |
+| Search | Rust Core | 部分完成 | fixture vertical |
+| Detail | Rust Core | 部分完成 | fixture vertical |
+| TOC | Rust Core | 部分完成 | fixture vertical |
+| Chapter content | Rust Core | 部分完成 | fixture vertical |
+| Pagination / continuation | Rust Core | Gap | 需旧 Core 迁移和 corpus 证明 |
+| Progress update/remap | Rust Core | 部分完成 | storage 基础能力 |
+| Offline cache | Rust Core | Gap | 需 storage/cache 迁移 |
 
----
+## 本地书、RSS、同步、数据
 
-*最后更新: 2026-06-24 | 以 `ARCHITECTURE.md` 为准*
+| 能力 | Owner | 状态 | 证据 |
+| --- | --- | --- | --- |
+| TXT | Rust Core | 部分完成 | `crates/reader-local-book` |
+| EPUB | Rust Core | Gap | 需从旧 Core/平台现状审计 |
+| SQLite schema/migration | Rust Core | Gap | 需落地持久化模型 |
+| Cache/progress/history/download queue | Rust Core | 部分完成 | `crates/reader-storage` 有基础 |
+| RSS | Rust Core | 部分完成 | `crates/reader-rss` |
+| WebDAV/sync/diff/recovery | Rust Core + 平台 adapter | 部分完成 | `crates/reader-sync` 有模型，平台 transport 待接入 |
+| TTS 数据契约 | Rust Core + 平台 adapter | Gap | Core 定义契约，平台执行播放 |
+
+## 平台 wrapper
+
+| 平台 | 状态 | 说明 |
+| --- | --- | --- |
+| iOS Swift wrapper | 部分完成 | 能消费 C ABI smoke；App-side URLSession/WKWebView/Keychain/File/TTS 仍需迁移验证 |
+| Android JNI/Kotlin wrapper | 部分完成 | JNI wrapper 已有；App-side OkHttp/WebView/Keystore/SAF/TTS 仍需迁移验证 |
+| HarmonyOS Node-API/ArkTS wrapper | 部分完成 | NAPI wrapper 已有；HAP/device 和平台 adapter 仍需验证 |
+
+## 平台负责能力
+
+以下能力不进入 Rust 业务内核实现，但必须有 host contract：
+
+- 真实 HTTP/TLS/socket 执行。
+- WebView 登录、captcha、Cookie、DOM。
+- Keychain / Keystore / credential store。
+- 文件选择、目录授权、系统沙箱。
+- TTS 播放和系统媒体能力。
+- UI、导航、主题、通知、后台任务。
+- App packaging、signing、distribution。
+
+## 迁移完成判定
+
+能力不能仅凭 Rust 单测或 wrapper smoke 标记为迁移完成。完成必须同时满足：
+
+1. 已审计旧 `Reader-Core` 或对应平台代码。
+2. Rust Core 有实现和测试。
+3. 至少一个 CLI fixture 可运行。
+4. 三端 wrapper/host adapter 有对应验证计划。
+5. release 前三端同一 fixture/corpus canonical result 一致。

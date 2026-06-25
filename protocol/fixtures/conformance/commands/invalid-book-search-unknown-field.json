@@ -1,0 +1,23 @@
+{
+  "protocolVersion": 1,
+  "requestId": 404,
+  "method": "book.search",
+  "params": {
+    "sourceId": "conformance-source",
+    "searchResponse": "{\"books\":[]}",
+    "source": {
+      "sourceId": "conformance-source",
+      "name": "Conformance Source",
+      "baseUrl": "https://books.example.test",
+      "rules": {
+        "search": [
+          {
+            "kind": "jsonPath",
+            "path": "$.books[*]"
+          }
+        ]
+      }
+    },
+    "sortBy": "latest"
+  }
+}

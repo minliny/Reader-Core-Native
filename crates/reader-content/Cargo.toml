@@ -9,3 +9,6 @@ authors.workspace = true
 [dependencies]
 reader-domain = { path = "../reader-domain" }
 reader-rule = { path = "../reader-rule" }
+reader-js = { path = "../reader-js" }
+serde.workspace = true
+serde_json.workspace = true

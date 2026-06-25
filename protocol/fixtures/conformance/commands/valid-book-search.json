@@ -1,0 +1,22 @@
+{
+  "protocolVersion": 1,
+  "requestId": 403,
+  "method": "book.search",
+  "params": {
+    "sourceId": "conformance-source",
+    "searchResponse": "{\"books\":[{\"bookId\":\"1\",\"title\":\"Dune\",\"author\":\"Herbert\"}]}",
+    "source": {
+      "sourceId": "conformance-source",
+      "name": "Conformance Source",
+      "baseUrl": "https://books.example.test",
+      "rules": {
+        "search": [
+          {
+            "kind": "jsonPath",
+            "path": "$.books[*]"
+          }
+        ]
+      }
+    }
+  }
+}

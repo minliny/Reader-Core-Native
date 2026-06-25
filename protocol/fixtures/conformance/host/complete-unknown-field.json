@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "requestId": 314,
+  "method": "host.complete",
+  "params": {
+    "operationId": 1,
+    "result": {
+      "status": "ok"
+    },
+    "completedAt": 123
+  }
+}

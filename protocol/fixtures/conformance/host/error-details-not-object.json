@@ -1,0 +1,18 @@
+{
+  "protocolVersion": 1,
+  "requestId": 423,
+  "method": "host.error",
+  "params": {
+    "operationId": 1,
+    "error": {
+      "code": "INTERNAL",
+      "message": "host failed",
+      "retryable": true,
+      "details": [
+        "not",
+        "an",
+        "object"
+      ]
+    }
+  }
+}

@@ -9,8 +9,11 @@
 //! Tokio is intentionally NOT a dependency in v1 to keep the OHOS toolchain
 //! risk surface minimal.
 
+pub mod remote;
 pub mod runtime;
 pub mod sink;
 
+pub use reader_contract::CoreError;
+pub use remote::RemoteState;
 pub use runtime::Runtime;
 pub use sink::EventSink;

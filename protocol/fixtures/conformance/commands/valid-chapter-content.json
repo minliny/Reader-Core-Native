@@ -1,0 +1,24 @@
+{
+  "protocolVersion": 1,
+  "requestId": 409,
+  "method": "chapter.content",
+  "params": {
+    "sourceId": "conformance-source",
+    "bookId": "1",
+    "chapterTitle": "C1",
+    "chapterResponse": "<html><body><p>Hello</p><p>World</p></body></html>",
+    "source": {
+      "sourceId": "conformance-source",
+      "name": "Conformance Source",
+      "baseUrl": "https://books.example.test",
+      "rules": {
+        "chapter": [
+          {
+            "kind": "cssText",
+            "selector": "p"
+          }
+        ]
+      }
+    }
+  }
+}

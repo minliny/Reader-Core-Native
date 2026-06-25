@@ -1,0 +1,33 @@
+{
+  "id": "wp-001",
+  "source_type": "web-page",
+  "format": "html",
+  "source_description": "Sanitized static HTML book-listing page. Exercises CSS selector features: class selectors, attribute selectors (data-id, href), descendant traversal, HTML entities (&nbsp; &amp;), missing-href anchors, and nested sections (book-list + sidebar). Intended for CSS/XPath rule validation.",
+  "sanitization": "All text is synthetic placeholder content ('Sample Volume One', 'Author Alpha', 'Tag Alpha'). No real domain (uses relative URLs only). No tracking scripts, no cookies, no accounts, no copyrighted text.",
+  "capability_tags": [
+    "rule-engine",
+    "css-selector",
+    "html-parsing",
+    "attribute-selector",
+    "list-rule",
+    "xpath"
+  ],
+  "privacy_check": {
+    "passed": true,
+    "checked_for": [
+      "real-tokens",
+      "cookies",
+      "account-credentials",
+      "private-content",
+      "copyrighted-long-text",
+      "tracking-scripts"
+    ],
+    "notes": "Pure static HTML with synthetic placeholder text; no scripts or external resources."
+  },
+  "consumer_branch": {
+    "primary": "codex/rule-engine-parity",
+    "secondary": ["codex/local-content-runtime"]
+  },
+  "fixture_file": "wp-001-fixture.html",
+  "added_in_round": 1
+}

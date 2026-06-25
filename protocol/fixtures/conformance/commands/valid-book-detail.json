@@ -1,0 +1,25 @@
+{
+  "protocolVersion": 1,
+  "requestId": 405,
+  "method": "book.detail",
+  "params": {
+    "sourceId": "conformance-source",
+    "book": {
+      "bookId": "1"
+    },
+    "detailResponse": "{\"detail\":{\"bookId\":\"1\",\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"intro\":\"desert\"}}",
+    "source": {
+      "sourceId": "conformance-source",
+      "name": "Conformance Source",
+      "baseUrl": "https://books.example.test",
+      "rules": {
+        "detail": [
+          {
+            "kind": "jsonPath",
+            "path": "$.detail"
+          }
+        ]
+      }
+    }
+  }
+}

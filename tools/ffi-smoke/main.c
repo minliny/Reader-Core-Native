@@ -1,24 +1,147 @@
+// C ABI smoke for reader_core.h.
+//
+// Drives the runtime the way a real C host would: create (with config), send
+// commands, receive events via the callback, answer host.request with
+// host.complete / host.error, cancel pending requests, and read structured
+// errors through rc_last_error. Failure paths are covered explicitly.
+
 #include "reader_core.h"
 
+#include <pthread.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
+#define MAX_EVENTS 80
+#define EVENT_BUF 8192
+#define MSG_BUF 256
+
+_Static_assert(RC_CREATE_PANIC == -1, "RC_CREATE_PANIC changed");
+_Static_assert(RC_CREATE_OK == 0, "RC_CREATE_OK changed");
+_Static_assert(RC_CREATE_NULL_OUT_RUNTIME == 2,
+               "RC_CREATE_NULL_OUT_RUNTIME changed");
+_Static_assert(RC_CREATE_NULL_CALLBACK == 3,
+               "RC_CREATE_NULL_CALLBACK changed");
+_Static_assert(RC_CREATE_INVALID_CONFIG == 4,
+               "RC_CREATE_INVALID_CONFIG changed");
+_Static_assert(RC_SEND_PANIC == -1, "RC_SEND_PANIC changed");
+_Static_assert(RC_SEND_OK == 0, "RC_SEND_OK changed");
+_Static_assert(RC_SEND_NULL_RUNTIME == 1, "RC_SEND_NULL_RUNTIME changed");
+_Static_assert(RC_SEND_NULL_COMMAND == 2, "RC_SEND_NULL_COMMAND changed");
+_Static_assert(RC_SEND_INVALID_COMMAND == 3,
+               "RC_SEND_INVALID_COMMAND changed");
+_Static_assert(RC_SEND_PROTOCOL_ERROR == 4,
+               "RC_SEND_PROTOCOL_ERROR changed");
+_Static_assert(RC_CANCEL_PANIC == -1, "RC_CANCEL_PANIC changed");
+_Static_assert(RC_CANCEL_OK == 0, "RC_CANCEL_OK changed");
+_Static_assert(RC_CANCEL_NULL_RUNTIME == 1,
+               "RC_CANCEL_NULL_RUNTIME changed");
+_Static_assert(RC_OK == 0, "RC_OK changed");
+_Static_assert(RC_ERR_UNKNOWN_METHOD == 1, "RC_ERR_UNKNOWN_METHOD changed");
+_Static_assert(RC_ERR_INVALID_PARAMS == 2, "RC_ERR_INVALID_PARAMS changed");
+_Static_assert(RC_ERR_INVALID_PROTOCOL_VERSION == 3,
+               "RC_ERR_INVALID_PROTOCOL_VERSION changed");
+_Static_assert(RC_ERR_CANCELLED == 4, "RC_ERR_CANCELLED changed");
+_Static_assert(RC_ERR_INVALID_MESSAGE == 5, "RC_ERR_INVALID_MESSAGE changed");
+_Static_assert(RC_ERR_INTERNAL == 6, "RC_ERR_INTERNAL changed");
+
 struct captured_event {
-  char json[4096];
+  char json[EVENT_BUF];
   size_t length;
 };
 
-static void capture_event(void *context, const uint8_t *json, size_t json_length) {
-  struct captured_event *captured = (struct captured_event *)context;
-  size_t copy_length = json_length;
-  if (copy_length >= sizeof(captured->json)) {
-    copy_length = sizeof(captured->json) - 1;
+struct channel {
+  pthread_mutex_t mutex;
+  struct captured_event events[MAX_EVENTS];
+  size_t count;
+};
+
+static void capture_event(void *context, const uint8_t *json,
+                          size_t json_length) {
+  struct channel *ch = (struct channel *)context;
+  pthread_mutex_lock(&ch->mutex);
+  if (ch->count < MAX_EVENTS) {
+    size_t copy = json_length < (EVENT_BUF - 1) ? json_length : (EVENT_BUF - 1);
+    memcpy(ch->events[ch->count].json, json, copy);
+    ch->events[ch->count].json[copy] = '\0';
+    ch->events[ch->count].length = copy;
+    ch->count++;
   }
-  memcpy(captured->json, json, copy_length);
-  captured->json[copy_length] = '\0';
-  captured->length = copy_length;
+  pthread_mutex_unlock(&ch->mutex);
+}
+
+static size_t channel_count(struct channel *ch) {
+  pthread_mutex_lock(&ch->mutex);
+  size_t n = ch->count;
+  pthread_mutex_unlock(&ch->mutex);
+  return n;
+}
+
+// Wait until at least `index + 1` events have arrived, then copy event[index]
+// into `out`. Returns 0 on success, non-zero on timeout.
+static int wait_event(struct channel *ch, size_t index, char *out, size_t cap) {
+  for (int i = 0; i < 1000; i++) {
+    if (channel_count(ch) > index) {
+      break;
+    }
+    usleep(5000);
+  }
+  pthread_mutex_lock(&ch->mutex);
+  if (index >= ch->count) {
+    pthread_mutex_unlock(&ch->mutex);
+    return 1;
+  }
+  strncpy(out, ch->events[index].json, cap - 1);
+  out[cap - 1] = '\0';
+  pthread_mutex_unlock(&ch->mutex);
+  return 0;
+}
+
+static int send_str(rc_runtime_t *rt, const char *json) {
+  return rc_runtime_send(rt, (const uint8_t *)json, strlen(json));
+}
+
+// Extract a `"key":<uint64>` value from a JSON blob. Returns 0 on miss.
+static int json_u64(const char *json, const char *key, uint64_t *out) {
+  char needle[64];
+  snprintf(needle, sizeof needle, "\"%s\":", key);
+  const char *p = strstr(json, needle);
+  if (p == NULL) {
+    return 0;
+  }
+  p += strlen(needle);
+  while (*p == ' ' || *p == '\t' || *p == '\n') {
+    p++;
+  }
+  char *end = NULL;
+  unsigned long long v = strtoull(p, &end, 10);
+  if (end == p) {
+    return 0;
+  }
+  *out = (uint64_t)v;
+  return 1;
+}
+
+static int contains(const char *haystack, const char *needle) {
+  return strstr(haystack, needle) != NULL;
+}
+
+static size_t count_occurrences(const char *haystack, const char *needle) {
+  size_t count = 0;
+  size_t needle_len = strlen(needle);
+  const char *p = haystack;
+  while ((p = strstr(p, needle)) != NULL) {
+    count++;
+    p += needle_len;
+  }
+  return count;
+}
+
+static int fail(const char *msg) {
+  fprintf(stderr, "FAIL: %s\n", msg);
+  return 1;
 }
 
 int main(void) {
@@ -26,42 +149,1483 @@ int main(void) {
     fprintf(stderr, "unexpected ABI version: %u\n", rc_abi_version());
     return 1;
   }
+  char msg[MSG_BUF];
+  int32_t code = RC_OK;
 
-  struct captured_event captured = {0};
-  rc_runtime_t *runtime = NULL;
-  const char *config = "{}";
-  int32_t code = rc_runtime_create((const uint8_t *)config, strlen(config), capture_event,
-                                   &captured, &runtime);
-  if (code != 0 || runtime == NULL) {
+  // --- Failure paths that need no runtime -------------------------------
+  if (rc_runtime_send(NULL, (const uint8_t *)"{}", 2) !=
+      RC_SEND_NULL_RUNTIME) {
+    return fail("null runtime send did not return RC_SEND_NULL_RUNTIME");
+  }
+  code = rc_last_error(NULL, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE) {
+    fprintf(stderr, "null-buffer last_error code=%d\n", code);
+    return fail("null-buffer last_error did not return INVALID_MESSAGE");
+  }
+  strcpy(msg, "stale");
+  code = rc_last_error(msg, 0);
+  if (code != RC_ERR_INVALID_MESSAGE || strcmp(msg, "stale") != 0) {
+    fprintf(stderr, "zero-cap last_error: code=%d msg=%s\n", code, msg);
+    return fail("zero-cap last_error wrote message or changed code");
+  }
+  (void)rc_abi_version();
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "runtime handle")) {
+    fprintf(stderr, "abi version last_error side effect: code=%d msg=%s\n", code,
+            msg);
+    return fail("rc_abi_version touched last_error");
+  }
+  if (rc_runtime_cancel(NULL, 42) != RC_CANCEL_NULL_RUNTIME) {
+    return fail("null runtime cancel did not return RC_CANCEL_NULL_RUNTIME");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "runtime handle")) {
+    fprintf(stderr, "null cancel last_error: code=%d msg=%s\n", code, msg);
+    return fail("null runtime cancel did not record INVALID_MESSAGE");
+  }
+  rc_runtime_destroy(NULL); // no-op contract
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("null destroy did not clear last_error");
+  }
+
+  // --- Create rejection paths -------------------------------------------
+  if (rc_runtime_create(NULL, 0, capture_event, NULL, NULL) !=
+      RC_CREATE_NULL_OUT_RUNTIME) {
+    return fail("null out_runtime did not return RC_CREATE_NULL_OUT_RUNTIME");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "out_runtime")) {
+    fprintf(stderr, "null out_runtime last_error: code=%d msg=%s\n", code, msg);
+    return fail("null out_runtime did not record INVALID_MESSAGE");
+  }
+  rc_runtime_t *no_runtime = NULL;
+  rc_runtime_t *sentinel = (rc_runtime_t *)(uintptr_t)1;
+  if (rc_runtime_create(NULL, 0, NULL, NULL, &no_runtime) !=
+          RC_CREATE_NULL_CALLBACK ||
+      no_runtime != NULL) {
+    return fail("null callback did not return RC_CREATE_NULL_CALLBACK");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "event callback")) {
+    fprintf(stderr, "null callback last_error: code=%d msg=%s\n", code, msg);
+    return fail("null callback did not record INVALID_MESSAGE");
+  }
+  if (rc_runtime_create(NULL, 0, NULL, NULL, &sentinel) !=
+          RC_CREATE_NULL_CALLBACK ||
+      sentinel != NULL) {
+    return fail("create failure did not clear out_runtime");
+  }
+
+  // Invalid config -> RC_CREATE_INVALID_CONFIG + structured INVALID_MESSAGE.
+  sentinel = (rc_runtime_t *)(uintptr_t)1;
+  if (rc_runtime_create(NULL, 1, capture_event, NULL, &sentinel) !=
+          RC_CREATE_INVALID_CONFIG ||
+      sentinel != NULL) {
+    return fail("null config with non-zero length did not return RC_CREATE_INVALID_CONFIG");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "config_json")) {
+    fprintf(stderr, "null config last_error: code=%d msg=%s\n", code, msg);
+    return fail("null config did not record INVALID_MESSAGE");
+  }
+
+  const char *bad_config = "{not json";
+  sentinel = (rc_runtime_t *)(uintptr_t)1;
+  if (rc_runtime_create((const uint8_t *)bad_config, strlen(bad_config),
+                        capture_event, NULL, &sentinel) !=
+          RC_CREATE_INVALID_CONFIG ||
+      sentinel != NULL) {
+    return fail("invalid config did not return RC_CREATE_INVALID_CONFIG");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || msg[0] == '\0') {
+    fprintf(stderr, "invalid config last_error: code=%d msg=%s\n", code, msg);
+    return fail("invalid config did not record INVALID_MESSAGE");
+  }
+  const char *unknown_field_config =
+      "{\"dataDirectory\":\"/tmp/reader-core-native/data\","
+      "\"extraDirectory\":\"/tmp/reader-core-native/extra\"}";
+  sentinel = (rc_runtime_t *)(uintptr_t)1;
+  if (rc_runtime_create((const uint8_t *)unknown_field_config,
+                        strlen(unknown_field_config), capture_event, NULL,
+                        &sentinel) != RC_CREATE_INVALID_CONFIG ||
+      sentinel != NULL) {
+    return fail("unknown field config did not return RC_CREATE_INVALID_CONFIG");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "runtime config")) {
+    fprintf(stderr, "unknown field config last_error: code=%d msg=%s\n", code,
+            msg);
+    return fail("unknown field config did not record INVALID_MESSAGE");
+  }
+  const char *empty_data_dir_config = "{\"dataDirectory\":\"\"}";
+  sentinel = (rc_runtime_t *)(uintptr_t)1;
+  if (rc_runtime_create((const uint8_t *)empty_data_dir_config,
+                        strlen(empty_data_dir_config), capture_event, NULL,
+                        &sentinel) != RC_CREATE_INVALID_CONFIG ||
+      sentinel != NULL) {
+    return fail("empty dataDirectory config did not return RC_CREATE_INVALID_CONFIG");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_PARAMS || !contains(msg, "dataDirectory")) {
+    fprintf(stderr, "empty dataDirectory last_error: code=%d msg=%s\n", code,
+            msg);
+    return fail("empty dataDirectory config did not record INVALID_PARAMS");
+  }
+
+  struct channel defaults_ch;
+  memset(&defaults_ch, 0, sizeof defaults_ch);
+  pthread_mutex_init(&defaults_ch.mutex, NULL);
+  rc_runtime_t *defaults_rt = NULL;
+  if (rc_runtime_create(NULL, 0, capture_event, &defaults_ch, &defaults_rt) !=
+          RC_CREATE_OK ||
+      defaults_rt == NULL) {
+    return fail("null config with zero length did not create defaults runtime");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("default create did not clear last_error");
+  }
+  rc_runtime_destroy(defaults_rt);
+  pthread_mutex_destroy(&defaults_ch.mutex);
+
+  // --- Create a real runtime --------------------------------------------
+  struct channel ch;
+  memset(&ch, 0, sizeof ch);
+  pthread_mutex_init(&ch.mutex, NULL);
+
+  rc_runtime_t *rt = NULL;
+  const char *config =
+      "{\"dataDirectory\":\"/tmp/reader-smoke-data\",\"cacheDirectory\":\"/tmp/"
+      "reader-smoke-cache\"}";
+  code = rc_runtime_create((const uint8_t *)config, strlen(config),
+                           capture_event, &ch, &rt);
+  if (code != RC_CREATE_OK || rt == NULL) {
     fprintf(stderr, "rc_runtime_create failed: %d\n", code);
     return 1;
   }
-
-  const char *command =
-      "{\"protocolVersion\":1,\"requestId\":42,\"method\":\"core.ping\",\"params\":{}}";
-  code = rc_runtime_send(runtime, (const uint8_t *)command, strlen(command));
-  if (code != 0) {
-    fprintf(stderr, "rc_runtime_send failed: %d\n", code);
-    rc_runtime_destroy(runtime);
-    return 1;
+  // A successful create clears the last-error slot and the message buffer.
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("successful create did not clear last_error");
   }
 
-  for (int i = 0; i < 100 && captured.length == 0; i++) {
-    usleep(10000);
+  // --- Synchronous send failures (no events emitted) --------------------
+  if (rc_runtime_send(rt, NULL, 1) != RC_SEND_NULL_COMMAND) {
+    return fail("null command with non-zero length did not return RC_SEND_NULL_COMMAND");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "command_json")) {
+    fprintf(stderr, "null command last_error: code=%d msg=%s\n", code, msg);
+    return fail("null command did not record INVALID_MESSAGE");
+  }
+  if (rc_runtime_cancel(rt, 123456) != RC_CANCEL_OK) {
+    return fail("cancel missing request did not return RC_CANCEL_OK");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("cancel missing request did not clear last_error");
+  }
+  if (channel_count(&ch) != 0) {
+    return fail("cancel missing request emitted an async event");
   }
 
-  rc_runtime_destroy(runtime);
-
-  if (captured.length == 0) {
-    fprintf(stderr, "no event captured\n");
-    return 1;
+  if (rc_runtime_send(rt, NULL, 0) != RC_SEND_INVALID_COMMAND) {
+    return fail("zero-length command did not return RC_SEND_INVALID_COMMAND");
   }
-  if (strstr(captured.json, "\"requestId\":42") == NULL ||
-      strstr(captured.json, "\"pong\":true") == NULL) {
-    fprintf(stderr, "unexpected event: %s\n", captured.json);
-    return 1;
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "command JSON")) {
+    fprintf(stderr, "zero-length command last_error: code=%d msg=%s\n", code,
+            msg);
+    return fail("zero-length command did not record INVALID_MESSAGE");
   }
 
-  puts(captured.json);
+  if (rc_runtime_send(rt, (const uint8_t *)"", 0) != RC_SEND_INVALID_COMMAND) {
+    return fail("empty command did not return RC_SEND_INVALID_COMMAND");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "command JSON")) {
+    fprintf(stderr, "empty command last_error: code=%d msg=%s\n", code, msg);
+    return fail("empty command did not record INVALID_MESSAGE");
+  }
+
+  if (send_str(rt, "{") != RC_SEND_INVALID_COMMAND) {
+    return fail("malformed send did not return RC_SEND_INVALID_COMMAND");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "command JSON")) {
+    fprintf(stderr, "malformed last_error: code=%d msg=%s\n", code, msg);
+    return fail("malformed send did not record INVALID_MESSAGE");
+  }
+
+  const char *params_not_object =
+      "{\"protocolVersion\":1,\"requestId\":8,\"method\":\"runtime.ping\","
+      "\"params\":[]}";
+  if (send_str(rt, params_not_object) != RC_SEND_INVALID_COMMAND) {
+    return fail("non-object params did not return RC_SEND_INVALID_COMMAND");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_PARAMS || !contains(msg, "params")) {
+    fprintf(stderr, "non-object params last_error: code=%d msg=%s\n", code,
+            msg);
+    return fail("non-object params did not record INVALID_PARAMS");
+  }
+  if (channel_count(&ch) != 0) {
+    return fail("non-object params emitted an async event");
+  }
+
+  const char *proto_v2 =
+      "{\"protocolVersion\":2,\"requestId\":9,\"method\":\"runtime.ping\","
+      "\"params\":{}}";
+  if (send_str(rt, proto_v2) != RC_SEND_PROTOCOL_ERROR) {
+    return fail("protocol v2 send did not return RC_SEND_PROTOCOL_ERROR");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_PROTOCOL_VERSION ||
+      !contains(msg, "protocolVersion")) {
+    fprintf(stderr, "proto v2 last_error: code=%d msg=%s\n", code, msg);
+    return fail("protocol v2 did not record INVALID_PROTOCOL_VERSION");
+  }
+
+  const char *missing_request_id =
+      "{\"protocolVersion\":1,\"method\":\"runtime.ping\",\"params\":{}}";
+  if (send_str(rt, missing_request_id) != RC_SEND_INVALID_COMMAND) {
+    return fail("missing requestId did not return RC_SEND_INVALID_COMMAND");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "command JSON")) {
+    fprintf(stderr, "missing requestId last_error: code=%d msg=%s\n", code,
+            msg);
+    return fail("missing requestId did not record INVALID_MESSAGE");
+  }
+
+  const char *request_id_zero =
+      "{\"protocolVersion\":1,\"requestId\":0,\"method\":\"runtime.ping\","
+      "\"params\":{}}";
+  if (send_str(rt, request_id_zero) != RC_SEND_PROTOCOL_ERROR) {
+    return fail("requestId zero did not return RC_SEND_PROTOCOL_ERROR");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "requestId")) {
+    fprintf(stderr, "requestId zero last_error: code=%d msg=%s\n", code, msg);
+    return fail("requestId zero did not record INVALID_MESSAGE");
+  }
+
+  const char *empty_method =
+      "{\"protocolVersion\":1,\"requestId\":205,\"method\":\"\","
+      "\"params\":{}}";
+  if (send_str(rt, empty_method) != RC_SEND_PROTOCOL_ERROR) {
+    return fail("empty method did not return RC_SEND_PROTOCOL_ERROR");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "method")) {
+    fprintf(stderr, "empty method last_error: code=%d msg=%s\n", code, msg);
+    return fail("empty method did not record INVALID_MESSAGE");
+  }
+
+  const char *method_whitespace =
+      "{\"protocolVersion\":1,\"requestId\":206,\"method\":\"runtime. ping\","
+      "\"params\":{}}";
+  if (send_str(rt, method_whitespace) != RC_SEND_PROTOCOL_ERROR) {
+    return fail("method whitespace did not return RC_SEND_PROTOCOL_ERROR");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "method")) {
+    fprintf(stderr, "method whitespace last_error: code=%d msg=%s\n", code,
+            msg);
+    return fail("method whitespace did not record INVALID_MESSAGE");
+  }
+
+  const char *method_empty_segment =
+      "{\"protocolVersion\":1,\"requestId\":207,\"method\":\"runtime..ping\","
+      "\"params\":{}}";
+  if (send_str(rt, method_empty_segment) != RC_SEND_PROTOCOL_ERROR) {
+    return fail("method empty segment did not return RC_SEND_PROTOCOL_ERROR");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "method")) {
+    fprintf(stderr, "method empty segment last_error: code=%d msg=%s\n", code,
+            msg);
+    return fail("method empty segment did not record INVALID_MESSAGE");
+  }
+  if (channel_count(&ch) != 0) {
+    return fail("invalid command envelope emitted an async event");
+  }
+
+  // --- core.info ---------------------------------------------------------
+  size_t ev = 0;
+  char event[EVENT_BUF];
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":10,\"method\":\"core."
+               "info\",\"params\":{}}") != RC_SEND_OK) {
+    return fail("core.info send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no core.info event");
+  }
+  ev++;
+  const char *core_info_needles[] = {
+      "\"type\":\"result\"",
+      "\"requestId\":10",
+      "\"data\":{",
+      "\"abiVersion\":1",
+      "\"buildVersion\":\"reader-core-native ",
+      "\"capabilities\":[",
+      "\"core.info\"",
+      "\"runtime.ping\"",
+      "\"runtime.hostSmoke\"",
+      "\"runtime.cancel\"",
+      "\"runtime.status\"",
+      "\"runtime.shutdown\"",
+      "\"host.complete\"",
+      "\"host.error\"",
+      "\"host.bus.v1\"",
+      "\"http.execute\"",
+      "\"runtime.config.v1\"",
+      "\"remote.reading.v1\"",
+  };
+  for (size_t i = 0;
+       i < sizeof core_info_needles / sizeof core_info_needles[0]; i++) {
+    if (!contains(event, core_info_needles[i])) {
+      fprintf(stderr, "core.info missing %s in event: %s\n",
+              core_info_needles[i], event);
+      return fail("core.info event shape");
+    }
+  }
+  if (count_occurrences(event, "\"protocolVersion\":1") < 2) {
+    fprintf(stderr, "unexpected core.info event: %s\n", event);
+    return fail("core.info did not report both event and data protocolVersion");
+  }
+
+  // --- runtime.ping + last_error cleared on success ---------------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":11,\"method\":\"runtime."
+               "ping\",\"params\":{}}") != RC_SEND_OK) {
+    return fail("runtime.ping send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no ping event");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"requestId\":11") || !contains(event, "\"pong\":true")) {
+    fprintf(stderr, "unexpected ping event: %s\n", event);
+    return fail("ping event shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("successful send did not clear last_error");
+  }
+
+  // --- Duplicate active requestId (first must stay pending) -------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":50,\"method\":\"runtime."
+               "hostSmoke\",\"params\":{\"capability\":\"host.smoke.echo\","
+               "\"params\":{}}}") != RC_SEND_OK) {
+    return fail("hostSmoke(50) send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no host.request for 50");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":50")) {
+    return fail("host.request(50) shape");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":50,\"method\":\"runtime."
+               "ping\",\"params\":{}}") != RC_SEND_PROTOCOL_ERROR) {
+    return fail("duplicate requestId did not return RC_SEND_PROTOCOL_ERROR");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "duplicate")) {
+    fprintf(stderr, "duplicate last_error: code=%d msg=%s\n", code, msg);
+    return fail("duplicate did not record INVALID_MESSAGE");
+  }
+  if (rc_runtime_cancel(rt, 50) != RC_CANCEL_OK) {
+    return fail("cancel(50) failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no cancelled event for 50");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"requestId\":50") ||
+      !contains(event, "\"CANCELLED\"")) {
+    return fail("cancelled(50) shape");
+  }
+
+  // --- host.request -> host.complete round trip -------------------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":60,\"method\":\"runtime."
+               "hostSmoke\",\"params\":{\"capability\":\"host.smoke.echo\","
+               "\"params\":{\"hello\":\"world\"}}}") != RC_SEND_OK) {
+    return fail("hostSmoke(60) send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no host.request for 60");
+  }
+  ev++;
+  uint64_t op60 = 0;
+  if (!json_u64(event, "operationId", &op60) ||
+      op60 == 0 ||
+      !contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"capability\":\"host.smoke.echo\"") ||
+      !contains(event, "\"params\":{") ||
+      !contains(event, "\"hello\":\"world\"")) {
+    fprintf(stderr, "host.request(60): %s\n", event);
+    return fail("host.request(60) shape");
+  }
+
+  char complete[256];
+  snprintf(complete, sizeof complete,
+           "{\"protocolVersion\":1,\"requestId\":61,\"method\":\"host."
+           "complete\",\"params\":{\"operationId\":%llu,\"result\":{\"echoed\":"
+           "true}}}",
+           (unsigned long long)op60);
+  if (send_str(rt, complete) != RC_SEND_OK) {
+    return fail("host.complete(60) send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no result event for 60");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":60") ||
+      !contains(event, "\"echoed\":true")) {
+    fprintf(stderr, "result(60): %s\n", event);
+    return fail("host.complete result shape");
+  }
+  if (rc_runtime_cancel(rt, 60) != RC_CANCEL_OK ||
+      rc_runtime_cancel(rt, 60) != RC_CANCEL_OK) {
+    return fail("cancel completed request did not return RC_CANCEL_OK");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("cancel completed request did not clear last_error");
+  }
+  if (channel_count(&ch) != ev) {
+    return fail("cancel completed request emitted an async event");
+  }
+  snprintf(complete, sizeof complete,
+           "{\"protocolVersion\":1,\"requestId\":78,\"method\":\"host."
+           "complete\",\"params\":{\"operationId\":%llu,\"result\":{\"echoed\":"
+           "true}}}",
+           (unsigned long long)op60);
+  if (send_str(rt, complete) != RC_SEND_OK) {
+    return fail("duplicate host.complete(60) send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for duplicate host.complete");
+  }
+  ev++;
+  char completed_op60[64];
+  snprintf(completed_op60, sizeof completed_op60, "\"operationId\":%llu",
+           (unsigned long long)op60);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":78") ||
+      !contains(event, "\"code\":\"INVALID_PARAMS\"") ||
+      !contains(event, completed_op60)) {
+    fprintf(stderr, "duplicate host.complete error: %s\n", event);
+    return fail("duplicate host.complete error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("duplicate host.complete left synchronous last_error");
+  }
+
+  // --- invalid runtime.hostSmoke params return async protocol errors ----
+  const struct {
+    const char *name;
+    const char *json;
+    unsigned long long request_id;
+    const char *message_fragment;
+  } invalid_host_requests[] = {
+      {"capability whitespace",
+       "{\"protocolVersion\":1,\"requestId\":307,\"method\":\"runtime."
+       "hostSmoke\",\"params\":{\"capability\":\"host. smoke.echo\","
+       "\"params\":{\"message\":\"invalid capability\"}}}",
+       307,
+       "capability"},
+      {"capability empty segment",
+       "{\"protocolVersion\":1,\"requestId\":308,\"method\":\"runtime."
+       "hostSmoke\",\"params\":{\"capability\":\"host..echo\","
+       "\"params\":{\"message\":\"invalid capability\"}}}",
+       308,
+       "capability"},
+      {"unknown params",
+       "{\"protocolVersion\":1,\"requestId\":309,\"method\":\"runtime."
+       "hostSmoke\",\"params\":{\"capability\":\"host.smoke.echo\","
+       "\"params\":{\"message\":\"unexpected metadata\"},\"timeoutMs\":1000}}",
+       309,
+       "runtime.hostSmoke"},
+      {"params not object",
+       "{\"protocolVersion\":1,\"requestId\":420,\"method\":\"runtime."
+       "hostSmoke\",\"params\":{\"capability\":\"host.smoke.echo\","
+       "\"params\":[\"message\",\"not an object\"]}}",
+       420,
+       "params.params"},
+  };
+  for (size_t i = 0;
+       i < sizeof invalid_host_requests / sizeof invalid_host_requests[0];
+       i++) {
+    if (send_str(rt, invalid_host_requests[i].json) != RC_SEND_OK) {
+      return fail("invalid host request send failed");
+    }
+    strcpy(msg, "stale");
+    if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+      return fail("invalid host request left synchronous last_error");
+    }
+    if (wait_event(&ch, ev, event, sizeof event) != 0) {
+      return fail("no invalid host request error event");
+    }
+    ev++;
+    char request_id_field[32];
+    snprintf(request_id_field, sizeof request_id_field, "\"requestId\":%llu",
+             invalid_host_requests[i].request_id);
+    if (!contains(event, "\"protocolVersion\":1") ||
+        !contains(event, "\"type\":\"error\"") ||
+        !contains(event, request_id_field) ||
+        !contains(event, "\"code\":\"INVALID_PARAMS\"") ||
+        !contains(event, invalid_host_requests[i].message_fragment) ||
+        contains(event, "\"type\":\"host.request\"")) {
+      fprintf(stderr, "invalid host request %s: %s\n",
+              invalid_host_requests[i].name, event);
+      return fail("invalid host request error shape");
+    }
+  }
+
+  // --- host.request -> host.error ---------------------------------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":62,\"method\":\"runtime."
+               "hostSmoke\",\"params\":{\"capability\":\"host.smoke.echo\","
+               "\"params\":{}}}") != RC_SEND_OK) {
+    return fail("hostSmoke(62) send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no host.request for 62");
+  }
+  ev++;
+  uint64_t op62 = 0;
+  if (!json_u64(event, "operationId", &op62) ||
+      !contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":62")) {
+    return fail("host.request(62) shape");
+  }
+  char err_cmd[320];
+  snprintf(err_cmd, sizeof err_cmd,
+           "{\"protocolVersion\":1,\"requestId\":63,\"method\":\"host."
+           "error\",\"params\":{\"operationId\":%llu,\"error\":{\"code\":"
+           "\"INTERNAL\",\"message\":\"host failed\",\"retryable\":true}}}",
+           (unsigned long long)op62);
+  if (send_str(rt, err_cmd) != RC_SEND_OK) {
+    return fail("host.error(62) send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for 62");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":62") ||
+      !contains(event, "\"INTERNAL\"") || !contains(event, "\"retryable\":true")) {
+    fprintf(stderr, "error(62): %s\n", event);
+    return fail("host.error result shape");
+  }
+
+  // --- runtime.status reports pending host metadata without payload -----
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":75,\"method\":\"runtime."
+               "hostSmoke\",\"params\":{\"capability\":\"host.smoke.echo\","
+               "\"params\":{\"hidden\":\"status payload\"}}}") != RC_SEND_OK) {
+    return fail("hostSmoke(75) send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no host.request for status metadata");
+  }
+  ev++;
+  uint64_t op75 = 0;
+  if (!json_u64(event, "operationId", &op75) ||
+      !contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":75") ||
+      !contains(event, "\"hidden\":\"status payload\"")) {
+    fprintf(stderr, "host.request(75): %s\n", event);
+    return fail("host.request(75) shape");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":76,\"method\":\"runtime."
+               "status\",\"params\":{}}") != RC_SEND_OK) {
+    return fail("runtime.status send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no runtime.status result");
+  }
+  ev++;
+  char status_op[64];
+  snprintf(status_op, sizeof status_op, "\"operationId\":%llu",
+           (unsigned long long)op75);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":76") ||
+      !contains(event, "\"activeRequestCount\":1") ||
+      !contains(event, "\"activeRequestIds\":[75]") ||
+      !contains(event, "\"pendingHostOperationCount\":1") ||
+      !contains(event, "\"pendingHostOperations\"") ||
+      !contains(event, status_op) ||
+      !contains(event, "\"requestId\":75") ||
+      !contains(event, "\"capability\":\"host.smoke.echo\"") ||
+      !contains(event, "\"state\":\"pending\"") ||
+      !contains(event, "\"shuttingDown\":false") ||
+      contains(event, "\"hidden\"") || contains(event, "status payload")) {
+    fprintf(stderr, "runtime.status result: %s\n", event);
+    return fail("runtime.status pending metadata shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("runtime.status left synchronous last_error");
+  }
+  char status_complete[256];
+  snprintf(status_complete, sizeof status_complete,
+           "{\"protocolVersion\":1,\"requestId\":77,\"method\":\"host."
+           "complete\",\"params\":{\"operationId\":%llu,\"result\":{\"echoed\":"
+           "true}}}",
+           (unsigned long long)op75);
+  if (send_str(rt, status_complete) != RC_SEND_OK) {
+    return fail("host.complete(75) send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no result event for status host.complete");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":75") ||
+      !contains(event, "\"echoed\":true")) {
+    fprintf(stderr, "status host.complete result: %s\n", event);
+    return fail("status host.complete result shape");
+  }
+
+  // --- host.complete for an unknown operation -> async INVALID_PARAMS ----
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":66,\"method\":\"host."
+               "complete\",\"params\":{\"operationId\":999999,\"result\":{"
+               "\"ok\":true}}}") != RC_SEND_OK) {
+    return fail("unknown host.complete send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for unknown host.complete");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":66") ||
+      !contains(event, "\"INVALID_PARAMS\"")) {
+    fprintf(stderr, "unknown host.complete error: %s\n", event);
+    return fail("unknown host.complete error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("unknown host.complete send left synchronous last_error");
+  }
+
+  // --- host.complete invalid params -> async INVALID_PARAMS -------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":305,\"method\":\"host."
+               "complete\",\"params\":{\"operationId\":0,\"result\":{\"status\":"
+               "\"invalid\"}}}") != RC_SEND_OK) {
+    return fail("zero operation host.complete send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for zero operation host.complete");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":305") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "\"operationId\":0")) {
+    fprintf(stderr, "zero operation host.complete error: %s\n", event);
+    return fail("zero operation host.complete error shape");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":422,\"method\":\"host."
+               "complete\",\"params\":{\"operationId\":1,\"result\":[\"not\","
+               "\"an\",\"object\"]}}") != RC_SEND_OK) {
+    return fail("non-object result host.complete send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for non-object result host.complete");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":422") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "host.complete result")) {
+    fprintf(stderr, "non-object result host.complete error: %s\n", event);
+    return fail("non-object result host.complete error shape");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":314,\"method\":\"host."
+               "complete\",\"params\":{\"operationId\":1,\"result\":{\"status\":"
+               "\"ok\"},\"completedAt\":123}}") != RC_SEND_OK) {
+    return fail("unknown field host.complete send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for unknown field host.complete");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":314") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "host.complete") ||
+      !contains(event, "unknown field")) {
+    fprintf(stderr, "unknown field host.complete error: %s\n", event);
+    return fail("unknown field host.complete error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("host.complete invalid params left synchronous last_error");
+  }
+
+  // --- host.error invalid params -> async INVALID_PARAMS ----------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":306,\"method\":\"host."
+               "error\",\"params\":{\"operationId\":0,\"error\":{\"code\":"
+               "\"INTERNAL\",\"message\":\"invalid operation id\","
+               "\"retryable\":false}}}") != RC_SEND_OK) {
+    return fail("zero operation host.error send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for zero operation host.error");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":306") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "\"operationId\":0")) {
+    fprintf(stderr, "zero operation host.error error: %s\n", event);
+    return fail("zero operation host.error error shape");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":315,\"method\":\"host."
+               "error\",\"params\":{\"operationId\":1,\"error\":{\"code\":"
+               "\"INTERNAL\",\"message\":\"host failed\",\"retryable\":true},"
+               "\"failedAt\":123}}") != RC_SEND_OK) {
+    return fail("unknown field host.error send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for unknown field host.error");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":315") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "host.error") ||
+      !contains(event, "unknown field")) {
+    fprintf(stderr, "unknown field host.error error: %s\n", event);
+    return fail("unknown field host.error error shape");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":423,\"method\":\"host."
+               "error\",\"params\":{\"operationId\":1,\"error\":{\"code\":"
+               "\"INTERNAL\",\"message\":\"host failed\",\"retryable\":true,"
+               "\"details\":[\"not\",\"an\",\"object\"]}}}") != RC_SEND_OK) {
+    return fail("non-object details host.error send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for non-object details host.error");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":423") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "details")) {
+    fprintf(stderr, "non-object details host.error error: %s\n", event);
+    return fail("non-object details host.error error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("host.error invalid params left synchronous last_error");
+  }
+
+  // --- invalid source.import params -> async INVALID_PARAMS -------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":319,\"method\":\"source."
+               "import\",\"params\":{\"sourceId\":\"ffi-source\","
+               "\"name\":\"   \",\"baseUrl\":\"https://books.example.test\"}}") !=
+      RC_SEND_OK) {
+    return fail("source.import whitespace name send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for source.import whitespace name");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":319") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "name")) {
+    fprintf(stderr, "source.import whitespace name error: %s\n", event);
+    return fail("source.import whitespace name error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("source.import whitespace name left synchronous last_error");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":320,\"method\":\"source."
+               "import\",\"params\":{\"sourceId\":\"ffi-source\","
+               "\"name\":\"FFI Source\",\"baseUrl\":\"https://books.example."
+               "test\",\"rules\":[\"search\",\"detail\"]}}") != RC_SEND_OK) {
+    return fail("source.import bad rules send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for source.import bad rules");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":320") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "rules")) {
+    fprintf(stderr, "source.import bad rules error: %s\n", event);
+    return fail("source.import bad rules error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("source.import bad rules left synchronous last_error");
+  }
+
+  // --- invalid inline source shape -> async INVALID_PARAMS --------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":321,\"method\":\"book."
+               "search\",\"params\":{\"sourceId\":\"ffi-http-src\","
+               "\"searchResponse\":\"{\\\"books\\\":[]}\","
+               "\"source\":[\"ffi-http-src\"]}}") != RC_SEND_OK) {
+    return fail("book.search bad inline source send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for bad inline source");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":321") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "inline source")) {
+    fprintf(stderr, "bad inline source error: %s\n", event);
+    return fail("bad inline source error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("bad inline source left synchronous last_error");
+  }
+
+  // --- invalid book.detail book shape -> async INVALID_PARAMS -----------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":421,\"method\":\"book."
+               "detail\",\"params\":{\"sourceId\":\"ffi-http-src\","
+               "\"book\":[{\"bookId\":\"1\"}],"
+               "\"detailResponse\":\"{\\\"detail\\\":{\\\"bookId\\\":\\\"1\\\","
+               "\\\"title\\\":\\\"Dune\\\"}}\","
+               "\"source\":{\"sourceId\":\"ffi-http-src\",\"name\":\"FFI "
+               "HTTP Source\",\"baseUrl\":\"https://books.example.test\","
+               "\"rules\":{\"detail\":[{\"kind\":\"jsonPath\",\"path\":\"$."
+               "detail\"}]}}}}") != RC_SEND_OK) {
+    return fail("book.detail bad book send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for bad book.detail book");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":421") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "book.detail book")) {
+    fprintf(stderr, "bad book.detail book error: %s\n", event);
+    return fail("bad book.detail book error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("bad book.detail book left synchronous last_error");
+  }
+
+  // --- invalid remote http.execute request method -> async INVALID_PARAMS
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":316,\"method\":\"book."
+               "search\",\"params\":{\"sourceId\":\"ffi-http-src\","
+               "\"searchRequest\":{\"url\":\"https://books.example.test/"
+               "search?q=empty-method\",\"method\":\"\"},"
+               "\"source\":{\"sourceId\":\"ffi-http-src\",\"name\":\"FFI HTTP "
+               "Source\",\"baseUrl\":\"https://books.example.test\",\"rules\":{"
+               "\"search\":[{\"kind\":\"jsonPath\",\"path\":\"$.books[*]\"}]}}"
+               "}}") != RC_SEND_OK) {
+    return fail("book.search empty http method send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for empty http method");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":316") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "method")) {
+    fprintf(stderr, "empty http method error: %s\n", event);
+    return fail("empty http method error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("empty http method left synchronous last_error");
+  }
+
+  // --- invalid remote http.execute request headers -> async INVALID_PARAMS
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":317,\"method\":\"book."
+               "search\",\"params\":{\"sourceId\":\"ffi-http-src\","
+               "\"searchRequest\":{\"url\":\"https://books.example.test/"
+               "search?q=bad-headers\",\"headers\":[\"Accept\",\"application/"
+               "json\"]},"
+               "\"source\":{\"sourceId\":\"ffi-http-src\",\"name\":\"FFI HTTP "
+               "Source\",\"baseUrl\":\"https://books.example.test\",\"rules\":{"
+               "\"search\":[{\"kind\":\"jsonPath\",\"path\":\"$.books[*]\"}]}}"
+               "}}") != RC_SEND_OK) {
+    return fail("book.search bad http headers send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for bad http headers");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":317") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "headers")) {
+    fprintf(stderr, "bad http headers error: %s\n", event);
+    return fail("bad http headers error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("bad http headers left synchronous last_error");
+  }
+
+  // --- invalid remote http.execute request url -> async INVALID_PARAMS ---
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":318,\"method\":\"book."
+               "search\",\"params\":{\"sourceId\":\"ffi-http-src\","
+               "\"searchRequest\":{\"url\":\"   \"},"
+               "\"source\":{\"sourceId\":\"ffi-http-src\",\"name\":\"FFI HTTP "
+               "Source\",\"baseUrl\":\"https://books.example.test\",\"rules\":{"
+               "\"search\":[{\"kind\":\"jsonPath\",\"path\":\"$.books[*]\"}]}}"
+               "}}") != RC_SEND_OK) {
+    return fail("book.search whitespace http url send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for whitespace http url");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":318") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "url")) {
+    fprintf(stderr, "whitespace http url error: %s\n", event);
+    return fail("whitespace http url error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("whitespace http url left synchronous last_error");
+  }
+
+  // --- remote http.execute completion carries metadata ------------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":68,\"method\":\"book."
+               "search\",\"params\":{\"sourceId\":\"ffi-http-src\","
+               "\"searchRequest\":{\"url\":\"https://books.example.test/"
+               "search?q=abi\",\"headers\":{\"Accept\":\"application/json\"}},"
+               "\"source\":{\"sourceId\":\"ffi-http-src\",\"name\":\"FFI HTTP "
+               "Source\",\"baseUrl\":\"https://books.example.test\",\"rules\":{"
+               "\"search\":[{\"kind\":\"jsonPath\",\"path\":\"$.books[*]\"}]}}"
+               "}}") != RC_SEND_OK) {
+    return fail("book.search http request send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no http.execute host.request event");
+  }
+  ev++;
+  uint64_t http_op = 0;
+  if (!json_u64(event, "operationId", &http_op) ||
+      !contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":68") ||
+      !contains(event, "\"capability\":\"http.execute\"") ||
+      !contains(event, "search?q=abi") ||
+      !contains(event, "\"Accept\":\"application/json\"")) {
+    fprintf(stderr, "http.execute request: %s\n", event);
+    return fail("http.execute request shape");
+  }
+  char http_complete[512];
+  snprintf(http_complete, sizeof http_complete,
+           "{\"protocolVersion\":1,\"requestId\":69,\"method\":\"host."
+           "complete\",\"params\":{\"operationId\":%llu,\"result\":{\"status\":"
+           "200,\"headers\":{\"content-type\":\"application/json\"},\"body\":"
+           "\"{\\\"books\\\":[]}\"}}}",
+           (unsigned long long)http_op);
+  if (send_str(rt, http_complete) != RC_SEND_OK) {
+    return fail("http host.complete send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no result event for http completion");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":68") ||
+      !contains(event, "\"books\":[]") ||
+      !contains(event, "\"http\"") ||
+      !contains(event, "\"status\":200") ||
+      !contains(event, "\"content-type\":\"application/json\"")) {
+    fprintf(stderr, "http completion result: %s\n", event);
+    return fail("http completion result shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("http completion left synchronous last_error");
+  }
+
+  // --- remote http.execute invalid status -> async INVALID_PARAMS -------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":70,\"method\":\"book."
+               "search\",\"params\":{\"sourceId\":\"ffi-http-src\","
+               "\"searchRequest\":{\"url\":\"https://books.example.test/"
+               "search?q=invalid-status\"},\"source\":{\"sourceId\":\"ffi-http-"
+               "src\",\"name\":\"FFI HTTP Source\",\"baseUrl\":\"https://books."
+               "example.test\",\"rules\":{\"search\":[{\"kind\":\"jsonPath\","
+               "\"path\":\"$.books[*]\"}]}}}}") != RC_SEND_OK) {
+    return fail("book.search invalid-status request send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no invalid-status http.execute host.request event");
+  }
+  ev++;
+  uint64_t invalid_http_op = 0;
+  if (!json_u64(event, "operationId", &invalid_http_op) ||
+      !contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":70") ||
+      !contains(event, "\"capability\":\"http.execute\"") ||
+      !contains(event, "search?q=invalid-status")) {
+    fprintf(stderr, "invalid-status http.execute request: %s\n", event);
+    return fail("invalid-status http.execute request shape");
+  }
+  char invalid_http_complete[512];
+  snprintf(invalid_http_complete, sizeof invalid_http_complete,
+           "{\"protocolVersion\":1,\"requestId\":71,\"method\":\"host."
+           "complete\",\"params\":{\"operationId\":%llu,\"result\":{\"status\":"
+           "99,\"body\":\"{\\\"books\\\":[]}\"}}}",
+           (unsigned long long)invalid_http_op);
+  if (send_str(rt, invalid_http_complete) != RC_SEND_OK) {
+    return fail("invalid-status http host.complete send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for invalid http status");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":70") ||
+      !contains(event, "\"code\":\"INVALID_PARAMS\"") ||
+      !contains(event, "status") || !contains(event, "\"status\":99")) {
+    fprintf(stderr, "invalid http status error: %s\n", event);
+    return fail("invalid http status error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("invalid http status left synchronous last_error");
+  }
+
+  // --- remote http.execute invalid headers -> async INVALID_PARAMS ------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":72,\"method\":\"book."
+               "search\",\"params\":{\"sourceId\":\"ffi-http-src\","
+               "\"searchRequest\":{\"url\":\"https://books.example.test/"
+               "search?q=invalid-headers\"},\"source\":{\"sourceId\":\"ffi-"
+               "http-src\",\"name\":\"FFI HTTP Source\",\"baseUrl\":\"https://"
+               "books.example.test\",\"rules\":{\"search\":[{\"kind\":"
+               "\"jsonPath\",\"path\":\"$.books[*]\"}]}}}}") != RC_SEND_OK) {
+    return fail("book.search invalid-headers request send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no invalid-headers http.execute host.request event");
+  }
+  ev++;
+  uint64_t invalid_headers_op = 0;
+  if (!json_u64(event, "operationId", &invalid_headers_op) ||
+      !contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":72") ||
+      !contains(event, "\"capability\":\"http.execute\"") ||
+      !contains(event, "search?q=invalid-headers")) {
+    fprintf(stderr, "invalid-headers http.execute request: %s\n", event);
+    return fail("invalid-headers http.execute request shape");
+  }
+  char invalid_headers_complete[640];
+  snprintf(invalid_headers_complete, sizeof invalid_headers_complete,
+           "{\"protocolVersion\":1,\"requestId\":73,\"method\":\"host."
+           "complete\",\"params\":{\"operationId\":%llu,\"result\":{\"status\":"
+           "200,\"headers\":[\"content-type\",\"application/json\"],\"body\":"
+           "\"{\\\"books\\\":[]}\"}}}",
+           (unsigned long long)invalid_headers_op);
+  if (send_str(rt, invalid_headers_complete) != RC_SEND_OK) {
+    return fail("invalid-headers http host.complete send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for invalid http headers");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":72") ||
+      !contains(event, "\"code\":\"INVALID_PARAMS\"") ||
+      !contains(event, "headers") ||
+      !contains(event, "[\"content-type\",\"application/json\"]")) {
+    fprintf(stderr, "invalid http headers error: %s\n", event);
+    return fail("invalid http headers error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("invalid http headers left synchronous last_error");
+  }
+
+  // --- method-specific invalid params -> async INVALID_PARAMS ------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":67,\"method\":\"reading."
+               "progress.update\",\"params\":{\"bookId\":\"1\","
+               "\"chapterIndex\":2,\"chapterOffset\":128,"
+               "\"chapterProgress\":0.5,\"syncToken\":\"host-owned\"}}") !=
+      RC_SEND_OK) {
+    return fail("reading.progress.update invalid params send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for invalid reading.progress.update params");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":67") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "reading.progress.update")) {
+    fprintf(stderr, "invalid reading.progress.update error: %s\n", event);
+    return fail("invalid reading.progress.update error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("invalid reading.progress.update send left synchronous last_error");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":68,\"method\":\"reading."
+               "progress.update\",\"params\":{\"bookId\":\"1\","
+               "\"chapterIndex\":2,\"chapterOffset\":128,"
+               "\"chapterProgress\":1.25}}") != RC_SEND_OK) {
+    return fail("reading.progress.update out-of-range progress send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for out-of-range reading.progress.update");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":68") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "chapterProgress")) {
+    fprintf(stderr, "out-of-range reading.progress.update error: %s\n", event);
+    return fail("out-of-range reading.progress.update error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("out-of-range reading.progress.update left synchronous last_error");
+  }
+
+  // --- unknown method -> async error event ------------------------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":64,\"method\":\"no.such."
+               "method\",\"params\":{}}") != RC_SEND_OK) {
+    return fail("unknown method send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for 64");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"requestId\":64") ||
+      !contains(event, "\"UNKNOWN_METHOD\"")) {
+    fprintf(stderr, "error(64): %s\n", event);
+    return fail("unknown method error shape");
+  }
+
+  // --- cancel a pending host.request ------------------------------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":65,\"method\":\"runtime."
+               "hostSmoke\",\"params\":{\"capability\":\"host.smoke.echo\","
+               "\"params\":{}}}") != RC_SEND_OK) {
+    return fail("hostSmoke(65) send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no host.request for 65");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":65")) {
+    fprintf(stderr, "host.request(65): %s\n", event);
+    return fail("host.request(65) shape");
+  }
+  if (rc_runtime_cancel(rt, 65) != RC_CANCEL_OK) {
+    return fail("cancel(65) failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no cancelled event for 65");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"requestId\":65") ||
+      !contains(event, "\"CANCELLED\"")) {
+    fprintf(stderr, "cancelled(65): %s\n", event);
+    return fail("cancelled(65) shape");
+  }
+
+  // --- runtime.cancel command cancels a pending host.request ------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":301,\"method\":\"runtime."
+               "hostSmoke\",\"params\":{\"capability\":\"host.smoke.echo\","
+               "\"params\":{\"message\":\"conformance host request\"}}}") !=
+      RC_SEND_OK) {
+    return fail("hostSmoke(301) send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no host.request for 301");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":301") ||
+      !contains(event, "\"capability\":\"host.smoke.echo\"") ||
+      !contains(event, "\"message\":\"conformance host request\"")) {
+    fprintf(stderr, "host.request(301): %s\n", event);
+    return fail("host.request(301) shape");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":310,\"method\":\"runtime."
+               "cancel\",\"params\":{\"requestId\":301}}") != RC_SEND_OK) {
+    return fail("runtime.cancel send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no cancelled event for runtime.cancel");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":301") ||
+      !contains(event, "\"CANCELLED\"")) {
+    fprintf(stderr, "runtime.cancel cancelled event: %s\n", event);
+    return fail("runtime.cancel cancelled event shape");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no runtime.cancel result");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":310") ||
+      !contains(event, "\"cancelled\":true")) {
+    fprintf(stderr, "runtime.cancel result: %s\n", event);
+    return fail("runtime.cancel result shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("runtime.cancel left synchronous last_error");
+  }
+
+  // --- runtime.cancel command false/invalid params ----------------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":313,\"method\":\"runtime."
+               "cancel\",\"params\":{\"requestId\":999999}}") != RC_SEND_OK) {
+    return fail("runtime.cancel unknown target send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no runtime.cancel false result");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":313") ||
+      !contains(event, "\"cancelled\":false")) {
+    fprintf(stderr, "runtime.cancel false result: %s\n", event);
+    return fail("runtime.cancel false result shape");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":311,\"method\":\"runtime."
+               "cancel\",\"params\":{\"requestId\":0}}") != RC_SEND_OK) {
+    return fail("runtime.cancel zero target send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no runtime.cancel zero target error");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":311") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "\"requestId\":0")) {
+    fprintf(stderr, "runtime.cancel zero target error: %s\n", event);
+    return fail("runtime.cancel zero target error shape");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":312,\"method\":\"runtime."
+               "cancel\",\"params\":{\"requestId\":301,\"reason\":\"host-"
+               "request-timeout\"}}") != RC_SEND_OK) {
+    return fail("runtime.cancel unknown field send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no runtime.cancel unknown field error");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":312") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "runtime.cancel") ||
+      !contains(event, "unknown field")) {
+    fprintf(stderr, "runtime.cancel unknown field error: %s\n", event);
+    return fail("runtime.cancel unknown field error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("runtime.cancel invalid params left synchronous last_error");
+  }
+
+  // --- invalid runtime.shutdown params do not stop runtime --------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":73,\"method\":\"runtime."
+               "shutdown\",\"params\":{\"force\":true}}") != RC_SEND_OK) {
+    return fail("invalid runtime.shutdown send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no invalid runtime.shutdown error event");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":73") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "runtime.shutdown")) {
+    fprintf(stderr, "invalid runtime.shutdown error: %s\n", event);
+    return fail("invalid runtime.shutdown error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("invalid runtime.shutdown send left synchronous last_error");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":74,\"method\":\"runtime."
+               "ping\",\"params\":{}}") != RC_SEND_OK) {
+    return fail("runtime.ping after invalid shutdown failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no ping event after invalid shutdown");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":74") ||
+      !contains(event, "\"pong\":true")) {
+    fprintf(stderr, "ping after invalid shutdown: %s\n", event);
+    return fail("ping after invalid shutdown shape");
+  }
+
+  // --- runtime.shutdown cancels pending work and blocks future sends -----
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":70,\"method\":\"runtime."
+               "hostSmoke\",\"params\":{\"capability\":\"host.smoke.echo\","
+               "\"params\":{}}}") != RC_SEND_OK) {
+    return fail("hostSmoke(70) send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no host.request for 70");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":70")) {
+    fprintf(stderr, "host.request(70): %s\n", event);
+    return fail("host.request(70) shape");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":71,\"method\":\"runtime."
+               "shutdown\",\"params\":{}}") != RC_SEND_OK) {
+    return fail("runtime.shutdown send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no cancelled event for shutdown");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":70") ||
+      !contains(event, "\"CANCELLED\"")) {
+    fprintf(stderr, "shutdown cancelled event: %s\n", event);
+    return fail("shutdown cancelled event shape");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no runtime.shutdown result");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":71") ||
+      !contains(event, "\"shuttingDown\":true") ||
+      !contains(event, "\"cancelledRequestIds\":[70]")) {
+    fprintf(stderr, "shutdown result: %s\n", event);
+    return fail("shutdown result shape");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":72,\"method\":\"runtime."
+               "ping\",\"params\":{}}") != RC_SEND_PROTOCOL_ERROR) {
+    return fail("runtime.ping after shutdown did not return RC_SEND_PROTOCOL_ERROR");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INTERNAL || !contains(msg, "shutting down")) {
+    fprintf(stderr, "post-shutdown send last_error: code=%d msg=%s\n", code,
+            msg);
+    return fail("post-shutdown send did not record INTERNAL");
+  }
+  if (channel_count(&ch) != ev) {
+    return fail("post-shutdown send emitted an async event");
+  }
+
+  if (rc_runtime_send(rt, (const uint8_t *)"{", 1) != RC_SEND_INVALID_COMMAND) {
+    return fail("pre-destroy invalid command did not return RC_SEND_INVALID_COMMAND");
+  }
+  rc_runtime_destroy(rt);
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("successful destroy did not clear last_error");
+  }
+  pthread_mutex_destroy(&ch.mutex);
+
+  puts("c-abi-smoke: ok");
   return 0;
 }
