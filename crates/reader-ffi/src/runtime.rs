@@ -405,6 +405,80 @@ mod tests {
     }
 
     #[test]
+    fn invalid_command_envelope_reports_sync_errors_via_c_abi() {
+        let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
+        let handle = make_runtime(&events);
+
+        for (name, payload, status, message_fragment) in [
+            (
+                "missing requestId",
+                include_bytes!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-missing-request-id.json"
+                )
+                .as_slice(),
+                status::send::INVALID_COMMAND,
+                "command JSON",
+            ),
+            (
+                "requestId zero",
+                include_bytes!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-request-id-zero.json"
+                )
+                .as_slice(),
+                status::send::PROTOCOL_ERROR,
+                "requestId",
+            ),
+            (
+                "empty method",
+                include_bytes!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-empty-method.json"
+                )
+                .as_slice(),
+                status::send::PROTOCOL_ERROR,
+                "method",
+            ),
+            (
+                "method whitespace",
+                include_bytes!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-method-whitespace.json"
+                )
+                .as_slice(),
+                status::send::PROTOCOL_ERROR,
+                "method",
+            ),
+            (
+                "method empty segment",
+                include_bytes!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-method-empty-segment.json"
+                )
+                .as_slice(),
+                status::send::PROTOCOL_ERROR,
+                "method",
+            ),
+        ] {
+            assert_eq!(
+                unsafe { send(handle, payload.as_ptr(), payload.len()) },
+                status,
+                "{name}"
+            );
+            assert_eq!(
+                last_error_code(),
+                last_error::code_of(ErrorCode::InvalidMessage),
+                "{name}"
+            );
+            assert!(
+                last_error_message().contains(message_fragment),
+                "{name} last_error did not contain {message_fragment:?}"
+            );
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(25));
+        assert!(events.0.lock().unwrap().is_empty());
+
+        assert_eq!(unsafe { destroy(handle) }, 0);
+    }
+
+    #[test]
     fn create_rejects_invalid_config_and_records_last_error() {
         let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
         let ctx_ptr = Arc::as_ptr(&events) as *mut c_void;

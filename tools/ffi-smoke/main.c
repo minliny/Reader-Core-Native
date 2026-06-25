@@ -344,6 +344,71 @@ int main(void) {
     return fail("protocol v2 did not record INVALID_PROTOCOL_VERSION");
   }
 
+  const char *missing_request_id =
+      "{\"protocolVersion\":1,\"method\":\"runtime.ping\",\"params\":{}}";
+  if (send_str(rt, missing_request_id) != RC_SEND_INVALID_COMMAND) {
+    return fail("missing requestId did not return RC_SEND_INVALID_COMMAND");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "command JSON")) {
+    fprintf(stderr, "missing requestId last_error: code=%d msg=%s\n", code,
+            msg);
+    return fail("missing requestId did not record INVALID_MESSAGE");
+  }
+
+  const char *request_id_zero =
+      "{\"protocolVersion\":1,\"requestId\":0,\"method\":\"runtime.ping\","
+      "\"params\":{}}";
+  if (send_str(rt, request_id_zero) != RC_SEND_PROTOCOL_ERROR) {
+    return fail("requestId zero did not return RC_SEND_PROTOCOL_ERROR");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "requestId")) {
+    fprintf(stderr, "requestId zero last_error: code=%d msg=%s\n", code, msg);
+    return fail("requestId zero did not record INVALID_MESSAGE");
+  }
+
+  const char *empty_method =
+      "{\"protocolVersion\":1,\"requestId\":205,\"method\":\"\","
+      "\"params\":{}}";
+  if (send_str(rt, empty_method) != RC_SEND_PROTOCOL_ERROR) {
+    return fail("empty method did not return RC_SEND_PROTOCOL_ERROR");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "method")) {
+    fprintf(stderr, "empty method last_error: code=%d msg=%s\n", code, msg);
+    return fail("empty method did not record INVALID_MESSAGE");
+  }
+
+  const char *method_whitespace =
+      "{\"protocolVersion\":1,\"requestId\":206,\"method\":\"runtime. ping\","
+      "\"params\":{}}";
+  if (send_str(rt, method_whitespace) != RC_SEND_PROTOCOL_ERROR) {
+    return fail("method whitespace did not return RC_SEND_PROTOCOL_ERROR");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "method")) {
+    fprintf(stderr, "method whitespace last_error: code=%d msg=%s\n", code,
+            msg);
+    return fail("method whitespace did not record INVALID_MESSAGE");
+  }
+
+  const char *method_empty_segment =
+      "{\"protocolVersion\":1,\"requestId\":207,\"method\":\"runtime..ping\","
+      "\"params\":{}}";
+  if (send_str(rt, method_empty_segment) != RC_SEND_PROTOCOL_ERROR) {
+    return fail("method empty segment did not return RC_SEND_PROTOCOL_ERROR");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "method")) {
+    fprintf(stderr, "method empty segment last_error: code=%d msg=%s\n", code,
+            msg);
+    return fail("method empty segment did not record INVALID_MESSAGE");
+  }
+  if (channel_count(&ch) != 0) {
+    return fail("invalid command envelope emitted an async event");
+  }
+
   // --- core.info ---------------------------------------------------------
   size_t ev = 0;
   char event[EVENT_BUF];

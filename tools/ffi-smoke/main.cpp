@@ -305,6 +305,59 @@ int main() {
     return fail("protocol v2 did not record INVALID_PROTOCOL_VERSION");
   }
 
+  std::string missing_request_id =
+      R"({"protocolVersion":1,"method":"runtime.ping","params":{}})";
+  if (send_str(rt, missing_request_id) != RC_SEND_INVALID_COMMAND) {
+    return fail("missing requestId did not return RC_SEND_INVALID_COMMAND");
+  }
+  msg = last_error_message(&code);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "command JSON")) {
+    return fail("missing requestId did not record INVALID_MESSAGE");
+  }
+
+  std::string request_id_zero =
+      R"({"protocolVersion":1,"requestId":0,"method":"runtime.ping","params":{}})";
+  if (send_str(rt, request_id_zero) != RC_SEND_PROTOCOL_ERROR) {
+    return fail("requestId zero did not return RC_SEND_PROTOCOL_ERROR");
+  }
+  msg = last_error_message(&code);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "requestId")) {
+    return fail("requestId zero did not record INVALID_MESSAGE");
+  }
+
+  std::string empty_method =
+      R"({"protocolVersion":1,"requestId":205,"method":"","params":{}})";
+  if (send_str(rt, empty_method) != RC_SEND_PROTOCOL_ERROR) {
+    return fail("empty method did not return RC_SEND_PROTOCOL_ERROR");
+  }
+  msg = last_error_message(&code);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "method")) {
+    return fail("empty method did not record INVALID_MESSAGE");
+  }
+
+  std::string method_whitespace =
+      R"({"protocolVersion":1,"requestId":206,"method":"runtime. ping","params":{}})";
+  if (send_str(rt, method_whitespace) != RC_SEND_PROTOCOL_ERROR) {
+    return fail("method whitespace did not return RC_SEND_PROTOCOL_ERROR");
+  }
+  msg = last_error_message(&code);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "method")) {
+    return fail("method whitespace did not record INVALID_MESSAGE");
+  }
+
+  std::string method_empty_segment =
+      R"({"protocolVersion":1,"requestId":207,"method":"runtime..ping","params":{}})";
+  if (send_str(rt, method_empty_segment) != RC_SEND_PROTOCOL_ERROR) {
+    return fail("method empty segment did not return RC_SEND_PROTOCOL_ERROR");
+  }
+  msg = last_error_message(&code);
+  if (code != RC_ERR_INVALID_MESSAGE || !contains(msg, "method")) {
+    return fail("method empty segment did not record INVALID_MESSAGE");
+  }
+  if (channel_count(ch) != 0) {
+    return fail("invalid command envelope emitted an async event");
+  }
+
   size_t ev = 0;
 
   // --- core.info ---------------------------------------------------------
