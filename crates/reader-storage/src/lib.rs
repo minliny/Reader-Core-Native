@@ -173,6 +173,99 @@ impl StorageSnapshot {
     }
 }
 
+/// Lowest snapshot `schemaVersion` the migrator accepts as input.
+///
+/// Version 0 is the legacy pre-storage shape: it may omit `schemaVersion`
+/// entirely and may carry reading progress under the pre-snapshot `progress`
+/// field name instead of `legacyProgress`. The migrator normalizes both before
+/// deserializing into the current [`StorageSnapshot`] shape.
+pub const STORAGE_SNAPSHOT_MIN_SUPPORTED_SCHEMA_VERSION: u32 = 0;
+
+/// Upgrade a raw JSON snapshot to the current schema and validate it.
+///
+/// This is the canonical import entry point. Callers that already hold a typed
+/// [`StorageSnapshot`] at the current version can use [`StorageSnapshot::validate`]
+/// directly; `migrate_storage_snapshot` adds the ability to accept older or
+/// looser JSON shapes (missing `schemaVersion`, legacy field aliases) and bring
+/// them up to [`STORAGE_SNAPSHOT_SCHEMA_VERSION`].
+///
+/// The current schema is fixed at
+/// [`STORAGE_SNAPSHOT_SCHEMA_VERSION`]; any `schemaVersion` above that is
+/// rejected as [`StorageError::UnsupportedSnapshotSchemaVersion`] rather than
+/// silently truncated, so a future host never silently downgrades state it
+/// cannot understand.
+pub fn migrate_storage_snapshot(raw: serde_json::Value) -> Result<StorageSnapshot, StorageError> {
+    let mut object = match raw {
+        serde_json::Value::Object(object) => object,
+        _ => {
+            return Err(StorageError::InvalidSnapshot {
+                field: "root".into(),
+            });
+        }
+    };
+
+    let declared_version = object
+        .get("schemaVersion")
+        .and_then(|value| value.as_u64())
+        .map(|version| u32::try_from(version).unwrap_or(u32::MAX))
+        .unwrap_or(STORAGE_SNAPSHOT_MIN_SUPPORTED_SCHEMA_VERSION);
+
+    if declared_version > STORAGE_SNAPSHOT_SCHEMA_VERSION {
+        return Err(StorageError::UnsupportedSnapshotSchemaVersion {
+            schema_version: declared_version,
+        });
+    }
+
+    if declared_version < STORAGE_SNAPSHOT_SCHEMA_VERSION {
+        for from in declared_version..STORAGE_SNAPSHOT_SCHEMA_VERSION {
+            migrate_snapshot_step(&mut object, from)?;
+        }
+        object.insert(
+            "schemaVersion".into(),
+            serde_json::Value::from(STORAGE_SNAPSHOT_SCHEMA_VERSION),
+        );
+    }
+
+    let snapshot: StorageSnapshot = serde_json::from_value(serde_json::Value::Object(object))
+        .map_err(|_| StorageError::InvalidSnapshot {
+            field: "shape".into(),
+        })?;
+    snapshot.validate()?;
+    Ok(snapshot)
+}
+
+/// Apply one in-place schema upgrade step to a raw snapshot object.
+///
+/// Each step mutates the JSON object from `from` to `from + 1`. Only the
+/// `0 → 1` step is defined today; future versions register additional steps
+/// here. Keeping the steps as pure JSON transforms means the migrator never
+/// needs to round-trip through a typed legacy struct whose shape we do not own.
+fn migrate_snapshot_step(
+    object: &mut serde_json::Map<String, serde_json::Value>,
+    from: u32,
+) -> Result<(), StorageError> {
+    match from {
+        0 => {
+            // Legacy snapshots keyed reading progress under `progress`; the v1
+            // shape renamed it to `legacyProgress` to disambiguate from the
+            // composite-key `readingProgress` table. Merge into any existing
+            // `legacyProgress` array so a partial v0/v1 hybrid still imports.
+            if let Some(serde_json::Value::Array(incoming)) = object.remove("progress") {
+                let entry = object
+                    .entry("legacyProgress")
+                    .or_insert_with(|| serde_json::Value::Array(Vec::new()));
+                if let Some(existing) = entry.as_array_mut() {
+                    existing.extend(incoming);
+                }
+            }
+            Ok(())
+        }
+        other => Err(StorageError::UnsupportedSnapshotSchemaVersion {
+            schema_version: other,
+        }),
+    }
+}
+
 /// A book on the user's shelf.
 ///
 /// Keyed by the composite `(source_id, book_id)` so the same `book_id` from
@@ -4235,6 +4328,11 @@ pub enum StorageError {
     InvalidSnapshot {
         field: String,
     },
+    /// A storage snapshot carried a `schemaVersion` that no registered migration
+    /// knows how to upgrade to [`STORAGE_SNAPSHOT_SCHEMA_VERSION`].
+    UnsupportedSnapshotSchemaVersion {
+        schema_version: u32,
+    },
     /// An entry referenced by the operation does not exist.
     NotFound {
         source_id: String,
@@ -4265,6 +4363,10 @@ impl std::fmt::Display for StorageError {
             StorageError::InvalidSnapshot { field } => {
                 write!(f, "invalid storage snapshot field: {field}")
             }
+            StorageError::UnsupportedSnapshotSchemaVersion { schema_version } => write!(
+                f,
+                "unsupported storage snapshot schema version: {schema_version}"
+            ),
             StorageError::NotFound { source_id, book_id } => {
                 write!(
                     f,
@@ -4574,6 +4676,91 @@ mod tests {
         ));
 
         assert_eq!(store.export_snapshot(1).unwrap(), before);
+    }
+
+    #[test]
+    fn migrate_storage_snapshot_upgrades_legacy_v0_progress_to_v1() {
+        // v0 shape: no schemaVersion, reading progress under the legacy
+        // `progress` field name.
+        let raw = serde_json::json!({
+            "exportedAt": 99,
+            "progress": [
+                { "bookId": "legacy-b", "chapterIndex": 3, "chapterOffset": 250, "chapterProgress": 0.5 }
+            ]
+        });
+
+        let snapshot = migrate_storage_snapshot(raw).unwrap();
+        assert_eq!(snapshot.schema_version, STORAGE_SNAPSHOT_SCHEMA_VERSION);
+        assert_eq!(snapshot.exported_at, 99);
+        assert_eq!(snapshot.legacy_progress.len(), 1);
+        assert_eq!(snapshot.legacy_progress[0].book_id, "legacy-b");
+        assert_eq!(snapshot.legacy_progress[0].chapter_index, 3);
+        // The legacy alias must be gone from the v1 shape: re-serializing and
+        // re-parsing must round-trip through the typed struct without it.
+        let json = serde_json::to_string(&snapshot).unwrap();
+        assert!(!json.contains(r#""progress":"#));
+        assert!(json.contains(r#""legacyProgress":"#));
+        let back: StorageSnapshot = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, snapshot);
+    }
+
+    #[test]
+    fn migrate_storage_snapshot_passes_through_current_version_unchanged() {
+        let store = InMemoryStorage::new();
+        populate_snapshot_store(&store);
+        let snapshot = store.export_snapshot(7).unwrap();
+        let raw = serde_json::to_value(&snapshot).unwrap();
+
+        let migrated = migrate_storage_snapshot(raw).unwrap();
+        assert_eq!(migrated, snapshot);
+    }
+
+    #[test]
+    fn migrate_storage_snapshot_rejects_future_schema_version() {
+        let raw = serde_json::json!({
+            "schemaVersion": STORAGE_SNAPSHOT_SCHEMA_VERSION + 1,
+            "exportedAt": 1
+        });
+        assert_eq!(
+            migrate_storage_snapshot(raw).unwrap_err(),
+            StorageError::UnsupportedSnapshotSchemaVersion {
+                schema_version: STORAGE_SNAPSHOT_SCHEMA_VERSION + 1,
+            }
+        );
+    }
+
+    #[test]
+    fn migrate_storage_snapshot_rejects_non_object_root_and_malformed_shape() {
+        assert!(matches!(
+            migrate_storage_snapshot(serde_json::json!([1, 2, 3])),
+            Err(StorageError::InvalidSnapshot { field }) if field == "root"
+        ));
+
+        // Object root but a structurally invalid sources array: the JSON shape
+        // does not match StorageSnapshot, so deserialization fails closed.
+        let raw = serde_json::json!({
+            "schemaVersion": STORAGE_SNAPSHOT_SCHEMA_VERSION,
+            "exportedAt": 1,
+            "sources": ["not-a-source"]
+        });
+        assert!(matches!(
+            migrate_storage_snapshot(raw),
+            Err(StorageError::InvalidSnapshot { .. })
+        ));
+    }
+
+    #[test]
+    fn migrate_storage_snapshot_preserves_v1_legacy_progress_when_v0_alias_absent() {
+        let raw = serde_json::json!({
+            "schemaVersion": 0,
+            "exportedAt": 5,
+            "legacyProgress": [
+                { "bookId": "kept-b", "chapterIndex": 1, "chapterOffset": 0, "chapterProgress": 0.0 }
+            ]
+        });
+        let snapshot = migrate_storage_snapshot(raw).unwrap();
+        assert_eq!(snapshot.legacy_progress.len(), 1);
+        assert_eq!(snapshot.legacy_progress[0].book_id, "kept-b");
     }
 
     // ---- Source-scoped reading progress boundary tests ----
