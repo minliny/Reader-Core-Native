@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="bookid">urn:uuid:fixture-epub-001</dc:identifier>
+    <dc:title>Fixture EPUB Title</dc:title>
+    <dc:creator>Fixture Author</dc:creator>
+    <dc:language>zh-CN</dc:language>
+  </metadata>
+</package>
