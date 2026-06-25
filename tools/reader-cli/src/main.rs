@@ -43,6 +43,9 @@ enum Mode {
     /// Replay a host HTTP request/complete pair against Core without opening a
     /// real socket.
     HostReplay(PathBuf),
+    /// Replay a sequence of host HTTP request/complete pairs against one
+    /// runtime instance.
+    HostReplaySuite(PathBuf),
 }
 
 fn main() {
@@ -105,6 +108,7 @@ fn run() -> Result<(), CoreError> {
         }
         Mode::FixtureVertical(path) => run_fixture_vertical(&runtime, &rx, &path),
         Mode::HostReplay(path) => run_host_replay(&runtime, &rx, &path),
+        Mode::HostReplaySuite(path) => run_host_replay_suite(&runtime, &rx, &path),
     }
 }
 
@@ -140,6 +144,14 @@ where
                 };
                 set_mode(&mut mode, Mode::HostReplay(PathBuf::from(path)))?;
             }
+            "--host-replay-suite" => {
+                let Some(path) = iter.next() else {
+                    return Err(CoreError::invalid_message(
+                        "--host-replay-suite requires a path to a fixture JSON file",
+                    ));
+                };
+                set_mode(&mut mode, Mode::HostReplaySuite(PathBuf::from(path)))?;
+            }
             "--json" => {
                 let Some(json) = iter.next() else {
                     return Err(CoreError::invalid_message(
@@ -174,7 +186,7 @@ where
 fn set_mode(slot: &mut Option<Mode>, mode: Mode) -> Result<(), CoreError> {
     if slot.is_some() {
         return Err(CoreError::invalid_message(
-            "only one of --info, --ping, --status, --host-smoke, --conformance, --json, --stdin, --fixture-vertical, or --host-replay may be used",
+            "only one of --info, --ping, --status, --host-smoke, --conformance, --json, --stdin, --fixture-vertical, --host-replay, or --host-replay-suite may be used",
         ));
     }
     *slot = Some(mode);
@@ -417,15 +429,47 @@ fn run_host_replay(
     rx: &Receiver<Event>,
     path: &PathBuf,
 ) -> Result<(), CoreError> {
-    let raw = fs::read_to_string(path).map_err(|err| {
-        CoreError::invalid_message(format!("failed to read fixture {}", path.display()))
-            .with_details(serde_json::json!({ "source": err.to_string() }))
-    })?;
-    let fixture: Value = serde_json::from_str(&raw).map_err(|err| {
-        CoreError::invalid_message(format!("fixture {} is not valid JSON", path.display()))
-            .with_details(serde_json::json!({ "source": err.to_string() }))
-    })?;
+    let fixture = read_json_fixture(path, "host replay fixture")?;
+    run_host_replay_step(runtime, rx, &fixture)
+}
 
+fn run_host_replay_suite(
+    runtime: &Runtime,
+    rx: &Receiver<Event>,
+    path: &PathBuf,
+) -> Result<(), CoreError> {
+    let fixture = read_json_fixture(path, "host replay suite fixture")?;
+    let steps = fixture
+        .get("steps")
+        .and_then(Value::as_array)
+        .ok_or_else(|| CoreError::invalid_message("host replay suite fixture missing `steps`"))?;
+    if steps.is_empty() {
+        return Err(CoreError::invalid_message(
+            "host replay suite fixture `steps` must not be empty",
+        ));
+    }
+    for step in steps {
+        run_host_replay_step(runtime, rx, step)?;
+    }
+    Ok(())
+}
+
+fn read_json_fixture(path: &PathBuf, label: &str) -> Result<Value, CoreError> {
+    let raw = fs::read_to_string(path).map_err(|err| {
+        CoreError::invalid_message(format!("failed to read {label} {}", path.display()))
+            .with_details(serde_json::json!({ "source": err.to_string() }))
+    })?;
+    serde_json::from_str(&raw).map_err(|err| {
+        CoreError::invalid_message(format!("{label} {} is not valid JSON", path.display()))
+            .with_details(serde_json::json!({ "source": err.to_string() }))
+    })
+}
+
+fn run_host_replay_step(
+    runtime: &Runtime,
+    rx: &Receiver<Event>,
+    fixture: &Value,
+) -> Result<(), CoreError> {
     let command_value = fixture
         .get("command")
         .cloned()
@@ -435,7 +479,14 @@ fn run_host_replay(
             .with_details(serde_json::json!({ "source": err.to_string() }))
     })?;
     let command = Command::from_json_bytes(&command_json)?;
-    let completion_request_id = command.request_id + 1;
+    let completion_request_id = match fixture.get("completionRequestId") {
+        Some(value) => value.as_u64().filter(|id| *id > 0).ok_or_else(|| {
+            CoreError::invalid_message("host replay completionRequestId must be a positive integer")
+        })?,
+        None => command.request_id.checked_add(1).ok_or_else(|| {
+            CoreError::invalid_message("host replay command requestId is too large")
+        })?,
+    };
 
     runtime.send(command)?;
 
@@ -491,6 +542,27 @@ fn run_host_replay(
     let result = recv_event(rx)?;
     print_event(&result);
 
+    if let Some(expected_result) = fixture.get("expectResult") {
+        match &result {
+            Event::Result { data, .. } if data == expected_result => {}
+            Event::Result { data, .. } => {
+                return Err(
+                    CoreError::internal("host replay result data mismatch").with_details(
+                        serde_json::json!({
+                            "expected": expected_result,
+                            "actual": data,
+                        }),
+                    ),
+                );
+            }
+            other => {
+                return Err(CoreError::internal(format!(
+                    "expected result event after host.complete, got {other:?}"
+                )));
+            }
+        }
+    }
+
     if let Some(expected_http) = fixture.get("expectResultHttp") {
         match &result {
             Event::Result { data, .. } if data.get("http") == Some(expected_http) => {}
@@ -532,6 +604,6 @@ fn print_event(event: &Event) {
 
 fn print_usage() {
     eprintln!(
-        "usage: reader-cli [--info|--ping|--status|--host-smoke|--conformance|--json '<command>'|--stdin|--fixture-vertical <path>|--host-replay <path>] [--config-json '<config>']"
+        "usage: reader-cli [--info|--ping|--status|--host-smoke|--conformance|--json '<command>'|--stdin|--fixture-vertical <path>|--host-replay <path>|--host-replay-suite <path>] [--config-json '<config>']"
     );
 }
