@@ -458,6 +458,27 @@ mod tests {
     }
 
     #[test]
+    fn event_schema_requires_non_error_event_request_ids_positive() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+
+        for event_def in ["ResultEvent", "HostRequestEvent"] {
+            assert_eq!(
+                schema["$defs"][event_def]["properties"]["requestId"]["minimum"],
+                serde_json::json!(1),
+                "{event_def} requestId must be positive"
+            );
+        }
+        assert!(
+            schema["$defs"]["ErrorEvent"]["properties"]["requestId"]
+                .get("minimum")
+                .is_none(),
+            "ErrorEvent requestId 0 is reserved for process-level errors"
+        );
+    }
+
+    #[test]
     fn event_schema_requires_host_request_params_object() {
         let schema: Value =
             serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))

@@ -611,6 +611,60 @@ pub(crate) fn run_conformance() -> ConformanceReport {
 
     record(
         &mut report,
+        "event-json-rejects-zero-non-error-request-id",
+        || {
+            for event in [
+                json!({
+                    "protocolVersion": 1,
+                    "requestId": 0,
+                    "type": "result",
+                    "data": {}
+                }),
+                json!({
+                    "protocolVersion": 1,
+                    "requestId": 0,
+                    "type": "host.request",
+                    "operationId": 1,
+                    "capability": "host.smoke.echo",
+                    "params": {}
+                }),
+            ] {
+                let err = serde_json::from_value::<Event>(event)
+                    .err()
+                    .ok_or_else(|| "expected event requestId rejection".to_string())?;
+                if !err.to_string().contains("requestId") {
+                    return Err(format!("unexpected event requestId error: {err}"));
+                }
+            }
+            Ok(())
+        },
+    );
+
+    record(
+        &mut report,
+        "event-json-allows-process-level-error-request-id-zero",
+        || {
+            let event = serde_json::from_value::<Event>(json!({
+                "protocolVersion": 1,
+                "requestId": 0,
+                "type": "error",
+                "error": {
+                    "code": "INVALID_MESSAGE",
+                    "message": "failed before command correlation",
+                    "retryable": false
+                }
+            }))
+            .map_err(|err| format!("process-level error event parse failed: {err}"))?;
+
+            match event {
+                Event::Error { request_id, .. } if request_id == 0 => Ok(()),
+                other => Err(format!("expected process-level error event, got {other:?}")),
+            }
+        },
+    );
+
+    record(
+        &mut report,
         "host-request-invalid-capability-whitespace",
         || {
             let (_runtime, rx) = send_to_fresh_runtime(HOST_REQUEST_INVALID_CAPABILITY_WHITESPACE)?;

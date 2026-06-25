@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 use crate::command::is_valid_token_path;
@@ -20,6 +20,18 @@ fn assert_token_path(field: &str, value: &str) {
     );
 }
 
+fn deserialize_positive_event_request_id<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = u64::deserialize(deserializer)?;
+    if value > 0 {
+        Ok(value)
+    } else {
+        Err(de::Error::custom("event requestId must be greater than 0"))
+    }
+}
+
 /// Core → platform event. Mirrors `reader-event.schema.json`.
 ///
 /// Discriminated by the `type` field (`"result"` / `"error"` / `"host.request"`).
@@ -30,7 +42,10 @@ pub enum Event {
     Result {
         #[serde(rename = "protocolVersion")]
         protocol_version: u32,
-        #[serde(rename = "requestId")]
+        #[serde(
+            rename = "requestId",
+            deserialize_with = "deserialize_positive_event_request_id"
+        )]
         request_id: u64,
         data: Value,
     },
@@ -48,7 +63,10 @@ pub enum Event {
     HostRequest {
         #[serde(rename = "protocolVersion")]
         protocol_version: u32,
-        #[serde(rename = "requestId")]
+        #[serde(
+            rename = "requestId",
+            deserialize_with = "deserialize_positive_event_request_id"
+        )]
         request_id: u64,
         #[serde(rename = "operationId")]
         operation_id: u64,
@@ -60,6 +78,7 @@ pub enum Event {
 impl Event {
     /// Build a `result` event for the given request.
     pub fn result(request_id: u64, data: Value) -> Self {
+        assert_positive_id("result requestId", request_id);
         assert_object_payload("result.data", &data);
         Event::Result {
             protocol_version: PROTOCOL_VERSION,
@@ -85,6 +104,7 @@ impl Event {
         params: Value,
     ) -> Self {
         let capability = capability.into();
+        assert_positive_id("host.request requestId", request_id);
         assert_positive_id("host.request operationId", operation_id);
         assert_token_path("host.request capability", &capability);
         assert_object_payload("host.request params", &params);
@@ -119,6 +139,12 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "result requestId must be greater than 0")]
+    fn result_event_rejects_zero_request_id() {
+        let _event = Event::result(0, serde_json::json!({}));
+    }
+
+    #[test]
     fn host_request_event_accepts_object_params() {
         let event = Event::host_request(1, 2, "host.smoke.echo", serde_json::json!({ "ok": true }));
         let json = serde_json::to_value(event).expect("event must serialize");
@@ -128,6 +154,12 @@ mod tests {
         assert_eq!(json["capability"], "host.smoke.echo");
         assert!(json["params"].is_object());
         assert_eq!(json["params"]["ok"], true);
+    }
+
+    #[test]
+    #[should_panic(expected = "host.request requestId must be greater than 0")]
+    fn host_request_event_rejects_zero_request_id() {
+        let _event = Event::host_request(0, 2, "host.smoke.echo", serde_json::json!({}));
     }
 
     #[test]
@@ -202,6 +234,52 @@ mod tests {
                 err.to_string().contains("unknown field"),
                 "unexpected event parse error: {err}"
             );
+        }
+    }
+
+    #[test]
+    fn event_deserialize_rejects_zero_request_id_for_non_error_events() {
+        for event in [
+            serde_json::json!({
+                "protocolVersion": 1,
+                "requestId": 0,
+                "type": "result",
+                "data": {}
+            }),
+            serde_json::json!({
+                "protocolVersion": 1,
+                "requestId": 0,
+                "type": "host.request",
+                "operationId": 1,
+                "capability": "host.smoke.echo",
+                "params": {}
+            }),
+        ] {
+            let err = serde_json::from_value::<Event>(event).unwrap_err();
+            assert!(
+                err.to_string().contains("requestId"),
+                "unexpected event requestId parse error: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn error_event_deserialize_allows_process_level_zero_request_id() {
+        let event = serde_json::from_value::<Event>(serde_json::json!({
+            "protocolVersion": 1,
+            "requestId": 0,
+            "type": "error",
+            "error": {
+                "code": "INVALID_MESSAGE",
+                "message": "failed before command correlation",
+                "retryable": false
+            }
+        }))
+        .unwrap();
+
+        match event {
+            Event::Error { request_id, .. } => assert_eq!(request_id, 0),
+            other => panic!("expected process-level error event, got {other:?}"),
         }
     }
 }

@@ -15,7 +15,11 @@
       "required": ["protocolVersion", "requestId", "type", "data"],
       "properties": {
         "protocolVersion": { "type": "integer", "const": 1 },
-        "requestId": { "type": "integer" },
+        "requestId": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Original positive Core command requestId that produced this result."
+        },
         "type": { "type": "string", "const": "result" },
         "data": { "type": "object" }
       }
@@ -26,7 +30,10 @@
       "required": ["protocolVersion", "requestId", "type", "error"],
       "properties": {
         "protocolVersion": { "type": "integer", "const": 1 },
-        "requestId": { "type": "integer" },
+        "requestId": {
+          "type": "integer",
+          "description": "Original command requestId, or 0 for process-level errors emitted outside a host command."
+        },
         "type": { "type": "string", "const": "error" },
         "error": { "$ref": "#/$defs/CoreError" }
       }
@@ -39,6 +46,7 @@
         "protocolVersion": { "type": "integer", "const": 1 },
         "requestId": {
           "type": "integer",
+          "minimum": 1,
           "description": "Original Core command requestId that is blocked on this host operation."
         },
         "type": { "type": "string", "const": "host.request" },
