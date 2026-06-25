@@ -1052,6 +1052,33 @@ pub(crate) fn run_conformance() -> ConformanceReport {
 
     record(
         &mut report,
+        "pending-host-operation-rejects-invalid-capability",
+        || {
+            for capability in ["", "host. smoke.echo", "host..echo", "host"] {
+                let err = serde_json::from_value::<PendingHostOperationStatus>(json!({
+                    "operationId": 1,
+                    "requestId": 301,
+                    "capability": capability,
+                    "state": "pending"
+                }))
+                .err()
+                .ok_or_else(|| {
+                    format!(
+                        "expected pending host operation capability rejection for {capability:?}"
+                    )
+                })?;
+                if !err.to_string().contains("capability") {
+                    return Err(format!(
+                        "unexpected pending operation capability error: {err}"
+                    ));
+                }
+            }
+            Ok(())
+        },
+    );
+
+    record(
+        &mut report,
         "runtime-shutdown-stops-future-commands",
         || {
             let (runtime, rx) = send_to_fresh_runtime(VALID_RUNTIME_SHUTDOWN)?;

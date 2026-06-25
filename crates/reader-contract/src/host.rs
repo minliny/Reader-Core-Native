@@ -68,6 +68,22 @@ where
     }
 }
 
+fn deserialize_pending_host_operation_capability<'de, D>(
+    deserializer: D,
+) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = String::deserialize(deserializer)?;
+    if is_valid_token_path(&value) {
+        Ok(value)
+    } else {
+        Err(de::Error::custom(
+            "runtime.status pending host operation capability must be dot-separated non-empty tokens without whitespace",
+        ))
+    }
+}
+
 /// Parameters for `runtime.hostSmoke`, a local driver method that exercises the
 /// host bus without involving reader business modules.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -148,6 +164,7 @@ pub struct PendingHostOperationStatus {
     pub operation_id: u64,
     #[serde(deserialize_with = "deserialize_positive_pending_host_operation_id")]
     pub request_id: u64,
+    #[serde(deserialize_with = "deserialize_pending_host_operation_capability")]
     pub capability: String,
     #[serde(deserialize_with = "deserialize_pending_host_operation_state")]
     pub state: String,
@@ -474,6 +491,23 @@ mod tests {
             assert!(
                 err.to_string().contains(field) || err.to_string().contains("ids"),
                 "unexpected pending operation id error for {field}: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn pending_host_operation_status_requires_capability_token_path() {
+        for capability in ["", "host. smoke.echo", "host..echo", "host"] {
+            let err = serde_json::from_value::<PendingHostOperationStatus>(serde_json::json!({
+                "operationId": 1,
+                "requestId": 301,
+                "capability": capability,
+                "state": "pending"
+            }))
+            .unwrap_err();
+            assert!(
+                err.to_string().contains("capability"),
+                "unexpected pending operation capability error: {err}"
             );
         }
     }
