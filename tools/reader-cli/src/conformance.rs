@@ -213,10 +213,15 @@ pub(crate) fn run_conformance() -> ConformanceReport {
 
     record(&mut report, "valid-command-runtime-ping", || {
         let (_runtime, rx) = send_to_fresh_runtime(VALID_RUNTIME_PING)?;
-        match recv_event(&rx)? {
+        let event = recv_event(&rx)?;
+        let event_json =
+            serde_json::to_value(&event).map_err(|err| format!("event serialize failed: {err}"))?;
+        match &event {
             Event::Result {
                 request_id, data, ..
-            } if request_id == 101 && data["pong"] == true => Ok(()),
+            } if *request_id == 101 && data["pong"] == true && event_json["data"].is_object() => {
+                Ok(())
+            }
             other => Err(format!("unexpected event {other:?}")),
         }
     });

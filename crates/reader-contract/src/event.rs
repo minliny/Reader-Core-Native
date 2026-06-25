@@ -4,6 +4,10 @@ use serde_json::Value;
 use crate::error::CoreError;
 use crate::PROTOCOL_VERSION;
 
+fn assert_object_payload(field: &str, value: &Value) {
+    assert!(value.is_object(), "{field} must be a JSON object");
+}
+
 /// Core → platform event. Mirrors `reader-event.schema.json`.
 ///
 /// Discriminated by the `type` field (`"result"` / `"error"` / `"host.request"`).
@@ -44,6 +48,7 @@ pub enum Event {
 impl Event {
     /// Build a `result` event for the given request.
     pub fn result(request_id: u64, data: Value) -> Self {
+        assert_object_payload("result.data", &data);
         Event::Result {
             protocol_version: PROTOCOL_VERSION,
             request_id,
@@ -74,5 +79,26 @@ impl Event {
             capability: capability.into(),
             params,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn result_event_accepts_object_data() {
+        let event = Event::result(1, serde_json::json!({ "ok": true }));
+        let json = serde_json::to_value(event).expect("event must serialize");
+
+        assert_eq!(json["type"], "result");
+        assert!(json["data"].is_object());
+        assert_eq!(json["data"]["ok"], true);
+    }
+
+    #[test]
+    #[should_panic(expected = "result.data must be a JSON object")]
+    fn result_event_rejects_non_object_data() {
+        let _event = Event::result(1, serde_json::json!(["not", "an", "object"]));
     }
 }

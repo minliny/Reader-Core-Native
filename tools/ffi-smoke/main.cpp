@@ -415,6 +415,7 @@ int main() {
   const char *core_info_needles[] = {
       "\"type\":\"result\"",
       "\"requestId\":10",
+      "\"data\":{",
       "\"abiVersion\":1",
       "\"buildVersion\":\"reader-core-native ",
       "\"capabilities\":[",
