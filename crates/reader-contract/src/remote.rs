@@ -317,4 +317,42 @@ mod tests {
             err.details["source"]
         );
     }
+
+    #[test]
+    fn book_detail_params_parse_fixture_and_reject_unknown_fields() {
+        let command: crate::Command = crate::Command::from_json_bytes(
+            include_str!("../../../protocol/fixtures/conformance/commands/valid-book-detail.json")
+                .as_bytes(),
+        )
+        .unwrap();
+        let params: BookDetailParams = parse_params(crate::methods::BOOK_DETAIL, &command.params)
+            .expect("valid book.detail params should parse");
+        assert_eq!(params.source_id, "conformance-source");
+        assert_eq!(params.book["bookId"], "1");
+        assert!(params.detail_response.contains("Frank Herbert"));
+        assert!(params.detail_request.is_none());
+        assert_eq!(
+            params.source.as_ref().unwrap()["sourceId"],
+            "conformance-source"
+        );
+
+        let command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/invalid-book-detail-unknown-field.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let err = parse_params::<BookDetailParams>(crate::methods::BOOK_DETAIL, &command.params)
+            .unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert_eq!(err.details["method"], crate::methods::BOOK_DETAIL);
+        assert!(
+            err.details["source"]
+                .as_str()
+                .is_some_and(|source| source.contains("unknown field")),
+            "unexpected source detail: {}",
+            err.details["source"]
+        );
+    }
 }

@@ -169,6 +169,17 @@
           "params": { "$ref": "#/$defs/BookSearchParams" }
         }
       }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "book.detail" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/BookDetailParams" }
+        }
+      }
     }
   ],
   "$defs": {
@@ -337,6 +348,40 @@
           ],
           "default": null,
           "description": "Optional host HTTP request descriptor when searchResponse is empty."
+        },
+        "source": {
+          "type": ["object", "null"],
+          "default": null,
+          "description": "Optional inline source definition used instead of storage lookup."
+        }
+      }
+    },
+    "BookDetailParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "book"],
+      "description": "Parameters for book.detail. Merges fetched detail metadata into a base book.",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "description": "Source identifier used for storage lookup and result correlation."
+        },
+        "book": {
+          "type": "object",
+          "description": "Base book object to merge detail metadata into. Must contain at least bookId at runtime."
+        },
+        "detailResponse": {
+          "type": "string",
+          "default": "",
+          "description": "Prefetched detail response body."
+        },
+        "detailRequest": {
+          "anyOf": [
+            { "$ref": "#/$defs/HostHttpRequest" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Optional host HTTP request descriptor when detailResponse is empty."
         },
         "source": {
           "type": ["object", "null"],

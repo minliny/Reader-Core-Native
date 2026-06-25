@@ -17,6 +17,8 @@ const VALID_SOURCE_IMPORT: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-source-import.json");
 const VALID_BOOK_SEARCH: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-book-search.json");
+const VALID_BOOK_DETAIL: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-book-detail.json");
 const INVALID_RUNTIME_PING_UNKNOWN_FIELD: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-runtime-ping-unknown-field.json"
 );
@@ -28,6 +30,9 @@ const INVALID_SOURCE_IMPORT_UNKNOWN_FIELD: &str = include_str!(
 );
 const INVALID_BOOK_SEARCH_UNKNOWN_FIELD: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-book-search-unknown-field.json"
+);
+const INVALID_BOOK_DETAIL_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-book-detail-unknown-field.json"
 );
 const INVALID_MALFORMED_COMMAND: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/invalid-malformed-json.json");
@@ -238,6 +243,26 @@ pub(crate) fn run_conformance() -> ConformanceReport {
     record(&mut report, "book-search-rejects-unknown-params", || {
         let (_runtime, rx) = send_to_fresh_runtime(INVALID_BOOK_SEARCH_UNKNOWN_FIELD)?;
         expect_event_error(&rx, 404, ErrorCode::InvalidParams)
+    });
+
+    record(&mut report, "valid-command-book-detail", || {
+        let (_runtime, rx) = send_to_fresh_runtime(VALID_BOOK_DETAIL)?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 405
+                && data["book"]["title"] == "Dune"
+                && data["book"]["author"] == "Frank Herbert" =>
+            {
+                Ok(())
+            }
+            other => Err(format!("unexpected book.detail result {other:?}")),
+        }
+    });
+
+    record(&mut report, "book-detail-rejects-unknown-params", || {
+        let (_runtime, rx) = send_to_fresh_runtime(INVALID_BOOK_DETAIL_UNKNOWN_FIELD)?;
+        expect_event_error(&rx, 406, ErrorCode::InvalidParams)
     });
 
     for (name, json, expected) in [
