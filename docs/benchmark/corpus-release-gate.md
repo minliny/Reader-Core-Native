@@ -16,6 +16,7 @@ canonical result。
 | Piece | Location |
 |-------|----------|
 | Canonicalizer | `scripts/corpus_canonicalize.py` |
+| Real-run collector | `tools/corpus-real-run-collector/` |
 | Demo script | `scripts/corpus_release_gate_demo.sh` |
 | Cross-platform diff | `tools/cross-platform-diff/` |
 | Run packager | `tools/benchmark-run-packager/` |
@@ -55,8 +56,11 @@ canonical result。
 ## Pipeline
 
 ```text
-candidate JSON
+real-run candidate JSON
 (cli / ios / android / harmony)
+        |
+        v
+tools/corpus-real-run-collector/corpus_real_run_collector.py
         |
         v
 scripts/corpus_canonicalize.py
@@ -71,7 +75,56 @@ tools/cross-platform-diff/cross_platform_diff.py
         +--> tools/release-blocker-register/release_blocker_register.py
 ```
 
-### 1. Canonicalizer
+### 1. Real-run collector
+
+`tools/corpus-real-run-collector/corpus_real_run_collector.py` 把已经由
+CLI / iOS / Android / HarmonyOS 真实运行产出的本地 JSON 文件收成统一 candidate package。
+它不运行 Core、不运行平台 adapter、不联网，只复制本地 JSON、生成 canonicalized candidate、
+执行四端 diff，并把 diff 产生的差异写入 blocker register。
+
+collector 输出目录同时满足 `benchmark-run-packager` 的 run directory 结构：
+
+```text
+candidate-package/
+  manifest.json
+  platform-result.json
+  canonical-result.json
+  diff-result.json
+  environment.json
+  corpus-blocker-register.json
+  input.json
+  raw/
+    cli-result.json
+    ios-result.json
+    android-result.json
+    harmony-result.json
+  candidates/
+    cli-result.json
+    ios-result.json
+    android-result.json
+    harmony-result.json
+```
+
+示例：
+
+```bash
+python3 tools/corpus-real-run-collector/corpus_real_run_collector.py \
+  --run-id sample-four-platform-match \
+  --scenario fixture-search \
+  --input samples/corpus-release-gate/four-platform-match/input.json \
+  --source-manifest samples/corpus-release-gate/four-platform-match/manifest.json \
+  --canonical samples/corpus-release-gate/four-platform-match/canonical-result.json \
+  --candidate cli:samples/corpus-release-gate/four-platform-match/candidates/cli-result.json \
+  --candidate ios:samples/corpus-release-gate/four-platform-match/candidates/ios-result.json \
+  --candidate android:samples/corpus-release-gate/four-platform-match/candidates/android-result.json \
+  --candidate harmony:samples/corpus-release-gate/four-platform-match/candidates/harmony-result.json
+```
+
+默认输出在 `/private/tmp/<run-id>-candidate`。如果四端 diff 存在差异，
+collector 会把对应差异写入该目录下的 `corpus-blocker-register.json`；
+是否关闭或 waiver 这些 blocker 由后续审查决定。
+
+### 2. Canonicalizer
 
 `scripts/corpus_canonicalize.py` 将 JSON result 归一化为稳定可比较的 canonical JSON：
 
@@ -86,7 +139,7 @@ tools/cross-platform-diff/cross_platform_diff.py
 python3 scripts/corpus_canonicalize.py input.json -o output.json
 ```
 
-### 2. Cross-platform diff
+### 3. Cross-platform diff
 
 `tools/cross-platform-diff/cross_platform_diff.py` 对 canonical reference 和多个 named
 candidate 先做 canonicalize，再生成 `diff-result.json`。
@@ -126,7 +179,7 @@ python3 tools/cross-platform-diff/cross_platform_diff.py \
 
 预期：`android` 产生 1 个 `value-mismatch`，路径为 `results[1].name`。
 
-### 3. Run packager
+### 4. Run packager
 
 `tools/benchmark-run-packager/benchmark_run_packager.py` 只打包已经存在的 run directory：
 
@@ -144,7 +197,7 @@ run-dir/
 python3 tools/benchmark-run-packager/benchmark_run_packager.py /private/tmp/run-dir --out /private/tmp/run-bundle
 ```
 
-### 4. Release blocker register
+### 5. Release blocker register
 
 `tools/release-blocker-register/release_blocker_register.py` 从 `diff-result.json` 中把非匹配
 candidate 的差异登记为 blocker。它只维护 blocker 状态，不认证 release。
@@ -195,3 +248,5 @@ python3 -m unittest discover -s tests/tooling -q
   `android results[1].name` 一个 mismatch。
 - `tests/tooling/test_release_blocker_register.py` 验证 mismatch diff 会生成一个
   `android` blocker。
+- `tests/tooling/test_corpus_real_run_collector.py` 验证 collector 生成 packager-compatible
+  candidate package，并把 mismatch 写入 blocker register。
