@@ -552,6 +552,72 @@ mod tests {
     }
 
     #[test]
+    fn runtime_status_reports_pending_host_operation_metadata_via_c_abi() {
+        let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
+        let handle = make_runtime(&events);
+
+        let smoke = br#"{"protocolVersion":1,"requestId":140,"method":"runtime.hostSmoke","params":{"capability":"host.smoke.echo","params":{"hidden":"status payload"}}}"#;
+        assert_eq!(unsafe { send(handle, smoke.as_ptr(), smoke.len()) }, 0);
+
+        let evs = wait_events(&events, 1);
+        let req: serde_json::Value = serde_json::from_slice(&evs[0]).unwrap();
+        assert_eq!(req["type"], "host.request");
+        assert_eq!(req["protocolVersion"], 1);
+        assert_eq!(req["requestId"], 140);
+        assert_eq!(req["capability"], "host.smoke.echo");
+        assert_eq!(req["params"]["hidden"], "status payload");
+        let operation_id = req["operationId"].as_u64().unwrap();
+
+        let status =
+            br#"{"protocolVersion":1,"requestId":141,"method":"runtime.status","params":{}}"#;
+        assert_eq!(unsafe { send(handle, status.as_ptr(), status.len()) }, 0);
+        assert_eq!(last_error_code(), 0);
+
+        let evs = wait_events(&events, 2);
+        let result: serde_json::Value = serde_json::from_slice(&evs[1]).unwrap();
+        assert_eq!(result["type"], "result");
+        assert_eq!(result["protocolVersion"], 1);
+        assert_eq!(result["requestId"], 141);
+        assert_eq!(result["data"]["activeRequestCount"], 1);
+        assert_eq!(result["data"]["activeRequestIds"], serde_json::json!([140]));
+        assert_eq!(result["data"]["pendingHostOperationCount"], 1);
+        assert_eq!(result["data"]["shuttingDown"], false);
+        let operations = result["data"]["pendingHostOperations"]
+            .as_array()
+            .expect("pendingHostOperations");
+        assert_eq!(operations.len(), 1);
+        assert_eq!(operations[0]["operationId"], operation_id);
+        assert_eq!(operations[0]["requestId"], 140);
+        assert_eq!(operations[0]["capability"], "host.smoke.echo");
+        assert_eq!(operations[0]["state"], "pending");
+        assert!(operations[0].get("params").is_none());
+
+        let complete = serde_json::json!({
+            "protocolVersion": 1,
+            "requestId": 142,
+            "method": "host.complete",
+            "params": {
+                "operationId": operation_id,
+                "result": { "echoed": true }
+            }
+        })
+        .to_string();
+        assert_eq!(
+            unsafe { send(handle, complete.as_ptr(), complete.len()) },
+            0
+        );
+
+        let evs = wait_events(&events, 3);
+        let completed: serde_json::Value = serde_json::from_slice(&evs[2]).unwrap();
+        assert_eq!(completed["type"], "result");
+        assert_eq!(completed["protocolVersion"], 1);
+        assert_eq!(completed["requestId"], 140);
+        assert_eq!(completed["data"]["echoed"], true);
+
+        assert_eq!(unsafe { destroy(handle) }, 0);
+    }
+
+    #[test]
     fn host_error_routes_error_to_original_request_via_c_abi() {
         let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
         let handle = make_runtime(&events);

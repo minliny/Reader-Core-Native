@@ -381,6 +381,66 @@ int main() {
     return fail("host.error result shape");
   }
 
+  // --- runtime.status reports pending host metadata without payload -----
+  if (send_str(rt,
+               R"({"protocolVersion":1,"requestId":35,"method":"runtime.hostSmoke","params":{"capability":"host.smoke.echo","params":{"hidden":"status payload"}}})") !=
+      RC_SEND_OK) {
+    return fail("hostSmoke(35) send failed");
+  }
+  event = wait_event(ch, ev++);
+  uint64_t pending_op = 0;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":35") ||
+      !contains(event, "\"capability\":\"host.smoke.echo\"") ||
+      !contains(event, "\"hidden\":\"status payload\"") ||
+      !json_u64(event, "operationId", &pending_op)) {
+    std::cerr << "host.request(35): " << event << '\n';
+    return fail("host.request(35) shape");
+  }
+  if (send_str(
+          rt,
+          R"({"protocolVersion":1,"requestId":36,"method":"runtime.status","params":{}})") !=
+      RC_SEND_OK) {
+    return fail("runtime.status send failed");
+  }
+  event = wait_event(ch, ev++);
+  std::string pending_op_field =
+      "\"operationId\":" + std::to_string(pending_op);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":36") ||
+      !contains(event, "\"activeRequestCount\":1") ||
+      !contains(event, "\"activeRequestIds\":[35]") ||
+      !contains(event, "\"pendingHostOperationCount\":1") ||
+      !contains(event, "\"pendingHostOperations\"") ||
+      !contains(event, pending_op_field.c_str()) ||
+      !contains(event, "\"requestId\":35") ||
+      !contains(event, "\"capability\":\"host.smoke.echo\"") ||
+      !contains(event, "\"state\":\"pending\"") ||
+      !contains(event, "\"shuttingDown\":false") ||
+      contains(event, "\"hidden\"") || contains(event, "status payload")) {
+    std::cerr << "runtime.status result: " << event << '\n';
+    return fail("runtime.status pending metadata shape");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("runtime.status left synchronous last_error");
+  }
+  std::string status_complete =
+      R"({"protocolVersion":1,"requestId":37,"method":"host.complete","params":{"operationId":)" +
+      std::to_string(pending_op) + R"(,"result":{"echoed":true}}})";
+  if (send_str(rt, status_complete) != RC_SEND_OK) {
+    return fail("host.complete(35) send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":35") ||
+      !contains(event, "\"echoed\":true")) {
+    std::cerr << "status host.complete result: " << event << '\n';
+    return fail("status host.complete result shape");
+  }
+
   // --- host.complete for an unknown operation -> async INVALID_PARAMS ----
   std::string unknown_complete =
       R"({"protocolVersion":1,"requestId":25,"method":"host.complete","params":{"operationId":999999,"result":{"ok":true}}})";

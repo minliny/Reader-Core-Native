@@ -502,6 +502,79 @@ int main(void) {
     return fail("host.error result shape");
   }
 
+  // --- runtime.status reports pending host metadata without payload -----
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":75,\"method\":\"runtime."
+               "hostSmoke\",\"params\":{\"capability\":\"host.smoke.echo\","
+               "\"params\":{\"hidden\":\"status payload\"}}}") != RC_SEND_OK) {
+    return fail("hostSmoke(75) send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no host.request for status metadata");
+  }
+  ev++;
+  uint64_t op75 = 0;
+  if (!json_u64(event, "operationId", &op75) ||
+      !contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":75") ||
+      !contains(event, "\"hidden\":\"status payload\"")) {
+    fprintf(stderr, "host.request(75): %s\n", event);
+    return fail("host.request(75) shape");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":76,\"method\":\"runtime."
+               "status\",\"params\":{}}") != RC_SEND_OK) {
+    return fail("runtime.status send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no runtime.status result");
+  }
+  ev++;
+  char status_op[64];
+  snprintf(status_op, sizeof status_op, "\"operationId\":%llu",
+           (unsigned long long)op75);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":76") ||
+      !contains(event, "\"activeRequestCount\":1") ||
+      !contains(event, "\"activeRequestIds\":[75]") ||
+      !contains(event, "\"pendingHostOperationCount\":1") ||
+      !contains(event, "\"pendingHostOperations\"") ||
+      !contains(event, status_op) ||
+      !contains(event, "\"requestId\":75") ||
+      !contains(event, "\"capability\":\"host.smoke.echo\"") ||
+      !contains(event, "\"state\":\"pending\"") ||
+      !contains(event, "\"shuttingDown\":false") ||
+      contains(event, "\"hidden\"") || contains(event, "status payload")) {
+    fprintf(stderr, "runtime.status result: %s\n", event);
+    return fail("runtime.status pending metadata shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("runtime.status left synchronous last_error");
+  }
+  char status_complete[256];
+  snprintf(status_complete, sizeof status_complete,
+           "{\"protocolVersion\":1,\"requestId\":77,\"method\":\"host."
+           "complete\",\"params\":{\"operationId\":%llu,\"result\":{\"echoed\":"
+           "true}}}",
+           (unsigned long long)op75);
+  if (send_str(rt, status_complete) != RC_SEND_OK) {
+    return fail("host.complete(75) send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no result event for status host.complete");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":75") ||
+      !contains(event, "\"echoed\":true")) {
+    fprintf(stderr, "status host.complete result: %s\n", event);
+    return fail("status host.complete result shape");
+  }
+
   // --- host.complete for an unknown operation -> async INVALID_PARAMS ----
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":66,\"method\":\"host."
