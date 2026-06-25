@@ -322,15 +322,30 @@ mod tests {
     }
 
     #[test]
-    fn cancel_missing_request_is_noop_success_via_c_abi() {
+    fn cancel_unknown_and_completed_requests_are_noop_success_via_c_abi() {
         let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
         let handle = make_runtime(&events);
 
         crate::last_error::set(CoreError::internal("stale"));
         assert_eq!(unsafe { cancel(handle, 404) }, 0);
+        assert_eq!(unsafe { cancel(handle, 404) }, 0);
         assert_eq!(last_error_code(), 0);
         std::thread::sleep(std::time::Duration::from_millis(25));
         assert!(events.0.lock().unwrap().is_empty());
+
+        let ping = br#"{"protocolVersion":1,"requestId":405,"method":"runtime.ping","params":{}}"#;
+        assert_eq!(unsafe { send(handle, ping.as_ptr(), ping.len()) }, 0);
+        let evs = wait_events(&events, 1);
+        let result: serde_json::Value = serde_json::from_slice(&evs[0]).unwrap();
+        assert_eq!(result["type"], "result");
+        assert_eq!(result["requestId"], 405);
+
+        crate::last_error::set(CoreError::internal("stale"));
+        assert_eq!(unsafe { cancel(handle, 405) }, 0);
+        assert_eq!(unsafe { cancel(handle, 405) }, 0);
+        assert_eq!(last_error_code(), 0);
+        std::thread::sleep(std::time::Duration::from_millis(25));
+        assert_eq!(events.0.lock().unwrap().len(), 1);
 
         assert_eq!(unsafe { destroy(handle) }, 0);
     }

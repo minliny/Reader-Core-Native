@@ -268,6 +268,9 @@ int main() {
   if (!last_error_clears_message_when_ok()) {
     return fail("cancel missing request did not clear last_error");
   }
+  if (channel_count(ch) != 0) {
+    return fail("cancel missing request emitted an async event");
+  }
 
   if (rc_runtime_send(rt, nullptr, 0) != RC_SEND_INVALID_COMMAND) {
     return fail("zero-length command did not return RC_SEND_INVALID_COMMAND");
@@ -439,6 +442,16 @@ int main() {
       !contains(event, "\"echoed\":true")) {
     std::cerr << "result(20): " << event << '\n';
     return fail("host.complete result shape");
+  }
+  if (rc_runtime_cancel(rt, 20) != RC_CANCEL_OK ||
+      rc_runtime_cancel(rt, 20) != RC_CANCEL_OK) {
+    return fail("cancel completed request did not return RC_CANCEL_OK");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("cancel completed request did not clear last_error");
+  }
+  if (channel_count(ch) != ev) {
+    return fail("cancel completed request emitted an async event");
   }
   std::string duplicate_complete =
       R"({"protocolVersion":1,"requestId":38,"method":"host.complete","params":{"operationId":)" +

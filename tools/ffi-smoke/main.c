@@ -297,6 +297,9 @@ int main(void) {
   if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
     return fail("cancel missing request did not clear last_error");
   }
+  if (channel_count(&ch) != 0) {
+    return fail("cancel missing request emitted an async event");
+  }
 
   if (rc_runtime_send(rt, NULL, 0) != RC_SEND_INVALID_COMMAND) {
     return fail("zero-length command did not return RC_SEND_INVALID_COMMAND");
@@ -562,6 +565,17 @@ int main(void) {
       !contains(event, "\"echoed\":true")) {
     fprintf(stderr, "result(60): %s\n", event);
     return fail("host.complete result shape");
+  }
+  if (rc_runtime_cancel(rt, 60) != RC_CANCEL_OK ||
+      rc_runtime_cancel(rt, 60) != RC_CANCEL_OK) {
+    return fail("cancel completed request did not return RC_CANCEL_OK");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("cancel completed request did not clear last_error");
+  }
+  if (channel_count(&ch) != ev) {
+    return fail("cancel completed request emitted an async event");
   }
   snprintf(complete, sizeof complete,
            "{\"protocolVersion\":1,\"requestId\":78,\"method\":\"host."
