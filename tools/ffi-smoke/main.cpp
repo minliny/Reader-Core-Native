@@ -486,6 +486,40 @@ int main() {
     return fail("successful cancel did not clear last_error");
   }
 
+  // --- invalid runtime.shutdown params do not stop runtime --------------
+  std::string invalid_shutdown =
+      R"({"protocolVersion":1,"requestId":33,"method":"runtime.shutdown","params":{"force":true}})";
+  if (send_str(rt, invalid_shutdown) != RC_SEND_OK) {
+    return fail("invalid runtime.shutdown send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":33") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "runtime.shutdown")) {
+    std::cerr << "invalid runtime.shutdown error: " << event << '\n';
+    return fail("invalid runtime.shutdown error shape");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("invalid runtime.shutdown send left synchronous last_error");
+  }
+
+  if (send_str(
+          rt,
+          R"({"protocolVersion":1,"requestId":34,"method":"runtime.ping","params":{}})") !=
+      RC_SEND_OK) {
+    return fail("runtime.ping after invalid shutdown failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":34") ||
+      !contains(event, "\"pong\":true")) {
+    std::cerr << "ping after invalid shutdown: " << event << '\n';
+    return fail("ping after invalid shutdown shape");
+  }
+
   // --- runtime.shutdown cancels pending work and blocks future sends -----
   if (send_str(rt,
                R"({"protocolVersion":1,"requestId":30,"method":"runtime.hostSmoke","params":{"capability":"host.smoke.echo","params":{}}})") !=

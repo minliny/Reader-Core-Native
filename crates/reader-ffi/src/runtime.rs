@@ -698,6 +698,51 @@ mod tests {
     }
 
     #[test]
+    fn runtime_shutdown_invalid_params_does_not_stop_runtime_via_c_abi() {
+        let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
+        let handle = make_runtime(&events);
+
+        let invalid_shutdown = include_bytes!(
+            "../../../protocol/fixtures/conformance/commands/invalid-runtime-shutdown-unknown-field.json"
+        );
+        assert_eq!(
+            unsafe { send(handle, invalid_shutdown.as_ptr(), invalid_shutdown.len()) },
+            0
+        );
+        assert_eq!(last_error_code(), 0);
+
+        let evs = wait_events(&events, 1);
+        let err: serde_json::Value = serde_json::from_slice(&evs[0]).unwrap();
+        assert_eq!(err["type"], "error");
+        assert_eq!(err["protocolVersion"], 1);
+        assert_eq!(err["requestId"], 331);
+        assert_eq!(err["error"]["code"], "INVALID_PARAMS");
+        assert_eq!(
+            err["error"]["details"]["method"],
+            reader_contract::methods::RUNTIME_SHUTDOWN
+        );
+        assert!(
+            err["error"]["details"]["source"]
+                .as_str()
+                .is_some_and(|source| source.contains("unknown field")),
+            "unexpected error event: {err}"
+        );
+
+        let ping = br#"{"protocolVersion":1,"requestId":433,"method":"runtime.ping","params":{}}"#;
+        assert_eq!(unsafe { send(handle, ping.as_ptr(), ping.len()) }, 0);
+        assert_eq!(last_error_code(), 0);
+
+        let evs = wait_events(&events, 2);
+        let result: serde_json::Value = serde_json::from_slice(&evs[1]).unwrap();
+        assert_eq!(result["type"], "result");
+        assert_eq!(result["protocolVersion"], 1);
+        assert_eq!(result["requestId"], 433);
+        assert_eq!(result["data"]["pong"], true);
+
+        assert_eq!(unsafe { destroy(handle) }, 0);
+    }
+
+    #[test]
     fn runtime_shutdown_cancels_pending_and_blocks_future_sends_via_c_abi() {
         let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
         let handle = make_runtime(&events);

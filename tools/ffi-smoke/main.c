@@ -655,6 +655,45 @@ int main(void) {
     return fail("cancelled(65) shape");
   }
 
+  // --- invalid runtime.shutdown params do not stop runtime --------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":73,\"method\":\"runtime."
+               "shutdown\",\"params\":{\"force\":true}}") != RC_SEND_OK) {
+    return fail("invalid runtime.shutdown send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no invalid runtime.shutdown error event");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":73") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "runtime.shutdown")) {
+    fprintf(stderr, "invalid runtime.shutdown error: %s\n", event);
+    return fail("invalid runtime.shutdown error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("invalid runtime.shutdown send left synchronous last_error");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":74,\"method\":\"runtime."
+               "ping\",\"params\":{}}") != RC_SEND_OK) {
+    return fail("runtime.ping after invalid shutdown failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no ping event after invalid shutdown");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":74") ||
+      !contains(event, "\"pong\":true")) {
+    fprintf(stderr, "ping after invalid shutdown: %s\n", event);
+    return fail("ping after invalid shutdown shape");
+  }
+
   // --- runtime.shutdown cancels pending work and blocks future sends -----
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":70,\"method\":\"runtime."
