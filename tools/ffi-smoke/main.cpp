@@ -525,6 +525,10 @@ int main() {
        R"({"protocolVersion":1,"requestId":309,"method":"runtime.hostSmoke","params":{"capability":"host.smoke.echo","params":{"message":"unexpected metadata"},"timeoutMs":1000}})",
        309,
        "runtime.hostSmoke"},
+      {"params not object",
+       R"({"protocolVersion":1,"requestId":420,"method":"runtime.hostSmoke","params":{"capability":"host.smoke.echo","params":["message","not an object"]}})",
+       420,
+       "params.params"},
   };
   for (const auto &invalid : invalid_host_requests) {
     if (send_str(rt, invalid.json) != RC_SEND_OK) {

@@ -660,6 +660,12 @@ int main(void) {
        "\"params\":{\"message\":\"unexpected metadata\"},\"timeoutMs\":1000}}",
        309,
        "runtime.hostSmoke"},
+      {"params not object",
+       "{\"protocolVersion\":1,\"requestId\":420,\"method\":\"runtime."
+       "hostSmoke\",\"params\":{\"capability\":\"host.smoke.echo\","
+       "\"params\":[\"message\",\"not an object\"]}}",
+       420,
+       "params.params"},
   };
   for (size_t i = 0;
        i < sizeof invalid_host_requests / sizeof invalid_host_requests[0];

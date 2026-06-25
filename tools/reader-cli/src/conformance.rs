@@ -111,6 +111,8 @@ const HOST_REQUEST_INVALID_CAPABILITY_WHITESPACE: &str = include_str!(
 const HOST_REQUEST_INVALID_CAPABILITY_EMPTY_SEGMENT: &str = include_str!(
     "../../../protocol/fixtures/conformance/host/request-invalid-capability-empty-segment.json"
 );
+const HOST_REQUEST_PARAMS_NOT_OBJECT: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/request-params-not-object.json");
 const HOST_COMPLETE: &str =
     include_str!("../../../protocol/fixtures/conformance/host/complete.json");
 const HOST_ERROR: &str = include_str!("../../../protocol/fixtures/conformance/host/error.json");
@@ -558,6 +560,15 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         let (_runtime, rx) = send_to_fresh_runtime(HOST_REQUEST_UNKNOWN_FIELD)?;
         expect_event_error(&rx, 309, ErrorCode::InvalidParams)
     });
+
+    record(
+        &mut report,
+        "host-request-rejects-non-object-params",
+        || {
+            let (_runtime, rx) = send_to_fresh_runtime(HOST_REQUEST_PARAMS_NOT_OBJECT)?;
+            expect_event_error(&rx, 420, ErrorCode::InvalidParams)
+        },
+    );
 
     record(&mut report, "host-complete-routes-result", || {
         let (runtime, rx) = send_to_fresh_runtime(HOST_REQUEST)?;

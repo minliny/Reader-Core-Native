@@ -200,6 +200,17 @@ mod tests {
     }
 
     #[test]
+    fn command_schema_requires_host_smoke_params_object() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+        let params = &schema["$defs"]["HostSmokeParams"]["properties"]["params"];
+
+        assert_eq!(params["type"], serde_json::json!("object"));
+        assert_eq!(params["default"], serde_json::json!({}));
+    }
+
+    #[test]
     fn command_schema_binds_source_import_to_param_def() {
         let schema: Value =
             serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))

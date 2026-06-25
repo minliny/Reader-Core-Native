@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 use crate::command::is_valid_token_path;
@@ -12,6 +12,20 @@ fn default_smoke_capability() -> String {
     "host.smoke.echo".to_string()
 }
 
+fn deserialize_host_smoke_params<'de, D>(deserializer: D) -> Result<Value, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+    if value.is_object() {
+        Ok(value)
+    } else {
+        Err(de::Error::custom(
+            "runtime.hostSmoke params.params must be a JSON object",
+        ))
+    }
+}
+
 /// Parameters for `runtime.hostSmoke`, a local driver method that exercises the
 /// host bus without involving reader business modules.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -19,7 +33,10 @@ fn default_smoke_capability() -> String {
 pub struct HostSmokeParams {
     #[serde(default = "default_smoke_capability")]
     pub capability: String,
-    #[serde(default = "empty_object")]
+    #[serde(
+        default = "empty_object",
+        deserialize_with = "deserialize_host_smoke_params"
+    )]
     pub params: Value,
 }
 
@@ -206,6 +223,19 @@ mod tests {
         .unwrap();
         let err = serde_json::from_value::<HostSmokeParams>(command.params).unwrap_err();
         assert!(err.to_string().contains("unknown field"));
+
+        let command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/host/request-params-not-object.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let err = serde_json::from_value::<HostSmokeParams>(command.params).unwrap_err();
+        assert!(
+            err.to_string().contains("params.params"),
+            "unexpected hostSmoke params error: {err}"
+        );
     }
 
     #[test]
