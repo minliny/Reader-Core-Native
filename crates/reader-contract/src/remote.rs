@@ -539,6 +539,29 @@ pub struct BookTocData {
     pub http: Option<RemoteHttpDiagnosticsData>,
 }
 
+/// Execution path that produced a `chapter.content` result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ChapterContentVia {
+    Rule,
+    Js,
+}
+
+/// Result data for `chapter.content`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChapterContentData {
+    #[serde(deserialize_with = "deserialize_non_blank_source_id")]
+    pub source_id: String,
+    #[serde(deserialize_with = "deserialize_non_blank_book_id")]
+    pub book_id: String,
+    pub chapter_title: String,
+    pub content: Value,
+    pub via: ChapterContentVia,
+    #[serde(default, deserialize_with = "deserialize_remote_http_diagnostics")]
+    pub http: Option<RemoteHttpDiagnosticsData>,
+}
+
 /// Parameters for `book.detail`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -1260,6 +1283,133 @@ mod tests {
             assert!(
                 err.to_string().contains(expected),
                 "unexpected book.toc data error for {label}: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn chapter_content_data_parses_result_and_rejects_invalid_shape() {
+        let data: ChapterContentData = serde_json::from_value(serde_json::json!({
+            "sourceId": "conformance-source",
+            "bookId": "1",
+            "chapterTitle": "C1",
+            "content": "Hello\nWorld",
+            "via": "rule"
+        }))
+        .unwrap();
+        assert_eq!(data.source_id, "conformance-source");
+        assert_eq!(data.book_id, "1");
+        assert_eq!(data.chapter_title, "C1");
+        assert_eq!(data.content, serde_json::json!("Hello\nWorld"));
+        assert_eq!(data.via, ChapterContentVia::Rule);
+        assert!(data.http.is_none());
+
+        let data: ChapterContentData = serde_json::from_value(serde_json::json!({
+            "sourceId": "conformance-source",
+            "bookId": "1",
+            "chapterTitle": "C1",
+            "content": { "status": "ok", "words": 42 },
+            "via": "js",
+            "http": {
+                "status": 200,
+                "headers": { "content-type": "application/json" }
+            }
+        }))
+        .unwrap();
+        assert_eq!(data.content["status"], serde_json::json!("ok"));
+        assert_eq!(data.via, ChapterContentVia::Js);
+        let http = data.http.expect("http diagnostics");
+        assert_eq!(http.status, Some(200));
+        assert_eq!(
+            http.headers.unwrap()["content-type"],
+            serde_json::json!("application/json")
+        );
+
+        for (label, value, expected) in [
+            (
+                "sourceId",
+                serde_json::json!({
+                    "sourceId": " ",
+                    "bookId": "1",
+                    "chapterTitle": "C1",
+                    "content": "Hello",
+                    "via": "rule"
+                }),
+                "sourceId",
+            ),
+            (
+                "bookId",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "bookId": " ",
+                    "chapterTitle": "C1",
+                    "content": "Hello",
+                    "via": "rule"
+                }),
+                "bookId",
+            ),
+            (
+                "chapterTitle",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "bookId": "1",
+                    "content": "Hello",
+                    "via": "rule"
+                }),
+                "chapterTitle",
+            ),
+            (
+                "content",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "bookId": "1",
+                    "chapterTitle": "C1",
+                    "via": "rule"
+                }),
+                "content",
+            ),
+            (
+                "via",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "bookId": "1",
+                    "chapterTitle": "C1",
+                    "content": "Hello",
+                    "via": "native"
+                }),
+                "unknown variant",
+            ),
+            (
+                "http.status",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "bookId": "1",
+                    "chapterTitle": "C1",
+                    "content": "Hello",
+                    "via": "rule",
+                    "http": { "status": 99 }
+                }),
+                "status",
+            ),
+            (
+                "unknown top-level field",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "bookId": "1",
+                    "chapterTitle": "C1",
+                    "content": "Hello",
+                    "via": "rule",
+                    "extra": true
+                }),
+                "unknown field",
+            ),
+        ] {
+            let err = serde_json::from_value::<ChapterContentData>(value)
+                .err()
+                .unwrap_or_else(|| panic!("expected rejection for {label}"));
+            assert!(
+                err.to_string().contains(expected),
+                "unexpected chapter.content data error for {label}: {err}"
             );
         }
     }

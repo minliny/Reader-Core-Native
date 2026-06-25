@@ -27,9 +27,10 @@ pub use host::{
 };
 pub use remote::{
     BookDetailBookData, BookDetailData, BookDetailParams, BookSearchBookData, BookSearchData,
-    BookSearchParams, BookTocData, BookTocEntryData, BookTocParams, ChapterContentParams,
-    HostHttpRequest, HostHttpResponse, ReadingProgressUpdateData, ReadingProgressUpdateParams,
-    RemoteHttpDiagnosticsData, SourceImportData, SourceImportParams,
+    BookSearchParams, BookTocData, BookTocEntryData, BookTocParams, ChapterContentData,
+    ChapterContentParams, ChapterContentVia, HostHttpRequest, HostHttpResponse,
+    ReadingProgressUpdateData, ReadingProgressUpdateParams, RemoteHttpDiagnosticsData,
+    SourceImportData, SourceImportParams,
 };
 
 /// JSON protocol version. Bumped on non-backward-compatible schema changes.
@@ -810,6 +811,41 @@ mod tests {
         assert_eq!(
             entry["properties"]["url"]["type"],
             serde_json::json!("string")
+        );
+    }
+
+    #[test]
+    fn event_schema_defines_chapter_content_data_contract() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+        let data = &schema["$defs"]["ChapterContentData"];
+        let required = strings_at(data, "required");
+        let properties = &data["properties"];
+        let content_types = strings_at(&properties["content"], "type");
+        let via_values = strings_at(&properties["via"], "enum");
+
+        assert_eq!(data["additionalProperties"], serde_json::json!(false));
+        assert_eq!(
+            required,
+            vec!["sourceId", "bookId", "chapterTitle", "content", "via"]
+        );
+        assert_eq!(properties["sourceId"]["minLength"], serde_json::json!(1));
+        assert_eq!(properties["sourceId"]["pattern"], serde_json::json!("\\S"));
+        assert_eq!(properties["bookId"]["minLength"], serde_json::json!(1));
+        assert_eq!(properties["bookId"]["pattern"], serde_json::json!("\\S"));
+        assert_eq!(
+            properties["chapterTitle"]["type"],
+            serde_json::json!("string")
+        );
+        assert_eq!(
+            content_types,
+            vec!["string", "object", "array", "number", "boolean", "null"]
+        );
+        assert_eq!(via_values, vec!["rule", "js"]);
+        assert_eq!(
+            properties["http"]["$ref"],
+            serde_json::json!("#/$defs/RemoteHttpDiagnosticsData")
         );
     }
 

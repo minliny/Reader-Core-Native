@@ -38,7 +38,7 @@ Current scan date: 2026-06-25.
 | `book.search` | `BookSearchParams` | `BookSearchData` | Typed parse and negative result-shape cases | Covered in current pass |
 | `book.detail` | `BookDetailParams` | `BookDetailData` | Typed parse and negative result-shape cases | Covered in current pass |
 | `book.toc` | `BookTocParams` | `BookTocData` | Typed parse and negative result-shape cases | Covered in current pass |
-| `chapter.content` | `ChapterContentParams` | Generic JSON result | Field assertions only | Open: no typed result DTO |
+| `chapter.content` | `ChapterContentParams` | `ChapterContentData` | Typed parse and negative result-shape cases | Covered in current pass |
 | `reading.progress.update` | `ReadingProgressUpdateParams` | `ReadingProgressUpdateData` | Typed parse and negative result-shape cases | Covered in current pass |
 
 ## Shortlist
@@ -68,5 +68,7 @@ Current scan date: 2026-06-25.
 8. `book.toc` result data contract. Closed in this pass.
    The result now has a typed top-level `sourceId`/`bookId`/`toc` contract,
    stable TOC entry shape, and optional host HTTP diagnostics.
-9. `chapter.content` result data contract.
-   This is the last open remote-reading result DTO in the current checklist.
+9. `chapter.content` result data contract. Closed in this pass.
+   The result now has a typed top-level `sourceId`/`bookId`/`chapterTitle`/
+   `content`/`via` contract, accepts JS JSON output, and carries optional host
+   HTTP diagnostics.

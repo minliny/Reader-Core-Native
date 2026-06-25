@@ -373,6 +373,40 @@
         "http": { "$ref": "#/$defs/RemoteHttpDiagnosticsData" }
       }
     },
+    "ChapterContentData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "bookId", "chapterTitle", "content", "via"],
+      "description": "Result data for chapter.content. Rule execution returns text content; JS execution returns any JSON value.",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Source identifier used by the chapter command."
+        },
+        "bookId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Book identifier used by the chapter command."
+        },
+        "chapterTitle": {
+          "type": "string",
+          "description": "Chapter title surfaced by the chapter command."
+        },
+        "content": {
+          "type": ["string", "object", "array", "number", "boolean", "null"],
+          "description": "Rule path returns a string; JS path returns the JSON value produced by the script."
+        },
+        "via": {
+          "type": "string",
+          "enum": ["rule", "js"],
+          "description": "Execution path that produced the content."
+        },
+        "http": { "$ref": "#/$defs/RemoteHttpDiagnosticsData" }
+      }
+    },
     "ReadingProgressUpdateData": {
       "type": "object",
       "additionalProperties": false,

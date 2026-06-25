@@ -3,10 +3,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use reader_contract::{
-    methods, BookDetailData, BookSearchData, BookTocData, Command, CoreError, CoreInfoData,
-    ErrorCode, Event, PendingHostOperationStatus, ReadingProgressUpdateData, RuntimeCancelData,
-    RuntimeConfig, RuntimePingData, RuntimeShutdownData, RuntimeStatus, SourceImportData,
-    PROTOCOL_VERSION, V1_CAPABILITIES,
+    methods, BookDetailData, BookSearchData, BookTocData, ChapterContentData, ChapterContentVia,
+    Command, CoreError, CoreInfoData, ErrorCode, Event, PendingHostOperationStatus,
+    ReadingProgressUpdateData, RuntimeCancelData, RuntimeConfig, RuntimePingData,
+    RuntimeShutdownData, RuntimeStatus, SourceImportData, PROTOCOL_VERSION, V1_CAPABILITIES,
 };
 use reader_runtime::{EventSink, Runtime};
 use serde_json::{json, Value};
@@ -879,16 +879,122 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         match recv_event(&rx)? {
             Event::Result {
                 request_id, data, ..
-            } if request_id == 409
-                && data["chapterTitle"] == "C1"
-                && data["content"] == "Hello\nWorld"
-                && data["via"] == "rule" =>
-            {
-                Ok(())
+            } if request_id == 409 => {
+                let data = serde_json::from_value::<ChapterContentData>(data)
+                    .map_err(|err| format!("chapter.content data contract parse failed: {err}"))?;
+                if data.source_id == "conformance-source"
+                    && data.book_id == "1"
+                    && data.chapter_title == "C1"
+                    && data.content == json!("Hello\nWorld")
+                    && data.via == ChapterContentVia::Rule
+                    && data.http.is_none()
+                {
+                    Ok(())
+                } else {
+                    Err(format!("unexpected chapter.content data {data:?}"))
+                }
             }
             other => Err(format!("unexpected chapter.content result {other:?}")),
         }
     });
+
+    record(
+        &mut report,
+        "chapter-content-data-rejects-invalid-result-shape",
+        || {
+            for (label, data, expected) in [
+                (
+                    "sourceId",
+                    json!({
+                        "sourceId": " ",
+                        "bookId": "1",
+                        "chapterTitle": "C1",
+                        "content": "Hello",
+                        "via": "rule"
+                    }),
+                    "sourceId",
+                ),
+                (
+                    "bookId",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "bookId": " ",
+                        "chapterTitle": "C1",
+                        "content": "Hello",
+                        "via": "rule"
+                    }),
+                    "bookId",
+                ),
+                (
+                    "chapterTitle",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "bookId": "1",
+                        "content": "Hello",
+                        "via": "rule"
+                    }),
+                    "chapterTitle",
+                ),
+                (
+                    "content",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "bookId": "1",
+                        "chapterTitle": "C1",
+                        "via": "rule"
+                    }),
+                    "content",
+                ),
+                (
+                    "via",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "bookId": "1",
+                        "chapterTitle": "C1",
+                        "content": "Hello",
+                        "via": "native"
+                    }),
+                    "unknown variant",
+                ),
+                (
+                    "http.status",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "bookId": "1",
+                        "chapterTitle": "C1",
+                        "content": "Hello",
+                        "via": "rule",
+                        "http": { "status": 99 }
+                    }),
+                    "status",
+                ),
+                (
+                    "unknown top-level field",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "bookId": "1",
+                        "chapterTitle": "C1",
+                        "content": "Hello",
+                        "via": "rule",
+                        "extra": true
+                    }),
+                    "unknown field",
+                ),
+            ] {
+                let err = serde_json::from_value::<ChapterContentData>(data)
+                    .err()
+                    .ok_or_else(|| {
+                        format!("expected chapter.content data rejection for {label}")
+                    })?;
+                if !err.to_string().contains(expected) {
+                    return Err(format!(
+                        "unexpected chapter.content data error for {label}: {err}"
+                    ));
+                }
+            }
+            Ok(())
+        },
+    );
 
     record(
         &mut report,
