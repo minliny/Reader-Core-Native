@@ -158,6 +158,17 @@
           "params": { "$ref": "#/$defs/SourceImportParams" }
         }
       }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "book.search" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/BookSearchParams" }
+        }
+      }
     }
   ],
   "$defs": {
@@ -198,6 +209,34 @@
           "type": ["object", "null"],
           "default": {},
           "description": "Optional HTTP response headers accepted by Core for diagnostics."
+        }
+      }
+    },
+    "HostHttpRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url"],
+      "description": "Host HTTP request descriptor emitted for remote-reading commands.",
+      "properties": {
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute or host-resolvable URL to fetch."
+        },
+        "method": {
+          "type": "string",
+          "default": "GET",
+          "description": "HTTP method. Defaults to GET."
+        },
+        "headers": {
+          "type": "object",
+          "default": {},
+          "description": "HTTP request headers."
+        },
+        "body": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "Optional request body."
         }
       }
     },
@@ -273,6 +312,36 @@
           "type": ["object", "null"],
           "default": null,
           "description": "Optional extraction rules object keyed by remote-reading stage."
+        }
+      }
+    },
+    "BookSearchParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId"],
+      "description": "Parameters for book.search. Uses a prefetched response or emits http.execute via searchRequest.",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "description": "Source identifier used for storage lookup and result correlation."
+        },
+        "searchResponse": {
+          "type": "string",
+          "default": "",
+          "description": "Prefetched search response body."
+        },
+        "searchRequest": {
+          "anyOf": [
+            { "$ref": "#/$defs/HostHttpRequest" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Optional host HTTP request descriptor when searchResponse is empty."
+        },
+        "source": {
+          "type": ["object", "null"],
+          "default": null,
+          "description": "Optional inline source definition used instead of storage lookup."
         }
       }
     }
