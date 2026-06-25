@@ -180,6 +180,17 @@
           "params": { "$ref": "#/$defs/BookDetailParams" }
         }
       }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "book.toc" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/BookTocParams" }
+        }
+      }
     }
   ],
   "$defs": {
@@ -382,6 +393,40 @@
           ],
           "default": null,
           "description": "Optional host HTTP request descriptor when detailResponse is empty."
+        },
+        "source": {
+          "type": ["object", "null"],
+          "default": null,
+          "description": "Optional inline source definition used instead of storage lookup."
+        }
+      }
+    },
+    "BookTocParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "bookId"],
+      "description": "Parameters for book.toc. Extracts a table of contents for one book.",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "description": "Source identifier used for storage lookup and result correlation."
+        },
+        "bookId": {
+          "type": "string",
+          "description": "Book identifier whose table of contents is being fetched."
+        },
+        "tocResponse": {
+          "type": "string",
+          "default": "",
+          "description": "Prefetched TOC response body."
+        },
+        "tocRequest": {
+          "anyOf": [
+            { "$ref": "#/$defs/HostHttpRequest" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Optional host HTTP request descriptor when tocResponse is empty."
         },
         "source": {
           "type": ["object", "null"],

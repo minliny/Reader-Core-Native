@@ -355,4 +355,42 @@ mod tests {
             err.details["source"]
         );
     }
+
+    #[test]
+    fn book_toc_params_parse_fixture_and_reject_unknown_fields() {
+        let command: crate::Command = crate::Command::from_json_bytes(
+            include_str!("../../../protocol/fixtures/conformance/commands/valid-book-toc.json")
+                .as_bytes(),
+        )
+        .unwrap();
+        let params: BookTocParams = parse_params(crate::methods::BOOK_TOC, &command.params)
+            .expect("valid book.toc params should parse");
+        assert_eq!(params.source_id, "conformance-source");
+        assert_eq!(params.book_id, "1");
+        assert!(params.toc_response.contains("\"C1\""));
+        assert!(params.toc_request.is_none());
+        assert_eq!(
+            params.source.as_ref().unwrap()["sourceId"],
+            "conformance-source"
+        );
+
+        let command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/invalid-book-toc-unknown-field.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let err =
+            parse_params::<BookTocParams>(crate::methods::BOOK_TOC, &command.params).unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert_eq!(err.details["method"], crate::methods::BOOK_TOC);
+        assert!(
+            err.details["source"]
+                .as_str()
+                .is_some_and(|source| source.contains("unknown field")),
+            "unexpected source detail: {}",
+            err.details["source"]
+        );
+    }
 }
