@@ -40,6 +40,20 @@ where
     }
 }
 
+fn deserialize_pending_host_operation_state<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = String::deserialize(deserializer)?;
+    if value == "pending" {
+        Ok(value)
+    } else {
+        Err(de::Error::custom(
+            "runtime.status pending host operation state must be pending",
+        ))
+    }
+}
+
 /// Parameters for `runtime.hostSmoke`, a local driver method that exercises the
 /// host bus without involving reader business modules.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -119,6 +133,7 @@ pub struct PendingHostOperationStatus {
     pub operation_id: u64,
     pub request_id: u64,
     pub capability: String,
+    #[serde(deserialize_with = "deserialize_pending_host_operation_state")]
     pub state: String,
 }
 
@@ -391,5 +406,29 @@ mod tests {
         .unwrap();
         let err = serde_json::from_value::<RuntimeShutdownParams>(command.params).unwrap_err();
         assert!(err.to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn pending_host_operation_status_requires_pending_state() {
+        let status: PendingHostOperationStatus = serde_json::from_value(serde_json::json!({
+            "operationId": 1,
+            "requestId": 301,
+            "capability": "host.smoke.echo",
+            "state": "pending"
+        }))
+        .unwrap();
+        assert_eq!(status.state, "pending");
+
+        let err = serde_json::from_value::<PendingHostOperationStatus>(serde_json::json!({
+            "operationId": 1,
+            "requestId": 301,
+            "capability": "host.smoke.echo",
+            "state": "completed"
+        }))
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("state"),
+            "unexpected pending operation state error: {err}"
+        );
     }
 }

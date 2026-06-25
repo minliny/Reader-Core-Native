@@ -504,6 +504,16 @@ mod tests {
         }
     }
 
+    #[test]
+    fn event_schema_requires_pending_host_operation_state_pending() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+        let state = &schema["$defs"]["PendingHostOperationStatus"]["properties"]["state"];
+
+        assert_eq!(state["const"], serde_json::json!("pending"));
+    }
+
     fn strings_at<'a>(value: &'a Value, key: &str) -> Vec<&'a str> {
         value[key]
             .as_array()

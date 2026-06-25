@@ -2,7 +2,9 @@ use std::sync::mpsc::{self, Receiver};
 use std::sync::Arc;
 use std::time::Duration;
 
-use reader_contract::{methods, Command, CoreError, ErrorCode, Event, RuntimeConfig};
+use reader_contract::{
+    methods, Command, CoreError, ErrorCode, Event, PendingHostOperationStatus, RuntimeConfig,
+};
 use reader_runtime::{EventSink, Runtime};
 use serde_json::{json, Value};
 
@@ -989,9 +991,32 @@ pub(crate) fn run_conformance() -> ConformanceReport {
                     {
                         return Err(format!("unexpected pending operation {operation}"));
                     }
+                    serde_json::from_value::<PendingHostOperationStatus>(operation.clone())
+                        .map_err(|err| format!("pending operation contract parse failed: {err}"))?;
                     Ok(())
                 }
                 other => Err(format!("expected pending runtime.status, got {other:?}")),
+            }
+        },
+    );
+
+    record(
+        &mut report,
+        "pending-host-operation-rejects-invalid-state",
+        || {
+            let err = serde_json::from_value::<PendingHostOperationStatus>(json!({
+                "operationId": 1,
+                "requestId": 301,
+                "capability": "host.smoke.echo",
+                "state": "completed"
+            }))
+            .err()
+            .ok_or_else(|| "expected pending host operation state rejection".to_string())?;
+
+            if err.to_string().contains("state") {
+                Ok(())
+            } else {
+                Err(format!("unexpected pending operation state error: {err}"))
             }
         },
     );
