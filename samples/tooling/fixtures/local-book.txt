@@ -1,0 +1,5 @@
+Chapter One
+
+This is placeholder text for a local book fixture used by the
+fixture-manifest tool. Host: example.test. No real tokens or
+copyrighted material.

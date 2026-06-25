@@ -1,0 +1,6 @@
+{
+  "version": "fixture-manifest/1",
+  "tool": "fixture-manifest-generator",
+  "fixtures": [],
+  "comment": "Pre-existing manifest fixture; must be skipped by the scanner."
+}

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Example Test Feed</title>
+    <link>https://example.test/feed</link>
+    <description>Synthetic RSS fixture for the fixture-manifest tool.</description>
+    <item>
+      <title>Item One</title>
+      <link>https://example.test/item/1</link>
+    </item>
+  </channel>
+</rss>
