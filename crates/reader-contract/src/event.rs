@@ -20,6 +20,20 @@ fn assert_token_path(field: &str, value: &str) {
     );
 }
 
+fn deserialize_event_protocol_version<'de, D>(deserializer: D) -> Result<u32, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = u32::deserialize(deserializer)?;
+    if value == PROTOCOL_VERSION {
+        Ok(value)
+    } else {
+        Err(de::Error::custom(
+            "event protocolVersion must match supported protocol version",
+        ))
+    }
+}
+
 fn deserialize_positive_event_request_id<'de, D>(deserializer: D) -> Result<u64, D::Error>
 where
     D: Deserializer<'de>,
@@ -40,7 +54,10 @@ where
 pub enum Event {
     #[serde(rename = "result")]
     Result {
-        #[serde(rename = "protocolVersion")]
+        #[serde(
+            rename = "protocolVersion",
+            deserialize_with = "deserialize_event_protocol_version"
+        )]
         protocol_version: u32,
         #[serde(
             rename = "requestId",
@@ -52,7 +69,10 @@ pub enum Event {
 
     #[serde(rename = "error")]
     Error {
-        #[serde(rename = "protocolVersion")]
+        #[serde(
+            rename = "protocolVersion",
+            deserialize_with = "deserialize_event_protocol_version"
+        )]
         protocol_version: u32,
         #[serde(rename = "requestId")]
         request_id: u64,
@@ -61,7 +81,10 @@ pub enum Event {
 
     #[serde(rename = "host.request")]
     HostRequest {
-        #[serde(rename = "protocolVersion")]
+        #[serde(
+            rename = "protocolVersion",
+            deserialize_with = "deserialize_event_protocol_version"
+        )]
         protocol_version: u32,
         #[serde(
             rename = "requestId",
@@ -233,6 +256,42 @@ mod tests {
             assert!(
                 err.to_string().contains("unknown field"),
                 "unexpected event parse error: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn event_deserialize_rejects_unsupported_protocol_version() {
+        for event in [
+            serde_json::json!({
+                "protocolVersion": 2,
+                "requestId": 1,
+                "type": "result",
+                "data": {}
+            }),
+            serde_json::json!({
+                "protocolVersion": 2,
+                "requestId": 1,
+                "type": "error",
+                "error": {
+                    "code": "INTERNAL",
+                    "message": "failed",
+                    "retryable": true
+                }
+            }),
+            serde_json::json!({
+                "protocolVersion": 2,
+                "requestId": 1,
+                "type": "host.request",
+                "operationId": 1,
+                "capability": "host.smoke.echo",
+                "params": {}
+            }),
+        ] {
+            let err = serde_json::from_value::<Event>(event).unwrap_err();
+            assert!(
+                err.to_string().contains("protocolVersion"),
+                "unexpected event protocolVersion parse error: {err}"
             );
         }
     }

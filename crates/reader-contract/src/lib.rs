@@ -458,6 +458,21 @@ mod tests {
     }
 
     #[test]
+    fn event_schema_requires_current_protocol_version() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+
+        for event_def in ["ResultEvent", "ErrorEvent", "HostRequestEvent"] {
+            assert_eq!(
+                schema["$defs"][event_def]["properties"]["protocolVersion"]["const"],
+                serde_json::json!(PROTOCOL_VERSION),
+                "{event_def} protocolVersion must match PROTOCOL_VERSION"
+            );
+        }
+    }
+
+    #[test]
     fn event_schema_requires_non_error_event_request_ids_positive() {
         let schema: Value =
             serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))

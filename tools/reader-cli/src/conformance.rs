@@ -611,6 +611,47 @@ pub(crate) fn run_conformance() -> ConformanceReport {
 
     record(
         &mut report,
+        "event-json-rejects-unsupported-protocol-version",
+        || {
+            for event in [
+                json!({
+                    "protocolVersion": 2,
+                    "requestId": 301,
+                    "type": "result",
+                    "data": {}
+                }),
+                json!({
+                    "protocolVersion": 2,
+                    "requestId": 301,
+                    "type": "error",
+                    "error": {
+                        "code": "INTERNAL",
+                        "message": "failed",
+                        "retryable": true
+                    }
+                }),
+                json!({
+                    "protocolVersion": 2,
+                    "requestId": 301,
+                    "type": "host.request",
+                    "operationId": 1,
+                    "capability": "host.smoke.echo",
+                    "params": {}
+                }),
+            ] {
+                let err = serde_json::from_value::<Event>(event)
+                    .err()
+                    .ok_or_else(|| "expected event protocolVersion rejection".to_string())?;
+                if !err.to_string().contains("protocolVersion") {
+                    return Err(format!("unexpected event protocolVersion error: {err}"));
+                }
+            }
+            Ok(())
+        },
+    );
+
+    record(
+        &mut report,
         "event-json-rejects-zero-non-error-request-id",
         || {
             for event in [
