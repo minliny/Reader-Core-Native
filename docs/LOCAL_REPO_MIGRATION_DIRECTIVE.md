@@ -5,6 +5,9 @@
 本文是当前 Reader 迁移工作的最高优先级文档。仓库内其他规划、审计、报告、状态文档
 若与本文冲突，以本文为准；历史报告只保留证据价值，不再作为当前实施路线。
 
+详细落地路线见 `docs/MAINLINE_EXECUTION_PLAN.md`。后续所有 agent goal、短任务、
+PR 描述和合并判断都必须引用该主线阶段，不得绕开其阶段顺序和防偏离规则。
+
 ## 角色与职责
 
 执行者是一名资深跨平台系统架构师与实际开发工程师，目标是把现有 Reader 项目迁移为
@@ -107,6 +110,19 @@ iOS / Android / HarmonyOS
 ```
 
 Rust Core 必须成为业务能力的唯一来源。三端不得各自保留独立业务实现并长期分叉。
+
+主线顺序固定为：
+
+```text
+Legado 定义要兼容什么
+  -> 旧 Reader-Core 定义已有能力如何迁移
+  -> Reader-Core-Native 用 Rust Core + C ABI 定义全平台接入边界
+  -> corpus benchmark 证明 CLI / iOS / Android / HarmonyOS 读出同样结果
+```
+
+因此，BookSource / 规则链路必须先以本地 `legado` 和旧 `Reader-Core` 建立兼容模型、
+fixture 和 raw rule 保真，再进入 Rust 执行器、三端 adapter 和 benchmark。不能先按
+当前 Rust V1 `RuleStepSpec` 继续扩展后再倒推兼容 Legado。
 
 ## 工作方式
 

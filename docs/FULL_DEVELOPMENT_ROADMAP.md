@@ -4,10 +4,14 @@
 
 最高优先级入口：`docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`
 
+主线执行计划：`docs/MAINLINE_EXECUTION_PLAN.md`
+
 当前 Rust 目标仓库：`/Users/minliny/Documents/Reader-Core-Native`
 
 说明：本轮文档和开发统一以 `Reader-Core-Native` 为 Rust 目标仓库。后续任何 agent
 仍必须先扫描本地工作区，确认目标仓库路径、Git 状态和分支后再开始修改。
+若本文的阶段描述与 `docs/MAINLINE_EXECUTION_PLAN.md` 的执行顺序或禁止项冲突，
+以 `docs/MAINLINE_EXECUTION_PLAN.md` 为准。
 
 ## 最终目标
 
@@ -65,6 +69,25 @@ HarmonyOS
 ```
 
 ## 分阶段路线
+
+### 不可跳过的主线顺序
+
+```text
+Legado 定义要兼容什么
+  -> 旧 Reader-Core 定义已有能力如何迁移
+  -> Reader-Core-Native 用 Rust Core + C ABI 定义全平台接入边界
+  -> corpus benchmark 证明 CLI / iOS / Android / HarmonyOS 读出同样结果
+```
+
+这不是建议顺序，而是合入顺序。当前最重要的纠偏点是 BookSource / Rule：
+
+- Legado `BookSource` 和 CSS 管道链 DSL 是兼容目标。
+- 旧 `Reader-Core` 的 BookSource model、sample、parser 测试是迁移资产。
+- `Reader-Core-Native` 的 `RuleStepSpec` 是 V1 结构化规则执行格式，不是 Legado DSL。
+- raw Legado DSL 必须先保存在 `LegadoBookSource` / `BookSourceCompat`，再由独立
+  `LegadoRuleDsl` / `LegadoRulePipeline` 执行。
+- 禁止继续通过扩展 `RuleStepSpec` 来硬凑 `div.list&&div.item;div.name&&a@text`
+  这类 Legado 字符串。
 
 ### 阶段 0：本地仓库定位与安全基线
 
@@ -132,14 +155,19 @@ git -C <repo> log -5 --oneline
 
 优先级：
 
-1. Rule engine：CSS、XPath、JSONPath、Regex、链式规则、fallback。
-2. JS runtime：可嵌入 JS、host callback、timeout、cancel、安全边界。
-3. Request descriptor：method、headers、body、charset、cookie、redirect、retry。
-4. Remote reading：source import -> search -> detail -> toc -> content -> progress。
-5. Local book：TXT、EPUB、章节切分、资源读取、编码检测。
-6. Storage：SQLite schema、cache、progress、bookshelf、history、download queue。
-7. Sync：WebDAV、backup/restore、conflict、diff。
-8. RSS/TTS：Core 数据和契约，平台执行保留在 host。
+1. BookSource 兼容入口：Legado raw object decode/encode、unknown field preserve、
+   raw rule preserve、`source.import` conformance。
+2. Legado DSL 执行器：CSS 管道链 DSL tokenizer/AST/pipeline/extractor，最小
+   search -> detail -> toc -> content fixture 闭环。
+3. Rule engine V1：保持 `RuleStepSpec` 结构化格式，用于已定义的 V1 JSONPath/CSS
+   step，不接收 raw Legado DSL 字符串。
+4. JS runtime：可嵌入 JS、host callback、timeout、cancel、安全边界。
+5. Request descriptor：method、headers、body、charset、cookie、redirect、retry。
+6. Remote reading：source import -> search -> detail -> toc -> content -> progress。
+7. Local book：TXT、EPUB、章节切分、资源读取、编码检测。
+8. Storage：SQLite schema、cache、progress、bookshelf、history、download queue。
+9. Sync：WebDAV、backup/restore、conflict、diff。
+10. RSS/TTS：Core 数据和契约，平台执行保留在 host。
 
 退出条件：
 
