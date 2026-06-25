@@ -598,6 +598,49 @@ int main(void) {
     return fail("unknown host.complete send left synchronous last_error");
   }
 
+  // --- host.complete invalid params -> async INVALID_PARAMS -------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":305,\"method\":\"host."
+               "complete\",\"params\":{\"operationId\":0,\"result\":{\"status\":"
+               "\"invalid\"}}}") != RC_SEND_OK) {
+    return fail("zero operation host.complete send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for zero operation host.complete");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":305") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "\"operationId\":0")) {
+    fprintf(stderr, "zero operation host.complete error: %s\n", event);
+    return fail("zero operation host.complete error shape");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":314,\"method\":\"host."
+               "complete\",\"params\":{\"operationId\":1,\"result\":{\"status\":"
+               "\"ok\"},\"completedAt\":123}}") != RC_SEND_OK) {
+    return fail("unknown field host.complete send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for unknown field host.complete");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":314") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "host.complete") ||
+      !contains(event, "unknown field")) {
+    fprintf(stderr, "unknown field host.complete error: %s\n", event);
+    return fail("unknown field host.complete error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("host.complete invalid params left synchronous last_error");
+  }
+
   // --- remote http.execute completion carries metadata ------------------
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":68,\"method\":\"book."

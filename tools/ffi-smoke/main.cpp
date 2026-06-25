@@ -459,6 +459,40 @@ int main() {
     return fail("unknown host.complete send left synchronous last_error");
   }
 
+  // --- host.complete invalid params -> async INVALID_PARAMS -------------
+  std::string zero_complete =
+      R"({"protocolVersion":1,"requestId":305,"method":"host.complete","params":{"operationId":0,"result":{"status":"invalid"}}})";
+  if (send_str(rt, zero_complete) != RC_SEND_OK) {
+    return fail("zero operation host.complete send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":305") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "\"operationId\":0")) {
+    std::cerr << "zero operation host.complete error: " << event << '\n';
+    return fail("zero operation host.complete error shape");
+  }
+  std::string unknown_field_complete =
+      R"({"protocolVersion":1,"requestId":314,"method":"host.complete","params":{"operationId":1,"result":{"status":"ok"},"completedAt":123}})";
+  if (send_str(rt, unknown_field_complete) != RC_SEND_OK) {
+    return fail("unknown field host.complete send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":314") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "host.complete") ||
+      !contains(event, "unknown field")) {
+    std::cerr << "unknown field host.complete error: " << event << '\n';
+    return fail("unknown field host.complete error shape");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("host.complete invalid params left synchronous last_error");
+  }
+
   // --- remote http.execute completion carries metadata ------------------
   std::string http_search =
       R"({"protocolVersion":1,"requestId":27,"method":"book.search","params":{"sourceId":"ffi-http-src","searchRequest":{"url":"https://books.example.test/search?q=abi","headers":{"Accept":"application/json"}},"source":{"sourceId":"ffi-http-src","name":"FFI HTTP Source","baseUrl":"https://books.example.test","rules":{"search":[{"kind":"jsonPath","path":"$.books[*]"}]}}}})";
