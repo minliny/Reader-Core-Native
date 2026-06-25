@@ -665,6 +665,72 @@ mod tests {
     }
 
     #[test]
+    fn invalid_host_request_params_report_async_errors_via_c_abi() {
+        let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
+        let handle = make_runtime(&events);
+
+        for (index, name, payload, request_id, message_fragment) in [
+            (
+                0,
+                "capability whitespace",
+                include_bytes!(
+                    "../../../protocol/fixtures/conformance/host/request-invalid-capability-whitespace.json"
+                )
+                .as_slice(),
+                307,
+                "capability",
+            ),
+            (
+                1,
+                "capability empty segment",
+                include_bytes!(
+                    "../../../protocol/fixtures/conformance/host/request-invalid-capability-empty-segment.json"
+                )
+                .as_slice(),
+                308,
+                "capability",
+            ),
+            (
+                2,
+                "unknown host smoke params",
+                include_bytes!("../../../protocol/fixtures/conformance/host/request-unknown-field.json")
+                    .as_slice(),
+                309,
+                "runtime.hostSmoke",
+            ),
+        ] {
+            assert_eq!(
+                unsafe { send(handle, payload.as_ptr(), payload.len()) },
+                status::send::OK,
+                "{name}"
+            );
+            assert_eq!(last_error_code(), 0, "{name}");
+
+            let evs = wait_events(&events, index + 1);
+            let event: serde_json::Value = serde_json::from_slice(&evs[index]).unwrap();
+            assert_eq!(event["type"], "error", "{name}");
+            assert_eq!(event["protocolVersion"], 1, "{name}");
+            assert_eq!(event["requestId"], request_id, "{name}");
+            assert_eq!(
+                event["error"]["code"],
+                serde_json::json!(ErrorCode::InvalidParams),
+                "{name}"
+            );
+            assert_eq!(event["error"]["retryable"], false, "{name}");
+            assert!(
+                event["error"]["message"]
+                    .as_str()
+                    .unwrap()
+                    .contains(message_fragment),
+                "{name}: {event}"
+            );
+        }
+
+        assert_eq!(events.0.lock().unwrap().len(), 3);
+        assert_eq!(unsafe { destroy(handle) }, 0);
+    }
+
+    #[test]
     fn runtime_status_reports_pending_host_operation_metadata_via_c_abi() {
         let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
         let handle = make_runtime(&events);

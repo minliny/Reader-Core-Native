@@ -564,6 +564,61 @@ int main(void) {
     return fail("host.complete result shape");
   }
 
+  // --- invalid runtime.hostSmoke params return async protocol errors ----
+  const struct {
+    const char *name;
+    const char *json;
+    unsigned long long request_id;
+    const char *message_fragment;
+  } invalid_host_requests[] = {
+      {"capability whitespace",
+       "{\"protocolVersion\":1,\"requestId\":307,\"method\":\"runtime."
+       "hostSmoke\",\"params\":{\"capability\":\"host. smoke.echo\","
+       "\"params\":{\"message\":\"invalid capability\"}}}",
+       307,
+       "capability"},
+      {"capability empty segment",
+       "{\"protocolVersion\":1,\"requestId\":308,\"method\":\"runtime."
+       "hostSmoke\",\"params\":{\"capability\":\"host..echo\","
+       "\"params\":{\"message\":\"invalid capability\"}}}",
+       308,
+       "capability"},
+      {"unknown params",
+       "{\"protocolVersion\":1,\"requestId\":309,\"method\":\"runtime."
+       "hostSmoke\",\"params\":{\"capability\":\"host.smoke.echo\","
+       "\"params\":{\"message\":\"unexpected metadata\"},\"timeoutMs\":1000}}",
+       309,
+       "runtime.hostSmoke"},
+  };
+  for (size_t i = 0;
+       i < sizeof invalid_host_requests / sizeof invalid_host_requests[0];
+       i++) {
+    if (send_str(rt, invalid_host_requests[i].json) != RC_SEND_OK) {
+      return fail("invalid host request send failed");
+    }
+    strcpy(msg, "stale");
+    if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+      return fail("invalid host request left synchronous last_error");
+    }
+    if (wait_event(&ch, ev, event, sizeof event) != 0) {
+      return fail("no invalid host request error event");
+    }
+    ev++;
+    char request_id_field[32];
+    snprintf(request_id_field, sizeof request_id_field, "\"requestId\":%llu",
+             invalid_host_requests[i].request_id);
+    if (!contains(event, "\"protocolVersion\":1") ||
+        !contains(event, "\"type\":\"error\"") ||
+        !contains(event, request_id_field) ||
+        !contains(event, "\"code\":\"INVALID_PARAMS\"") ||
+        !contains(event, invalid_host_requests[i].message_fragment) ||
+        contains(event, "\"type\":\"host.request\"")) {
+      fprintf(stderr, "invalid host request %s: %s\n",
+              invalid_host_requests[i].name, event);
+      return fail("invalid host request error shape");
+    }
+  }
+
   // --- host.request -> host.error ---------------------------------------
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":62,\"method\":\"runtime."

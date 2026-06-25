@@ -441,6 +441,49 @@ int main() {
     return fail("host.complete result shape");
   }
 
+  // --- invalid runtime.hostSmoke params return async protocol errors ----
+  struct InvalidHostRequest {
+    const char *name;
+    std::string json;
+    uint64_t request_id;
+    const char *message_fragment;
+  };
+  const InvalidHostRequest invalid_host_requests[] = {
+      {"capability whitespace",
+       R"({"protocolVersion":1,"requestId":307,"method":"runtime.hostSmoke","params":{"capability":"host. smoke.echo","params":{"message":"invalid capability"}}})",
+       307,
+       "capability"},
+      {"capability empty segment",
+       R"({"protocolVersion":1,"requestId":308,"method":"runtime.hostSmoke","params":{"capability":"host..echo","params":{"message":"invalid capability"}}})",
+       308,
+       "capability"},
+      {"unknown params",
+       R"({"protocolVersion":1,"requestId":309,"method":"runtime.hostSmoke","params":{"capability":"host.smoke.echo","params":{"message":"unexpected metadata"},"timeoutMs":1000}})",
+       309,
+       "runtime.hostSmoke"},
+  };
+  for (const auto &invalid : invalid_host_requests) {
+    if (send_str(rt, invalid.json) != RC_SEND_OK) {
+      return fail("invalid host request send failed");
+    }
+    if (!last_error_clears_message_when_ok()) {
+      return fail("invalid host request left synchronous last_error");
+    }
+    event = wait_event(ch, ev++);
+    const std::string request_id_field =
+        "\"requestId\":" + std::to_string(invalid.request_id);
+    if (!contains(event, "\"protocolVersion\":1") ||
+        !contains(event, "\"type\":\"error\"") ||
+        !contains(event, request_id_field.c_str()) ||
+        !contains(event, "\"code\":\"INVALID_PARAMS\"") ||
+        !contains(event, invalid.message_fragment) ||
+        contains(event, "\"type\":\"host.request\"")) {
+      std::cerr << "invalid host request " << invalid.name << ": " << event
+                << '\n';
+      return fail("invalid host request error shape");
+    }
+  }
+
   // --- host.request -> host.error ---------------------------------------
   if (send_str(rt,
                R"({"protocolVersion":1,"requestId":22,"method":"runtime.hostSmoke","params":{"capability":"host.smoke.echo","params":{}}})") !=
