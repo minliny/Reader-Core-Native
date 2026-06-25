@@ -3,9 +3,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use reader_contract::{
-    methods, Command, CoreError, ErrorCode, Event, PendingHostOperationStatus,
+    methods, Command, CoreError, CoreInfoData, ErrorCode, Event, PendingHostOperationStatus,
     ReadingProgressUpdateData, RuntimeCancelData, RuntimeConfig, RuntimePingData,
-    RuntimeShutdownData, RuntimeStatus,
+    RuntimeShutdownData, RuntimeStatus, PROTOCOL_VERSION, V1_CAPABILITIES,
 };
 use reader_runtime::{EventSink, Runtime};
 use serde_json::{json, Value};
@@ -282,22 +282,88 @@ pub(crate) fn run_conformance() -> ConformanceReport {
     record(&mut report, "valid-command-core-info", || {
         let (_runtime, rx) = send_to_fresh_runtime(VALID_CORE_INFO)?;
         match recv_event(&rx)? {
-            Event::Result { data, .. } => {
-                let capabilities = data["capabilities"]
-                    .as_array()
-                    .ok_or_else(|| "missing capabilities array".to_string())?;
-                if capabilities
-                    .iter()
-                    .any(|value| value == methods::RUNTIME_PING)
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 102 => {
+                let data = serde_json::from_value::<CoreInfoData>(data)
+                    .map_err(|err| format!("core.info data contract parse failed: {err}"))?;
+                if data.abi_version > 0
+                    && data.protocol_version == PROTOCOL_VERSION
+                    && !data.build_version.is_empty()
+                    && data
+                        .capabilities
+                        .iter()
+                        .map(String::as_str)
+                        .eq(V1_CAPABILITIES.iter().copied())
                 {
                     Ok(())
                 } else {
-                    Err(format!("runtime.ping missing from capabilities: {data}"))
+                    Err(format!("unexpected core.info data {data:?}"))
                 }
             }
             other => Err(format!("unexpected event {other:?}")),
         }
     });
+
+    record(
+        &mut report,
+        "core-info-data-rejects-invalid-result-shape",
+        || {
+            for (label, data, expected) in [
+                (
+                    "abiVersion",
+                    json!({
+                        "abiVersion": 0,
+                        "protocolVersion": PROTOCOL_VERSION,
+                        "buildVersion": "reader-core-native test",
+                        "capabilities": V1_CAPABILITIES
+                    }),
+                    "abiVersion",
+                ),
+                (
+                    "protocolVersion",
+                    json!({
+                        "abiVersion": 1,
+                        "protocolVersion": PROTOCOL_VERSION + 1,
+                        "buildVersion": "reader-core-native test",
+                        "capabilities": V1_CAPABILITIES
+                    }),
+                    "protocolVersion",
+                ),
+                (
+                    "capabilities",
+                    json!({
+                        "abiVersion": 1,
+                        "protocolVersion": PROTOCOL_VERSION,
+                        "buildVersion": "reader-core-native test",
+                        "capabilities": ["runtime.ping"]
+                    }),
+                    "capabilities",
+                ),
+                (
+                    "unknown field",
+                    json!({
+                        "abiVersion": 1,
+                        "protocolVersion": PROTOCOL_VERSION,
+                        "buildVersion": "reader-core-native test",
+                        "capabilities": V1_CAPABILITIES,
+                        "extra": true
+                    }),
+                    "unknown field",
+                ),
+            ] {
+                let err = serde_json::from_value::<CoreInfoData>(data)
+                    .err()
+                    .ok_or_else(|| format!("expected core.info data rejection for {label}"))?;
+                if !err.to_string().contains(expected) {
+                    return Err(format!(
+                        "unexpected core.info data error for {label}: {err}"
+                    ));
+                }
+            }
+            Ok(())
+        },
+    );
 
     record(&mut report, "runtime-ping-rejects-unknown-params", || {
         let (_runtime, rx) = send_to_fresh_runtime(INVALID_RUNTIME_PING_UNKNOWN_FIELD)?;

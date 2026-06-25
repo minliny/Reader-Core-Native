@@ -17,7 +17,7 @@ pub mod remote;
 
 pub use command::{Command, EmptyParams};
 pub use config::RuntimeConfig;
-pub use core_info::core_info;
+pub use core_info::{core_info, CoreInfoData};
 pub use error::{CoreError, ErrorCode};
 pub use event::Event;
 pub use host::{
@@ -598,6 +598,55 @@ mod tests {
             properties["cancelledRequestIds"]["items"]["minimum"],
             serde_json::json!(1)
         );
+    }
+
+    #[test]
+    fn event_schema_defines_core_info_data_contract() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+        let data = &schema["$defs"]["CoreInfoData"];
+        let required = strings_at(data, "required");
+        let properties = &data["properties"];
+        let capabilities = properties["capabilities"]["prefixItems"]
+            .as_array()
+            .expect("core.info capabilities prefixItems must be an array")
+            .iter()
+            .map(|item| {
+                item["const"]
+                    .as_str()
+                    .expect("core.info capability prefix item must be const string")
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(data["additionalProperties"], serde_json::json!(false));
+        assert_eq!(
+            required,
+            vec![
+                "abiVersion",
+                "protocolVersion",
+                "buildVersion",
+                "capabilities"
+            ]
+        );
+        assert_eq!(properties["abiVersion"]["minimum"], serde_json::json!(1));
+        assert_eq!(
+            properties["protocolVersion"]["const"],
+            serde_json::json!(PROTOCOL_VERSION)
+        );
+        assert_eq!(
+            properties["buildVersion"]["type"],
+            serde_json::json!("string")
+        );
+        assert_eq!(
+            properties["capabilities"]["minItems"],
+            serde_json::json!(V1_CAPABILITIES.len())
+        );
+        assert_eq!(
+            properties["capabilities"]["maxItems"],
+            serde_json::json!(V1_CAPABILITIES.len())
+        );
+        assert_eq!(capabilities, V1_CAPABILITIES);
     }
 
     #[test]

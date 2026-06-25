@@ -26,7 +26,7 @@ Current scan date: 2026-06-25.
 
 | Method | Params schema/DTO | Result schema/DTO | CLI evidence | Status |
 | --- | --- | --- | --- | --- |
-| `core.info` | `EmptyParams` | Generic JSON result | Capabilities assertion | Open: no typed result DTO |
+| `core.info` | `EmptyParams` | `CoreInfoData` | Typed parse and negative result-shape cases | Covered in current pass |
 | `runtime.ping` | `EmptyParams` | `RuntimePingData` | Typed parse and negative result-shape cases | Covered in current pass |
 | `runtime.cancel` | `RuntimeCancelParams` | `RuntimeCancelData` | Typed parse and negative result-shape cases | Covered in current pass |
 | `runtime.status` | `RuntimeStatusParams` | `RuntimeStatusData` / `RuntimeStatus` | Typed parse and negative result-shape cases | Covered |
@@ -54,7 +54,7 @@ Current scan date: 2026-06-25.
 3. `runtime.ping` result data contract. Closed in this pass.
    Result is small (`pong`, `method`) and closes another runtime-control
    result object without touching runtime, ABI, or host code.
-4. `core.info` result data contract.
+4. `core.info` result data contract. Closed in this pass.
    Result is larger because it binds capability advertisement and version
    fields, but it remains a Core-owned protocol contract.
 5. `source.import` result data contract.

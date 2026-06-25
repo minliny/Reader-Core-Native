@@ -80,6 +80,48 @@
         "details": { "type": "object" }
       }
     },
+    "CoreInfoData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["abiVersion", "protocolVersion", "buildVersion", "capabilities"],
+      "description": "Result data for core.info.",
+      "properties": {
+        "abiVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "C ABI version exposed by the loaded Core runtime."
+        },
+        "protocolVersion": {
+          "type": "integer",
+          "const": 1,
+          "description": "JSON protocol version implemented by this Core runtime."
+        },
+        "buildVersion": {
+          "type": "string",
+          "description": "Build/version string for diagnostics."
+        },
+        "capabilities": {
+          "type": "array",
+          "minItems": 12,
+          "maxItems": 12,
+          "prefixItems": [
+            { "type": "string", "const": "core.info" },
+            { "type": "string", "const": "runtime.ping" },
+            { "type": "string", "const": "runtime.hostSmoke" },
+            { "type": "string", "const": "runtime.cancel" },
+            { "type": "string", "const": "runtime.status" },
+            { "type": "string", "const": "runtime.shutdown" },
+            { "type": "string", "const": "host.complete" },
+            { "type": "string", "const": "host.error" },
+            { "type": "string", "const": "host.bus.v1" },
+            { "type": "string", "const": "http.execute" },
+            { "type": "string", "const": "runtime.config.v1" },
+            { "type": "string", "const": "remote.reading.v1" }
+          ],
+          "description": "Ordered V1 capability list advertised to hosts."
+        }
+      }
+    },
     "RuntimePingData": {
       "type": "object",
       "additionalProperties": false,
