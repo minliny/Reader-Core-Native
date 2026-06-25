@@ -57,6 +57,21 @@
 - Android NDK `26.3.11579264`
 - Rust target：`aarch64-linux-android`、`x86_64-linux-android`
 
+## Host adapter 接入路径（2026-06-25 新增）
+
+`bindings/android/host-adapter/` 是纯 JVM host 适配器模块，桥接 Core
+`host.request` event 到 host capability，并编码 `host.complete` / `host.error`
+command 经现有 `rc_runtime_send` 通道回 Core。**不触碰 C ABI**，只消费协议。
+
+- 组件：`HostRequest` / `HostReply` / `CapabilityHandler` / `HostAdapter` /
+  `HostReplyCodec` / 零依赖 `Json`。
+- Gradle gate：`bindings/android/host-adapter` 下 `gradle test`（JDK 17、
+  Gradle 9.5.1 验证；`--offline` 可复跑）。
+- Contract evidence：单测断言 `HostReplyCodec` 输出与
+  `protocol/fixtures/conformance/host/{complete,error,http-complete-with-metadata}.json`
+  在 canonical 形式下逐字节一致；`HostAdapterTest` 覆盖 dispatch → encode 端到端。
+- 模块详情见 `bindings/android/host-adapter/README.md`。
+
 ## ABI gap 记录
 
 1. **Event 只通过 callback 传递。** ABI v1 没有 `rc_runtime_poll`，因此 JNI 层拥有

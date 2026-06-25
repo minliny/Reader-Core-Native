@@ -1,0 +1,72 @@
+# Reader for Android — Host Adapter
+
+> 范围规则：本模块只在 `Reader for Android` 工作。它消费 Rust Core 的
+> ABI/protocol，不新增也不修改 C ABI 或 Core 语义。Native 与其他平台不在此
+> lane 修改。
+
+## 角色
+
+`HostAdapter` 是 Android host 侧适配器，把 Core 发出的 `host.request` event
+桥接到 host 拥有的 capability（如 `http.execute`、`host.smoke.echo`），并把结果
+编码回 `host.complete` / `host.error` command，交由现有
+`ReaderCoreRuntime.send` / `rc_runtime_send` 发回 Core。
+
+接入路径（host → Core ABI/protocol）：
+
+```
+Core (Rust) --rc_event_callback--> ReaderCoreRuntime.pollEvent (现有 Java wrapper)
+   |                                   |
+   |  host.request event bytes         |
+   v                                   v
+HostRequest.parse  -->  HostAdapter.dispatch(capability)  -->  CapabilityHandler
+                                                                   |
+                                                                   v
+                                          HostReply  <--  HostReplyCodec.encode
+                                                                   |
+                                                                   v
+                                          ReaderCoreRuntime.send  -->  rc_runtime_send --> Core
+```
+
+本模块**不触碰 C ABI**：它消费协议（`host.request` / `host.complete` /
+`host.error`），复用现有 `ReaderCoreRuntime` 的发送通道，不新增 native symbol。
+
+## 组件
+
+| 类 | 职责 |
+| --- | --- |
+| `HostRequest` | 解析并校验 `host.request` event（operationId≥1、dotted capability、params）。 |
+| `HostReply` | host 回复：`complete(resultJson)` 或 `error(code, message, retryable)`。 |
+| `CapabilityHandler` | 单个 capability 的 host 侧实现接口。 |
+| `HostAdapter` | 按 capability 分发；未注册/抛异常 → `host.error`。 |
+| `HostReplyCodec` | 把 `HostReply` 编码为协议 command JSON。 |
+| `Json` | 零依赖最小 JSON codec，供纯 JVM 单测与 Android 嵌入。 |
+
+## 构建 / 测试
+
+需要 JDK 17 与 Gradle（已用 Gradle 9.5.1 验证）。
+
+```bash
+cd bindings/android/host-adapter
+JAVA_HOME=<jdk17> gradle test          # 在线首跑拉取 JUnit Jupiter
+JAVA_HOME=<jdk17> gradle --offline test # 依赖已缓存，可离线复跑
+```
+
+## Contract evidence
+
+`src/test/resources/conformance/host/` 复制自 `protocol/fixtures/conformance/host/`。
+单测断言 `HostReplyCodec` 输出与这些 fixture 在 canonical 形式下逐字节一致：
+
+- `complete.json` ← `host.complete` 编码
+- `error.json` ← `host.error` 编码
+- `http-complete-with-metadata.json` ← 带 HTTP status/headers/body 的完成
+
+`HostAdapterTest` 进一步做端到端：解析 `host.request` → `dispatch` → `encode`，
+结果与 fixture 对齐。这是本 lane 每轮提交的可验证 contract evidence
+（Gradle `test` task，纯 JVM，无需 NDK/设备）。
+
+## 不在此 lane
+
+- Gradle packaging 成完整 AAR / Android App 项目、UI、WebView、CookieManager、
+  keystore、network policy 仍属 host-app 工作。
+- C ABI 扩展（`rc_host_complete`、`rc_runtime_poll` 等）不在本 lane；host
+  completion 仍通过 `rc_runtime_send` 发送普通 JSON command。
