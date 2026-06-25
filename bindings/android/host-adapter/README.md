@@ -52,6 +52,8 @@ HostRequest.parse  -->  HostAdapter.dispatch(capability)  -->  CapabilityHandler
 | `HttpExecuteHandler` | `http.execute` shared-contract capability handler；委托 `HttpFetch` 做真实网络。 |
 | `HttpFetch` / `HttpRequest` / `HttpResponse` | host-owned HTTP 机制抽象与请求/响应值对象。 |
 | `HostSmokeEchoHandler` | `host.smoke.echo` conformance smoke capability；回显请求 params。 |
+| `CredentialResolveHandler` | `credential.resolve` capability（host-app-contracts Gap D）；委托 `CredentialProvider` 解析凭据句柄。 |
+| `CredentialProvider` / `Credential` | host-owned 凭据存储机制抽象与值对象（Keychain/Keystore）。 |
 | `Json` | 零依赖最小 JSON codec，供纯 JVM 单测与 Android 嵌入。 |
 
 ## 构建 / 测试
@@ -87,6 +89,9 @@ JAVA_HOME=<jdk17> gradle --offline test # 依赖已缓存，可离线复跑
 - `HostBusTest` 覆盖产品 surface：同步 `tick`/`drain` 脚本、unsupported capability →
   `host.error`、`start`/`stop` 幂等，并用阻塞型 fake transport 驱动 daemon 轮询线程
   端到端验证异步 host.request 处理。
+- `CredentialResolveHandlerTest` 用 fake `CredentialProvider` 验证 `credential.resolve`
+  草案契约（填补 host-app-contracts Gap D）：解析 → `{username,password}`，未知 handle →
+  非重试 INTERNAL，provider 抛异常 → 可重试 INTERNAL，并经 `HostEventLoop` 端到端发命令。
 
 这是本 lane 每轮提交的可验证 contract evidence（Gradle `test` task，纯 JVM，无需
 NDK/设备）。模块通过 `sourceSets` 编译引用现有 Java JNI wrapper（`ReaderCoreRuntime`
