@@ -1,0 +1,101 @@
+{
+  "version": "fixture-manifest/1",
+  "generated_at": "2026-06-25T00:00:00+00:00",
+  "tool": "fixture-manifest-generator",
+  "root": "/synthetic/corpus-batches-sample",
+  "fixtures": [
+    {
+      "id": "bs-sample-001",
+      "path": "samples/tooling/corpus-batches/book-source-001.json",
+      "source_type": "book-source",
+      "format": "json",
+      "platforms": ["ios", "android", "harmony"],
+      "capability_tags": ["search", "toc", "chapter-content"],
+      "sanitization": "synthetic",
+      "bytes": 256,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    {
+      "id": "wp-sample-001",
+      "path": "samples/tooling/corpus-batches/web-page-001.html",
+      "source_type": "web-page",
+      "format": "html",
+      "platforms": ["ios", "android", "harmony"],
+      "capability_tags": ["chapter-content"],
+      "sanitization": "synthetic",
+      "bytes": 200,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000002"
+    },
+    {
+      "id": "ja-sample-001",
+      "path": "samples/tooling/corpus-batches/json-api-001.json",
+      "source_type": "json-api",
+      "format": "json",
+      "platforms": ["ios", "android", "harmony"],
+      "capability_tags": ["search"],
+      "sanitization": "synthetic",
+      "bytes": 180,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000003"
+    },
+    {
+      "id": "xf-sample-001",
+      "path": "samples/tooling/corpus-batches/xml-feed-001.xml",
+      "source_type": "xml-feed",
+      "format": "xml",
+      "platforms": ["ios", "android", "harmony"],
+      "capability_tags": ["toc"],
+      "sanitization": "synthetic",
+      "bytes": 220,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000004"
+    },
+    {
+      "id": "rf-sample-001",
+      "path": "samples/tooling/corpus-batches/rss-feed-001.xml",
+      "source_type": "rss-feed",
+      "format": "xml",
+      "platforms": ["ios", "android", "harmony"],
+      "capability_tags": ["toc", "search"],
+      "sanitization": "synthetic",
+      "bytes": 240,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000005"
+    },
+    {
+      "id": "lb-sample-001",
+      "path": "samples/tooling/corpus-batches/local-book-001.txt",
+      "source_type": "local-book",
+      "format": "text",
+      "platforms": ["ios", "android", "harmony"],
+      "capability_tags": ["chapter-content"],
+      "sanitization": "synthetic",
+      "bytes": 150,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000006"
+    },
+    {
+      "id": "bs-sample-002-nonsynthetic",
+      "path": "samples/tooling/corpus-batches/book-source-002-real.json",
+      "source_type": "book-source",
+      "format": "json",
+      "platforms": ["ios", "android", "harmony"],
+      "capability_tags": ["search", "toc", "chapter-content"],
+      "sanitization": "unknown",
+      "bytes": 300,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000007"
+    }
+  ],
+  "summary": {
+    "total": 7,
+    "by_source_type": {
+      "book-source": 2,
+      "web-page": 1,
+      "json-api": 1,
+      "xml-feed": 1,
+      "rss-feed": 1,
+      "local-book": 1
+    },
+    "by_platform": {
+      "ios": 7,
+      "android": 7,
+      "harmony": 7
+    }
+  }
+}
