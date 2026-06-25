@@ -582,6 +582,45 @@ mod tests {
     }
 
     #[test]
+    fn core_info_advertises_v1_contract_via_c_abi() {
+        let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
+        let handle = make_runtime(&events);
+
+        let cmd = br#"{"protocolVersion":1,"requestId":10,"method":"core.info","params":{}}"#;
+        assert_eq!(
+            unsafe { send(handle, cmd.as_ptr(), cmd.len()) },
+            status::send::OK
+        );
+        assert_eq!(last_error_code(), 0);
+
+        let evs = wait_events(&events, 1);
+        let event: serde_json::Value = serde_json::from_slice(&evs[0]).unwrap();
+        assert_eq!(event["type"], "result");
+        assert_eq!(event["protocolVersion"].as_u64(), Some(1));
+        assert_eq!(event["requestId"].as_u64(), Some(10));
+
+        let data = &event["data"];
+        assert_eq!(data["abiVersion"].as_u64(), Some(u64::from(ABI_VERSION)));
+        assert_eq!(
+            data["protocolVersion"].as_u64(),
+            Some(u64::from(reader_contract::PROTOCOL_VERSION))
+        );
+        assert_eq!(
+            data["buildVersion"].as_str(),
+            Some(concat!("reader-core-native ", env!("CARGO_PKG_VERSION")))
+        );
+        let capabilities = data["capabilities"]
+            .as_array()
+            .expect("core.info capabilities must be an array")
+            .iter()
+            .map(|value| value.as_str().expect("capability must be a string"))
+            .collect::<Vec<_>>();
+        assert_eq!(capabilities.as_slice(), reader_contract::V1_CAPABILITIES);
+
+        assert_eq!(unsafe { destroy(handle) }, 0);
+    }
+
+    #[test]
     fn host_request_then_host_complete_round_trips_via_c_abi() {
         let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
         let handle = make_runtime(&events);

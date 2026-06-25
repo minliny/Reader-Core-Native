@@ -128,6 +128,17 @@ static int contains(const char *haystack, const char *needle) {
   return strstr(haystack, needle) != NULL;
 }
 
+static size_t count_occurrences(const char *haystack, const char *needle) {
+  size_t count = 0;
+  size_t needle_len = strlen(needle);
+  const char *p = haystack;
+  while ((p = strstr(p, needle)) != NULL) {
+    count++;
+    p += needle_len;
+  }
+  return count;
+}
+
 static int fail(const char *msg) {
   fprintf(stderr, "FAIL: %s\n", msg);
   return 1;
@@ -421,11 +432,36 @@ int main(void) {
     return fail("no core.info event");
   }
   ev++;
-  if (!contains(event, "\"protocolVersion\":1") ||
-      !contains(event, "\"requestId\":10") || !contains(event, "capabilities") ||
-      !contains(event, "runtime.ping")) {
+  const char *core_info_needles[] = {
+      "\"type\":\"result\"",
+      "\"requestId\":10",
+      "\"abiVersion\":1",
+      "\"buildVersion\":\"reader-core-native ",
+      "\"capabilities\":[",
+      "\"core.info\"",
+      "\"runtime.ping\"",
+      "\"runtime.hostSmoke\"",
+      "\"runtime.cancel\"",
+      "\"runtime.status\"",
+      "\"runtime.shutdown\"",
+      "\"host.complete\"",
+      "\"host.error\"",
+      "\"host.bus.v1\"",
+      "\"http.execute\"",
+      "\"runtime.config.v1\"",
+      "\"remote.reading.v1\"",
+  };
+  for (size_t i = 0;
+       i < sizeof core_info_needles / sizeof core_info_needles[0]; i++) {
+    if (!contains(event, core_info_needles[i])) {
+      fprintf(stderr, "core.info missing %s in event: %s\n",
+              core_info_needles[i], event);
+      return fail("core.info event shape");
+    }
+  }
+  if (count_occurrences(event, "\"protocolVersion\":1") < 2) {
     fprintf(stderr, "unexpected core.info event: %s\n", event);
-    return fail("core.info event shape");
+    return fail("core.info did not report both event and data protocolVersion");
   }
 
   // --- runtime.ping + last_error cleared on success ---------------------

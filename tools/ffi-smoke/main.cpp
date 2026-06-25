@@ -83,6 +83,17 @@ bool contains(const std::string &haystack, const char *needle) {
   return haystack.find(needle) != std::string::npos;
 }
 
+size_t count_occurrences(const std::string &haystack, const char *needle) {
+  size_t count = 0;
+  size_t pos = 0;
+  const std::string needle_str(needle);
+  while ((pos = haystack.find(needle_str, pos)) != std::string::npos) {
+    ++count;
+    pos += needle_str.size();
+  }
+  return count;
+}
+
 int send_str(rc_runtime_t *rt, const std::string &json) {
   return rc_runtime_send(rt, reinterpret_cast<const uint8_t *>(json.data()),
                          json.size());
@@ -367,9 +378,35 @@ int main() {
     return fail("core.info send failed");
   }
   auto event = wait_event(ch, ev++);
-  if (!contains(event, "\"protocolVersion\":1") ||
-      !contains(event, "\"requestId\":10") || !contains(event, "capabilities")) {
-    return fail("core.info event shape");
+  const char *core_info_needles[] = {
+      "\"type\":\"result\"",
+      "\"requestId\":10",
+      "\"abiVersion\":1",
+      "\"buildVersion\":\"reader-core-native ",
+      "\"capabilities\":[",
+      "\"core.info\"",
+      "\"runtime.ping\"",
+      "\"runtime.hostSmoke\"",
+      "\"runtime.cancel\"",
+      "\"runtime.status\"",
+      "\"runtime.shutdown\"",
+      "\"host.complete\"",
+      "\"host.error\"",
+      "\"host.bus.v1\"",
+      "\"http.execute\"",
+      "\"runtime.config.v1\"",
+      "\"remote.reading.v1\"",
+  };
+  for (const char *needle : core_info_needles) {
+    if (!contains(event, needle)) {
+      std::cerr << "core.info missing " << needle << " in event: " << event
+                << '\n';
+      return fail("core.info event shape");
+    }
+  }
+  if (count_occurrences(event, "\"protocolVersion\":1") < 2) {
+    std::cerr << "unexpected core.info event: " << event << '\n';
+    return fail("core.info did not report both event and data protocolVersion");
   }
 
   // --- host.request -> host.complete ------------------------------------
