@@ -35,7 +35,7 @@ Current scan date: 2026-06-25.
 | `host.complete` | `HostCompleteParams` | Generic host completion result | Typed params and route cases | Covered as generic host bus |
 | `host.error` | `HostErrorParams` | Error event | Typed params and route cases | Covered |
 | `source.import` | `SourceImportParams` | `SourceImportData` | Typed parse and negative result-shape cases | Covered in current pass |
-| `book.search` | `BookSearchParams` | Generic JSON result | Field assertions only | Open: no typed result DTO |
+| `book.search` | `BookSearchParams` | `BookSearchData` | Typed parse and negative result-shape cases | Covered in current pass |
 | `book.detail` | `BookDetailParams` | Generic JSON result | Field assertions only | Open: no typed result DTO |
 | `book.toc` | `BookTocParams` | Generic JSON result | Field assertions only | Open: no typed result DTO |
 | `chapter.content` | `ChapterContentParams` | Generic JSON result | Field assertions only | Open: no typed result DTO |
@@ -59,7 +59,10 @@ Current scan date: 2026-06-25.
    fields, but it remains a Core-owned protocol contract.
 5. `source.import` result data contract. Closed in this pass.
    Result is small, but it would start a broader remote result DTO pass.
-6. Larger remote-reading result contracts (`book.search`, `book.detail`,
-   `book.toc`, `chapter.content`).
+6. `book.search` result data contract. Closed in this pass.
+   The result now has a typed top-level `sourceId`/`books` contract, a minimal
+   stable book item shape, and optional host HTTP diagnostics.
+7. Larger remote-reading result contracts (`book.detail`, `book.toc`,
+   `chapter.content`).
    These depend on domain object shapes and optional HTTP diagnostics, so they
-   should be handled after the scalar result contracts.
+   should be handled after the search result contract.

@@ -6,6 +6,8 @@
 //! that Core emits as `capability: "http.execute"` (see
 //! `protocol/compatibility.md`).
 
+use std::collections::BTreeMap;
+
 use serde::{de, Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
@@ -97,12 +99,102 @@ where
 {
     let value = String::deserialize(deserializer)?;
     if value.trim().is_empty() {
-        Err(de::Error::custom(
-            "source.import sourceId must be non-empty",
-        ))
+        Err(de::Error::custom("sourceId must be non-empty"))
     } else {
         Ok(value)
     }
+}
+
+fn deserialize_non_blank_book_id<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = String::deserialize(deserializer)?;
+    if value.trim().is_empty() {
+        Err(de::Error::custom("book.search bookId must be non-empty"))
+    } else {
+        Ok(value)
+    }
+}
+
+fn deserialize_non_blank_book_title<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = String::deserialize(deserializer)?;
+    if value.trim().is_empty() {
+        Err(de::Error::custom("book.search title must be non-empty"))
+    } else {
+        Ok(value)
+    }
+}
+
+fn deserialize_book_search_books<'de, D>(
+    deserializer: D,
+) -> Result<Vec<BookSearchBookData>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+    if !value.is_array() {
+        return Err(de::Error::custom("book.search books must be an array"));
+    }
+    serde_json::from_value(value).map_err(de::Error::custom)
+}
+
+fn deserialize_remote_http_status<'de, D>(deserializer: D) -> Result<Option<u16>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<u16>::deserialize(deserializer)?;
+    let Some(status) = value else {
+        return Err(de::Error::custom(
+            "remote http diagnostics status must be an integer",
+        ));
+    };
+    if !(100..=599).contains(&status) {
+        Err(de::Error::custom(
+            "remote http diagnostics status must be between 100 and 599",
+        ))
+    } else {
+        Ok(Some(status))
+    }
+}
+
+fn deserialize_remote_http_headers<'de, D>(deserializer: D) -> Result<Option<Value>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+    if value.is_object() {
+        Ok(Some(value))
+    } else {
+        Err(de::Error::custom(
+            "remote http diagnostics headers must be an object",
+        ))
+    }
+}
+
+fn deserialize_remote_http_diagnostics<'de, D>(
+    deserializer: D,
+) -> Result<Option<RemoteHttpDiagnosticsData>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+    if !value.is_object() {
+        return Err(de::Error::custom(
+            "remote http diagnostics must be an object",
+        ));
+    }
+    if value.as_object().is_some_and(|object| object.is_empty()) {
+        return Err(de::Error::custom(
+            "remote http diagnostics must include status or headers",
+        ));
+    }
+    serde_json::from_value(value)
+        .map(Some)
+        .map_err(de::Error::custom)
 }
 
 fn deserialize_source_import_imported<'de, D>(deserializer: D) -> Result<bool, D::Error>
@@ -333,6 +425,41 @@ pub struct BookSearchParams {
     /// looking up `source_id` in storage (useful for smoke tests).
     #[serde(default, deserialize_with = "deserialize_inline_source")]
     pub source: Option<Value>,
+}
+
+/// Optional HTTP diagnostics attached to remote-reading results that resumed
+/// from a host `http.execute` completion.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RemoteHttpDiagnosticsData {
+    #[serde(default, deserialize_with = "deserialize_remote_http_status")]
+    pub status: Option<u16>,
+    #[serde(default, deserialize_with = "deserialize_remote_http_headers")]
+    pub headers: Option<Value>,
+}
+
+/// Minimal stable book shape returned by `book.search`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookSearchBookData {
+    #[serde(deserialize_with = "deserialize_non_blank_book_id")]
+    pub book_id: String,
+    #[serde(deserialize_with = "deserialize_non_blank_book_title")]
+    pub title: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Result data for `book.search`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookSearchData {
+    #[serde(deserialize_with = "deserialize_non_blank_source_id")]
+    pub source_id: String,
+    #[serde(deserialize_with = "deserialize_book_search_books")]
+    pub books: Vec<BookSearchBookData>,
+    #[serde(default, deserialize_with = "deserialize_remote_http_diagnostics")]
+    pub http: Option<RemoteHttpDiagnosticsData>,
 }
 
 /// Parameters for `book.detail`.
@@ -684,6 +811,117 @@ mod tests {
             assert!(
                 err.to_string().contains(expected),
                 "unexpected source.import data error for {label}: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn book_search_data_parses_result_and_rejects_invalid_shape() {
+        let data: BookSearchData = serde_json::from_value(serde_json::json!({
+            "sourceId": "conformance-source",
+            "books": [
+                {
+                    "bookId": "1",
+                    "title": "Dune",
+                    "author": "Herbert"
+                }
+            ]
+        }))
+        .unwrap();
+        assert_eq!(data.source_id, "conformance-source");
+        assert_eq!(data.books.len(), 1);
+        assert_eq!(data.books[0].book_id, "1");
+        assert_eq!(data.books[0].title, "Dune");
+        assert_eq!(data.books[0].extra["author"], serde_json::json!("Herbert"));
+        assert!(data.http.is_none());
+
+        let data: BookSearchData = serde_json::from_value(serde_json::json!({
+            "sourceId": "conformance-source",
+            "books": [],
+            "http": {
+                "status": 200,
+                "headers": { "content-type": "application/json" }
+            }
+        }))
+        .unwrap();
+        let http = data.http.expect("http diagnostics");
+        assert_eq!(http.status, Some(200));
+        assert_eq!(
+            http.headers.unwrap()["content-type"],
+            serde_json::json!("application/json")
+        );
+
+        for (label, value, expected) in [
+            (
+                "sourceId",
+                serde_json::json!({
+                    "sourceId": " ",
+                    "books": []
+                }),
+                "sourceId",
+            ),
+            (
+                "books",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "books": {}
+                }),
+                "books",
+            ),
+            (
+                "bookId",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "books": [
+                        { "title": "Dune" }
+                    ]
+                }),
+                "bookId",
+            ),
+            (
+                "title",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "books": [
+                        { "bookId": "1", "title": " " }
+                    ]
+                }),
+                "title",
+            ),
+            (
+                "http.status",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "books": [],
+                    "http": { "status": 99 }
+                }),
+                "status",
+            ),
+            (
+                "http.headers",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "books": [],
+                    "http": { "headers": ["content-type", "application/json"] }
+                }),
+                "headers",
+            ),
+            (
+                "unknown field",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "books": [],
+                    "extra": true
+                }),
+                "unknown field",
+            ),
+        ] {
+            let err = serde_json::from_value::<BookSearchData>(value)
+                .err()
+                .unwrap_or_else(|| panic!("expected rejection for {label}"));
+            assert!(
+                err.to_string().contains(expected),
+                "unexpected book.search data error for {label}: {err}"
             );
         }
     }

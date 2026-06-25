@@ -3,9 +3,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use reader_contract::{
-    methods, Command, CoreError, CoreInfoData, ErrorCode, Event, PendingHostOperationStatus,
-    ReadingProgressUpdateData, RuntimeCancelData, RuntimeConfig, RuntimePingData,
-    RuntimeShutdownData, RuntimeStatus, SourceImportData, PROTOCOL_VERSION, V1_CAPABILITIES,
+    methods, BookSearchData, Command, CoreError, CoreInfoData, ErrorCode, Event,
+    PendingHostOperationStatus, ReadingProgressUpdateData, RuntimeCancelData, RuntimeConfig,
+    RuntimePingData, RuntimeShutdownData, RuntimeStatus, SourceImportData, PROTOCOL_VERSION,
+    V1_CAPABILITIES,
 };
 use reader_runtime::{EventSink, Runtime};
 use serde_json::{json, Value};
@@ -476,17 +477,106 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         match recv_event(&rx)? {
             Event::Result {
                 request_id, data, ..
-            } if request_id == 403
-                && data["books"]
-                    .as_array()
-                    .and_then(|books| books.first())
-                    .is_some_and(|book| book["title"] == "Dune") =>
-            {
-                Ok(())
+            } if request_id == 403 => {
+                let data = serde_json::from_value::<BookSearchData>(data)
+                    .map_err(|err| format!("book.search data contract parse failed: {err}"))?;
+                if data.source_id == "conformance-source"
+                    && data.books.len() == 1
+                    && data.books[0].book_id == "1"
+                    && data.books[0].title == "Dune"
+                    && data.books[0].extra["author"] == "Herbert"
+                    && data.http.is_none()
+                {
+                    Ok(())
+                } else {
+                    Err(format!("unexpected book.search data {data:?}"))
+                }
             }
             other => Err(format!("unexpected book.search result {other:?}")),
         }
     });
+
+    record(
+        &mut report,
+        "book-search-data-rejects-invalid-result-shape",
+        || {
+            for (label, data, expected) in [
+                (
+                    "sourceId",
+                    json!({
+                        "sourceId": " ",
+                        "books": []
+                    }),
+                    "sourceId",
+                ),
+                (
+                    "books",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "books": {}
+                    }),
+                    "books",
+                ),
+                (
+                    "bookId",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "books": [
+                            { "title": "Dune" }
+                        ]
+                    }),
+                    "bookId",
+                ),
+                (
+                    "title",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "books": [
+                            { "bookId": "1", "title": " " }
+                        ]
+                    }),
+                    "title",
+                ),
+                (
+                    "http.status",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "books": [],
+                        "http": { "status": 99 }
+                    }),
+                    "status",
+                ),
+                (
+                    "http.headers",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "books": [],
+                        "http": { "headers": ["content-type", "application/json"] }
+                    }),
+                    "headers",
+                ),
+                (
+                    "unknown field",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "books": [],
+                        "extra": true
+                    }),
+                    "unknown field",
+                ),
+            ] {
+                let err = serde_json::from_value::<BookSearchData>(data)
+                    .err()
+                    .ok_or_else(|| format!("expected book.search data rejection for {label}"))?;
+                if !err.to_string().contains(expected) {
+                    return Err(format!(
+                        "unexpected book.search data error for {label}: {err}"
+                    ));
+                }
+            }
+            Ok(())
+        },
+    );
 
     record(&mut report, "book-search-rejects-unknown-params", || {
         let (_runtime, rx) = send_to_fresh_runtime(INVALID_BOOK_SEARCH_UNKNOWN_FIELD)?;
@@ -1115,12 +1205,26 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             match recv_event(&rx)? {
                 Event::Result {
                     request_id, data, ..
-                } if request_id == 501
-                    && data["books"].as_array().is_some_and(Vec::is_empty)
-                    && data["http"]["status"] == 200
-                    && data["http"]["headers"]["content-type"] == "application/json" =>
-                {
-                    Ok(())
+                } if request_id == 501 => {
+                    let data = serde_json::from_value::<BookSearchData>(data)
+                        .map_err(|err| format!("book.search http data parse failed: {err}"))?;
+                    let http = data
+                        .http
+                        .ok_or_else(|| "missing book.search http diagnostics".to_string())?;
+                    if data.books.is_empty()
+                        && http.status == Some(200)
+                        && http
+                            .headers
+                            .as_ref()
+                            .is_some_and(|headers| headers["content-type"] == "application/json")
+                    {
+                        Ok(())
+                    } else {
+                        Err(format!(
+                            "unexpected book.search http completion data: books={:?} http={http:?}",
+                            data.books
+                        ))
+                    }
                 }
                 other => Err(format!("unexpected http completion result {other:?}")),
             }

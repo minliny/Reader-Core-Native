@@ -215,6 +215,63 @@
         }
       }
     },
+    "RemoteHttpDiagnosticsData": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "description": "Optional diagnostics attached to remote-reading results resumed from host http.execute.",
+      "properties": {
+        "status": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599,
+          "description": "HTTP status supplied by the host completion."
+        },
+        "headers": {
+          "type": "object",
+          "description": "HTTP headers supplied by the host completion."
+        }
+      }
+    },
+    "BookSearchBookData": {
+      "type": "object",
+      "required": ["bookId", "title"],
+      "description": "Minimal stable book object returned by book.search. Additional book metadata remains extensible.",
+      "properties": {
+        "bookId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Stable book identifier from the source pipeline."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Book title from the source pipeline."
+        }
+      }
+    },
+    "BookSearchData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "books"],
+      "description": "Result data for book.search.",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Source identifier used by the search command."
+        },
+        "books": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/BookSearchBookData" },
+          "description": "Books extracted from the search response."
+        },
+        "http": { "$ref": "#/$defs/RemoteHttpDiagnosticsData" }
+      }
+    },
     "ReadingProgressUpdateData": {
       "type": "object",
       "additionalProperties": false,
