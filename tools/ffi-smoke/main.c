@@ -655,6 +655,66 @@ int main(void) {
     return fail("cancelled(65) shape");
   }
 
+  // --- runtime.shutdown cancels pending work and blocks future sends -----
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":70,\"method\":\"runtime."
+               "hostSmoke\",\"params\":{\"capability\":\"host.smoke.echo\","
+               "\"params\":{}}}") != RC_SEND_OK) {
+    return fail("hostSmoke(70) send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no host.request for 70");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":70")) {
+    fprintf(stderr, "host.request(70): %s\n", event);
+    return fail("host.request(70) shape");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":71,\"method\":\"runtime."
+               "shutdown\",\"params\":{}}") != RC_SEND_OK) {
+    return fail("runtime.shutdown send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no cancelled event for shutdown");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":70") ||
+      !contains(event, "\"CANCELLED\"")) {
+    fprintf(stderr, "shutdown cancelled event: %s\n", event);
+    return fail("shutdown cancelled event shape");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no runtime.shutdown result");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":71") ||
+      !contains(event, "\"shuttingDown\":true") ||
+      !contains(event, "\"cancelledRequestIds\":[70]")) {
+    fprintf(stderr, "shutdown result: %s\n", event);
+    return fail("shutdown result shape");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":72,\"method\":\"runtime."
+               "ping\",\"params\":{}}") != RC_SEND_PROTOCOL_ERROR) {
+    return fail("runtime.ping after shutdown did not return RC_SEND_PROTOCOL_ERROR");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INTERNAL || !contains(msg, "shutting down")) {
+    fprintf(stderr, "post-shutdown send last_error: code=%d msg=%s\n", code,
+            msg);
+    return fail("post-shutdown send did not record INTERNAL");
+  }
+  if (channel_count(&ch) != ev) {
+    return fail("post-shutdown send emitted an async event");
+  }
+
   if (rc_runtime_send(rt, (const uint8_t *)"{", 1) != RC_SEND_INVALID_COMMAND) {
     return fail("pre-destroy invalid command did not return RC_SEND_INVALID_COMMAND");
   }

@@ -698,6 +698,54 @@ mod tests {
     }
 
     #[test]
+    fn runtime_shutdown_cancels_pending_and_blocks_future_sends_via_c_abi() {
+        let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
+        let handle = make_runtime(&events);
+
+        let smoke = br#"{"protocolVersion":1,"requestId":430,"method":"runtime.hostSmoke","params":{"capability":"host.smoke.echo","params":{}}}"#;
+        assert_eq!(unsafe { send(handle, smoke.as_ptr(), smoke.len()) }, 0);
+        let evs = wait_events(&events, 1);
+        let req: serde_json::Value = serde_json::from_slice(&evs[0]).unwrap();
+        assert_eq!(req["type"], "host.request");
+        assert_eq!(req["requestId"], 430);
+
+        let shutdown =
+            br#"{"protocolVersion":1,"requestId":431,"method":"runtime.shutdown","params":{}}"#;
+        assert_eq!(
+            unsafe { send(handle, shutdown.as_ptr(), shutdown.len()) },
+            0
+        );
+        assert_eq!(last_error_code(), 0);
+
+        let evs = wait_events(&events, 3);
+        let cancelled: serde_json::Value = serde_json::from_slice(&evs[1]).unwrap();
+        assert_eq!(cancelled["type"], "error");
+        assert_eq!(cancelled["requestId"], 430);
+        assert_eq!(cancelled["error"]["code"], "CANCELLED");
+
+        let result: serde_json::Value = serde_json::from_slice(&evs[2]).unwrap();
+        assert_eq!(result["type"], "result");
+        assert_eq!(result["requestId"], 431);
+        assert_eq!(result["data"]["shuttingDown"], true);
+        assert_eq!(
+            result["data"]["cancelledRequestIds"],
+            serde_json::json!([430])
+        );
+
+        let ping = br#"{"protocolVersion":1,"requestId":432,"method":"runtime.ping","params":{}}"#;
+        assert_eq!(
+            unsafe { send(handle, ping.as_ptr(), ping.len()) },
+            status::send::PROTOCOL_ERROR
+        );
+        assert_eq!(last_error_code(), last_error::code_of(ErrorCode::Internal));
+        assert!(last_error_message().contains("shutting down"));
+        std::thread::sleep(std::time::Duration::from_millis(25));
+        assert_eq!(events.0.lock().unwrap().len(), 3);
+
+        assert_eq!(unsafe { destroy(handle) }, 0);
+    }
+
+    #[test]
     fn cancelling_pending_host_request_emits_cancelled_via_c_abi() {
         let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
         let handle = make_runtime(&events);

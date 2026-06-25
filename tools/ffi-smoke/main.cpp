@@ -486,6 +486,54 @@ int main() {
     return fail("successful cancel did not clear last_error");
   }
 
+  // --- runtime.shutdown cancels pending work and blocks future sends -----
+  if (send_str(rt,
+               R"({"protocolVersion":1,"requestId":30,"method":"runtime.hostSmoke","params":{"capability":"host.smoke.echo","params":{}}})") !=
+      RC_SEND_OK) {
+    return fail("hostSmoke(30) send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":30")) {
+    std::cerr << "host.request(30): " << event << '\n';
+    return fail("host.request(30) shape");
+  }
+  if (send_str(rt,
+               R"({"protocolVersion":1,"requestId":31,"method":"runtime.shutdown","params":{}})") !=
+      RC_SEND_OK) {
+    return fail("runtime.shutdown send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":30") ||
+      !contains(event, "\"CANCELLED\"")) {
+    std::cerr << "shutdown cancelled event: " << event << '\n';
+    return fail("shutdown cancelled event shape");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":31") ||
+      !contains(event, "\"shuttingDown\":true") ||
+      !contains(event, "\"cancelledRequestIds\":[30]")) {
+    std::cerr << "shutdown result: " << event << '\n';
+    return fail("shutdown result shape");
+  }
+  if (send_str(rt,
+               R"({"protocolVersion":1,"requestId":32,"method":"runtime.ping","params":{}})") !=
+      RC_SEND_PROTOCOL_ERROR) {
+    return fail("runtime.ping after shutdown did not return RC_SEND_PROTOCOL_ERROR");
+  }
+  msg = last_error_message(&code);
+  if (code != RC_ERR_INTERNAL || !contains(msg, "shutting down")) {
+    return fail("post-shutdown send did not record INTERNAL");
+  }
+  if (channel_count(ch) != ev) {
+    return fail("post-shutdown send emitted an async event");
+  }
+
   if (send_str(rt, "{") != RC_SEND_INVALID_COMMAND) {
     return fail("pre-destroy invalid command did not return RC_SEND_INVALID_COMMAND");
   }
