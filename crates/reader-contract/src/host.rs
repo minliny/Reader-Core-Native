@@ -2,7 +2,7 @@ use serde::{de, Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 use crate::command::is_valid_token_path;
-use crate::CoreError;
+use crate::{methods, CoreError};
 
 fn empty_object() -> Value {
     Value::Object(Default::default())
@@ -36,6 +36,32 @@ where
     } else {
         Err(de::Error::custom(
             "host.complete result must be a JSON object",
+        ))
+    }
+}
+
+fn deserialize_runtime_ping_pong<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = bool::deserialize(deserializer)?;
+    if value {
+        Ok(value)
+    } else {
+        Err(de::Error::custom("runtime.ping pong must be true"))
+    }
+}
+
+fn deserialize_runtime_ping_method<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = String::deserialize(deserializer)?;
+    if value == methods::RUNTIME_PING {
+        Ok(value)
+    } else {
+        Err(de::Error::custom(
+            "runtime.ping method must be runtime.ping",
         ))
     }
 }
@@ -154,6 +180,16 @@ impl HostSmokeParams {
         }
         Ok(())
     }
+}
+
+/// Result data for `runtime.ping`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimePingData {
+    #[serde(deserialize_with = "deserialize_runtime_ping_pong")]
+    pub pong: bool,
+    #[serde(deserialize_with = "deserialize_runtime_ping_method")]
+    pub method: String,
 }
 
 /// Parameters for `runtime.cancel`, the JSON-protocol counterpart of the C ABI
@@ -290,6 +326,53 @@ impl HostErrorParams {
 mod tests {
     use super::*;
     use crate::ErrorCode;
+
+    #[test]
+    fn runtime_ping_data_requires_true_pong_and_runtime_ping_method() {
+        let data: RuntimePingData = serde_json::from_value(serde_json::json!({
+            "pong": true,
+            "method": "runtime.ping"
+        }))
+        .unwrap();
+        assert!(data.pong);
+        assert_eq!(data.method, methods::RUNTIME_PING);
+
+        for (label, value, expected) in [
+            (
+                "pong",
+                serde_json::json!({
+                    "pong": false,
+                    "method": "runtime.ping"
+                }),
+                "pong",
+            ),
+            (
+                "method",
+                serde_json::json!({
+                    "pong": true,
+                    "method": "core.ping"
+                }),
+                "method",
+            ),
+            (
+                "unknown field",
+                serde_json::json!({
+                    "pong": true,
+                    "method": "runtime.ping",
+                    "extra": true
+                }),
+                "unknown field",
+            ),
+        ] {
+            let err = serde_json::from_value::<RuntimePingData>(value)
+                .err()
+                .unwrap_or_else(|| panic!("expected rejection for {label}"));
+            assert!(
+                err.to_string().contains(expected),
+                "unexpected runtime.ping data error for {label}: {err}"
+            );
+        }
+    }
 
     #[test]
     fn conformance_host_param_fixtures_parse() {

@@ -4,8 +4,8 @@ use std::time::Duration;
 
 use reader_contract::{
     methods, Command, CoreError, ErrorCode, Event, PendingHostOperationStatus,
-    ReadingProgressUpdateData, RuntimeCancelData, RuntimeConfig, RuntimeShutdownData,
-    RuntimeStatus,
+    ReadingProgressUpdateData, RuntimeCancelData, RuntimeConfig, RuntimePingData,
+    RuntimeShutdownData, RuntimeStatus,
 };
 use reader_runtime::{EventSink, Runtime};
 use serde_json::{json, Value};
@@ -219,18 +219,65 @@ pub(crate) fn run_conformance() -> ConformanceReport {
 
     record(&mut report, "valid-command-runtime-ping", || {
         let (_runtime, rx) = send_to_fresh_runtime(VALID_RUNTIME_PING)?;
-        let event = recv_event(&rx)?;
-        let event_json =
-            serde_json::to_value(&event).map_err(|err| format!("event serialize failed: {err}"))?;
-        match &event {
+        match recv_event(&rx)? {
             Event::Result {
                 request_id, data, ..
-            } if *request_id == 101 && data["pong"] == true && event_json["data"].is_object() => {
-                Ok(())
+            } if request_id == 101 => {
+                let data = serde_json::from_value::<RuntimePingData>(data)
+                    .map_err(|err| format!("runtime.ping data contract parse failed: {err}"))?;
+                if data.pong && data.method == methods::RUNTIME_PING {
+                    Ok(())
+                } else {
+                    Err(format!("unexpected runtime.ping data {data:?}"))
+                }
             }
             other => Err(format!("unexpected event {other:?}")),
         }
     });
+
+    record(
+        &mut report,
+        "runtime-ping-data-rejects-invalid-result-shape",
+        || {
+            for (label, data, expected) in [
+                (
+                    "pong",
+                    json!({
+                        "pong": false,
+                        "method": "runtime.ping"
+                    }),
+                    "pong",
+                ),
+                (
+                    "method",
+                    json!({
+                        "pong": true,
+                        "method": "core.ping"
+                    }),
+                    "method",
+                ),
+                (
+                    "unknown field",
+                    json!({
+                        "pong": true,
+                        "method": "runtime.ping",
+                        "extra": true
+                    }),
+                    "unknown field",
+                ),
+            ] {
+                let err = serde_json::from_value::<RuntimePingData>(data)
+                    .err()
+                    .ok_or_else(|| format!("expected runtime.ping data rejection for {label}"))?;
+                if !err.to_string().contains(expected) {
+                    return Err(format!(
+                        "unexpected runtime.ping data error for {label}: {err}"
+                    ));
+                }
+            }
+            Ok(())
+        },
+    );
 
     record(&mut report, "valid-command-core-info", || {
         let (_runtime, rx) = send_to_fresh_runtime(VALID_CORE_INFO)?;

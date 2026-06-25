@@ -80,6 +80,24 @@
         "details": { "type": "object" }
       }
     },
+    "RuntimePingData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pong", "method"],
+      "description": "Result data for runtime.ping.",
+      "properties": {
+        "pong": {
+          "type": "boolean",
+          "const": true,
+          "description": "Successful ping marker."
+        },
+        "method": {
+          "type": "string",
+          "const": "runtime.ping",
+          "description": "Canonical method echoed by the ping result."
+        }
+      }
+    },
     "RuntimeCancelData": {
       "type": "object",
       "additionalProperties": false,
