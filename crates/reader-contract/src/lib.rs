@@ -15,7 +15,7 @@ pub mod event;
 pub mod host;
 pub mod remote;
 
-pub use command::Command;
+pub use command::{Command, EmptyParams};
 pub use config::RuntimeConfig;
 pub use core_info::core_info;
 pub use error::{CoreError, ErrorCode};
@@ -147,6 +147,21 @@ mod tests {
     }
 
     #[test]
+    fn command_schema_binds_no_param_control_methods_to_empty_params() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+
+        for method in [methods::CORE_INFO, methods::RUNTIME_PING] {
+            assert_eq!(
+                params_ref_for_method(&schema, method),
+                Some("#/$defs/EmptyParams"),
+                "{method} must use EmptyParams in command schema"
+            );
+        }
+    }
+
+    #[test]
     fn event_schema_error_codes_match_error_code_enum() {
         let schema: Value =
             serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
@@ -190,5 +205,17 @@ mod tests {
                     .unwrap_or_else(|| panic!("{key} item must be a string"))
             })
             .collect()
+    }
+
+    fn params_ref_for_method<'a>(schema: &'a Value, method: &str) -> Option<&'a str> {
+        schema["allOf"].as_array()?.iter().find_map(|rule| {
+            let matches_method =
+                rule["if"]["properties"]["method"]["const"].as_str() == Some(method);
+            if matches_method {
+                rule["then"]["properties"]["params"]["$ref"].as_str()
+            } else {
+                None
+            }
+        })
     }
 }

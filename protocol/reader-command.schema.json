@@ -59,7 +59,36 @@
       "description": "Method-specific parameters."
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "method": { "const": "core.info" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/EmptyParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "runtime.ping" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/EmptyParams" }
+        }
+      }
+    }
+  ],
   "$defs": {
+    "EmptyParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Parameters for no-argument control commands. Must be an empty object."
+    },
     "HostCompleteParams": {
       "type": "object",
       "additionalProperties": false,

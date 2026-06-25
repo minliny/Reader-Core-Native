@@ -19,11 +19,16 @@ pub struct Command {
 
     pub method: String,
 
-    /// Method-specific parameters. Free-form in v1; per-method schemas land
-    /// before ARCHITECTURE phase 4.
+    /// Method-specific parameters. Common envelope validation guarantees this
+    /// is an object; method DTOs enforce the concrete contract.
     #[serde(default = "default_params")]
     pub params: Value,
 }
+
+/// Parameters for commands that intentionally accept no method-specific fields.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EmptyParams {}
 
 impl Command {
     /// Build a command with the current protocol version prefilled.
@@ -112,6 +117,50 @@ mod tests {
         .unwrap();
         assert_eq!(command.method, methods::RUNTIME_PING);
         assert_eq!(command.params, serde_json::json!({}));
+    }
+
+    #[test]
+    fn no_param_control_methods_accept_empty_and_reject_unknown_fields() {
+        for (name, json) in [
+            (
+                "valid-runtime-ping",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/valid-runtime-ping.json"
+                ),
+            ),
+            (
+                "valid-core-info",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/valid-core-info.json"
+                ),
+            ),
+        ] {
+            let command = Command::from_json_bytes(json.as_bytes()).unwrap();
+            serde_json::from_value::<EmptyParams>(command.params)
+                .unwrap_or_else(|err| panic!("{name} params should parse: {err}"));
+        }
+
+        for (name, json) in [
+            (
+                "invalid-runtime-ping-unknown-field",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-runtime-ping-unknown-field.json"
+                ),
+            ),
+            (
+                "invalid-core-info-unknown-field",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-core-info-unknown-field.json"
+                ),
+            ),
+        ] {
+            let command = Command::from_json_bytes(json.as_bytes()).unwrap();
+            let err = serde_json::from_value::<EmptyParams>(command.params).unwrap_err();
+            assert!(
+                err.to_string().contains("unknown field"),
+                "{name} returned {err}"
+            );
+        }
     }
 
     #[test]

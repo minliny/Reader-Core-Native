@@ -4,9 +4,9 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
 use reader_contract::{
-    core_info, methods, Command, CoreError, Event, HostCompleteParams, HostErrorParams,
-    HostSmokeParams, PendingHostOperationStatus, RuntimeCancelParams, RuntimeConfig,
-    RuntimeShutdownParams, RuntimeStatus, RuntimeStatusParams,
+    core_info, methods, Command, CoreError, EmptyParams, Event, HostCompleteParams,
+    HostErrorParams, HostSmokeParams, PendingHostOperationStatus, RuntimeCancelParams,
+    RuntimeConfig, RuntimeShutdownParams, RuntimeStatus, RuntimeStatusParams,
 };
 
 use crate::remote::{
@@ -316,23 +316,10 @@ fn dispatch_command(
     // commands are dispatched afterwards; if `dispatch_remote` returns false
     // (method not recognized by either), we fall through to unknown_method.
     match cmd.method.as_str() {
-        methods::CORE_INFO => finish_request(
-            sink,
-            active_requests,
-            cancelled,
-            cmd.request_id,
-            Event::result(cmd.request_id, core_info(ABI_VERSION, BUILD_VERSION)),
-        ),
-        methods::RUNTIME_PING | methods::LEGACY_CORE_PING => finish_request(
-            sink,
-            active_requests,
-            cancelled,
-            cmd.request_id,
-            Event::result(
-                cmd.request_id,
-                serde_json::json!({ "pong": true, "method": methods::RUNTIME_PING }),
-            ),
-        ),
+        methods::CORE_INFO => dispatch_core_info(cmd, sink, active_requests, cancelled),
+        methods::RUNTIME_PING | methods::LEGACY_CORE_PING => {
+            dispatch_runtime_ping(cmd, sink, active_requests, cancelled)
+        }
         methods::RUNTIME_HOST_SMOKE => dispatch_host_smoke(
             cmd,
             sink,
@@ -397,6 +384,61 @@ fn dispatch_command(
             )
         }
     }
+}
+
+fn dispatch_core_info(
+    cmd: &Command,
+    sink: &Arc<dyn EventSink>,
+    active_requests: &Mutex<HashSet<u64>>,
+    cancelled: &Mutex<HashSet<u64>>,
+) {
+    if let Err(error) = parse_empty_params(cmd) {
+        finish_request(
+            sink,
+            active_requests,
+            cancelled,
+            cmd.request_id,
+            Event::error(cmd.request_id, error),
+        );
+        return;
+    }
+
+    finish_request(
+        sink,
+        active_requests,
+        cancelled,
+        cmd.request_id,
+        Event::result(cmd.request_id, core_info(ABI_VERSION, BUILD_VERSION)),
+    );
+}
+
+fn dispatch_runtime_ping(
+    cmd: &Command,
+    sink: &Arc<dyn EventSink>,
+    active_requests: &Mutex<HashSet<u64>>,
+    cancelled: &Mutex<HashSet<u64>>,
+) {
+    if let Err(error) = parse_empty_params(cmd) {
+        finish_request(
+            sink,
+            active_requests,
+            cancelled,
+            cmd.request_id,
+            Event::error(cmd.request_id, error),
+        );
+        return;
+    }
+
+    finish_request(
+        sink,
+        active_requests,
+        cancelled,
+        cmd.request_id,
+        Event::result(
+            cmd.request_id,
+            serde_json::json!({ "pong": true, "method": methods::RUNTIME_PING }),
+        ),
+    );
 }
 
 fn dispatch_host_smoke(
@@ -806,6 +848,17 @@ fn dispatch_host_error(
     );
 }
 
+fn parse_empty_params(cmd: &Command) -> Result<EmptyParams, CoreError> {
+    serde_json::from_value::<EmptyParams>(cmd.params.clone()).map_err(|err| {
+        CoreError::invalid_params(format!("invalid params for {}", cmd.method)).with_details(
+            serde_json::json!({
+                "source": err.to_string(),
+                "method": cmd.method,
+            }),
+        )
+    })
+}
+
 fn parse_host_smoke_params(cmd: &Command) -> Result<HostSmokeParams, CoreError> {
     let params = serde_json::from_value::<HostSmokeParams>(cmd.params.clone()).map_err(|err| {
         CoreError::invalid_params(format!("invalid params for {}", cmd.method)).with_details(
@@ -1158,6 +1211,42 @@ mod tests {
                 assert_eq!(data["method"], methods::RUNTIME_PING);
             }
             other => panic!("expected result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn no_param_control_methods_reject_unknown_params() {
+        for (name, json, expected_request_id) in [
+            (
+                "runtime.ping",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-runtime-ping-unknown-field.json"
+                ),
+                202,
+            ),
+            (
+                "core.info",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/invalid-core-info-unknown-field.json"
+                ),
+                212,
+            ),
+        ] {
+            let sink = Arc::new(CollectSink::new());
+            let rt = Runtime::new(sink.clone());
+            rt.send_json(json.as_bytes()).unwrap();
+
+            let events = sink.wait_len(1);
+            match &events[0] {
+                Event::Error {
+                    request_id, error, ..
+                } => {
+                    assert_eq!(*request_id, expected_request_id, "{name}");
+                    assert_eq!(error.code, ErrorCode::InvalidParams, "{name}");
+                    assert!(error.message.contains(name), "{name}: {error:?}");
+                }
+                other => panic!("{name} expected params error, got {other:?}"),
+            }
         }
     }
 

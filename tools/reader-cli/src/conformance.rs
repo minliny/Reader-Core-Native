@@ -13,6 +13,12 @@ const VALID_RUNTIME_PING: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-runtime-ping.json");
 const VALID_CORE_INFO: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-core-info.json");
+const INVALID_RUNTIME_PING_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-runtime-ping-unknown-field.json"
+);
+const INVALID_CORE_INFO_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-core-info-unknown-field.json"
+);
 const INVALID_MALFORMED_COMMAND: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/invalid-malformed-json.json");
 const INVALID_UNSUPPORTED_PROTOCOL: &str = include_str!(
@@ -158,6 +164,16 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             }
             other => Err(format!("unexpected event {other:?}")),
         }
+    });
+
+    record(&mut report, "runtime-ping-rejects-unknown-params", || {
+        let (_runtime, rx) = send_to_fresh_runtime(INVALID_RUNTIME_PING_UNKNOWN_FIELD)?;
+        expect_event_error(&rx, 202, ErrorCode::InvalidParams)
+    });
+
+    record(&mut report, "core-info-rejects-unknown-params", || {
+        let (_runtime, rx) = send_to_fresh_runtime(INVALID_CORE_INFO_UNKNOWN_FIELD)?;
+        expect_event_error(&rx, 212, ErrorCode::InvalidParams)
     });
 
     for (name, json, expected) in [
