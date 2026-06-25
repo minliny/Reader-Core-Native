@@ -641,6 +641,63 @@ mod tests {
     }
 
     #[test]
+    fn remote_http_completion_metadata_round_trips_via_c_abi() {
+        let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
+        let handle = make_runtime(&events);
+
+        let search = br#"{"protocolVersion":1,"requestId":420,"method":"book.search","params":{"sourceId":"ffi-http-src","searchRequest":{"url":"https://books.example.test/search?q=abi","headers":{"Accept":"application/json"}},"source":{"sourceId":"ffi-http-src","name":"FFI HTTP Source","baseUrl":"https://books.example.test","rules":{"search":[{"kind":"jsonPath","path":"$.books[*]"}]}}}}"#;
+        assert_eq!(unsafe { send(handle, search.as_ptr(), search.len()) }, 0);
+
+        let evs = wait_events(&events, 1);
+        let req: serde_json::Value = serde_json::from_slice(&evs[0]).unwrap();
+        assert_eq!(req["type"], "host.request");
+        assert_eq!(req["protocolVersion"], 1);
+        assert_eq!(req["requestId"], 420);
+        assert_eq!(req["capability"], "http.execute");
+        assert_eq!(
+            req["params"]["url"],
+            "https://books.example.test/search?q=abi"
+        );
+        assert_eq!(req["params"]["method"], "GET");
+        assert_eq!(req["params"]["headers"]["Accept"], "application/json");
+        let operation_id = req["operationId"].as_u64().unwrap();
+
+        let complete = serde_json::json!({
+            "protocolVersion": 1,
+            "requestId": 421,
+            "method": "host.complete",
+            "params": {
+                "operationId": operation_id,
+                "result": {
+                    "status": 200,
+                    "headers": { "content-type": "application/json" },
+                    "body": "{\"books\":[]}"
+                }
+            }
+        })
+        .to_string();
+        assert_eq!(
+            unsafe { send(handle, complete.as_ptr(), complete.len()) },
+            0
+        );
+
+        let evs = wait_events(&events, 2);
+        let res: serde_json::Value = serde_json::from_slice(&evs[1]).unwrap();
+        assert_eq!(res["type"], "result");
+        assert_eq!(res["protocolVersion"], 1);
+        assert_eq!(res["requestId"], 420);
+        assert!(res["data"]["books"].as_array().is_some_and(Vec::is_empty));
+        assert_eq!(res["data"]["http"]["status"], 200);
+        assert_eq!(
+            res["data"]["http"]["headers"]["content-type"],
+            "application/json"
+        );
+        assert_eq!(last_error_code(), 0);
+
+        assert_eq!(unsafe { destroy(handle) }, 0);
+    }
+
+    #[test]
     fn cancelling_pending_host_request_emits_cancelled_via_c_abi() {
         let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
         let handle = make_runtime(&events);

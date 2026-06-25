@@ -525,6 +525,62 @@ int main(void) {
     return fail("unknown host.complete send left synchronous last_error");
   }
 
+  // --- remote http.execute completion carries metadata ------------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":68,\"method\":\"book."
+               "search\",\"params\":{\"sourceId\":\"ffi-http-src\","
+               "\"searchRequest\":{\"url\":\"https://books.example.test/"
+               "search?q=abi\",\"headers\":{\"Accept\":\"application/json\"}},"
+               "\"source\":{\"sourceId\":\"ffi-http-src\",\"name\":\"FFI HTTP "
+               "Source\",\"baseUrl\":\"https://books.example.test\",\"rules\":{"
+               "\"search\":[{\"kind\":\"jsonPath\",\"path\":\"$.books[*]\"}]}}"
+               "}}") != RC_SEND_OK) {
+    return fail("book.search http request send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no http.execute host.request event");
+  }
+  ev++;
+  uint64_t http_op = 0;
+  if (!json_u64(event, "operationId", &http_op) ||
+      !contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":68") ||
+      !contains(event, "\"capability\":\"http.execute\"") ||
+      !contains(event, "search?q=abi") ||
+      !contains(event, "\"Accept\":\"application/json\"")) {
+    fprintf(stderr, "http.execute request: %s\n", event);
+    return fail("http.execute request shape");
+  }
+  char http_complete[512];
+  snprintf(http_complete, sizeof http_complete,
+           "{\"protocolVersion\":1,\"requestId\":69,\"method\":\"host."
+           "complete\",\"params\":{\"operationId\":%llu,\"result\":{\"status\":"
+           "200,\"headers\":{\"content-type\":\"application/json\"},\"body\":"
+           "\"{\\\"books\\\":[]}\"}}}",
+           (unsigned long long)http_op);
+  if (send_str(rt, http_complete) != RC_SEND_OK) {
+    return fail("http host.complete send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no result event for http completion");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":68") ||
+      !contains(event, "\"books\":[]") ||
+      !contains(event, "\"http\"") ||
+      !contains(event, "\"status\":200") ||
+      !contains(event, "\"content-type\":\"application/json\"")) {
+    fprintf(stderr, "http completion result: %s\n", event);
+    return fail("http completion result shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("http completion left synchronous last_error");
+  }
+
   // --- method-specific invalid params -> async INVALID_PARAMS ------------
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":67,\"method\":\"reading."

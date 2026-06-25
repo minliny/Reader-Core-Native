@@ -399,6 +399,46 @@ int main() {
     return fail("unknown host.complete send left synchronous last_error");
   }
 
+  // --- remote http.execute completion carries metadata ------------------
+  std::string http_search =
+      R"({"protocolVersion":1,"requestId":27,"method":"book.search","params":{"sourceId":"ffi-http-src","searchRequest":{"url":"https://books.example.test/search?q=abi","headers":{"Accept":"application/json"}},"source":{"sourceId":"ffi-http-src","name":"FFI HTTP Source","baseUrl":"https://books.example.test","rules":{"search":[{"kind":"jsonPath","path":"$.books[*]"}]}}}})";
+  if (send_str(rt, http_search) != RC_SEND_OK) {
+    return fail("book.search http request send failed");
+  }
+  event = wait_event(ch, ev++);
+  uint64_t http_op = 0;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":27") ||
+      !contains(event, "\"capability\":\"http.execute\"") ||
+      !contains(event, "search?q=abi") ||
+      !contains(event, "\"Accept\":\"application/json\"") ||
+      !json_u64(event, "operationId", &http_op)) {
+    std::cerr << "http.execute request: " << event << '\n';
+    return fail("http.execute request shape");
+  }
+  std::string http_complete =
+      R"({"protocolVersion":1,"requestId":28,"method":"host.complete","params":{"operationId":)" +
+      std::to_string(http_op) +
+      R"(,"result":{"status":200,"headers":{"content-type":"application/json"},"body":"{\"books\":[]}"}}})";
+  if (send_str(rt, http_complete) != RC_SEND_OK) {
+    return fail("http host.complete send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":27") ||
+      !contains(event, "\"books\":[]") ||
+      !contains(event, "\"http\"") ||
+      !contains(event, "\"status\":200") ||
+      !contains(event, "\"content-type\":\"application/json\"")) {
+    std::cerr << "http completion result: " << event << '\n';
+    return fail("http completion result shape");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("http completion left synchronous last_error");
+  }
+
   // --- method-specific invalid params -> async INVALID_PARAMS ------------
   std::string invalid_progress =
       R"({"protocolVersion":1,"requestId":26,"method":"reading.progress.update","params":{"bookId":"1","chapterIndex":2,"chapterOffset":128,"chapterProgress":0.5,"syncToken":"host-owned"}})";
