@@ -227,6 +227,21 @@ int main() {
               << '\n';
     return fail("invalid config did not record INVALID_MESSAGE");
   }
+  std::string empty_data_dir_config = R"({"dataDirectory":""})";
+  sentinel = reinterpret_cast<rc_runtime_t *>(static_cast<uintptr_t>(1));
+  if (rc_runtime_create(
+          reinterpret_cast<const uint8_t *>(empty_data_dir_config.data()),
+          empty_data_dir_config.size(), capture_event, nullptr, &sentinel) !=
+          RC_CREATE_INVALID_CONFIG ||
+      sentinel != nullptr) {
+    return fail("empty dataDirectory config did not return RC_CREATE_INVALID_CONFIG");
+  }
+  msg = last_error_message(&code);
+  if (code != RC_ERR_INVALID_PARAMS || !contains(msg, "dataDirectory")) {
+    std::cerr << "empty dataDirectory last_error: code=" << code
+              << " msg=" << msg << '\n';
+    return fail("empty dataDirectory config did not record INVALID_PARAMS");
+  }
 
   Channel defaults_ch;
   rc_runtime_t *defaults_rt = nullptr;

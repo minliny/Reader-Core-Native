@@ -243,6 +243,20 @@ int main(void) {
     fprintf(stderr, "invalid config last_error: code=%d msg=%s\n", code, msg);
     return fail("invalid config did not record INVALID_MESSAGE");
   }
+  const char *empty_data_dir_config = "{\"dataDirectory\":\"\"}";
+  sentinel = (rc_runtime_t *)(uintptr_t)1;
+  if (rc_runtime_create((const uint8_t *)empty_data_dir_config,
+                        strlen(empty_data_dir_config), capture_event, NULL,
+                        &sentinel) != RC_CREATE_INVALID_CONFIG ||
+      sentinel != NULL) {
+    return fail("empty dataDirectory config did not return RC_CREATE_INVALID_CONFIG");
+  }
+  code = rc_last_error(msg, sizeof msg);
+  if (code != RC_ERR_INVALID_PARAMS || !contains(msg, "dataDirectory")) {
+    fprintf(stderr, "empty dataDirectory last_error: code=%d msg=%s\n", code,
+            msg);
+    return fail("empty dataDirectory config did not record INVALID_PARAMS");
+  }
 
   struct channel defaults_ch;
   memset(&defaults_ch, 0, sizeof defaults_ch);
