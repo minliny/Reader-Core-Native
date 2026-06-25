@@ -36,4 +36,10 @@ tasks.named('test') {
     testLogging {
         events 'passed', 'skipped', 'failed'
     }
+    // Point ProtocolConformanceTest at the upstream protocol fixtures dir (the
+    // source of truth) so a protocol change breaks the test, instead of relying
+    // on copied fixtures under src/test/resources. Resolved relative to this
+    // module's project dir: bindings/android/host-adapter -> repo root.
+    systemProperty 'reader.protocol.fixtures.host',
+            new File(rootProject.projectDir, '../../../protocol/fixtures/conformance/host').absolutePath
 }

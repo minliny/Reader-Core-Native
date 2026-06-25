@@ -50,6 +50,7 @@ HostRequest.parse  -->  HostAdapter.dispatch(capability)  -->  CapabilityHandler
 | `HostReplyCodec` | 把 `HostReply` 编码为协议 command JSON。 |
 | `HttpExecuteHandler` | `http.execute` shared-contract capability handler；委托 `HttpFetch` 做真实网络。 |
 | `HttpFetch` / `HttpRequest` / `HttpResponse` | host-owned HTTP 机制抽象与请求/响应值对象。 |
+| `HostSmokeEchoHandler` | `host.smoke.echo` conformance smoke capability；回显请求 params。 |
 | `Json` | 零依赖最小 JSON codec，供纯 JVM 单测与 Android 嵌入。 |
 
 ## 构建 / 测试
@@ -77,6 +78,11 @@ JAVA_HOME=<jdk17> gradle --offline test # 依赖已缓存，可离线复跑
 - `HttpExecuteHandlerTest` 用 fake `HttpFetch` 验证 `http.execute` 请求/响应契约
   （缺 url → 非重试 INTERNAL；fetch 抛异常 → 可重试 INTERNAL；带 headers 的完成与
   `http-complete-with-metadata.json` fixture 对齐），并经 `HostEventLoop` 端到端发命令。
+- `ProtocolConformanceTest` **直接读取上游 `protocol/fixtures/conformance/host/`**
+  （Gradle system property 注入路径），断言 codec 输出与
+  `complete/error/http-complete-with-metadata/http-complete-invalid-status` fixture
+  逐字节一致（modulo outbound requestId），拒绝 `*-operation-zero` 负 fixture，校验
+  `request.json` smoke 参数形状与 invalid-capability 负 fixture —— 协议变更即断测。
 
 这是本 lane 每轮提交的可验证 contract evidence（Gradle `test` task，纯 JVM，无需
 NDK/设备）。模块通过 `sourceSets` 编译引用现有 Java JNI wrapper（`ReaderCoreRuntime`
