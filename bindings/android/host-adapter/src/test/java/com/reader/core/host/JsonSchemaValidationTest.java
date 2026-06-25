@@ -39,14 +39,16 @@ class JsonSchemaValidationTest {
         Assumptions.assumeTrue(Files.exists(cmdPath), "missing command schema");
         Assumptions.assumeTrue(Files.exists(evtPath), "missing event schema");
 
-        JsonSchemaFactory factory = JsonSchemaFactory.getInstance(
-                com.networknt.schema.SpecVersion.VersionFlag.V202012);
         com.fasterxml.jackson.databind.ObjectMapper mapper =
                 com.fasterxml.jackson.databind.json.JsonMapper.builder().build();
         // Load the command schema with the protocol dir as the base URI so the
         // cross-schema $ref (reader-event.schema.json#/$defs/CoreError) resolves
         // from disk.
         String protocolDirUri = Paths.get(SCHEMA_DIR).toAbsolutePath().toUri().toString();
+        JsonSchemaFactory factory = JsonSchemaFactory.getInstance(
+                com.networknt.schema.SpecVersion.VersionFlag.V202012,
+                builder -> builder.schemaMappers(mappers ->
+                        mappers.mapPrefix("https://reader-core-native/", protocolDirUri)));
         commandSchema = factory.getSchema(
                 SchemaLocation.of(protocolDirUri),
                 mapper.readTree(Files.readString(cmdPath, StandardCharsets.UTF_8)));

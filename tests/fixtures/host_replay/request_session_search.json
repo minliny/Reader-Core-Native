@@ -1,0 +1,96 @@
+{
+  "command": {
+    "protocolVersion": 1,
+    "requestId": 801,
+    "method": "book.search",
+    "params": {
+      "sourceId": "host-contract-src",
+      "searchRequest": {
+        "url": "https://books.example.test/search?q=dune",
+        "method": "POST",
+        "headers": {
+          "Accept": "application/json",
+          "Cookie": "sid=old"
+        },
+        "body": "q=dune",
+        "charset": "gbk",
+        "followRedirects": false,
+        "maxRedirects": 0,
+        "retry": {
+          "maxAttempts": 2,
+          "backoffMillis": 50
+        },
+        "usePlatformCookieJar": false,
+        "session": {
+          "id": "core-session-main"
+        }
+      },
+      "source": {
+        "sourceId": "host-contract-src",
+        "name": "Host Contract Fixture",
+        "baseUrl": "https://books.example.test",
+        "rules": {
+          "search": [
+            {
+              "kind": "jsonPath",
+              "path": "$.books[*]"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "expectHostRequest": {
+    "capability": "http.execute",
+    "params": {
+      "url": "https://books.example.test/search?q=dune",
+      "method": "POST",
+      "headers": {
+        "Accept": "application/json",
+        "Cookie": "sid=old"
+      },
+      "body": "q=dune",
+      "charset": "gbk",
+      "followRedirects": false,
+      "maxRedirects": 0,
+      "retry": {
+        "maxAttempts": 2,
+        "backoffMillis": 50
+      },
+      "usePlatformCookieJar": false,
+      "session": {
+        "id": "core-session-main"
+      }
+    }
+  },
+  "hostResult": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=gbk",
+      "set-cookie": [
+        "sid=new; Path=/; HttpOnly"
+      ]
+    },
+    "finalUrl": "https://books.example.test/search?q=dune",
+    "charsetHint": "gbk",
+    "bodyBase64": "eyJib29rcyI6W119",
+    "body": "{\"books\":[]}",
+    "session": {
+      "id": "core-session-main"
+    }
+  },
+  "expectResultHttp": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=gbk",
+      "set-cookie": [
+        "sid=new; Path=/; HttpOnly"
+      ]
+    },
+    "finalUrl": "https://books.example.test/search?q=dune",
+    "charsetHint": "gbk",
+    "session": {
+      "id": "core-session-main"
+    }
+  }
+}

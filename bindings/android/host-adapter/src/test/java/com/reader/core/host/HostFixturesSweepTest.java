@@ -95,6 +95,7 @@ class HostFixturesSweepTest {
         assertFalse(params == null, name + ": missing params");
         Object opId = params.get("operationId");
         boolean opIdZero = opId instanceof Number && ((Number) opId).longValue() == 0;
+        long opIdLong = opId instanceof Number ? ((Number) opId).longValue() : -1L;
 
         if (opIdZero) {
             // Negative fixture: the codec must refuse operationId == 0.
@@ -105,11 +106,16 @@ class HostFixturesSweepTest {
                 assertTrue(throwsArg(() -> HostReplyCodec.encodeError(
                         1L, 0L, "INTERNAL", "x", false)), name + ": codec should refuse operationId 0 (error)");
             }
+        } else if (isComplete && !(params.get("result") instanceof java.util.Map)) {
+            assertTrue(throwsArg(() -> HostReplyCodec.encodeComplete(
+                    1L, opIdLong, Json.stringify(params.get("result")))),
+                    name + ": codec should refuse non-object result");
+        } else if (containsUnknownReplyMetadata(params, isComplete)) {
+            assertCodecDropsInvalidMetadata(name, m, params, isComplete, opIdLong);
         } else {
             // Positive fixture: re-encode from its params and assert the codec
             // produces a structurally equivalent command (same method, same
             // operationId, matching result/error block in canonical form).
-            long opIdLong = ((Number) opId).longValue();
             String actual;
             if (isComplete) {
                 String resultJson = Json.stringify(params.get("result"));
@@ -130,6 +136,55 @@ class HostFixturesSweepTest {
             actualParamsMap.put("requestId", m.get("requestId"));
             assertEqualsCanonical(name, Json.stringify(actualParamsMap), Json.stringify(m));
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static boolean containsUnknownReplyMetadata(java.util.Map<String, Object> params, boolean isComplete) {
+        for (String key : params.keySet()) {
+            if (!"operationId".equals(key) && !(isComplete && "result".equals(key))
+                    && !(!isComplete && "error".equals(key))) {
+                return true;
+            }
+        }
+        if (!isComplete) {
+            Object rawError = params.get("error");
+            if (!(rawError instanceof java.util.Map)) {
+                return true;
+            }
+            java.util.Map<String, Object> error = (java.util.Map<String, Object>) rawError;
+            for (String key : error.keySet()) {
+                if (!"code".equals(key) && !"message".equals(key) && !"retryable".equals(key)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void assertCodecDropsInvalidMetadata(
+            String name,
+            java.util.Map<String, Object> fixture,
+            java.util.Map<String, Object> params,
+            boolean isComplete,
+            long opIdLong
+    ) {
+        String actual;
+        if (isComplete) {
+            actual = HostReplyCodec.encodeComplete(1L, opIdLong, Json.stringify(params.get("result")));
+        } else {
+            java.util.Map<String, Object> err = (java.util.Map<String, Object>) params.get("error");
+            actual = HostReplyCodec.encodeError(1L, opIdLong,
+                    String.valueOf(err.get("code")),
+                    String.valueOf(err.get("message")),
+                    Boolean.TRUE.equals(err.get("retryable")));
+        }
+        Object actualRoot = Json.parse(actual);
+        java.util.Map<String, Object> actualRootMap = (java.util.Map<String, Object>) actualRoot;
+        actualRootMap.put("requestId", fixture.get("requestId"));
+        assertFalse(Json.canonicalize(Json.stringify(actualRootMap))
+                        .equals(Json.canonicalize(Json.stringify(fixture))),
+                name + ": codec should not reproduce invalid/unknown reply metadata");
     }
 
     @SuppressWarnings("unchecked")

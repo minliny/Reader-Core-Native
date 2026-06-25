@@ -1,0 +1,24 @@
+{
+  "protocolVersion": 1,
+  "requestId": 502,
+  "method": "host.complete",
+  "params": {
+    "operationId": 1,
+    "result": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=gbk",
+        "set-cookie": [
+          "sid=new; Path=/; HttpOnly"
+        ]
+      },
+      "finalUrl": "https://books.example.test/search?q=empty",
+      "charsetHint": "gbk",
+      "bodyBase64": "eyJib29rcyI6W119",
+      "session": {
+        "id": "core-session-main"
+      },
+      "body": "{\"books\":[]}"
+    }
+  }
+}

@@ -15,6 +15,7 @@ use std::time::Duration;
 
 use reader_contract::{methods, Command, CoreError, Event};
 use reader_runtime::{EventSink, Runtime};
+use serde_json::Value;
 
 const EVENT_TIMEOUT: Duration = Duration::from_secs(2);
 
@@ -39,6 +40,9 @@ enum Mode {
     /// Run the full remote-reading vertical pipeline against a fixture file.
     /// See `tests/fixtures/remote_source/basic_source.json` for the shape.
     FixtureVertical(PathBuf),
+    /// Replay a host HTTP request/complete pair against Core without opening a
+    /// real socket.
+    HostReplay(PathBuf),
 }
 
 fn main() {
@@ -100,6 +104,7 @@ fn run() -> Result<(), CoreError> {
             }
         }
         Mode::FixtureVertical(path) => run_fixture_vertical(&runtime, &rx, &path),
+        Mode::HostReplay(path) => run_host_replay(&runtime, &rx, &path),
     }
 }
 
@@ -126,6 +131,14 @@ where
                     ));
                 };
                 set_mode(&mut mode, Mode::FixtureVertical(PathBuf::from(path)))?;
+            }
+            "--host-replay" => {
+                let Some(path) = iter.next() else {
+                    return Err(CoreError::invalid_message(
+                        "--host-replay requires a path to a fixture JSON file",
+                    ));
+                };
+                set_mode(&mut mode, Mode::HostReplay(PathBuf::from(path)))?;
             }
             "--json" => {
                 let Some(json) = iter.next() else {
@@ -161,7 +174,7 @@ where
 fn set_mode(slot: &mut Option<Mode>, mode: Mode) -> Result<(), CoreError> {
     if slot.is_some() {
         return Err(CoreError::invalid_message(
-            "only one of --info, --ping, --status, --host-smoke, --conformance, --json, --stdin, or --fixture-vertical may be used",
+            "only one of --info, --ping, --status, --host-smoke, --conformance, --json, --stdin, --fixture-vertical, or --host-replay may be used",
         ));
     }
     *slot = Some(mode);
@@ -399,6 +412,109 @@ fn run_fixture_vertical(
     Ok(())
 }
 
+fn run_host_replay(
+    runtime: &Runtime,
+    rx: &Receiver<Event>,
+    path: &PathBuf,
+) -> Result<(), CoreError> {
+    let raw = fs::read_to_string(path).map_err(|err| {
+        CoreError::invalid_message(format!("failed to read fixture {}", path.display()))
+            .with_details(serde_json::json!({ "source": err.to_string() }))
+    })?;
+    let fixture: Value = serde_json::from_str(&raw).map_err(|err| {
+        CoreError::invalid_message(format!("fixture {} is not valid JSON", path.display()))
+            .with_details(serde_json::json!({ "source": err.to_string() }))
+    })?;
+
+    let command_value = fixture
+        .get("command")
+        .cloned()
+        .ok_or_else(|| CoreError::invalid_message("host replay fixture missing `command`"))?;
+    let command_json = serde_json::to_vec(&command_value).map_err(|err| {
+        CoreError::invalid_message("host replay command is not serializable")
+            .with_details(serde_json::json!({ "source": err.to_string() }))
+    })?;
+    let command = Command::from_json_bytes(&command_json)?;
+    let completion_request_id = command.request_id + 1;
+
+    runtime.send(command)?;
+
+    let host_request = recv_event(rx)?;
+    print_event(&host_request);
+
+    let operation_id =
+        match &host_request {
+            Event::HostRequest {
+                operation_id,
+                capability,
+                params,
+                ..
+            } => {
+                if let Some(expected) = fixture.get("expectHostRequest") {
+                    if expected.get("capability") != Some(&Value::String(capability.clone())) {
+                        return Err(CoreError::internal("host replay capability mismatch")
+                            .with_details(serde_json::json!({
+                                "expected": expected.get("capability"),
+                                "actual": capability,
+                            })));
+                    }
+                    if expected.get("params") != Some(params) {
+                        return Err(CoreError::internal("host replay params mismatch")
+                            .with_details(serde_json::json!({
+                                "expected": expected.get("params"),
+                                "actual": params,
+                            })));
+                    }
+                }
+                *operation_id
+            }
+            other => {
+                return Err(CoreError::internal(format!(
+                    "expected host.request event, got {other:?}"
+                )));
+            }
+        };
+
+    let host_result = fixture
+        .get("hostResult")
+        .cloned()
+        .ok_or_else(|| CoreError::invalid_message("host replay fixture missing `hostResult`"))?;
+    runtime.send(Command::new(
+        completion_request_id,
+        methods::HOST_COMPLETE,
+        serde_json::json!({
+            "operationId": operation_id,
+            "result": host_result,
+        }),
+    ))?;
+
+    let result = recv_event(rx)?;
+    print_event(&result);
+
+    if let Some(expected_http) = fixture.get("expectResultHttp") {
+        match &result {
+            Event::Result { data, .. } if data.get("http") == Some(expected_http) => {}
+            Event::Result { data, .. } => {
+                return Err(
+                    CoreError::internal("host replay result http mismatch").with_details(
+                        serde_json::json!({
+                            "expected": expected_http,
+                            "actual": data.get("http"),
+                        }),
+                    ),
+                );
+            }
+            other => {
+                return Err(CoreError::internal(format!(
+                    "expected result event after host.complete, got {other:?}"
+                )));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn print_next_event(rx: &Receiver<Event>) -> Result<(), CoreError> {
     let event = recv_event(rx)?;
     print_event(&event);
@@ -416,6 +532,6 @@ fn print_event(event: &Event) {
 
 fn print_usage() {
     eprintln!(
-        "usage: reader-cli [--info|--ping|--status|--host-smoke|--conformance|--json '<command>'|--stdin|--fixture-vertical <path>] [--config-json '<config>']"
+        "usage: reader-cli [--info|--ping|--status|--host-smoke|--conformance|--json '<command>'|--stdin|--fixture-vertical <path>|--host-replay <path>] [--config-json '<config>']"
     );
 }

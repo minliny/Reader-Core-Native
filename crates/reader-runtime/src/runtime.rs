@@ -2162,7 +2162,21 @@ mod tests {
                 "sourceId": "vtest-src",
                 "searchRequest": {
                     "url": "https://books.example.test/search?q=dune",
-                    "headers": { "Accept": "application/json" }
+                    "headers": {
+                        "Accept": "application/json",
+                        "Cookie": "sid=old"
+                    },
+                    "charset": "gbk",
+                    "followRedirects": false,
+                    "maxRedirects": 0,
+                    "retry": {
+                        "maxAttempts": 2,
+                        "backoffMillis": 50
+                    },
+                    "usePlatformCookieJar": false,
+                    "session": {
+                        "id": "core-session-main"
+                    }
                 },
                 "source": vertical_source(),
             }),
@@ -2183,6 +2197,14 @@ mod tests {
                 assert_eq!(params["method"], "GET");
                 assert_eq!(params["url"], "https://books.example.test/search?q=dune");
                 assert_eq!(params["headers"]["Accept"], "application/json");
+                assert_eq!(params["headers"]["Cookie"], "sid=old");
+                assert_eq!(params["charset"], "gbk");
+                assert_eq!(params["followRedirects"], false);
+                assert_eq!(params["maxRedirects"], 0);
+                assert_eq!(params["retry"]["maxAttempts"], 2);
+                assert_eq!(params["retry"]["backoffMillis"], 50);
+                assert_eq!(params["usePlatformCookieJar"], false);
+                assert_eq!(params["session"]["id"], "core-session-main");
                 *operation_id
             }
             other => panic!("expected http host request, got {other:?}"),
@@ -2195,7 +2217,16 @@ mod tests {
                 "operationId": operation_id,
                 "result": {
                     "status": 200,
-                    "headers": { "content-type": "application/json" },
+                    "headers": {
+                        "content-type": "application/json; charset=gbk",
+                        "set-cookie": ["sid=new; Path=/; HttpOnly"]
+                    },
+                    "finalUrl": "https://books.example.test/search?q=dune",
+                    "charsetHint": "gbk",
+                    "bodyBase64": "eyJib29rcyI6W119",
+                    "session": {
+                        "id": "core-session-main"
+                    },
                     "body": "{\"books\":[{\"bookId\":\"1\",\"title\":\"Dune\",\"author\":\"Herbert\"}]}"
                 }
             }),
@@ -2211,7 +2242,20 @@ mod tests {
                 let books = data["books"].as_array().expect("books array");
                 assert_eq!(books[0]["title"], "Dune");
                 assert_eq!(data["http"]["status"], 200);
-                assert_eq!(data["http"]["headers"]["content-type"], "application/json");
+                assert_eq!(
+                    data["http"]["headers"]["content-type"],
+                    "application/json; charset=gbk"
+                );
+                assert_eq!(
+                    data["http"]["headers"]["set-cookie"][0],
+                    "sid=new; Path=/; HttpOnly"
+                );
+                assert_eq!(
+                    data["http"]["finalUrl"],
+                    "https://books.example.test/search?q=dune"
+                );
+                assert_eq!(data["http"]["charsetHint"], "gbk");
+                assert_eq!(data["http"]["session"]["id"], "core-session-main");
             }
             other => panic!("expected remote result after host completion, got {other:?}"),
         }
