@@ -29,6 +29,10 @@ repositories {
 dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    // JSON Schema validator (draft 2020-12) — validates the adapter's encoded
+    // commands/events directly against protocol/reader-{command,event}.schema.json,
+    // the strongest contract evidence. Fetched once online; --offline reproduces.
+    testImplementation 'com.networknt:json-schema-validator:1.5.1'
 }
 
 tasks.named('test') {
@@ -42,6 +46,10 @@ tasks.named('test') {
     // module's project dir: bindings/android/host-adapter -> repo root.
     systemProperty 'reader.protocol.fixtures.host',
             new File(rootProject.projectDir, '../../../protocol/fixtures/conformance/host').absolutePath
+    // Path to the upstream protocol JSON schemas (source of truth) for
+    // JsonSchemaValidationTest. Resolved relative to this module's project dir.
+    systemProperty 'reader.protocol.schema.dir',
+            new File(rootProject.projectDir, '../../../protocol').absolutePath
 }
 
 // Compile-gate the runnable wiring sample (HostBusSample). Running it needs the

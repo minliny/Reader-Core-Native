@@ -116,6 +116,10 @@ JAVA_HOME=<jdk17> gradle --offline test # 依赖已缓存，可离线复跑
   对每个 fixture 分类断言（reply fixture 重编码后 canonical 等价 / operationId==0 负 fixture
   被 codec 拒绝 / request fixture 的 capability 被 HostRequest 接受或拒绝）—— 新增 fixture
   自动获覆盖，无需改测试。
+- `JsonSchemaValidationTest` 用 draft 2020-12 validator（networknt）直接校验 adapter 编码
+  输出对上游 `protocol/reader-command.schema.json`（host.complete / host.error / runtime.ping
+  command）与 `protocol/reader-event.schema.json`（host.request event）—— 最强 contract evidence，
+  wire bytes 必须满足协议自身 schema，跨 schema `$ref`（CoreError）从磁盘解析。
 
 这是本 lane 每轮提交的可验证 contract evidence（Gradle `test` task，纯 JVM，无需
 NDK/设备）。模块通过 `sourceSets` 编译引用现有 Java JNI wrapper（`ReaderCoreRuntime`
