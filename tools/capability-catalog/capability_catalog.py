@@ -147,14 +147,15 @@ def _resolve_owner_status(cells, header):
         col_name = header[idx] if (header and idx < len(header)) else ""
 
         # Column-header-driven ownership (real FEATURE_MATRIX shape).
+        # A checkmark marks OWNERSHIP, not completion -- it must NOT imply
+        # "implemented". Status only comes from explicit status tokens
+        # (已完成/部分完成/Gap) or the V1 checklist (see parse_checklist).
         if has_check:
             col_lower = col_name.lower()
             if "rust core" in col_lower:
                 owner = "core"
             elif "platform adapter" in col_lower or "平台" in col_name:
                 owner = "host"
-            if status is None:
-                status = "implemented"
 
         # Token-driven ownership (synthetic Owner-column shape).
         for tok in _OWNER_HOST_TOKENS:
@@ -204,6 +205,55 @@ def parse_feature_matrix(text):
             "evidence": " | ".join(cells),
         })
     return rows
+
+
+def parse_checklist(text, section=None):
+    """Parse markdown checkbox items (``- [x]`` / ``- [ ]``).
+
+    If ``section`` is given (e.g. ``"V1 功能边界"``), only items under the
+    matching ``## <section>`` heading (up to the next ``## `` heading) are
+    parsed -- this avoids conflating the V1 boundary checklist with the
+    migration/retirement checklist.
+
+    Returns a list of dicts:
+        ``{"text", "done": bool, "methods": [str], "keywords": [str]}``
+    where ``methods`` are backtick-quoted method-like tokens (contain a
+    dot) and ``keywords`` are uppercase Latin tokens (len >= 3) extracted
+    from the item text outside backticks.
+    """
+    items = []
+    lines = (text or "").splitlines()
+    if section is not None:
+        scoped = []
+        in_section = False
+        for line in lines:
+            stripped = line.lstrip()
+            if stripped.startswith("## "):
+                in_section = stripped[3:].strip() == section
+                continue
+            if in_section:
+                scoped.append(line)
+        lines = scoped
+
+    check_re = re.compile(r"^\s*[-*]\s*\[([ xX])\]\s*(.*)$")
+    backtick_re = re.compile(r"`([^`]+)`")
+    keyword_re = re.compile(r"[A-Za-z]{3,}")
+    for line in lines:
+        m = check_re.match(line)
+        if not m:
+            continue
+        done = m.group(1).lower() == "x"
+        body = m.group(2)
+        methods = [t for t in backtick_re.findall(body) if "." in t]
+        text_only = backtick_re.sub(" ", body)
+        keywords = sorted({w.upper() for w in keyword_re.findall(text_only)})
+        items.append({
+            "text": body.strip(),
+            "done": done,
+            "methods": methods,
+            "keywords": keywords,
+        })
+    return items
 
 
 def parse_host_contracts(file_iter):
@@ -279,6 +329,7 @@ def collect(root):
         if key not in caps:
             caps[key] = {
                 "id": key,
+                "name_raw": key,
                 "from_core": False,
                 "from_host": False,
                 "status": None,
@@ -323,25 +374,59 @@ def collect(root):
 
     # 3. FEATURE_MATRIX.md -> owner/status enrichment.
     matrix_path = root_path / "FEATURE_MATRIX.md"
-    if matrix_path.is_file():
-        text = _read_text(matrix_path)
-        if text:
-            rel = _rel(root_str, matrix_path)
-            for entry in parse_feature_matrix(text):
-                key = entry["name"]
-                # Match schema-derived methods by raw name; otherwise the id
-                # is the slugified name.
-                if key not in caps:
-                    key = _slug(entry["name"])
-                rec = _ensure(key, rel)
-                if entry["owner"] == "core":
-                    rec["from_core"] = True
-                elif entry["owner"] == "host":
-                    rec["from_host"] = True
-                if entry["status"]:
-                    rec["status"] = entry["status"]
-                if rel not in rec["evidence_files"]:
-                    rec["evidence_files"].append(rel)
+    matrix_text = _read_text(matrix_path) if matrix_path.is_file() else None
+    if matrix_text:
+        rel = _rel(root_str, matrix_path)
+        for entry in parse_feature_matrix(matrix_text):
+            key = entry["name"]
+            # Match schema-derived methods by raw name; otherwise the id
+            # is the slugified name.
+            if key not in caps:
+                key = _slug(entry["name"])
+            rec = _ensure(key, rel)
+            rec["name_raw"] = entry["name"]
+            if entry["owner"] == "core":
+                rec["from_core"] = True
+            elif entry["owner"] == "host":
+                rec["from_host"] = True
+            if entry["status"]:
+                rec["status"] = entry["status"]
+            if rel not in rec["evidence_files"]:
+                rec["evidence_files"].append(rel)
+
+    # 3b. V1 checklist (in FEATURE_MATRIX.md) -> status by method + keyword.
+    # A checkmark in the ownership table marks OWNERSHIP only; the V1
+    # boundary checklist is the real source of done/not-done. An undone
+    # checklist item overrides any schema-default "implemented" status.
+    if matrix_text:
+        rel = _rel(root_str, matrix_path)
+        checklist = parse_checklist(matrix_text, section="V1 功能边界")
+        # Index capabilities by uppercase keyword for keyword matching.
+        # Only capabilities whose name_raw contains the keyword qualify.
+        for item in checklist:
+            new_status = "implemented" if item["done"] else "missing"
+            matched_any = False
+            # Method-token match: pin a specific capability id.
+            for method in item["methods"]:
+                if method in caps:
+                    caps[method]["status"] = new_status
+                    if rel not in caps[method]["evidence_files"]:
+                        caps[method]["evidence_files"].append(rel)
+                    matched_any = True
+            # Keyword match: an undone item with an uppercase keyword (e.g.
+            # "EPUB", "TXT") marks any capability whose name_raw contains
+            # that keyword as missing. Done items do not keyword-promote
+            # (a done checklist item only certifies the methods it names).
+            if not item["done"]:
+                for kw in item["keywords"]:
+                    for rec in caps.values():
+                        raw = rec.get("name_raw") or ""
+                        if kw and kw in raw.upper():
+                            rec["status"] = "missing"
+                            if rel not in rec["evidence_files"]:
+                                rec["evidence_files"].append(rel)
+                            matched_any = True
+            # If a checklist item matched nothing it is informational only.
 
     # 4. docs/host-app-contracts/**/*.md -> host-owned mentions.
     host_dir = root_path / "docs" / "host-app-contracts"

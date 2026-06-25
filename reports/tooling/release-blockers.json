@@ -1,0 +1,846 @@
+{
+  "blockers": [
+    {
+      "capability": "epub-\u89e3\u6790",
+      "evidence_status": "missing",
+      "id": "rb-epub-\u89e3\u6790",
+      "mitigation": "Implement epub-\u89e3\u6790 (currently missing)",
+      "platform": "all",
+      "reason": "epub-\u89e3\u6790 is missing with zero passing evidence",
+      "severity": "blocker",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "txt-\u89e3\u6790",
+      "evidence_status": "missing",
+      "id": "rb-txt-\u89e3\u6790",
+      "mitigation": "Implement txt-\u89e3\u6790 (currently missing)",
+      "platform": "all",
+      "reason": "txt-\u89e3\u6790 is missing with zero passing evidence",
+      "severity": "blocker",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "book.detail",
+      "evidence_status": "missing",
+      "id": "rb-book.detail",
+      "mitigation": "Verify implemented capability book.detail with at least one passing evidence",
+      "platform": "all",
+      "reason": "book.detail is implemented but unverified (zero evidence)",
+      "severity": "medium",
+      "sources": [
+        "protocol/reader-command.schema.json",
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "book.search",
+      "evidence_status": "missing",
+      "id": "rb-book.search",
+      "mitigation": "Verify implemented capability book.search with at least one passing evidence",
+      "platform": "all",
+      "reason": "book.search is implemented but unverified (zero evidence)",
+      "severity": "medium",
+      "sources": [
+        "protocol/reader-command.schema.json",
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "book.toc",
+      "evidence_status": "missing",
+      "id": "rb-book.toc",
+      "mitigation": "Verify implemented capability book.toc with at least one passing evidence",
+      "platform": "all",
+      "reason": "book.toc is implemented but unverified (zero evidence)",
+      "severity": "medium",
+      "sources": [
+        "protocol/reader-command.schema.json",
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "chapter.content",
+      "evidence_status": "missing",
+      "id": "rb-chapter.content",
+      "mitigation": "Verify implemented capability chapter.content with at least one passing evidence",
+      "platform": "all",
+      "reason": "chapter.content is implemented but unverified (zero evidence)",
+      "severity": "medium",
+      "sources": [
+        "protocol/reader-command.schema.json",
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "core.info",
+      "evidence_status": "missing",
+      "id": "rb-core.info",
+      "mitigation": "Verify implemented capability core.info with at least one passing evidence",
+      "platform": "all",
+      "reason": "core.info is implemented but unverified (zero evidence)",
+      "severity": "medium",
+      "sources": [
+        "protocol/reader-command.schema.json"
+      ]
+    },
+    {
+      "capability": "host.bus.v1",
+      "evidence_status": "missing",
+      "id": "rb-host.bus.v1",
+      "mitigation": "Verify implemented capability host.bus.v1 with at least one passing evidence",
+      "platform": "all",
+      "reason": "host.bus.v1 is implemented but unverified (zero evidence)",
+      "severity": "medium",
+      "sources": [
+        "protocol/reader-command.schema.json"
+      ]
+    },
+    {
+      "capability": "host.complete",
+      "evidence_status": "missing",
+      "id": "rb-host.complete",
+      "mitigation": "Verify implemented capability host.complete with at least one passing evidence",
+      "platform": "all",
+      "reason": "host.complete is implemented but unverified (zero evidence)",
+      "severity": "medium",
+      "sources": [
+        "protocol/reader-command.schema.json"
+      ]
+    },
+    {
+      "capability": "host.error",
+      "evidence_status": "missing",
+      "id": "rb-host.error",
+      "mitigation": "Verify implemented capability host.error with at least one passing evidence",
+      "platform": "all",
+      "reason": "host.error is implemented but unverified (zero evidence)",
+      "severity": "medium",
+      "sources": [
+        "protocol/reader-command.schema.json"
+      ]
+    },
+    {
+      "capability": "host.request",
+      "evidence_status": "missing",
+      "id": "rb-host.request",
+      "mitigation": "Verify implemented capability host.request with at least one passing evidence",
+      "platform": "all",
+      "reason": "host.request is implemented but unverified (zero evidence)",
+      "severity": "medium",
+      "sources": [
+        "protocol/reader-event.schema.json"
+      ]
+    },
+    {
+      "capability": "http-transport",
+      "evidence_status": "unknown",
+      "id": "rb-http-transport",
+      "mitigation": "Add passing evidence for http-transport on all required platforms",
+      "platform": "all",
+      "reason": "http-transport is host-owned with zero evidence",
+      "severity": "medium",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "http.execute",
+      "evidence_status": "missing",
+      "id": "rb-http.execute",
+      "mitigation": "Verify implemented capability http.execute with at least one passing evidence",
+      "platform": "all",
+      "reason": "http.execute is implemented but unverified (zero evidence)",
+      "severity": "medium",
+      "sources": [
+        "protocol/reader-command.schema.json",
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "reading.progress.update",
+      "evidence_status": "missing",
+      "id": "rb-reading.progress.update",
+      "mitigation": "Verify implemented capability reading.progress.update with at least one passing evidence",
+      "platform": "all",
+      "reason": "reading.progress.update is implemented but unverified (zero evidence)",
+      "severity": "medium",
+      "sources": [
+        "protocol/reader-command.schema.json"
+      ]
+    },
+    {
+      "capability": "remote.reading.v1",
+      "evidence_status": "missing",
+      "id": "rb-remote.reading.v1",
+      "mitigation": "Verify implemented capability remote.reading.v1 with at least one passing evidence",
+      "platform": "all",
+      "reason": "remote.reading.v1 is implemented but unverified (zero evidence)",
+      "severity": "medium",
+      "sources": [
+        "protocol/reader-command.schema.json",
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "runtime.config.v1",
+      "evidence_status": "missing",
+      "id": "rb-runtime.config.v1",
+      "mitigation": "Verify implemented capability runtime.config.v1 with at least one passing evidence",
+      "platform": "all",
+      "reason": "runtime.config.v1 is implemented but unverified (zero evidence)",
+      "severity": "medium",
+      "sources": [
+        "protocol/reader-command.schema.json"
+      ]
+    },
+    {
+      "capability": "runtime.hostSmoke",
+      "evidence_status": "missing",
+      "id": "rb-runtime.hostsmoke",
+      "mitigation": "Verify implemented capability runtime.hostSmoke with at least one passing evidence",
+      "platform": "all",
+      "reason": "runtime.hostSmoke is implemented but unverified (zero evidence)",
+      "severity": "medium",
+      "sources": [
+        "protocol/reader-command.schema.json"
+      ]
+    },
+    {
+      "capability": "runtime.ping",
+      "evidence_status": "missing",
+      "id": "rb-runtime.ping",
+      "mitigation": "Verify implemented capability runtime.ping with at least one passing evidence",
+      "platform": "all",
+      "reason": "runtime.ping is implemented but unverified (zero evidence)",
+      "severity": "medium",
+      "sources": [
+        "protocol/reader-command.schema.json"
+      ]
+    },
+    {
+      "capability": "source.import",
+      "evidence_status": "missing",
+      "id": "rb-source.import",
+      "mitigation": "Verify implemented capability source.import with at least one passing evidence",
+      "platform": "all",
+      "reason": "source.import is implemented but unverified (zero evidence)",
+      "severity": "medium",
+      "sources": [
+        "protocol/reader-command.schema.json",
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "tls-\u5b9e\u9645\u7f51\u7edc-socket",
+      "evidence_status": "unknown",
+      "id": "rb-tls-\u5b9e\u9645\u7f51\u7edc-socket",
+      "mitigation": "Add passing evidence for tls-\u5b9e\u9645\u7f51\u7edc-socket on all required platforms",
+      "platform": "all",
+      "reason": "tls-\u5b9e\u9645\u7f51\u7edc-socket is host-owned with zero evidence",
+      "severity": "medium",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "ui-\u7ec4\u4ef6\u548c\u5bfc\u822a",
+      "evidence_status": "unknown",
+      "id": "rb-ui-\u7ec4\u4ef6\u548c\u5bfc\u822a",
+      "mitigation": "Add passing evidence for ui-\u7ec4\u4ef6\u548c\u5bfc\u822a on all required platforms",
+      "platform": "all",
+      "reason": "ui-\u7ec4\u4ef6\u548c\u5bfc\u822a is host-owned with zero evidence",
+      "severity": "medium",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "webview-cookie-\u83b7\u53d6",
+      "evidence_status": "unknown",
+      "id": "rb-webview-cookie-\u83b7\u53d6",
+      "mitigation": "Add passing evidence for webview-cookie-\u83b7\u53d6 on all required platforms",
+      "platform": "all",
+      "reason": "webview-cookie-\u83b7\u53d6 is host-owned with zero evidence",
+      "severity": "medium",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u4e3b\u9898\u548c\u5b57\u4f53",
+      "evidence_status": "unknown",
+      "id": "rb-\u4e3b\u9898\u548c\u5b57\u4f53",
+      "mitigation": "Add passing evidence for \u4e3b\u9898\u548c\u5b57\u4f53 on all required platforms",
+      "platform": "all",
+      "reason": "\u4e3b\u9898\u548c\u5b57\u4f53 is host-owned with zero evidence",
+      "severity": "medium",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u5305\u4f53\u7b7e\u540d\u548c\u5206\u53d1",
+      "evidence_status": "unknown",
+      "id": "rb-\u5305\u4f53\u7b7e\u540d\u548c\u5206\u53d1",
+      "mitigation": "Add passing evidence for \u5305\u4f53\u7b7e\u540d\u548c\u5206\u53d1 on all required platforms",
+      "platform": "all",
+      "reason": "\u5305\u4f53\u7b7e\u540d\u548c\u5206\u53d1 is host-owned with zero evidence",
+      "severity": "medium",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u540e\u53f0\u4efb\u52a1\u548c\u901a\u77e5",
+      "evidence_status": "unknown",
+      "id": "rb-\u540e\u53f0\u4efb\u52a1\u548c\u901a\u77e5",
+      "mitigation": "Add passing evidence for \u540e\u53f0\u4efb\u52a1\u548c\u901a\u77e5 on all required platforms",
+      "platform": "all",
+      "reason": "\u540e\u53f0\u4efb\u52a1\u548c\u901a\u77e5 is host-owned with zero evidence",
+      "severity": "medium",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u5b89\u5168\u51ed\u636e\u5b58\u50a8-keychain-keystore-etc",
+      "evidence_status": "unknown",
+      "id": "rb-\u5b89\u5168\u51ed\u636e\u5b58\u50a8-keychain-keystore-etc",
+      "mitigation": "Add passing evidence for \u5b89\u5168\u51ed\u636e\u5b58\u50a8-keychain-keystore-etc on all required platforms",
+      "platform": "all",
+      "reason": "\u5b89\u5168\u51ed\u636e\u5b58\u50a8-keychain-keystore-etc is host-owned with zero evidence",
+      "severity": "medium",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u6587\u4ef6\u9009\u62e9\u548c\u6c99\u7bb1\u6388\u6743",
+      "evidence_status": "unknown",
+      "id": "rb-\u6587\u4ef6\u9009\u62e9\u548c\u6c99\u7bb1\u6388\u6743",
+      "mitigation": "Add passing evidence for \u6587\u4ef6\u9009\u62e9\u548c\u6c99\u7bb1\u6388\u6743 on all required platforms",
+      "platform": "all",
+      "reason": "\u6587\u4ef6\u9009\u62e9\u548c\u6c99\u7bb1\u6388\u6743 is host-owned with zero evidence",
+      "severity": "medium",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u767b\u5f55-webview-\u4ea4\u4e92",
+      "evidence_status": "unknown",
+      "id": "rb-\u767b\u5f55-webview-\u4ea4\u4e92",
+      "mitigation": "Add passing evidence for \u767b\u5f55-webview-\u4ea4\u4e92 on all required platforms",
+      "platform": "all",
+      "reason": "\u767b\u5f55-webview-\u4ea4\u4e92 is host-owned with zero evidence",
+      "severity": "medium",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u7cfb\u7edf-tts-\u53d1\u58f0",
+      "evidence_status": "unknown",
+      "id": "rb-\u7cfb\u7edf-tts-\u53d1\u58f0",
+      "mitigation": "Add passing evidence for \u7cfb\u7edf-tts-\u53d1\u58f0 on all required platforms",
+      "platform": "all",
+      "reason": "\u7cfb\u7edf-tts-\u53d1\u58f0 is host-owned with zero evidence",
+      "severity": "medium",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "book-chapter-source-\u6570\u636e\u6a21\u578b",
+      "evidence_status": "unknown",
+      "id": "rb-book-chapter-source-\u6570\u636e\u6a21\u578b",
+      "mitigation": "Clarify status of book-chapter-source-\u6570\u636e\u6a21\u578b and add evidence",
+      "platform": "all",
+      "reason": "book-chapter-source-\u6570\u636e\u6a21\u578b has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "booklist-scoping",
+      "evidence_status": "unknown",
+      "id": "rb-booklist-scoping",
+      "mitigation": "Clarify status of booklist-scoping and add evidence",
+      "platform": "all",
+      "reason": "booklist-scoping has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "cookie-session-\u6301\u4e45\u5316",
+      "evidence_status": "unknown",
+      "id": "rb-cookie-session-\u6301\u4e45\u5316",
+      "mitigation": "Clarify status of cookie-session-\u6301\u4e45\u5316 and add evidence",
+      "platform": "all",
+      "reason": "cookie-session-\u6301\u4e45\u5316 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "cookie-\u7b56\u7565\u63a7\u5236",
+      "evidence_status": "unknown",
+      "id": "rb-cookie-\u7b56\u7565\u63a7\u5236",
+      "mitigation": "Clarify status of cookie-\u7b56\u7565\u63a7\u5236 and add evidence",
+      "platform": "all",
+      "reason": "cookie-\u7b56\u7565\u63a7\u5236 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "css-selector-\u89c4\u5219",
+      "evidence_status": "unknown",
+      "id": "rb-css-selector-\u89c4\u5219",
+      "mitigation": "Clarify status of css-selector-\u89c4\u5219 and add evidence",
+      "platform": "all",
+      "reason": "css-selector-\u89c4\u5219 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "html-\u89e3\u6790",
+      "evidence_status": "unknown",
+      "id": "rb-html-\u89e3\u6790",
+      "mitigation": "Clarify status of html-\u89e3\u6790 and add evidence",
+      "platform": "all",
+      "reason": "html-\u89e3\u6790 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "js-host-api-console-fetch-crypto-etc.",
+      "evidence_status": "unknown",
+      "id": "rb-js-host-api-console-fetch-crypto-etc.",
+      "mitigation": "Clarify status of js-host-api-console-fetch-crypto-etc. and add evidence",
+      "platform": "all",
+      "reason": "js-host-api-console-fetch-crypto-etc. has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "js-\u6267\u884c-quickjs",
+      "evidence_status": "unknown",
+      "id": "rb-js-\u6267\u884c-quickjs",
+      "mitigation": "Clarify status of js-\u6267\u884c-quickjs and add evidence",
+      "platform": "all",
+      "reason": "js-\u6267\u884c-quickjs has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "json-\u89e3\u6790",
+      "evidence_status": "unknown",
+      "id": "rb-json-\u89e3\u6790",
+      "mitigation": "Clarify status of json-\u89e3\u6790 and add evidence",
+      "platform": "all",
+      "reason": "json-\u89e3\u6790 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "jsonpath-\u89c4\u5219",
+      "evidence_status": "unknown",
+      "id": "rb-jsonpath-\u89c4\u5219",
+      "mitigation": "Clarify status of jsonpath-\u89c4\u5219 and add evidence",
+      "platform": "all",
+      "reason": "jsonpath-\u89c4\u5219 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "recovery-\u6821\u9a8c-diff",
+      "evidence_status": "unknown",
+      "id": "rb-recovery-\u6821\u9a8c-diff",
+      "mitigation": "Clarify status of recovery-\u6821\u9a8c-diff and add evidence",
+      "platform": "all",
+      "reason": "recovery-\u6821\u9a8c-diff has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "rss-\u89e3\u6790\u548c\u8ba2\u9605\u72b6\u6001",
+      "evidence_status": "unknown",
+      "id": "rb-rss-\u89e3\u6790\u548c\u8ba2\u9605\u72b6\u6001",
+      "mitigation": "Clarify status of rss-\u89e3\u6790\u548c\u8ba2\u9605\u72b6\u6001 and add evidence",
+      "platform": "all",
+      "reason": "rss-\u89e3\u6790\u548c\u8ba2\u9605\u72b6\u6001 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "sqlite-schema-\u7ba1\u7406",
+      "evidence_status": "unknown",
+      "id": "rb-sqlite-schema-\u7ba1\u7406",
+      "mitigation": "Clarify status of sqlite-schema-\u7ba1\u7406 and add evidence",
+      "platform": "all",
+      "reason": "sqlite-schema-\u7ba1\u7406 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "tag.index",
+      "evidence_status": "unknown",
+      "id": "rb-tag.index",
+      "mitigation": "Clarify status of tag.index and add evidence",
+      "platform": "all",
+      "reason": "tag.index has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "tts-\u6587\u672c\u5207\u7247\u548c\u64ad\u653e\u961f\u5217",
+      "evidence_status": "unknown",
+      "id": "rb-tts-\u6587\u672c\u5207\u7247\u548c\u64ad\u653e\u961f\u5217",
+      "mitigation": "Clarify status of tts-\u6587\u672c\u5207\u7247\u548c\u64ad\u653e\u961f\u5217 and add evidence",
+      "platform": "all",
+      "reason": "tts-\u6587\u672c\u5207\u7247\u548c\u64ad\u653e\u961f\u5217 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "webdav-\u534f\u8bae\u548c\u51b2\u7a81\u7b56\u7565",
+      "evidence_status": "unknown",
+      "id": "rb-webdav-\u534f\u8bae\u548c\u51b2\u7a81\u7b56\u7565",
+      "mitigation": "Clarify status of webdav-\u534f\u8bae\u548c\u51b2\u7a81\u7b56\u7565 and add evidence",
+      "platform": "all",
+      "reason": "webdav-\u534f\u8bae\u548c\u51b2\u7a81\u7b56\u7565 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "xml-\u89e3\u6790",
+      "evidence_status": "unknown",
+      "id": "rb-xml-\u89e3\u6790",
+      "mitigation": "Clarify status of xml-\u89e3\u6790 and add evidence",
+      "platform": "all",
+      "reason": "xml-\u89e3\u6790 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "xpath-\u89c4\u5219",
+      "evidence_status": "unknown",
+      "id": "rb-xpath-\u89c4\u5219",
+      "mitigation": "Clarify status of xpath-\u89c4\u5219 and add evidence",
+      "platform": "all",
+      "reason": "xpath-\u89c4\u5219 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u4e0b\u8f7d\u961f\u5217",
+      "evidence_status": "unknown",
+      "id": "rb-\u4e0b\u8f7d\u961f\u5217",
+      "mitigation": "Clarify status of \u4e0b\u8f7d\u961f\u5217 and add evidence",
+      "platform": "all",
+      "reason": "\u4e0b\u8f7d\u961f\u5217 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u4e66\u6e90\u5bfc\u5165-\u5bfc\u51fa",
+      "evidence_status": "unknown",
+      "id": "rb-\u4e66\u6e90\u5bfc\u5165-\u5bfc\u51fa",
+      "mitigation": "Clarify status of \u4e66\u6e90\u5bfc\u5165-\u5bfc\u51fa and add evidence",
+      "platform": "all",
+      "reason": "\u4e66\u6e90\u5bfc\u5165-\u5bfc\u51fa has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u4e66\u7c4d\u8be6\u60c5\u89c4\u5219",
+      "evidence_status": "unknown",
+      "id": "rb-\u4e66\u7c4d\u8be6\u60c5\u89c4\u5219",
+      "mitigation": "Clarify status of \u4e66\u7c4d\u8be6\u60c5\u89c4\u5219 and add evidence",
+      "platform": "all",
+      "reason": "\u4e66\u7c4d\u8be6\u60c5\u89c4\u5219 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u5185\u5bb9\u6e05\u6d17\u548c\u6807\u51c6\u5316",
+      "evidence_status": "unknown",
+      "id": "rb-\u5185\u5bb9\u6e05\u6d17\u548c\u6807\u51c6\u5316",
+      "mitigation": "Clarify status of \u5185\u5bb9\u6e05\u6d17\u548c\u6807\u51c6\u5316 and add evidence",
+      "platform": "all",
+      "reason": "\u5185\u5bb9\u6e05\u6d17\u548c\u6807\u51c6\u5316 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u53d8\u91cf\u4f5c\u7528\u57df",
+      "evidence_status": "unknown",
+      "id": "rb-\u53d8\u91cf\u4f5c\u7528\u57df",
+      "mitigation": "Clarify status of \u53d8\u91cf\u4f5c\u7528\u57df and add evidence",
+      "platform": "all",
+      "reason": "\u53d8\u91cf\u4f5c\u7528\u57df has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u540c\u6b65-\u51b2\u7a81\u89e3\u51b3",
+      "evidence_status": "unknown",
+      "id": "rb-\u540c\u6b65-\u51b2\u7a81\u89e3\u51b3",
+      "mitigation": "Clarify status of \u540c\u6b65-\u51b2\u7a81\u89e3\u51b3 and add evidence",
+      "platform": "all",
+      "reason": "\u540c\u6b65-\u51b2\u7a81\u89e3\u51b3 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u54cd\u5e94\u7f16\u7801\u68c0\u6d4b\u548c\u8f6c\u6362",
+      "evidence_status": "unknown",
+      "id": "rb-\u54cd\u5e94\u7f16\u7801\u68c0\u6d4b\u548c\u8f6c\u6362",
+      "mitigation": "Clarify status of \u54cd\u5e94\u7f16\u7801\u68c0\u6d4b\u548c\u8f6c\u6362 and add evidence",
+      "platform": "all",
+      "reason": "\u54cd\u5e94\u7f16\u7801\u68c0\u6d4b\u548c\u8f6c\u6362 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u5907\u4efd-\u6062\u590d",
+      "evidence_status": "unknown",
+      "id": "rb-\u5907\u4efd-\u6062\u590d",
+      "mitigation": "Clarify status of \u5907\u4efd-\u6062\u590d and add evidence",
+      "platform": "all",
+      "reason": "\u5907\u4efd-\u6062\u590d has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u591a\u5b57\u6bb5\u89c4\u5219",
+      "evidence_status": "unknown",
+      "id": "rb-\u591a\u5b57\u6bb5\u89c4\u5219",
+      "mitigation": "Clarify status of \u591a\u5b57\u6bb5\u89c4\u5219 and add evidence",
+      "platform": "all",
+      "reason": "\u591a\u5b57\u6bb5\u89c4\u5219 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u641c\u7d22\u89c4\u5219",
+      "evidence_status": "unknown",
+      "id": "rb-\u641c\u7d22\u89c4\u5219",
+      "mitigation": "Clarify status of \u641c\u7d22\u89c4\u5219 and add evidence",
+      "platform": "all",
+      "reason": "\u641c\u7d22\u89c4\u5219 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u6570\u636e\u5e93\u8fc1\u79fb",
+      "evidence_status": "unknown",
+      "id": "rb-\u6570\u636e\u5e93\u8fc1\u79fb",
+      "mitigation": "Clarify status of \u6570\u636e\u5e93\u8fc1\u79fb and add evidence",
+      "platform": "all",
+      "reason": "\u6570\u636e\u5e93\u8fc1\u79fb has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u66ff\u6362\u89c4\u5219",
+      "evidence_status": "unknown",
+      "id": "rb-\u66ff\u6362\u89c4\u5219",
+      "mitigation": "Clarify status of \u66ff\u6362\u89c4\u5219 and add evidence",
+      "platform": "all",
+      "reason": "\u66ff\u6362\u89c4\u5219 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u6700\u8fd1\u5386\u53f2",
+      "evidence_status": "unknown",
+      "id": "rb-\u6700\u8fd1\u5386\u53f2",
+      "mitigation": "Clarify status of \u6700\u8fd1\u5386\u53f2 and add evidence",
+      "platform": "all",
+      "reason": "\u6700\u8fd1\u5386\u53f2 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u6b63\u5219\u89c4\u5219",
+      "evidence_status": "unknown",
+      "id": "rb-\u6b63\u5219\u89c4\u5219",
+      "mitigation": "Clarify status of \u6b63\u5219\u89c4\u5219 and add evidence",
+      "platform": "all",
+      "reason": "\u6b63\u5219\u89c4\u5219 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u6b63\u6587\u89c4\u5219",
+      "evidence_status": "unknown",
+      "id": "rb-\u6b63\u6587\u89c4\u5219",
+      "mitigation": "Clarify status of \u6b63\u6587\u89c4\u5219 and add evidence",
+      "platform": "all",
+      "reason": "\u6b63\u6587\u89c4\u5219 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u76ee\u5f55\u89c4\u5219",
+      "evidence_status": "unknown",
+      "id": "rb-\u76ee\u5f55\u89c4\u5219",
+      "mitigation": "Clarify status of \u76ee\u5f55\u89c4\u5219 and add evidence",
+      "platform": "all",
+      "reason": "\u76ee\u5f55\u89c4\u5219 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u7ae0\u8282\u5185\u5bb9\u7f13\u5b58",
+      "evidence_status": "unknown",
+      "id": "rb-\u7ae0\u8282\u5185\u5bb9\u7f13\u5b58",
+      "mitigation": "Clarify status of \u7ae0\u8282\u5185\u5bb9\u7f13\u5b58 and add evidence",
+      "platform": "all",
+      "reason": "\u7ae0\u8282\u5185\u5bb9\u7f13\u5b58 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u8bf7\u6c42\u53c2\u6570\u6784\u5efa",
+      "evidence_status": "unknown",
+      "id": "rb-\u8bf7\u6c42\u53c2\u6570\u6784\u5efa",
+      "mitigation": "Clarify status of \u8bf7\u6c42\u53c2\u6570\u6784\u5efa and add evidence",
+      "platform": "all",
+      "reason": "\u8bf7\u6c42\u53c2\u6570\u6784\u5efa has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u91cd\u5b9a\u5411\u7b56\u7565\u63a7\u5236",
+      "evidence_status": "unknown",
+      "id": "rb-\u91cd\u5b9a\u5411\u7b56\u7565\u63a7\u5236",
+      "mitigation": "Clarify status of \u91cd\u5b9a\u5411\u7b56\u7565\u63a7\u5236 and add evidence",
+      "platform": "all",
+      "reason": "\u91cd\u5b9a\u5411\u7b56\u7565\u63a7\u5236 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u94fe\u89c4\u5219",
+      "evidence_status": "unknown",
+      "id": "rb-\u94fe\u89c4\u5219",
+      "mitigation": "Clarify status of \u94fe\u89c4\u5219 and add evidence",
+      "platform": "all",
+      "reason": "\u94fe\u89c4\u5219 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "capability": "\u9605\u8bfb\u8fdb\u5ea6",
+      "evidence_status": "unknown",
+      "id": "rb-\u9605\u8bfb\u8fdb\u5ea6",
+      "mitigation": "Clarify status of \u9605\u8bfb\u8fdb\u5ea6 and add evidence",
+      "platform": "all",
+      "reason": "\u9605\u8bfb\u8fdb\u5ea6 has unknown status with zero evidence",
+      "severity": "low",
+      "sources": [
+        "FEATURE_MATRIX.md"
+      ]
+    }
+  ],
+  "generated_at": "2026-06-25T07:40:32Z",
+  "summary": {
+    "by_platform": {
+      "all": 68,
+      "android": 0,
+      "harmony": 0,
+      "ios": 0,
+      "unknown": 0
+    },
+    "by_severity": {
+      "blocker": 2,
+      "high": 0,
+      "low": 39,
+      "medium": 27
+    },
+    "total": 68
+  },
+  "tool": "release-blocker-register-generator",
+  "version": "release-blockers/1"
+}

@@ -134,6 +134,63 @@ class ParseFeatureMatrixTests(unittest.TestCase):
         self.assertEqual(by_name["Search rules"]["owner"], "core")
         self.assertEqual(by_name["TLS socket"]["owner"], "host")
 
+    def test_checkmark_does_not_imply_implemented(self):
+        # A checkmark marks OWNERSHIP, not completion. Without an explicit
+        # status token (已完成/部分完成/Gap) the status must stay None so
+        # the caller can default to "unknown" rather than "implemented".
+        md = (
+            "| 能力 | Rust Core | Platform Adapter |\n"
+            "|------|:---------:|:----------------:|\n"
+            "| SQLite schema | ✅ | | |\n"
+        )
+        rows = cc.parse_feature_matrix(md)
+        self.assertEqual(rows[0]["owner"], "core")
+        self.assertIsNone(rows[0]["status"])
+
+
+# ---------------------------------------------------------------------------
+# 3b. parse_checklist: V1 boundary checklist -> done/undone + method/keyword
+# ---------------------------------------------------------------------------
+class ParseChecklistTests(unittest.TestCase):
+    def test_extracts_done_and_undone_with_methods_and_keywords(self):
+        md = (
+            "## V1 功能边界\n\n"
+            "- [x] 搜索（`book.search`）\n"
+            "- [ ] EPUB 基础支持\n"
+            "- [x] HTTP host contract（`http.execute`）\n"
+        )
+        items = cc.parse_checklist(md, section="V1 功能边界")
+        self.assertEqual(len(items), 3)
+        self.assertTrue(items[0]["done"])
+        self.assertEqual(items[0]["methods"], ["book.search"])
+        self.assertFalse(items[1]["done"])
+        self.assertEqual(items[1]["methods"], [])
+        self.assertIn("EPUB", items[1]["keywords"])
+        self.assertTrue(items[2]["done"])
+        self.assertEqual(items[2]["methods"], ["http.execute"])
+
+    def test_section_scoping_ignores_other_sections(self):
+        md = (
+            "## V1 功能边界\n\n"
+            "- [x] 搜索（`book.search`）\n\n"
+            "## 退役清单\n\n"
+            "- [ ] Android: Room 内容数据库 → Rust SQLite\n"
+        )
+        items = cc.parse_checklist(md, section="V1 功能边界")
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["methods"], ["book.search"])
+
+    def test_no_section_parses_all_items(self):
+        md = "- [x] done one\n- [ ] undone two\n"
+        items = cc.parse_checklist(md)
+        self.assertEqual(len(items), 2)
+        self.assertTrue(items[0]["done"])
+        self.assertFalse(items[1]["done"])
+
+    def test_missing_section_returns_empty(self):
+        md = "## Other\n\n- [x] item\n"
+        self.assertEqual(cc.parse_checklist(md, section="V1 功能边界"), [])
+
 
 # ---------------------------------------------------------------------------
 # 4. parse_host_contracts: heading + code-block tokens extracted
@@ -261,6 +318,70 @@ class CollectStatusFallbackTests(unittest.TestCase):
             catalog = cc.collect(d)
         by_id = {c["id"]: c for c in catalog["capabilities"]}
         self.assertEqual(by_id["core.info"]["status"], "implemented")
+
+
+# ---------------------------------------------------------------------------
+# 9b. V1 checklist enriches status by method token and by keyword
+# ---------------------------------------------------------------------------
+class CollectChecklistStatusTests(unittest.TestCase):
+    def test_checklist_method_token_sets_status(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(Path(d) / "protocol" / "reader-command.schema.json", json.dumps({
+                "$defs": {"A": {"properties": {"method": {"const": "book.search"}}}}
+            }))
+            _write(Path(d) / "FEATURE_MATRIX.md", (
+                "## V1 功能边界\n\n"
+                "- [x] 搜索（`book.search`）\n"
+                "- [ ] EPUB 基础支持\n"
+            ))
+            catalog = cc.collect(d)
+        by_id = {c["id"]: c for c in catalog["capabilities"]}
+        self.assertEqual(by_id["book.search"]["status"], "implemented")
+
+    def test_checklist_keyword_sets_missing_for_epub_and_txt(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(Path(d) / "FEATURE_MATRIX.md", (
+                "| 能力 | Rust Core | Platform Adapter |\n"
+                "|------|:---------:|:----------------:|\n"
+                "| EPUB 解析 | ✅ | | |\n"
+                "| TXT 解析 | ✅ | | |\n"
+                "| SQLite schema | ✅ | | |\n"
+                "\n## V1 功能边界\n\n"
+                "- [ ] EPUB 基础支持\n"
+                "- [ ] TXT 基础支持\n"
+            ))
+            catalog = cc.collect(d)
+        by_id = {c["id"]: c for c in catalog["capabilities"]}
+        self.assertEqual(by_id["epub-解析"]["status"], "missing")
+        self.assertEqual(by_id["txt-解析"]["status"], "missing")
+        # SQLite has no checklist item -> unknown (not implemented).
+        self.assertEqual(by_id["sqlite-schema"]["status"], "unknown")
+
+    def test_checkmark_only_no_checklist_unknown(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(Path(d) / "FEATURE_MATRIX.md", (
+                "| 能力 | Rust Core | Platform Adapter |\n"
+                "|------|:---------:|:----------------:|\n"
+                "| SQLite schema | ✅ | | |\n"
+            ))
+            catalog = cc.collect(d)
+        by_id = {c["id"]: c for c in catalog["capabilities"]}
+        self.assertEqual(by_id["sqlite-schema"]["status"], "unknown")
+
+    def test_checklist_undone_method_overrides_schema_default(self):
+        # If the V1 checklist marks a schema-defined method as NOT done,
+        # the checklist status wins over the schema "implemented" default.
+        with tempfile.TemporaryDirectory() as d:
+            _write(Path(d) / "protocol" / "reader-command.schema.json", json.dumps({
+                "$defs": {"A": {"properties": {"method": {"const": "book.search"}}}}
+            }))
+            _write(Path(d) / "FEATURE_MATRIX.md", (
+                "## V1 功能边界\n\n"
+                "- [ ] 搜索（`book.search`）\n"
+            ))
+            catalog = cc.collect(d)
+        by_id = {c["id"]: c for c in catalog["capabilities"]}
+        self.assertEqual(by_id["book.search"]["status"], "missing")
 
 
 # ---------------------------------------------------------------------------
