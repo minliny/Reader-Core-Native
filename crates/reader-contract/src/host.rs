@@ -238,11 +238,14 @@ mod tests {
         assert_eq!(params.request_id, 301);
         params.validate().unwrap();
 
-        let err = serde_json::from_value::<RuntimeCancelParams>(serde_json::json!({
-            "requestId": 1,
-            "extra": true
-        }))
-        .unwrap_err();
+        let command: crate::Command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/invalid-runtime-cancel-unknown-field.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let err = serde_json::from_value::<RuntimeCancelParams>(command.params).unwrap_err();
         assert!(err.to_string().contains("unknown field"));
     }
 
@@ -273,10 +276,14 @@ mod tests {
         .unwrap();
         let _params: RuntimeStatusParams = serde_json::from_value(command.params).unwrap();
 
-        let err = serde_json::from_value::<RuntimeStatusParams>(serde_json::json!({
-            "includePayloads": true
-        }))
-        .unwrap_err();
+        let command: crate::Command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/invalid-runtime-status-unknown-field.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let err = serde_json::from_value::<RuntimeStatusParams>(command.params).unwrap_err();
         assert!(err.to_string().contains("unknown field"));
     }
 

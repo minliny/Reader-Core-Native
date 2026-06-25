@@ -81,6 +81,39 @@
           "params": { "$ref": "#/$defs/EmptyParams" }
         }
       }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "runtime.cancel" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/RuntimeCancelParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "runtime.status" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/RuntimeStatusParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "runtime.shutdown" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/RuntimeShutdownParams" }
+        }
+      }
     }
   ],
   "$defs": {

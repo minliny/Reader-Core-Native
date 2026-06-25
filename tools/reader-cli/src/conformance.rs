@@ -80,6 +80,12 @@ const VALID_RUNTIME_SHUTDOWN: &str =
 const INVALID_RUNTIME_CANCEL_TARGET_ZERO: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-runtime-cancel-target-zero.json"
 );
+const INVALID_RUNTIME_CANCEL_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-runtime-cancel-unknown-field.json"
+);
+const INVALID_RUNTIME_STATUS_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-runtime-status-unknown-field.json"
+);
 const INVALID_RUNTIME_SHUTDOWN_UNKNOWN_FIELD: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-runtime-shutdown-unknown-field.json"
 );
@@ -491,6 +497,11 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         expect_event_error(&rx, 311, ErrorCode::InvalidParams)
     });
 
+    record(&mut report, "runtime-cancel-rejects-unknown-params", || {
+        let (_runtime, rx) = send_to_fresh_runtime(INVALID_RUNTIME_CANCEL_UNKNOWN_FIELD)?;
+        expect_event_error(&rx, 312, ErrorCode::InvalidParams)
+    });
+
     record(
         &mut report,
         "runtime-status-empty-runtime-excludes-status-command",
@@ -516,6 +527,11 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             }
         },
     );
+
+    record(&mut report, "runtime-status-rejects-unknown-params", || {
+        let (_runtime, rx) = send_to_fresh_runtime(INVALID_RUNTIME_STATUS_UNKNOWN_FIELD)?;
+        expect_event_error(&rx, 321, ErrorCode::InvalidParams)
+    });
 
     record(
         &mut report,

@@ -1,0 +1,8 @@
+{
+  "protocolVersion": 1,
+  "requestId": 321,
+  "method": "runtime.status",
+  "params": {
+    "includePayloads": true
+  }
+}
