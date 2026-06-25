@@ -437,6 +437,16 @@ mod tests {
     }
 
     #[test]
+    fn event_schema_rejects_core_error_unknown_fields() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+        let core_error = &schema["$defs"]["CoreError"];
+
+        assert_eq!(core_error["additionalProperties"], serde_json::json!(false));
+    }
+
+    #[test]
     fn event_schema_requires_result_data_object() {
         let schema: Value =
             serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))

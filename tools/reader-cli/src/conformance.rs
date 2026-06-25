@@ -133,6 +133,8 @@ const HOST_ERROR_UNKNOWN_FIELD: &str =
     include_str!("../../../protocol/fixtures/conformance/host/error-unknown-field.json");
 const HOST_ERROR_DETAILS_NOT_OBJECT: &str =
     include_str!("../../../protocol/fixtures/conformance/host/error-details-not-object.json");
+const HOST_ERROR_CORE_ERROR_UNKNOWN_FIELD: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/error-core-error-unknown-field.json");
 const HOST_HTTP_COMPLETE_WITH_METADATA: &str =
     include_str!("../../../protocol/fixtures/conformance/host/http-complete-with-metadata.json");
 const HOST_HTTP_COMPLETE_INVALID_STATUS: &str =
@@ -717,6 +719,29 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             other => Err(format!("unexpected host.error details rejection {other:?}")),
         }
     });
+
+    record(
+        &mut report,
+        "host-error-rejects-unknown-error-fields",
+        || {
+            let (_runtime, rx) = send_to_fresh_runtime(HOST_ERROR_CORE_ERROR_UNKNOWN_FIELD)?;
+            match recv_event(&rx)? {
+                Event::Error {
+                    request_id, error, ..
+                } if request_id == 424
+                    && error.code == ErrorCode::InvalidParams
+                    && error.details["source"]
+                        .as_str()
+                        .is_some_and(|source| source.contains("unknown field")) =>
+                {
+                    Ok(())
+                }
+                other => Err(format!(
+                    "unexpected host.error unknown CoreError field rejection {other:?}"
+                )),
+            }
+        },
+    );
 
     record(
         &mut report,

@@ -34,6 +34,7 @@ pub enum ErrorCode {
 /// A structured Core error. Mirrors the `error` object in
 /// `reader-event.schema.json`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CoreError {
     pub code: ErrorCode,
     pub message: String,
@@ -146,5 +147,21 @@ mod tests {
                 "unexpected details error: {err}"
             );
         }
+    }
+
+    #[test]
+    fn core_error_rejects_unknown_fields() {
+        let err = serde_json::from_value::<CoreError>(serde_json::json!({
+            "code": "INTERNAL",
+            "message": "host failed",
+            "retryable": true,
+            "extra": true
+        }))
+        .unwrap_err();
+
+        assert!(
+            err.to_string().contains("unknown field"),
+            "unexpected CoreError unknown-field error: {err}"
+        );
     }
 }
