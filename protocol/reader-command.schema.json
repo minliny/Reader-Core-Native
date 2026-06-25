@@ -265,7 +265,8 @@
         "url": {
           "type": "string",
           "minLength": 1,
-          "description": "Absolute or host-resolvable URL to fetch."
+          "pattern": "\\S",
+          "description": "Absolute or host-resolvable URL to fetch. Must not be empty or whitespace-only."
         },
         "method": {
           "type": "string",

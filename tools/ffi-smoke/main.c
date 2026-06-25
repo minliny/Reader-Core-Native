@@ -972,6 +972,34 @@ int main(void) {
     return fail("bad http headers left synchronous last_error");
   }
 
+  // --- invalid remote http.execute request url -> async INVALID_PARAMS ---
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":318,\"method\":\"book."
+               "search\",\"params\":{\"sourceId\":\"ffi-http-src\","
+               "\"searchRequest\":{\"url\":\"   \"},"
+               "\"source\":{\"sourceId\":\"ffi-http-src\",\"name\":\"FFI HTTP "
+               "Source\",\"baseUrl\":\"https://books.example.test\",\"rules\":{"
+               "\"search\":[{\"kind\":\"jsonPath\",\"path\":\"$.books[*]\"}]}}"
+               "}}") != RC_SEND_OK) {
+    return fail("book.search whitespace http url send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for whitespace http url");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":318") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "url")) {
+    fprintf(stderr, "whitespace http url error: %s\n", event);
+    return fail("whitespace http url error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("whitespace http url left synchronous last_error");
+  }
+
   // --- remote http.execute completion carries metadata ------------------
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":68,\"method\":\"book."

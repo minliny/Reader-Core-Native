@@ -312,6 +312,17 @@ mod tests {
     }
 
     #[test]
+    fn command_schema_rejects_blank_host_http_request_url() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+        let url = &schema["$defs"]["HostHttpRequest"]["properties"]["url"];
+
+        assert_eq!(url["minLength"], serde_json::json!(1));
+        assert_eq!(url["pattern"], serde_json::json!("\\S"));
+    }
+
+    #[test]
     fn event_schema_error_codes_match_error_code_enum() {
         let schema: Value =
             serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
