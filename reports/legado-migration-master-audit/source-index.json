@@ -11,7 +11,7 @@
       "本地仓库是唯一事实来源。",
       "Reader-Core 定义旧业务能力、迁移资产和期望行为证据。",
       "Reader for iOS、Reader for Android、Reader for HarmonyOS 定义真实宿主接入方式。",
-      "目标 Rust 仓库默认查找 Reader-Core-Rust；当前本机实际定位为 Reader-Core-Native。",
+      "目标 Rust 仓库统一使用 Reader-Core-Native。",
       "构建、测试和三端可运行结果证明迁移完成。"
     ],
     "guardrails": [

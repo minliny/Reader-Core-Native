@@ -17,8 +17,7 @@
 1. 本地仓库是唯一事实来源。
 2. 旧 `Reader-Core` 是业务能力迁移源。
 3. `Reader for iOS`、`Reader for Android`、`Reader for HarmonyOS` 是真实宿主接入目标。
-4. Rust 目标仓库默认查找 `Reader-Core-Rust`；当前本机实际定位为
-   `/Users/minliny/Documents/Reader-Core-Native`。
+4. Rust 目标仓库统一使用 `/Users/minliny/Documents/Reader-Core-Native`。
 5. 最终目标是三端共用同一个 Rust Reader-Core 作为唯一业务内核。
 
 因此，本报告不再作为当前开发路线、能力优先级或事实来源顺序的依据。

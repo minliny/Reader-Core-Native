@@ -9,8 +9,7 @@
 
 ## 当前定位
 
-目标 Rust 仓库默认应优先查找 `Reader-Core-Rust`。当前本机扫描未发现该目录，实际
-Rust 目标仓库定位为：
+目标 Rust 仓库统一使用 `Reader-Core-Native`。当前可操作路径为：
 
 ```text
 /Users/minliny/Documents/Reader-Core-Native
@@ -66,7 +65,7 @@ git -C <repo> log -5 --oneline
 - iOS：`Reader for iOS`
 - Android：`Reader for Android`
 - HarmonyOS：`Reader for HarmonyOS`
-- Rust 目标仓库：优先 `Reader-Core-Rust`，当前本机为 `Reader-Core-Native`
+- Rust 目标仓库：`Reader-Core-Native`
 
 ## 目录
 

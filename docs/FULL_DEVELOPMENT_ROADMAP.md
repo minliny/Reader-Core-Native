@@ -6,9 +6,8 @@
 
 当前 Rust 目标仓库：`/Users/minliny/Documents/Reader-Core-Native`
 
-说明：目标 Rust 仓库默认名应优先查找 `Reader-Core-Rust`。当前本机未发现该目录，
-因此本轮文档和开发把 `Reader-Core-Native` 作为实际 Rust 目标仓库。后续任何 agent
-都必须先扫描本地工作区再确认目标仓库名称。
+说明：本轮文档和开发统一以 `Reader-Core-Native` 为 Rust 目标仓库。后续任何 agent
+仍必须先扫描本地工作区，确认目标仓库路径、Git 状态和分支后再开始修改。
 
 ## 最终目标
 
@@ -33,7 +32,7 @@
 | iOS 宿主 | `Reader-for-iOS` | `/Users/minliny/Documents/Reader for iOS` | SwiftUI App、Swift wrapper、URLSession/WebView/Keychain/File/TTS 等平台 adapter |
 | Android 宿主 | `Reader-for-Android` | `/Users/minliny/Documents/Reader for Android` | Android App、Kotlin/JNI、OkHttp/WebView/Keystore/Room/系统服务 |
 | HarmonyOS 宿主 | `Reader-for-HarmonyOS` | `/Users/minliny/Documents/Reader for HarmonyOS` | ArkTS/HarmonyOS NEXT、Node-API、平台 adapter、HAP/设备验证 |
-| Rust 目标 Core | `Reader-Core-Rust` | `/Users/minliny/Documents/Reader-Core-Native` | 唯一业务内核、C ABI、跨平台 runtime |
+| Rust 目标 Core | `Reader-Core-Native` | `/Users/minliny/Documents/Reader-Core-Native` | 唯一业务内核、C ABI、跨平台 runtime |
 
 远程 README、历史讨论、旧架构报告只能补充上下文，不能覆盖本地代码。
 

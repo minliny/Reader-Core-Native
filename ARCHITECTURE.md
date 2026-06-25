@@ -2,8 +2,8 @@
 
 最高优先级入口：`docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md`
 
-本文描述当前 Rust 目标仓库的架构。当前本机未发现 `Reader-Core-Rust`，因此实际目标
-仓库为 `Reader-Core-Native`。后续必须先扫描本地工作区确认目标仓库名称。
+本文描述当前 Rust 目标仓库 `Reader-Core-Native` 的架构。后续必须先扫描本地工作区，
+确认目标仓库路径、Git 状态和分支后再开始修改。
 
 ## 架构目标
 

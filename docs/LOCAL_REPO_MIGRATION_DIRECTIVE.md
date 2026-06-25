@@ -45,16 +45,15 @@
 - `Reader-for-Android`
 - `Reader-for-HarmonyOS`
 
-目标 Rust 仓库默认名为：
+目标 Rust 仓库统一使用：
 
-- `Reader-Core-Rust`
+- `Reader-Core-Native`
 
-如果本地目录名称不同，必须先扫描当前工作区定位对应 Git 仓库，不得假设仓库不存在，
+后续仍必须先扫描当前工作区定位对应 Git 仓库和分支状态，不得假设仓库不存在，
 也不得优先依赖远程 GitHub。
 
 当前本机扫描结果：
 
-- 未发现 `Reader-Core-Rust`。
 - 当前可定位的 Rust 目标仓库为 `/Users/minliny/Documents/Reader-Core-Native`。
 - 现有宿主仓库分别为：
   - `/Users/minliny/Documents/Reader-Core`
