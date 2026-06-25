@@ -40,6 +40,7 @@ public final class HostRuntime {
     private final long tickTimeoutMillis;
     private final ConcurrentHashMap<Long, CompletableFuture<CommandResult>> pending =
             new ConcurrentHashMap<>();
+    private volatile java.util.concurrent.Executor dispatchExecutor;
     private long counter;
     private Thread worker;
     private volatile boolean running;
@@ -61,6 +62,18 @@ public final class HostRuntime {
 
     public HostRuntime register(String capability, CapabilityHandler handler) {
         adapter.register(capability, handler);
+        return this;
+    }
+
+    /**
+     * Offload {@code host.request} handler dispatch (and the reply send) to the
+     * given executor so a slow capability (e.g. a real HTTP fetch) does not
+     * block the single poll thread. When unset (the default), dispatch runs
+     * synchronously on the poll thread. The transport must be thread-safe
+     * ({@link ReaderCoreHostTransport} is).
+     */
+    public HostRuntime dispatchExecutor(java.util.concurrent.Executor executor) {
+        this.dispatchExecutor = executor;
         return this;
     }
 
@@ -174,13 +187,12 @@ public final class HostRuntime {
             } catch (IllegalArgumentException e) {
                 return;
             }
-            HostReply reply = adapter.dispatch(req);
-            // The runtime owns outbound reply requestIds.
-            long replyRequestId;
-            synchronized (this) {
-                replyRequestId = counter++;
+            java.util.concurrent.Executor exec = dispatchExecutor;
+            if (exec == null) {
+                dispatchAndReply(req);
+            } else {
+                exec.execute(() -> dispatchAndReply(req));
             }
-            transport.sendCommand(HostReplyCodec.encode(replyRequestId, reply, req.operationId()));
         } else if ("result".equals(type) || "error".equals(type)) {
             Object idVal = m.get("requestId");
             if (idVal instanceof Number) {
@@ -198,6 +210,28 @@ public final class HostRuntime {
                     }
                 }
             }
+        }
+    }
+
+    private void dispatchAndReply(HostRequest req) {
+        HostReply reply;
+        try {
+            reply = adapter.dispatch(req);
+        } catch (RuntimeException e) {
+            // Handler blew up synchronously; report a retryable internal error
+            // so Core is not left waiting on this operationId.
+            reply = HostReply.error("INTERNAL",
+                    "host handler threw: " + e.getMessage(), true);
+        }
+        long replyRequestId;
+        synchronized (this) {
+            replyRequestId = counter++;
+        }
+        try {
+            transport.sendCommand(HostReplyCodec.encode(replyRequestId, reply, req.operationId()));
+        } catch (RuntimeException e) {
+            // Best-effort: a transport failure here can't be surfaced to Core;
+            // the poll thread keeps running for subsequent events.
         }
     }
 }

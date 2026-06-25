@@ -40,7 +40,7 @@ HostRequest.parse  -->  HostAdapter.dispatch(capability)  -->  CapabilityHandler
 
 | 类 | 职责 |
 | --- | --- |
-| `HostRuntime` | 统一并发 facade：单一 poll 线程路由 `host.request`→adapter、`result`/`error`→`sendAndAwait` future。 |
+| `HostRuntime` | 统一并发 facade：单一 poll 线程路由 `host.request`→adapter、`result`/`error`→`sendAndAwait` future；`dispatchExecutor` 可卸载慢 handler。 |
 | `HostBus` | host app 一站式接入点：`over(transport).register(...).start()/stop()`，含 daemon 轮询线程与同步 `tick`/`drain`。 |
 | `HostCommander` | host 发起命令的协议入口：`sendAndAwait(method, params, timeout)` 按 `requestId` 关联 `result`/`error` event。 |
 | `CommandResult` | 命令结果：success（data JSON）/ error（error JSON）/ timeout。 |
@@ -109,6 +109,9 @@ JAVA_HOME=<jdk17> gradle --offline test # 依赖已缓存，可离线复跑
   （http.execute + host.smoke.echo + credential.resolve），脚本化混合事件序列
   （两个 host.request + 一个命令 result）经单一 poll 线程处理，断言各自 host.complete
   形状，证明整 adapter 组合工作。
+- `HostRuntimeExecutorTest` 验证 `dispatchExecutor` 卸载：慢 capability handler 不阻塞
+  poll 线程对并发命令 result 的关联（sendAndAwait 在慢 handler 完成前返回）；无 executor
+  时同步 dispatch 仍工作。
 
 这是本 lane 每轮提交的可验证 contract evidence（Gradle `test` task，纯 JVM，无需
 NDK/设备）。模块通过 `sourceSets` 编译引用现有 Java JNI wrapper（`ReaderCoreRuntime`
