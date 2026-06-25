@@ -1,0 +1,23 @@
+{
+  "platform": "android",
+  "device": "Pixel 8",
+  "runtimeVersion": "1.2.3-android.4",
+  "timestamp": 1719300012,
+  "corpusId": "bs-001",
+  "result": {
+    "total": "2",
+    "books": [
+      {
+        "title": "Solo Leveling",
+        "author": "Chugong",
+        "url": "https://example.test/book/1/android"
+      },
+      {
+        "title": "Omniscient Reader's Viewpoint",
+        "author": "Sing-Shong",
+        "url": "https://example.test/book/2"
+      }
+    ],
+    "debug": "ok"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "platform": "ios",
+  "device": "iPhone 15 Pro",
+  "runtimeVersion": "1.2.3",
+  "timestamp": 1719300000,
+  "corpusId": "bs-001",
+  "result": {
+    "total": 2,
+    "books": [
+      {
+        "title": "Solo Leveling",
+        "author": "Chugong",
+        "url": "https://example.test/book/1"
+      },
+      {
+        "title": "Omniscient Reader's Viewpoint",
+        "author": "Sing-Shong",
+        "url": "https://example.test/book/2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "platform": "harmony",
+  "device": "Mate 60 Pro",
+  "runtimeVersion": "1.2.3-harmony.2",
+  "timestamp": 1719300025,
+  "corpusId": "bs-001",
+  "result": {
+    "total": 2,
+    "books": [
+      {
+        "title": "Solo Levelling",
+        "author": "Chugong",
+        "url": "https://example.test/book/1"
+      },
+      {
+        "title": "Omniscient Reader's Viewpoint",
+        "url": "https://example.test/book/2"
+      }
+    ]
+  }
+}
