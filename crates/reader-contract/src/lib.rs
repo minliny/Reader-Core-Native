@@ -514,6 +514,17 @@ mod tests {
         assert_eq!(state["const"], serde_json::json!("pending"));
     }
 
+    #[test]
+    fn event_schema_requires_pending_host_operation_positive_ids() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+        let properties = &schema["$defs"]["PendingHostOperationStatus"]["properties"];
+
+        assert_eq!(properties["operationId"]["minimum"], serde_json::json!(1));
+        assert_eq!(properties["requestId"]["minimum"], serde_json::json!(1));
+    }
+
     fn strings_at<'a>(value: &'a Value, key: &str) -> Vec<&'a str> {
         value[key]
             .as_array()

@@ -1023,6 +1023,35 @@ pub(crate) fn run_conformance() -> ConformanceReport {
 
     record(
         &mut report,
+        "pending-host-operation-rejects-zero-ids",
+        || {
+            for operation in [
+                json!({
+                    "operationId": 0,
+                    "requestId": 301,
+                    "capability": "host.smoke.echo",
+                    "state": "pending"
+                }),
+                json!({
+                    "operationId": 1,
+                    "requestId": 0,
+                    "capability": "host.smoke.echo",
+                    "state": "pending"
+                }),
+            ] {
+                let err = serde_json::from_value::<PendingHostOperationStatus>(operation)
+                    .err()
+                    .ok_or_else(|| "expected pending host operation id rejection".to_string())?;
+                if !err.to_string().contains("ids") {
+                    return Err(format!("unexpected pending operation id error: {err}"));
+                }
+            }
+            Ok(())
+        },
+    );
+
+    record(
+        &mut report,
         "runtime-shutdown-stops-future-commands",
         || {
             let (runtime, rx) = send_to_fresh_runtime(VALID_RUNTIME_SHUTDOWN)?;

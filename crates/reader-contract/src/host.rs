@@ -54,6 +54,20 @@ where
     }
 }
 
+fn deserialize_positive_pending_host_operation_id<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = u64::deserialize(deserializer)?;
+    if value > 0 {
+        Ok(value)
+    } else {
+        Err(de::Error::custom(
+            "runtime.status pending host operation ids must be greater than 0",
+        ))
+    }
+}
+
 /// Parameters for `runtime.hostSmoke`, a local driver method that exercises the
 /// host bus without involving reader business modules.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -130,7 +144,9 @@ pub struct RuntimeShutdownParams {}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PendingHostOperationStatus {
+    #[serde(deserialize_with = "deserialize_positive_pending_host_operation_id")]
     pub operation_id: u64,
+    #[serde(deserialize_with = "deserialize_positive_pending_host_operation_id")]
     pub request_id: u64,
     pub capability: String,
     #[serde(deserialize_with = "deserialize_pending_host_operation_state")]
@@ -430,5 +446,35 @@ mod tests {
             err.to_string().contains("state"),
             "unexpected pending operation state error: {err}"
         );
+    }
+
+    #[test]
+    fn pending_host_operation_status_requires_positive_ids() {
+        for (field, json) in [
+            (
+                "operationId",
+                serde_json::json!({
+                    "operationId": 0,
+                    "requestId": 301,
+                    "capability": "host.smoke.echo",
+                    "state": "pending"
+                }),
+            ),
+            (
+                "requestId",
+                serde_json::json!({
+                    "operationId": 1,
+                    "requestId": 0,
+                    "capability": "host.smoke.echo",
+                    "state": "pending"
+                }),
+            ),
+        ] {
+            let err = serde_json::from_value::<PendingHostOperationStatus>(json).unwrap_err();
+            assert!(
+                err.to_string().contains(field) || err.to_string().contains("ids"),
+                "unexpected pending operation id error for {field}: {err}"
+            );
+        }
     }
 }
