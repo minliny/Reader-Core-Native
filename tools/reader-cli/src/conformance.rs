@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use reader_contract::{
     methods, Command, CoreError, ErrorCode, Event, PendingHostOperationStatus, RuntimeConfig,
+    RuntimeShutdownData,
 };
 use reader_runtime::{EventSink, Runtime};
 use serde_json::{json, Value};
@@ -1079,18 +1080,57 @@ pub(crate) fn run_conformance() -> ConformanceReport {
 
     record(
         &mut report,
+        "runtime-shutdown-data-rejects-invalid-result-shape",
+        || {
+            for (label, data, expected) in [
+                (
+                    "shuttingDown",
+                    json!({
+                        "shuttingDown": false,
+                        "cancelledRequestIds": []
+                    }),
+                    "shuttingDown",
+                ),
+                (
+                    "cancelledRequestIds",
+                    json!({
+                        "shuttingDown": true,
+                        "cancelledRequestIds": [0]
+                    }),
+                    "cancelledRequestIds",
+                ),
+            ] {
+                let err = serde_json::from_value::<RuntimeShutdownData>(data)
+                    .err()
+                    .ok_or_else(|| {
+                        format!("expected runtime.shutdown data rejection for {label}")
+                    })?;
+                if !err.to_string().contains(expected) {
+                    return Err(format!(
+                        "unexpected runtime.shutdown data error for {label}: {err}"
+                    ));
+                }
+            }
+            Ok(())
+        },
+    );
+
+    record(
+        &mut report,
         "runtime-shutdown-stops-future-commands",
         || {
             let (runtime, rx) = send_to_fresh_runtime(VALID_RUNTIME_SHUTDOWN)?;
             match recv_event(&rx)? {
                 Event::Result {
                     request_id, data, ..
-                } if request_id == 330
-                    && data["shuttingDown"] == true
-                    && data["cancelledRequestIds"]
-                        .as_array()
-                        .is_some_and(Vec::is_empty) =>
-                {
+                } if request_id == 330 => {
+                    let data =
+                        serde_json::from_value::<RuntimeShutdownData>(data).map_err(|err| {
+                            format!("runtime.shutdown data contract parse failed: {err}")
+                        })?;
+                    if !data.shutting_down || !data.cancelled_request_ids.is_empty() {
+                        return Err(format!("unexpected runtime.shutdown data {data:?}"));
+                    }
                     let err = runtime
                         .send(Command::new(332, methods::RUNTIME_PING, json!({})))
                         .err()
@@ -1124,11 +1164,16 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             match recv_event(&rx)? {
                 Event::Result {
                     request_id, data, ..
-                } if request_id == 330
-                    && data["shuttingDown"] == true
-                    && data["cancelledRequestIds"] == json!([301]) =>
-                {
-                    Ok(())
+                } if request_id == 330 => {
+                    let data =
+                        serde_json::from_value::<RuntimeShutdownData>(data).map_err(|err| {
+                            format!("runtime.shutdown data contract parse failed: {err}")
+                        })?;
+                    if data.shutting_down && data.cancelled_request_ids == vec![301] {
+                        Ok(())
+                    } else {
+                        Err(format!("unexpected runtime.shutdown data {data:?}"))
+                    }
                 }
                 other => Err(format!("expected runtime.shutdown result, got {other:?}")),
             }

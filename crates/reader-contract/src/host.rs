@@ -84,6 +84,36 @@ where
     }
 }
 
+fn deserialize_runtime_shutdown_shutting_down<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = bool::deserialize(deserializer)?;
+    if value {
+        Ok(value)
+    } else {
+        Err(de::Error::custom(
+            "runtime.shutdown shuttingDown must be true",
+        ))
+    }
+}
+
+fn deserialize_positive_runtime_shutdown_cancelled_request_ids<'de, D>(
+    deserializer: D,
+) -> Result<Vec<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let values = Vec::<u64>::deserialize(deserializer)?;
+    if values.iter().all(|request_id| *request_id > 0) {
+        Ok(values)
+    } else {
+        Err(de::Error::custom(
+            "runtime.shutdown cancelledRequestIds items must be greater than 0",
+        ))
+    }
+}
+
 /// Parameters for `runtime.hostSmoke`, a local driver method that exercises the
 /// host bus without involving reader business modules.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -155,6 +185,16 @@ pub struct RuntimeStatusParams {}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeShutdownParams {}
+
+/// Result data for `runtime.shutdown`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeShutdownData {
+    #[serde(deserialize_with = "deserialize_runtime_shutdown_shutting_down")]
+    pub shutting_down: bool,
+    #[serde(deserialize_with = "deserialize_positive_runtime_shutdown_cancelled_request_ids")]
+    pub cancelled_request_ids: Vec<u64>,
+}
 
 /// One pending host operation reported by `runtime.status`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -439,6 +479,42 @@ mod tests {
         .unwrap();
         let err = serde_json::from_value::<RuntimeShutdownParams>(command.params).unwrap_err();
         assert!(err.to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn runtime_shutdown_data_requires_true_shutdown_and_positive_cancelled_ids() {
+        for cancelled_request_ids in [serde_json::json!([]), serde_json::json!([301])] {
+            let data: RuntimeShutdownData = serde_json::from_value(serde_json::json!({
+                "shuttingDown": true,
+                "cancelledRequestIds": cancelled_request_ids
+            }))
+            .unwrap();
+            assert!(data.shutting_down);
+            assert!(data
+                .cancelled_request_ids
+                .iter()
+                .all(|request_id| *request_id > 0));
+        }
+
+        let err = serde_json::from_value::<RuntimeShutdownData>(serde_json::json!({
+            "shuttingDown": false,
+            "cancelledRequestIds": []
+        }))
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("shuttingDown"),
+            "unexpected runtime.shutdown shuttingDown error: {err}"
+        );
+
+        let err = serde_json::from_value::<RuntimeShutdownData>(serde_json::json!({
+            "shuttingDown": true,
+            "cancelledRequestIds": [0]
+        }))
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("cancelledRequestIds"),
+            "unexpected runtime.shutdown cancelledRequestIds error: {err}"
+        );
     }
 
     #[test]

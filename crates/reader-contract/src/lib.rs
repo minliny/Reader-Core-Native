@@ -22,7 +22,8 @@ pub use error::{CoreError, ErrorCode};
 pub use event::Event;
 pub use host::{
     HostCompleteParams, HostErrorParams, HostSmokeParams, PendingHostOperationStatus,
-    RuntimeCancelParams, RuntimeShutdownParams, RuntimeStatus, RuntimeStatusParams,
+    RuntimeCancelParams, RuntimeShutdownData, RuntimeShutdownParams, RuntimeStatus,
+    RuntimeStatusParams,
 };
 pub use remote::{
     BookDetailParams, BookSearchParams, BookTocParams, ChapterContentParams, HostHttpRequest,
@@ -535,6 +536,20 @@ mod tests {
         assert_eq!(
             capability["pattern"],
             serde_json::json!("^[^\\s.]+(\\.[^\\s.]+)+$")
+        );
+    }
+
+    #[test]
+    fn event_schema_requires_runtime_shutdown_data_contract_bounds() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+        let properties = &schema["$defs"]["RuntimeShutdownData"]["properties"];
+
+        assert_eq!(properties["shuttingDown"]["const"], serde_json::json!(true));
+        assert_eq!(
+            properties["cancelledRequestIds"]["items"]["minimum"],
+            serde_json::json!(1)
         );
     }
 
