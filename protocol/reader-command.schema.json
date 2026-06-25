@@ -147,6 +147,17 @@
           "params": { "$ref": "#/$defs/HostErrorParams" }
         }
       }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "source.import" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/SourceImportParams" }
+        }
+      }
     }
   ],
   "$defs": {
@@ -236,6 +247,34 @@
       "type": "object",
       "additionalProperties": false,
       "description": "Parameters for runtime.shutdown. Must be an empty object."
+    },
+    "SourceImportParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "description": "Parameters for source.import. Imports one remote-reading source definition into Core runtime state.",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "default": "",
+          "description": "Stable source identifier. If omitted or blank, Core assigns one."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable source name. Runtime validation rejects blank or whitespace-only names."
+        },
+        "baseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Optional source base URL."
+        },
+        "rules": {
+          "type": ["object", "null"],
+          "default": null,
+          "description": "Optional extraction rules object keyed by remote-reading stage."
+        }
+      }
     }
   }
 }

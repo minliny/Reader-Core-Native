@@ -200,6 +200,19 @@ mod tests {
     }
 
     #[test]
+    fn command_schema_binds_source_import_to_param_def() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+
+        assert_eq!(
+            params_ref_for_method(&schema, methods::SOURCE_IMPORT),
+            Some("#/$defs/SourceImportParams"),
+            "source.import must use SourceImportParams in command schema"
+        );
+    }
+
+    #[test]
     fn event_schema_error_codes_match_error_code_enum() {
         let schema: Value =
             serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))

@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "requestId": 401,
+  "method": "source.import",
+  "params": {
+    "sourceId": "conformance-source",
+    "name": "Conformance Source",
+    "baseUrl": "https://books.example.test",
+    "rules": {}
+  }
+}
