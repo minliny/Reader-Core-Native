@@ -1,0 +1,11 @@
+{
+  "lastChapter": "https://demo.test/c99",
+  "updated_at": "2024-12-31T23:59:59Z",
+  "wordCount": 12345,
+  "category": "Fiction",
+  "intro": "Line1\nLine2\nLine3",
+  "coverUrl": "https://demo.test/cover.jpg",
+  "author": "Author X",
+  "name": "Demo & Co",
+  "type": "detail"
+}

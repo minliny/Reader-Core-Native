@@ -1,0 +1,9 @@
+{
+  "url": "https://demo.test/book/ch1",
+  "type": "chapter",
+  "timestamp": 1700000099,
+  "request_id": "req-bbbb-2222",
+  "wordCount": 7,
+  "title": "Chapter 1",
+  "content": "It was & always will be.\n\nThe quick brown fox jumps."
+}

@@ -1,0 +1,9 @@
+{
+  "updated_at": "2024-06-15T12:30:00Z",
+  "bookName": "Demo Book",
+  "type": "toc",
+  "chapters": [
+    {"url": "https://demo.test/c1", "name": "Ch 1"},
+    {"url": "https://demo.test/c2", "name": "Ch 2"}
+  ]
+}
