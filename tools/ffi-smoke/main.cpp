@@ -738,6 +738,20 @@ int main() {
     std::cerr << "unknown field host.error error: " << event << '\n';
     return fail("unknown field host.error error shape");
   }
+  std::string details_not_object_error =
+      R"({"protocolVersion":1,"requestId":423,"method":"host.error","params":{"operationId":1,"error":{"code":"INTERNAL","message":"host failed","retryable":true,"details":["not","an","object"]}}})";
+  if (send_str(rt, details_not_object_error) != RC_SEND_OK) {
+    return fail("non-object details host.error send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":423") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "details")) {
+    std::cerr << "non-object details host.error error: " << event << '\n';
+    return fail("non-object details host.error error shape");
+  }
   if (!last_error_clears_message_when_ok()) {
     return fail("host.error invalid params left synchronous last_error");
   }

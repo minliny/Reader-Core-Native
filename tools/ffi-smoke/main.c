@@ -932,6 +932,25 @@ int main(void) {
     fprintf(stderr, "unknown field host.error error: %s\n", event);
     return fail("unknown field host.error error shape");
   }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":423,\"method\":\"host."
+               "error\",\"params\":{\"operationId\":1,\"error\":{\"code\":"
+               "\"INTERNAL\",\"message\":\"host failed\",\"retryable\":true,"
+               "\"details\":[\"not\",\"an\",\"object\"]}}}") != RC_SEND_OK) {
+    return fail("non-object details host.error send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for non-object details host.error");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":423") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "details")) {
+    fprintf(stderr, "non-object details host.error error: %s\n", event);
+    return fail("non-object details host.error error shape");
+  }
   strcpy(msg, "stale");
   if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
     return fail("host.error invalid params left synchronous last_error");

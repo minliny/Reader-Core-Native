@@ -426,6 +426,16 @@ mod tests {
         assert_eq!(schema_codes, rust_codes);
     }
 
+    #[test]
+    fn event_schema_requires_core_error_details_object() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+        let details = &schema["$defs"]["CoreError"]["properties"]["details"];
+
+        assert_eq!(details["type"], serde_json::json!("object"));
+    }
+
     fn strings_at<'a>(value: &'a Value, key: &str) -> Vec<&'a str> {
         value[key]
             .as_array()
