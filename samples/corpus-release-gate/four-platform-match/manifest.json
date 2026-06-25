@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "runId": "fixture-four-platform-match",
+  "scenario": "four-platform-search",
+  "input": "input.json",
+  "canonical": "canonical-result.json",
+  "candidates": {
+    "cli": "candidates/cli-result.json",
+    "ios": "candidates/ios-result.json",
+    "android": "candidates/android-result.json",
+    "harmony": "candidates/harmony-result.json"
+  },
+  "expected": {
+    "match": true,
+    "total": 0
+  }
+}

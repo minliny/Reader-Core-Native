@@ -27,6 +27,26 @@ def _write(tmpdir, name, obj):
     return path
 
 
+FOUR_PLATFORM_CANDIDATES = ("cli", "ios", "android", "harmony")
+
+
+def _fixture_dir(name):
+    return os.path.join(_ROOT, "samples", "corpus-release-gate", name)
+
+
+def _fixture_diff_inputs(name):
+    fixture = _fixture_dir(name)
+    canonical = os.path.join(fixture, "canonical-result.json")
+    candidates = [
+        (
+            platform,
+            os.path.join(fixture, "candidates", "{0}-result.json".format(platform)),
+        )
+        for platform in FOUR_PLATFORM_CANDIDATES
+    ]
+    return canonical, candidates
+
+
 class TestParsing(unittest.TestCase):
     def test_name_colon_path(self):
         name, path = cpd._parse_candidate_spec("ios:results/ios.json")
@@ -148,6 +168,38 @@ class TestBuildDiffResult(unittest.TestCase):
         result = cpd.build_diff_result(canonical, [("c", cand)])
         self.assertEqual(len(result["canonical"]["sha256"]), 64)
         self.assertEqual(len(result["candidates"]["c"]["sha256"]), 64)
+
+    def test_four_platform_fixture_all_candidates_match(self):
+        canonical, candidates = _fixture_diff_inputs("four-platform-match")
+
+        result = cpd.build_diff_result(canonical, candidates)
+
+        self.assertTrue(result["match"])
+        self.assertEqual(result["total"], 0)
+        self.assertEqual(set(result["candidates"].keys()), set(FOUR_PLATFORM_CANDIDATES))
+        self.assertEqual(
+            result["summary"],
+            {
+                platform: {"match": True, "total": 0}
+                for platform in FOUR_PLATFORM_CANDIDATES
+            },
+        )
+
+    def test_four_platform_fixture_minimal_mismatch(self):
+        canonical, candidates = _fixture_diff_inputs("four-platform-mismatch")
+
+        result = cpd.build_diff_result(canonical, candidates)
+
+        self.assertFalse(result["match"])
+        self.assertEqual(result["total"], 1)
+        for platform in ("cli", "ios", "harmony"):
+            self.assertTrue(result["candidates"][platform]["match"])
+            self.assertEqual(result["candidates"][platform]["total"], 0)
+        android = result["candidates"]["android"]
+        self.assertFalse(android["match"])
+        self.assertEqual(android["total"], 1)
+        self.assertEqual(android["differences"][0]["path"], "results[1].name")
+        self.assertEqual(android["differences"][0]["kind"], "value-mismatch")
 
 
 class TestCLI(unittest.TestCase):
