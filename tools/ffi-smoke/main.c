@@ -14,7 +14,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define MAX_EVENTS 40
+#define MAX_EVENTS 80
 #define EVENT_BUF 8192
 #define MSG_BUF 256
 
@@ -562,6 +562,33 @@ int main(void) {
       !contains(event, "\"echoed\":true")) {
     fprintf(stderr, "result(60): %s\n", event);
     return fail("host.complete result shape");
+  }
+  snprintf(complete, sizeof complete,
+           "{\"protocolVersion\":1,\"requestId\":78,\"method\":\"host."
+           "complete\",\"params\":{\"operationId\":%llu,\"result\":{\"echoed\":"
+           "true}}}",
+           (unsigned long long)op60);
+  if (send_str(rt, complete) != RC_SEND_OK) {
+    return fail("duplicate host.complete(60) send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for duplicate host.complete");
+  }
+  ev++;
+  char completed_op60[64];
+  snprintf(completed_op60, sizeof completed_op60, "\"operationId\":%llu",
+           (unsigned long long)op60);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":78") ||
+      !contains(event, "\"code\":\"INVALID_PARAMS\"") ||
+      !contains(event, completed_op60)) {
+    fprintf(stderr, "duplicate host.complete error: %s\n", event);
+    return fail("duplicate host.complete error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("duplicate host.complete left synchronous last_error");
   }
 
   // --- invalid runtime.hostSmoke params return async protocol errors ----

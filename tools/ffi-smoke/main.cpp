@@ -44,7 +44,7 @@ static_assert(RC_ERR_INTERNAL == 6, "RC_ERR_INTERNAL changed");
 
 namespace {
 
-constexpr size_t kMaxEvents = 40;
+constexpr size_t kMaxEvents = 80;
 
 struct Channel {
   std::mutex mutex;
@@ -439,6 +439,26 @@ int main() {
       !contains(event, "\"echoed\":true")) {
     std::cerr << "result(20): " << event << '\n';
     return fail("host.complete result shape");
+  }
+  std::string duplicate_complete =
+      R"({"protocolVersion":1,"requestId":38,"method":"host.complete","params":{"operationId":)" +
+      std::to_string(op) + R"(,"result":{"echoed":true}}})";
+  if (send_str(rt, duplicate_complete) != RC_SEND_OK) {
+    return fail("duplicate host.complete(20) send failed");
+  }
+  event = wait_event(ch, ev++);
+  const std::string completed_op_field =
+      "\"operationId\":" + std::to_string(op);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":38") ||
+      !contains(event, "\"code\":\"INVALID_PARAMS\"") ||
+      !contains(event, completed_op_field.c_str())) {
+    std::cerr << "duplicate host.complete error: " << event << '\n';
+    return fail("duplicate host.complete error shape");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("duplicate host.complete left synchronous last_error");
   }
 
   // --- invalid runtime.hostSmoke params return async protocol errors ----

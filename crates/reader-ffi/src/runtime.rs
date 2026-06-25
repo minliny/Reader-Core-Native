@@ -665,6 +665,79 @@ mod tests {
     }
 
     #[test]
+    fn repeated_host_completion_reports_async_error_via_c_abi() {
+        let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
+        let handle = make_runtime(&events);
+
+        let smoke = br#"{"protocolVersion":1,"requestId":120,"method":"runtime.hostSmoke","params":{"capability":"host.smoke.echo","params":{"hello":"world"}}}"#;
+        assert_eq!(unsafe { send(handle, smoke.as_ptr(), smoke.len()) }, 0);
+        assert_eq!(last_error_code(), 0);
+
+        let evs = wait_events(&events, 1);
+        let req: serde_json::Value = serde_json::from_slice(&evs[0]).unwrap();
+        assert_eq!(req["type"], "host.request");
+        assert_eq!(req["protocolVersion"], 1);
+        assert_eq!(req["requestId"], 120);
+        assert_eq!(req["capability"], "host.smoke.echo");
+        let operation_id = req["operationId"].as_u64().unwrap();
+
+        let complete = serde_json::json!({
+            "protocolVersion": 1,
+            "requestId": 121,
+            "method": "host.complete",
+            "params": {
+                "operationId": operation_id,
+                "result": { "echoed": true }
+            }
+        })
+        .to_string();
+        assert_eq!(
+            unsafe { send(handle, complete.as_ptr(), complete.len()) },
+            0
+        );
+        assert_eq!(last_error_code(), 0);
+
+        let evs = wait_events(&events, 2);
+        let res: serde_json::Value = serde_json::from_slice(&evs[1]).unwrap();
+        assert_eq!(res["type"], "result");
+        assert_eq!(res["protocolVersion"], 1);
+        assert_eq!(res["requestId"], 120);
+        assert_eq!(res["data"]["echoed"], true);
+
+        let duplicate_complete = serde_json::json!({
+            "protocolVersion": 1,
+            "requestId": 122,
+            "method": "host.complete",
+            "params": {
+                "operationId": operation_id,
+                "result": { "echoed": true }
+            }
+        })
+        .to_string();
+        assert_eq!(
+            unsafe {
+                send(
+                    handle,
+                    duplicate_complete.as_ptr(),
+                    duplicate_complete.len(),
+                )
+            },
+            0
+        );
+        assert_eq!(last_error_code(), 0);
+
+        let evs = wait_events(&events, 3);
+        let err: serde_json::Value = serde_json::from_slice(&evs[2]).unwrap();
+        assert_eq!(err["type"], "error");
+        assert_eq!(err["protocolVersion"], 1);
+        assert_eq!(err["requestId"], 122);
+        assert_eq!(err["error"]["code"], "INVALID_PARAMS");
+        assert_eq!(err["error"]["details"]["operationId"], operation_id);
+
+        assert_eq!(unsafe { destroy(handle) }, 0);
+    }
+
+    #[test]
     fn invalid_host_request_params_report_async_errors_via_c_abi() {
         let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
         let handle = make_runtime(&events);
