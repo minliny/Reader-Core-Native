@@ -662,6 +662,72 @@ mod tests {
     }
 
     #[test]
+    fn runtime_cancel_command_reports_false_and_invalid_params_via_c_abi() {
+        let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
+        let handle = make_runtime(&events);
+
+        let unknown_target =
+            br#"{"protocolVersion":1,"requestId":313,"method":"runtime.cancel","params":{"requestId":999999}}"#;
+        assert_eq!(
+            unsafe { send(handle, unknown_target.as_ptr(), unknown_target.len()) },
+            0
+        );
+        assert_eq!(last_error_code(), 0);
+
+        let evs = wait_events(&events, 1);
+        let result: serde_json::Value = serde_json::from_slice(&evs[0]).unwrap();
+        assert_eq!(result["type"], "result");
+        assert_eq!(result["protocolVersion"], 1);
+        assert_eq!(result["requestId"], 313);
+        assert_eq!(result["data"]["cancelled"], false);
+
+        let zero_target = include_bytes!(
+            "../../../protocol/fixtures/conformance/commands/invalid-runtime-cancel-target-zero.json"
+        );
+        assert_eq!(
+            unsafe { send(handle, zero_target.as_ptr(), zero_target.len()) },
+            0
+        );
+        assert_eq!(last_error_code(), 0);
+
+        let evs = wait_events(&events, 2);
+        let err: serde_json::Value = serde_json::from_slice(&evs[1]).unwrap();
+        assert_eq!(err["type"], "error");
+        assert_eq!(err["protocolVersion"], 1);
+        assert_eq!(err["requestId"], 311);
+        assert_eq!(err["error"]["code"], "INVALID_PARAMS");
+        assert_eq!(err["error"]["details"]["requestId"], 0);
+
+        let unknown_field = include_bytes!(
+            "../../../protocol/fixtures/conformance/commands/invalid-runtime-cancel-unknown-field.json"
+        );
+        assert_eq!(
+            unsafe { send(handle, unknown_field.as_ptr(), unknown_field.len()) },
+            0
+        );
+        assert_eq!(last_error_code(), 0);
+
+        let evs = wait_events(&events, 3);
+        let err: serde_json::Value = serde_json::from_slice(&evs[2]).unwrap();
+        assert_eq!(err["type"], "error");
+        assert_eq!(err["protocolVersion"], 1);
+        assert_eq!(err["requestId"], 312);
+        assert_eq!(err["error"]["code"], "INVALID_PARAMS");
+        assert_eq!(
+            err["error"]["details"]["method"],
+            reader_contract::methods::RUNTIME_CANCEL
+        );
+        assert!(
+            err["error"]["details"]["source"]
+                .as_str()
+                .is_some_and(|source| source.contains("unknown field")),
+            "unexpected error event: {err}"
+        );
+
+        assert_eq!(unsafe { destroy(handle) }, 0);
+    }
+
+    #[test]
     fn host_error_routes_error_to_original_request_via_c_abi() {
         let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
         let handle = make_runtime(&events);

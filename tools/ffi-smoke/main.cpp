@@ -588,6 +588,56 @@ int main() {
     return fail("runtime.cancel left synchronous last_error");
   }
 
+  // --- runtime.cancel command false/invalid params ----------------------
+  if (send_str(
+          rt,
+          R"({"protocolVersion":1,"requestId":313,"method":"runtime.cancel","params":{"requestId":999999}})") !=
+      RC_SEND_OK) {
+    return fail("runtime.cancel unknown target send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":313") ||
+      !contains(event, "\"cancelled\":false")) {
+    std::cerr << "runtime.cancel false result: " << event << '\n';
+    return fail("runtime.cancel false result shape");
+  }
+  if (send_str(
+          rt,
+          R"({"protocolVersion":1,"requestId":311,"method":"runtime.cancel","params":{"requestId":0}})") !=
+      RC_SEND_OK) {
+    return fail("runtime.cancel zero target send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":311") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "\"requestId\":0")) {
+    std::cerr << "runtime.cancel zero target error: " << event << '\n';
+    return fail("runtime.cancel zero target error shape");
+  }
+  if (send_str(
+          rt,
+          R"({"protocolVersion":1,"requestId":312,"method":"runtime.cancel","params":{"requestId":301,"reason":"host-request-timeout"}})") !=
+      RC_SEND_OK) {
+    return fail("runtime.cancel unknown field send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":312") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "runtime.cancel") ||
+      !contains(event, "unknown field")) {
+    std::cerr << "runtime.cancel unknown field error: " << event << '\n';
+    return fail("runtime.cancel unknown field error shape");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("runtime.cancel invalid params left synchronous last_error");
+  }
+
   // --- invalid runtime.shutdown params do not stop runtime --------------
   std::string invalid_shutdown =
       R"({"protocolVersion":1,"requestId":33,"method":"runtime.shutdown","params":{"force":true}})";
