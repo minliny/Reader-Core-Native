@@ -6,7 +6,7 @@
 //! that Core emits as `capability: "http.execute"` (see
 //! `protocol/compatibility.md`).
 
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 use crate::CoreError;
@@ -17,6 +17,23 @@ fn empty_string() -> String {
 
 fn default_http_method() -> String {
     "GET".to_string()
+}
+
+fn deserialize_chapter_progress<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = f64::deserialize(deserializer)?;
+    validate_chapter_progress_scalar(value).map_err(de::Error::custom)?;
+    Ok(value)
+}
+
+fn validate_chapter_progress_scalar(value: f64) -> Result<(), &'static str> {
+    if (0.0..=1.0).contains(&value) {
+        Ok(())
+    } else {
+        Err("chapterProgress must be between 0 and 1")
+    }
 }
 
 /// Host HTTP request description emitted as `capability: "http.execute"`.
@@ -173,8 +190,19 @@ pub struct ReadingProgressUpdateParams {
     pub chapter_index: u32,
     #[serde(default)]
     pub chapter_offset: u64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_chapter_progress")]
     pub chapter_progress: f64,
+}
+
+impl ReadingProgressUpdateParams {
+    pub fn validate(&self) -> Result<(), CoreError> {
+        validate_chapter_progress_scalar(self.chapter_progress).map_err(|message| {
+            CoreError::invalid_params(message).with_details(serde_json::json!({
+                "field": "chapterProgress",
+                "chapterProgress": self.chapter_progress,
+            }))
+        })
+    }
 }
 
 /// Helper: parse a typed params object from a `Command`'s free-form params,
@@ -476,6 +504,31 @@ mod tests {
             err.details["source"]
                 .as_str()
                 .is_some_and(|source| source.contains("unknown field")),
+            "unexpected source detail: {}",
+            err.details["source"]
+        );
+
+        let command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/invalid-reading-progress-update-progress-out-of-range.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let err = parse_params::<ReadingProgressUpdateParams>(
+            crate::methods::READING_PROGRESS_UPDATE,
+            &command.params,
+        )
+        .unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert_eq!(
+            err.details["method"],
+            crate::methods::READING_PROGRESS_UPDATE
+        );
+        assert!(
+            err.details["source"]
+                .as_str()
+                .is_some_and(|source| source.contains("chapterProgress")),
             "unexpected source detail: {}",
             err.details["source"]
         );

@@ -50,6 +50,9 @@ const INVALID_CHAPTER_CONTENT_UNKNOWN_FIELD: &str = include_str!(
 const INVALID_READING_PROGRESS_UPDATE_UNKNOWN_FIELD: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-reading-progress-update-unknown-field.json"
 );
+const INVALID_READING_PROGRESS_UPDATE_PROGRESS_OUT_OF_RANGE: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-reading-progress-update-progress-out-of-range.json"
+);
 const INVALID_MALFORMED_COMMAND: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/invalid-malformed-json.json");
 const INVALID_UNSUPPORTED_PROTOCOL: &str = include_str!(
@@ -357,6 +360,16 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             let (_runtime, rx) =
                 send_to_fresh_runtime(INVALID_READING_PROGRESS_UPDATE_UNKNOWN_FIELD)?;
             expect_event_error(&rx, 412, ErrorCode::InvalidParams)
+        },
+    );
+
+    record(
+        &mut report,
+        "reading-progress-update-rejects-progress-out-of-range",
+        || {
+            let (_runtime, rx) =
+                send_to_fresh_runtime(INVALID_READING_PROGRESS_UPDATE_PROGRESS_OUT_OF_RANGE)?;
+            expect_event_error(&rx, 413, ErrorCode::InvalidParams)
         },
     );
 

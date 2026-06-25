@@ -525,6 +525,8 @@
         },
         "chapterProgress": {
           "type": "number",
+          "minimum": 0,
+          "maximum": 1,
           "default": 0,
           "description": "Fractional progress reported by the host reader for the current chapter."
         }

@@ -857,6 +857,24 @@ int main() {
   if (!last_error_clears_message_when_ok()) {
     return fail("invalid reading.progress.update send left synchronous last_error");
   }
+  std::string out_of_range_progress =
+      R"({"protocolVersion":1,"requestId":27,"method":"reading.progress.update","params":{"bookId":"1","chapterIndex":2,"chapterOffset":128,"chapterProgress":1.25}})";
+  if (send_str(rt, out_of_range_progress) != RC_SEND_OK) {
+    return fail("reading.progress.update out-of-range progress send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":27") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "chapterProgress")) {
+    std::cerr << "out-of-range reading.progress.update error: " << event
+              << '\n';
+    return fail("out-of-range reading.progress.update error shape");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("out-of-range reading.progress.update left synchronous last_error");
+  }
 
   // --- cancel a pending host.request ------------------------------------
   if (send_str(rt,

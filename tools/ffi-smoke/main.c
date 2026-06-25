@@ -1098,6 +1098,29 @@ int main(void) {
   if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
     return fail("invalid reading.progress.update send left synchronous last_error");
   }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":68,\"method\":\"reading."
+               "progress.update\",\"params\":{\"bookId\":\"1\","
+               "\"chapterIndex\":2,\"chapterOffset\":128,"
+               "\"chapterProgress\":1.25}}") != RC_SEND_OK) {
+    return fail("reading.progress.update out-of-range progress send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for out-of-range reading.progress.update");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":68") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "chapterProgress")) {
+    fprintf(stderr, "out-of-range reading.progress.update error: %s\n", event);
+    return fail("out-of-range reading.progress.update error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("out-of-range reading.progress.update left synchronous last_error");
+  }
 
   // --- unknown method -> async error event ------------------------------
   if (send_str(rt,

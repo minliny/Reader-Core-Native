@@ -278,6 +278,18 @@ mod tests {
     }
 
     #[test]
+    fn command_schema_bounds_reading_progress_update_progress() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+        let progress =
+            &schema["$defs"]["ReadingProgressUpdateParams"]["properties"]["chapterProgress"];
+
+        assert_eq!(progress["minimum"], serde_json::json!(0));
+        assert_eq!(progress["maximum"], serde_json::json!(1));
+    }
+
+    #[test]
     fn event_schema_error_codes_match_error_code_enum() {
         let schema: Value =
             serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
