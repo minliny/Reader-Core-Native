@@ -87,7 +87,7 @@
         "activeRequestCount": { "type": "integer", "minimum": 0 },
         "activeRequestIds": {
           "type": "array",
-          "items": { "type": "integer" }
+          "items": { "type": "integer", "minimum": 1 }
         },
         "pendingHostOperationCount": { "type": "integer", "minimum": 0 },
         "pendingHostOperations": {

@@ -114,6 +114,22 @@ where
     }
 }
 
+fn deserialize_positive_runtime_status_active_request_ids<'de, D>(
+    deserializer: D,
+) -> Result<Vec<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let values = Vec::<u64>::deserialize(deserializer)?;
+    if values.iter().all(|request_id| *request_id > 0) {
+        Ok(values)
+    } else {
+        Err(de::Error::custom(
+            "runtime.status activeRequestIds items must be greater than 0",
+        ))
+    }
+}
+
 /// Parameters for `runtime.hostSmoke`, a local driver method that exercises the
 /// host bus without involving reader business modules.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -215,6 +231,7 @@ pub struct PendingHostOperationStatus {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeStatus {
     pub active_request_count: u64,
+    #[serde(deserialize_with = "deserialize_positive_runtime_status_active_request_ids")]
     pub active_request_ids: Vec<u64>,
     pub pending_host_operation_count: u64,
     pub pending_host_operations: Vec<PendingHostOperationStatus>,
@@ -514,6 +531,32 @@ mod tests {
         assert!(
             err.to_string().contains("cancelledRequestIds"),
             "unexpected runtime.shutdown cancelledRequestIds error: {err}"
+        );
+    }
+
+    #[test]
+    fn runtime_status_requires_positive_active_request_ids() {
+        let status: RuntimeStatus = serde_json::from_value(serde_json::json!({
+            "activeRequestCount": 1,
+            "activeRequestIds": [301],
+            "pendingHostOperationCount": 0,
+            "pendingHostOperations": [],
+            "shuttingDown": false
+        }))
+        .unwrap();
+        assert_eq!(status.active_request_ids, vec![301]);
+
+        let err = serde_json::from_value::<RuntimeStatus>(serde_json::json!({
+            "activeRequestCount": 1,
+            "activeRequestIds": [0],
+            "pendingHostOperationCount": 0,
+            "pendingHostOperations": [],
+            "shuttingDown": false
+        }))
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("activeRequestIds"),
+            "unexpected runtime.status activeRequestIds error: {err}"
         );
     }
 

@@ -527,6 +527,17 @@ mod tests {
     }
 
     #[test]
+    fn event_schema_requires_runtime_status_active_request_ids_positive() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+        let active_request_ids =
+            &schema["$defs"]["RuntimeStatusData"]["properties"]["activeRequestIds"];
+
+        assert_eq!(active_request_ids["items"]["minimum"], serde_json::json!(1));
+    }
+
+    #[test]
     fn event_schema_requires_pending_host_operation_capability_token_path() {
         let schema: Value =
             serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))

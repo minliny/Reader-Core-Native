@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use reader_contract::{
     methods, Command, CoreError, ErrorCode, Event, PendingHostOperationStatus, RuntimeConfig,
-    RuntimeShutdownData,
+    RuntimeShutdownData, RuntimeStatus,
 };
 use reader_runtime::{EventSink, Runtime};
 use serde_json::{json, Value};
@@ -938,18 +938,19 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             match recv_event(&rx)? {
                 Event::Result {
                     request_id, data, ..
-                } if request_id == 320
-                    && data["activeRequestCount"] == 0
-                    && data["activeRequestIds"]
-                        .as_array()
-                        .is_some_and(Vec::is_empty)
-                    && data["pendingHostOperationCount"] == 0
-                    && data["pendingHostOperations"]
-                        .as_array()
-                        .is_some_and(Vec::is_empty)
-                    && data["shuttingDown"] == false =>
-                {
-                    Ok(())
+                } if request_id == 320 => {
+                    let status = serde_json::from_value::<RuntimeStatus>(data)
+                        .map_err(|err| format!("runtime.status contract parse failed: {err}"))?;
+                    if status.active_request_count == 0
+                        && status.active_request_ids.is_empty()
+                        && status.pending_host_operation_count == 0
+                        && status.pending_host_operations.is_empty()
+                        && !status.shutting_down
+                    {
+                        Ok(())
+                    } else {
+                        Err(format!("unexpected empty runtime.status {status:?}"))
+                    }
                 }
                 other => Err(format!("expected empty runtime.status, got {other:?}")),
             }
@@ -973,30 +974,52 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             match recv_event(&rx)? {
                 Event::Result {
                     request_id, data, ..
-                } if request_id == 320
-                    && data["activeRequestCount"] == 1
-                    && data["activeRequestIds"] == json!([301])
-                    && data["pendingHostOperationCount"] == 1 =>
-                {
-                    let operations = data["pendingHostOperations"]
-                        .as_array()
-                        .ok_or_else(|| "pendingHostOperations missing".to_string())?;
-                    let Some(operation) = operations.first() else {
+                } if request_id == 320 => {
+                    let status = serde_json::from_value::<RuntimeStatus>(data)
+                        .map_err(|err| format!("runtime.status contract parse failed: {err}"))?;
+                    if status.active_request_count != 1
+                        || status.active_request_ids != vec![301]
+                        || status.pending_host_operation_count != 1
+                    {
+                        return Err(format!("unexpected pending runtime.status {status:?}"));
+                    }
+                    let Some(operation) = status.pending_host_operations.first() else {
                         return Err("pendingHostOperations empty".to_string());
                     };
-                    if operation["operationId"] != 1
-                        || operation["requestId"] != 301
-                        || operation["capability"] != "host.smoke.echo"
-                        || operation["state"] != "pending"
-                        || operation.get("params").is_some()
+                    if operation.operation_id != 1
+                        || operation.request_id != 301
+                        || operation.capability != "host.smoke.echo"
+                        || operation.state != "pending"
                     {
-                        return Err(format!("unexpected pending operation {operation}"));
+                        return Err(format!("unexpected pending operation {operation:?}"));
                     }
-                    serde_json::from_value::<PendingHostOperationStatus>(operation.clone())
-                        .map_err(|err| format!("pending operation contract parse failed: {err}"))?;
                     Ok(())
                 }
                 other => Err(format!("expected pending runtime.status, got {other:?}")),
+            }
+        },
+    );
+
+    record(
+        &mut report,
+        "runtime-status-data-rejects-zero-active-request-id",
+        || {
+            let err = serde_json::from_value::<RuntimeStatus>(json!({
+                "activeRequestCount": 1,
+                "activeRequestIds": [0],
+                "pendingHostOperationCount": 0,
+                "pendingHostOperations": [],
+                "shuttingDown": false
+            }))
+            .err()
+            .ok_or_else(|| "expected runtime.status activeRequestIds rejection".to_string())?;
+
+            if err.to_string().contains("activeRequestIds") {
+                Ok(())
+            } else {
+                Err(format!(
+                    "unexpected runtime.status activeRequestIds error: {err}"
+                ))
             }
         },
     );
