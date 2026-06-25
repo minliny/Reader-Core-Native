@@ -1110,6 +1110,67 @@ mod tests {
     }
 
     #[test]
+    fn remote_http_invalid_headers_report_async_error_via_c_abi() {
+        let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
+        let handle = make_runtime(&events);
+
+        let search = br#"{"protocolVersion":1,"requestId":440,"method":"book.search","params":{"sourceId":"ffi-http-src","searchRequest":{"url":"https://books.example.test/search?q=invalid-headers"},"source":{"sourceId":"ffi-http-src","name":"FFI HTTP Source","baseUrl":"https://books.example.test","rules":{"search":[{"kind":"jsonPath","path":"$.books[*]"}]}}}}"#;
+        assert_eq!(unsafe { send(handle, search.as_ptr(), search.len()) }, 0);
+        assert_eq!(last_error_code(), 0);
+
+        let evs = wait_events(&events, 1);
+        let req: serde_json::Value = serde_json::from_slice(&evs[0]).unwrap();
+        assert_eq!(req["type"], "host.request");
+        assert_eq!(req["protocolVersion"], 1);
+        assert_eq!(req["requestId"], 440);
+        assert_eq!(req["capability"], "http.execute");
+        assert_eq!(
+            req["params"]["url"],
+            "https://books.example.test/search?q=invalid-headers"
+        );
+        let operation_id = req["operationId"].as_u64().unwrap();
+
+        let complete = serde_json::json!({
+            "protocolVersion": 1,
+            "requestId": 441,
+            "method": "host.complete",
+            "params": {
+                "operationId": operation_id,
+                "result": {
+                    "status": 200,
+                    "headers": ["content-type", "application/json"],
+                    "body": "{\"books\":[]}"
+                }
+            }
+        })
+        .to_string();
+        assert_eq!(
+            unsafe { send(handle, complete.as_ptr(), complete.len()) },
+            0
+        );
+        assert_eq!(last_error_code(), 0);
+
+        let evs = wait_events(&events, 2);
+        let err: serde_json::Value = serde_json::from_slice(&evs[1]).unwrap();
+        assert_eq!(err["type"], "error");
+        assert_eq!(err["protocolVersion"], 1);
+        assert_eq!(err["requestId"], 440);
+        assert_eq!(err["error"]["code"], "INVALID_PARAMS");
+        assert_eq!(
+            err["error"]["details"]["headers"],
+            serde_json::json!(["content-type", "application/json"])
+        );
+        assert!(
+            err["error"]["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("headers")),
+            "unexpected http headers error: {err}"
+        );
+
+        assert_eq!(unsafe { destroy(handle) }, 0);
+    }
+
+    #[test]
     fn runtime_shutdown_invalid_params_does_not_stop_runtime_via_c_abi() {
         let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
         let handle = make_runtime(&events);

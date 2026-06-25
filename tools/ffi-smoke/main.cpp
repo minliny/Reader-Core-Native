@@ -737,6 +737,44 @@ int main() {
     return fail("invalid http status left synchronous last_error");
   }
 
+  // --- remote http.execute invalid headers -> async INVALID_PARAMS ------
+  std::string invalid_headers_search =
+      R"({"protocolVersion":1,"requestId":31,"method":"book.search","params":{"sourceId":"ffi-http-src","searchRequest":{"url":"https://books.example.test/search?q=invalid-headers"},"source":{"sourceId":"ffi-http-src","name":"FFI HTTP Source","baseUrl":"https://books.example.test","rules":{"search":[{"kind":"jsonPath","path":"$.books[*]"}]}}}})";
+  if (send_str(rt, invalid_headers_search) != RC_SEND_OK) {
+    return fail("book.search invalid-headers request send failed");
+  }
+  event = wait_event(ch, ev++);
+  uint64_t invalid_headers_op = 0;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":31") ||
+      !contains(event, "\"capability\":\"http.execute\"") ||
+      !contains(event, "search?q=invalid-headers") ||
+      !json_u64(event, "operationId", &invalid_headers_op)) {
+    std::cerr << "invalid-headers http.execute request: " << event << '\n';
+    return fail("invalid-headers http.execute request shape");
+  }
+  std::string invalid_headers_complete =
+      R"({"protocolVersion":1,"requestId":32,"method":"host.complete","params":{"operationId":)" +
+      std::to_string(invalid_headers_op) +
+      R"(,"result":{"status":200,"headers":["content-type","application/json"],"body":"{\"books\":[]}"}}})";
+  if (send_str(rt, invalid_headers_complete) != RC_SEND_OK) {
+    return fail("invalid-headers http host.complete send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":31") ||
+      !contains(event, "\"code\":\"INVALID_PARAMS\"") ||
+      !contains(event, "headers") ||
+      !contains(event, "[\"content-type\",\"application/json\"]")) {
+    std::cerr << "invalid http headers error: " << event << '\n';
+    return fail("invalid http headers error shape");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("invalid http headers left synchronous last_error");
+  }
+
   // --- method-specific invalid params -> async INVALID_PARAMS ------------
   std::string invalid_progress =
       R"({"protocolVersion":1,"requestId":26,"method":"reading.progress.update","params":{"bookId":"1","chapterIndex":2,"chapterOffset":128,"chapterProgress":0.5,"syncToken":"host-owned"}})";

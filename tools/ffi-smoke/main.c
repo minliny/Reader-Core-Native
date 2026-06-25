@@ -949,6 +949,59 @@ int main(void) {
     return fail("invalid http status left synchronous last_error");
   }
 
+  // --- remote http.execute invalid headers -> async INVALID_PARAMS ------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":72,\"method\":\"book."
+               "search\",\"params\":{\"sourceId\":\"ffi-http-src\","
+               "\"searchRequest\":{\"url\":\"https://books.example.test/"
+               "search?q=invalid-headers\"},\"source\":{\"sourceId\":\"ffi-"
+               "http-src\",\"name\":\"FFI HTTP Source\",\"baseUrl\":\"https://"
+               "books.example.test\",\"rules\":{\"search\":[{\"kind\":"
+               "\"jsonPath\",\"path\":\"$.books[*]\"}]}}}}") != RC_SEND_OK) {
+    return fail("book.search invalid-headers request send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no invalid-headers http.execute host.request event");
+  }
+  ev++;
+  uint64_t invalid_headers_op = 0;
+  if (!json_u64(event, "operationId", &invalid_headers_op) ||
+      !contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":72") ||
+      !contains(event, "\"capability\":\"http.execute\"") ||
+      !contains(event, "search?q=invalid-headers")) {
+    fprintf(stderr, "invalid-headers http.execute request: %s\n", event);
+    return fail("invalid-headers http.execute request shape");
+  }
+  char invalid_headers_complete[640];
+  snprintf(invalid_headers_complete, sizeof invalid_headers_complete,
+           "{\"protocolVersion\":1,\"requestId\":73,\"method\":\"host."
+           "complete\",\"params\":{\"operationId\":%llu,\"result\":{\"status\":"
+           "200,\"headers\":[\"content-type\",\"application/json\"],\"body\":"
+           "\"{\\\"books\\\":[]}\"}}}",
+           (unsigned long long)invalid_headers_op);
+  if (send_str(rt, invalid_headers_complete) != RC_SEND_OK) {
+    return fail("invalid-headers http host.complete send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for invalid http headers");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":72") ||
+      !contains(event, "\"code\":\"INVALID_PARAMS\"") ||
+      !contains(event, "headers") ||
+      !contains(event, "[\"content-type\",\"application/json\"]")) {
+    fprintf(stderr, "invalid http headers error: %s\n", event);
+    return fail("invalid http headers error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("invalid http headers left synchronous last_error");
+  }
+
   // --- method-specific invalid params -> async INVALID_PARAMS ------------
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":67,\"method\":\"reading."

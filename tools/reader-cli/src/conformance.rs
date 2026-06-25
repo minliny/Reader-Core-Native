@@ -107,6 +107,8 @@ const HOST_HTTP_COMPLETE_WITH_METADATA: &str =
     include_str!("../../../protocol/fixtures/conformance/host/http-complete-with-metadata.json");
 const HOST_HTTP_COMPLETE_INVALID_STATUS: &str =
     include_str!("../../../protocol/fixtures/conformance/host/http-complete-invalid-status.json");
+const HOST_HTTP_COMPLETE_INVALID_HEADERS: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/http-complete-invalid-headers.json");
 
 const VALID_RUNTIME_CANCEL: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-runtime-cancel.json");
@@ -609,6 +611,35 @@ pub(crate) fn run_conformance() -> ConformanceReport {
                     Ok(())
                 }
                 other => Err(format!("expected invalid http status error, got {other:?}")),
+            }
+        },
+    );
+
+    record(
+        &mut report,
+        "remote-http-complete-rejects-invalid-headers",
+        || {
+            let (runtime, rx) = fresh_runtime();
+            runtime
+                .send(remote_http_search_command(506))
+                .map_err(|err| format!("remote http command send failed: {err:?}"))?;
+            expect_http_host_request(&rx, 506)?;
+            runtime
+                .send_json(HOST_HTTP_COMPLETE_INVALID_HEADERS.as_bytes())
+                .map_err(|err| format!("http host.complete send failed: {err:?}"))?;
+
+            match recv_event(&rx)? {
+                Event::Error {
+                    request_id, error, ..
+                } if request_id == 506
+                    && error.code == ErrorCode::InvalidParams
+                    && error.message.contains("headers") =>
+                {
+                    Ok(())
+                }
+                other => Err(format!(
+                    "expected invalid http headers error, got {other:?}"
+                )),
             }
         },
     );

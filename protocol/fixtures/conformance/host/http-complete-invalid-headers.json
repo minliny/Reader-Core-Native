@@ -1,0 +1,16 @@
+{
+  "protocolVersion": 1,
+  "requestId": 507,
+  "method": "host.complete",
+  "params": {
+    "operationId": 1,
+    "result": {
+      "status": 200,
+      "headers": [
+        "content-type",
+        "application/json"
+      ],
+      "body": "{\"books\":[]}"
+    }
+  }
+}
