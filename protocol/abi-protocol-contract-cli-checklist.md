@@ -34,7 +34,7 @@ Current scan date: 2026-06-25.
 | `runtime.hostSmoke` | `HostSmokeParams` | Generic echo result | Host request/complete route cases | Covered as generic host bus |
 | `host.complete` | `HostCompleteParams` | Generic host completion result | Typed params and route cases | Covered as generic host bus |
 | `host.error` | `HostErrorParams` | Error event | Typed params and route cases | Covered |
-| `source.import` | `SourceImportParams` | Generic JSON result | Field assertions only | Open: no typed result DTO |
+| `source.import` | `SourceImportParams` | `SourceImportData` | Typed parse and negative result-shape cases | Covered in current pass |
 | `book.search` | `BookSearchParams` | Generic JSON result | Field assertions only | Open: no typed result DTO |
 | `book.detail` | `BookDetailParams` | Generic JSON result | Field assertions only | Open: no typed result DTO |
 | `book.toc` | `BookTocParams` | Generic JSON result | Field assertions only | Open: no typed result DTO |
@@ -57,7 +57,7 @@ Current scan date: 2026-06-25.
 4. `core.info` result data contract. Closed in this pass.
    Result is larger because it binds capability advertisement and version
    fields, but it remains a Core-owned protocol contract.
-5. `source.import` result data contract.
+5. `source.import` result data contract. Closed in this pass.
    Result is small, but it would start a broader remote result DTO pass.
 6. Larger remote-reading result contracts (`book.search`, `book.detail`,
    `book.toc`, `chapter.content`).

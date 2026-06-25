@@ -5,7 +5,7 @@ use std::time::Duration;
 use reader_contract::{
     methods, Command, CoreError, CoreInfoData, ErrorCode, Event, PendingHostOperationStatus,
     ReadingProgressUpdateData, RuntimeCancelData, RuntimeConfig, RuntimePingData,
-    RuntimeShutdownData, RuntimeStatus, PROTOCOL_VERSION, V1_CAPABILITIES,
+    RuntimeShutdownData, RuntimeStatus, SourceImportData, PROTOCOL_VERSION, V1_CAPABILITIES,
 };
 use reader_runtime::{EventSink, Runtime};
 use serde_json::{json, Value};
@@ -380,15 +380,77 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         match recv_event(&rx)? {
             Event::Result {
                 request_id, data, ..
-            } if request_id == 401
-                && data["sourceId"] == "conformance-source"
-                && data["imported"] == true =>
-            {
-                Ok(())
+            } if request_id == 401 => {
+                let data = serde_json::from_value::<SourceImportData>(data)
+                    .map_err(|err| format!("source.import data contract parse failed: {err}"))?;
+                if data.source_id == "conformance-source"
+                    && data.name == "Conformance Source"
+                    && data.imported
+                {
+                    Ok(())
+                } else {
+                    Err(format!("unexpected source.import data {data:?}"))
+                }
             }
             other => Err(format!("unexpected source.import result {other:?}")),
         }
     });
+
+    record(
+        &mut report,
+        "source-import-data-rejects-invalid-result-shape",
+        || {
+            for (label, data, expected) in [
+                (
+                    "sourceId",
+                    json!({
+                        "sourceId": " ",
+                        "name": "Conformance Source",
+                        "imported": true
+                    }),
+                    "sourceId",
+                ),
+                (
+                    "name",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "name": " ",
+                        "imported": true
+                    }),
+                    "name",
+                ),
+                (
+                    "imported",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "name": "Conformance Source",
+                        "imported": false
+                    }),
+                    "imported",
+                ),
+                (
+                    "unknown field",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "name": "Conformance Source",
+                        "imported": true,
+                        "extra": true
+                    }),
+                    "unknown field",
+                ),
+            ] {
+                let err = serde_json::from_value::<SourceImportData>(data)
+                    .err()
+                    .ok_or_else(|| format!("expected source.import data rejection for {label}"))?;
+                if !err.to_string().contains(expected) {
+                    return Err(format!(
+                        "unexpected source.import data error for {label}: {err}"
+                    ));
+                }
+            }
+            Ok(())
+        },
+    );
 
     record(&mut report, "source-import-rejects-unknown-params", || {
         let (_runtime, rx) = send_to_fresh_runtime(INVALID_SOURCE_IMPORT_UNKNOWN_FIELD)?;

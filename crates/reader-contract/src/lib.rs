@@ -27,7 +27,8 @@ pub use host::{
 };
 pub use remote::{
     BookDetailParams, BookSearchParams, BookTocParams, ChapterContentParams, HostHttpRequest,
-    HostHttpResponse, ReadingProgressUpdateData, ReadingProgressUpdateParams, SourceImportParams,
+    HostHttpResponse, ReadingProgressUpdateData, ReadingProgressUpdateParams, SourceImportData,
+    SourceImportParams,
 };
 
 /// JSON protocol version. Bumped on non-backward-compatible schema changes.
@@ -647,6 +648,24 @@ mod tests {
             serde_json::json!(V1_CAPABILITIES.len())
         );
         assert_eq!(capabilities, V1_CAPABILITIES);
+    }
+
+    #[test]
+    fn event_schema_defines_source_import_data_contract() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+        let data = &schema["$defs"]["SourceImportData"];
+        let required = strings_at(data, "required");
+        let properties = &data["properties"];
+
+        assert_eq!(data["additionalProperties"], serde_json::json!(false));
+        assert_eq!(required, vec!["sourceId", "name", "imported"]);
+        assert_eq!(properties["sourceId"]["minLength"], serde_json::json!(1));
+        assert_eq!(properties["sourceId"]["pattern"], serde_json::json!("\\S"));
+        assert_eq!(properties["name"]["minLength"], serde_json::json!(1));
+        assert_eq!(properties["name"]["pattern"], serde_json::json!("\\S"));
+        assert_eq!(properties["imported"]["const"], serde_json::json!(true));
     }
 
     #[test]

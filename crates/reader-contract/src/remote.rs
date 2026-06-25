@@ -91,6 +91,32 @@ fn validate_source_name_scalar(value: &str) -> Result<(), &'static str> {
     }
 }
 
+fn deserialize_non_blank_source_id<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = String::deserialize(deserializer)?;
+    if value.trim().is_empty() {
+        Err(de::Error::custom(
+            "source.import sourceId must be non-empty",
+        ))
+    } else {
+        Ok(value)
+    }
+}
+
+fn deserialize_source_import_imported<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = bool::deserialize(deserializer)?;
+    if value {
+        Ok(value)
+    } else {
+        Err(de::Error::custom("source.import imported must be true"))
+    }
+}
+
 fn deserialize_object_or_null<'de, D>(deserializer: D) -> Result<Value, D::Error>
 where
     D: Deserializer<'de>,
@@ -277,6 +303,18 @@ pub struct SourceImportParams {
     /// `reader-content`.
     #[serde(default, deserialize_with = "deserialize_object_or_null")]
     pub rules: Value,
+}
+
+/// Result data for `source.import`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SourceImportData {
+    #[serde(deserialize_with = "deserialize_non_blank_source_id")]
+    pub source_id: String,
+    #[serde(deserialize_with = "deserialize_non_blank_source_name")]
+    pub name: String,
+    #[serde(deserialize_with = "deserialize_source_import_imported")]
+    pub imported: bool,
 }
 
 /// Parameters for `book.search`.
@@ -587,6 +625,67 @@ mod tests {
             "unexpected source detail: {}",
             err.details["source"]
         );
+    }
+
+    #[test]
+    fn source_import_data_parses_result_and_rejects_invalid_shape() {
+        let data: SourceImportData = serde_json::from_value(serde_json::json!({
+            "sourceId": "conformance-source",
+            "name": "Conformance Source",
+            "imported": true
+        }))
+        .unwrap();
+        assert_eq!(data.source_id, "conformance-source");
+        assert_eq!(data.name, "Conformance Source");
+        assert!(data.imported);
+
+        for (label, value, expected) in [
+            (
+                "sourceId",
+                serde_json::json!({
+                    "sourceId": " ",
+                    "name": "Conformance Source",
+                    "imported": true
+                }),
+                "sourceId",
+            ),
+            (
+                "name",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "name": " ",
+                    "imported": true
+                }),
+                "name",
+            ),
+            (
+                "imported",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "name": "Conformance Source",
+                    "imported": false
+                }),
+                "imported",
+            ),
+            (
+                "unknown field",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "name": "Conformance Source",
+                    "imported": true,
+                    "extra": true
+                }),
+                "unknown field",
+            ),
+        ] {
+            let err = serde_json::from_value::<SourceImportData>(value)
+                .err()
+                .unwrap_or_else(|| panic!("expected rejection for {label}"));
+            assert!(
+                err.to_string().contains(expected),
+                "unexpected source.import data error for {label}: {err}"
+            );
+        }
     }
 
     #[test]

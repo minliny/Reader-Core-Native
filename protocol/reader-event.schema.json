@@ -190,6 +190,31 @@
         }
       }
     },
+    "SourceImportData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "name", "imported"],
+      "description": "Result data for source.import.",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Stable source identifier stored by Core."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Human-readable source name stored by Core."
+        },
+        "imported": {
+          "type": "boolean",
+          "const": true,
+          "description": "Successful import marker. Failed imports are reported as error events."
+        }
+      }
+    },
     "ReadingProgressUpdateData": {
       "type": "object",
       "additionalProperties": false,
