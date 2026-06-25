@@ -3,10 +3,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use reader_contract::{
-    methods, BookDetailData, BookSearchData, Command, CoreError, CoreInfoData, ErrorCode, Event,
-    PendingHostOperationStatus, ReadingProgressUpdateData, RuntimeCancelData, RuntimeConfig,
-    RuntimePingData, RuntimeShutdownData, RuntimeStatus, SourceImportData, PROTOCOL_VERSION,
-    V1_CAPABILITIES,
+    methods, BookDetailData, BookSearchData, BookTocData, Command, CoreError, CoreInfoData,
+    ErrorCode, Event, PendingHostOperationStatus, ReadingProgressUpdateData, RuntimeCancelData,
+    RuntimeConfig, RuntimePingData, RuntimeShutdownData, RuntimeStatus, SourceImportData,
+    PROTOCOL_VERSION, V1_CAPABILITIES,
 };
 use reader_runtime::{EventSink, Runtime};
 use serde_json::{json, Value};
@@ -752,17 +752,122 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         match recv_event(&rx)? {
             Event::Result {
                 request_id, data, ..
-            } if request_id == 407
-                && data["toc"]
-                    .as_array()
-                    .and_then(|toc| toc.first())
-                    .is_some_and(|entry| entry["title"] == "C1") =>
-            {
-                Ok(())
+            } if request_id == 407 => {
+                let data = serde_json::from_value::<BookTocData>(data)
+                    .map_err(|err| format!("book.toc data contract parse failed: {err}"))?;
+                if data.source_id == "conformance-source"
+                    && data.book_id == "1"
+                    && data.toc.len() == 2
+                    && data.toc[0].index == 0
+                    && data.toc[0].title == "C1"
+                    && data.toc[0].url == "u1"
+                    && data.http.is_none()
+                {
+                    Ok(())
+                } else {
+                    Err(format!("unexpected book.toc data {data:?}"))
+                }
             }
             other => Err(format!("unexpected book.toc result {other:?}")),
         }
     });
+
+    record(
+        &mut report,
+        "book-toc-data-rejects-invalid-result-shape",
+        || {
+            for (label, data, expected) in [
+                (
+                    "sourceId",
+                    json!({
+                        "sourceId": " ",
+                        "bookId": "1",
+                        "toc": []
+                    }),
+                    "sourceId",
+                ),
+                (
+                    "bookId",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "bookId": " ",
+                        "toc": []
+                    }),
+                    "bookId",
+                ),
+                (
+                    "toc",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "bookId": "1",
+                        "toc": {}
+                    }),
+                    "toc",
+                ),
+                (
+                    "index",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "bookId": "1",
+                        "toc": [
+                            { "title": "C1", "url": "u1" }
+                        ]
+                    }),
+                    "index",
+                ),
+                (
+                    "title",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "bookId": "1",
+                        "toc": [
+                            { "index": 0, "url": "u1" }
+                        ]
+                    }),
+                    "title",
+                ),
+                (
+                    "unknown toc field",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "bookId": "1",
+                        "toc": [
+                            { "index": 0, "title": "C1", "url": "u1", "extra": true }
+                        ]
+                    }),
+                    "unknown field",
+                ),
+                (
+                    "http.status",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "bookId": "1",
+                        "toc": [],
+                        "http": { "status": 99 }
+                    }),
+                    "status",
+                ),
+                (
+                    "unknown top-level field",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "bookId": "1",
+                        "toc": [],
+                        "extra": true
+                    }),
+                    "unknown field",
+                ),
+            ] {
+                let err = serde_json::from_value::<BookTocData>(data)
+                    .err()
+                    .ok_or_else(|| format!("expected book.toc data rejection for {label}"))?;
+                if !err.to_string().contains(expected) {
+                    return Err(format!("unexpected book.toc data error for {label}: {err}"));
+                }
+            }
+            Ok(())
+        },
+    );
 
     record(&mut report, "book-toc-rejects-unknown-params", || {
         let (_runtime, rx) = send_to_fresh_runtime(INVALID_BOOK_TOC_UNKNOWN_FIELD)?;

@@ -27,9 +27,9 @@ pub use host::{
 };
 pub use remote::{
     BookDetailBookData, BookDetailData, BookDetailParams, BookSearchBookData, BookSearchData,
-    BookSearchParams, BookTocParams, ChapterContentParams, HostHttpRequest, HostHttpResponse,
-    ReadingProgressUpdateData, ReadingProgressUpdateParams, RemoteHttpDiagnosticsData,
-    SourceImportData, SourceImportParams,
+    BookSearchParams, BookTocData, BookTocEntryData, BookTocParams, ChapterContentParams,
+    HostHttpRequest, HostHttpResponse, ReadingProgressUpdateData, ReadingProgressUpdateParams,
+    RemoteHttpDiagnosticsData, SourceImportData, SourceImportParams,
 };
 
 /// JSON protocol version. Bumped on non-backward-compatible schema changes.
@@ -767,6 +767,48 @@ mod tests {
         );
         assert_eq!(
             book["properties"]["lastChapter"]["type"],
+            serde_json::json!("string")
+        );
+    }
+
+    #[test]
+    fn event_schema_defines_book_toc_data_contract() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+        let data = &schema["$defs"]["BookTocData"];
+        let required = strings_at(data, "required");
+        let properties = &data["properties"];
+        let entry = &schema["$defs"]["BookTocEntryData"];
+        let entry_required = strings_at(entry, "required");
+
+        assert_eq!(data["additionalProperties"], serde_json::json!(false));
+        assert_eq!(required, vec!["sourceId", "bookId", "toc"]);
+        assert_eq!(properties["sourceId"]["minLength"], serde_json::json!(1));
+        assert_eq!(properties["sourceId"]["pattern"], serde_json::json!("\\S"));
+        assert_eq!(properties["bookId"]["minLength"], serde_json::json!(1));
+        assert_eq!(properties["bookId"]["pattern"], serde_json::json!("\\S"));
+        assert_eq!(properties["toc"]["type"], serde_json::json!("array"));
+        assert_eq!(
+            properties["toc"]["items"]["$ref"],
+            serde_json::json!("#/$defs/BookTocEntryData")
+        );
+        assert_eq!(
+            properties["http"]["$ref"],
+            serde_json::json!("#/$defs/RemoteHttpDiagnosticsData")
+        );
+        assert_eq!(entry["additionalProperties"], serde_json::json!(false));
+        assert_eq!(entry_required, vec!["index", "title", "url"]);
+        assert_eq!(
+            entry["properties"]["index"]["minimum"],
+            serde_json::json!(0)
+        );
+        assert_eq!(
+            entry["properties"]["title"]["type"],
+            serde_json::json!("string")
+        );
+        assert_eq!(
+            entry["properties"]["url"]["type"],
             serde_json::json!("string")
         );
     }

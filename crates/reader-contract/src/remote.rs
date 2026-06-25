@@ -111,7 +111,7 @@ where
 {
     let value = String::deserialize(deserializer)?;
     if value.trim().is_empty() {
-        Err(de::Error::custom("book.search bookId must be non-empty"))
+        Err(de::Error::custom("bookId must be non-empty"))
     } else {
         Ok(value)
     }
@@ -151,6 +151,17 @@ where
     let value = Value::deserialize(deserializer)?;
     if !value.is_object() {
         return Err(de::Error::custom("book.detail book must be an object"));
+    }
+    serde_json::from_value(value).map_err(de::Error::custom)
+}
+
+fn deserialize_book_toc_entries<'de, D>(deserializer: D) -> Result<Vec<BookTocEntryData>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+    if !value.is_array() {
+        return Err(de::Error::custom("book.toc toc must be an array"));
     }
     serde_json::from_value(value).map_err(de::Error::custom)
 }
@@ -501,6 +512,29 @@ pub struct BookDetailData {
     pub source_id: String,
     #[serde(deserialize_with = "deserialize_book_detail_data_book")]
     pub book: BookDetailBookData,
+    #[serde(default, deserialize_with = "deserialize_remote_http_diagnostics")]
+    pub http: Option<RemoteHttpDiagnosticsData>,
+}
+
+/// Stable table-of-contents entry returned by `book.toc`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookTocEntryData {
+    pub index: u32,
+    pub title: String,
+    pub url: String,
+}
+
+/// Result data for `book.toc`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookTocData {
+    #[serde(deserialize_with = "deserialize_non_blank_source_id")]
+    pub source_id: String,
+    #[serde(deserialize_with = "deserialize_non_blank_book_id")]
+    pub book_id: String,
+    #[serde(deserialize_with = "deserialize_book_toc_entries")]
+    pub toc: Vec<BookTocEntryData>,
     #[serde(default, deserialize_with = "deserialize_remote_http_diagnostics")]
     pub http: Option<RemoteHttpDiagnosticsData>,
 }
@@ -1098,6 +1132,134 @@ mod tests {
             assert!(
                 err.to_string().contains(expected),
                 "unexpected book.detail data error for {label}: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn book_toc_data_parses_result_and_rejects_invalid_shape() {
+        let data: BookTocData = serde_json::from_value(serde_json::json!({
+            "sourceId": "conformance-source",
+            "bookId": "1",
+            "toc": [
+                { "index": 0, "title": "C1", "url": "u1" },
+                { "index": 1, "title": "C2", "url": "u2" }
+            ]
+        }))
+        .unwrap();
+        assert_eq!(data.source_id, "conformance-source");
+        assert_eq!(data.book_id, "1");
+        assert_eq!(data.toc.len(), 2);
+        assert_eq!(data.toc[0].index, 0);
+        assert_eq!(data.toc[0].title, "C1");
+        assert_eq!(data.toc[0].url, "u1");
+        assert!(data.http.is_none());
+
+        let data: BookTocData = serde_json::from_value(serde_json::json!({
+            "sourceId": "conformance-source",
+            "bookId": "1",
+            "toc": [],
+            "http": {
+                "status": 200,
+                "headers": { "content-type": "application/json" }
+            }
+        }))
+        .unwrap();
+        let http = data.http.expect("http diagnostics");
+        assert_eq!(http.status, Some(200));
+        assert_eq!(
+            http.headers.unwrap()["content-type"],
+            serde_json::json!("application/json")
+        );
+
+        for (label, value, expected) in [
+            (
+                "sourceId",
+                serde_json::json!({
+                    "sourceId": " ",
+                    "bookId": "1",
+                    "toc": []
+                }),
+                "sourceId",
+            ),
+            (
+                "bookId",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "bookId": " ",
+                    "toc": []
+                }),
+                "bookId",
+            ),
+            (
+                "toc",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "bookId": "1",
+                    "toc": {}
+                }),
+                "toc",
+            ),
+            (
+                "index",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "bookId": "1",
+                    "toc": [
+                        { "title": "C1", "url": "u1" }
+                    ]
+                }),
+                "index",
+            ),
+            (
+                "title",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "bookId": "1",
+                    "toc": [
+                        { "index": 0, "url": "u1" }
+                    ]
+                }),
+                "title",
+            ),
+            (
+                "unknown toc field",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "bookId": "1",
+                    "toc": [
+                        { "index": 0, "title": "C1", "url": "u1", "extra": true }
+                    ]
+                }),
+                "unknown field",
+            ),
+            (
+                "http.status",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "bookId": "1",
+                    "toc": [],
+                    "http": { "status": 99 }
+                }),
+                "status",
+            ),
+            (
+                "unknown top-level field",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "bookId": "1",
+                    "toc": [],
+                    "extra": true
+                }),
+                "unknown field",
+            ),
+        ] {
+            let err = serde_json::from_value::<BookTocData>(value)
+                .err()
+                .unwrap_or_else(|| panic!("expected rejection for {label}"));
+            assert!(
+                err.to_string().contains(expected),
+                "unexpected book.toc data error for {label}: {err}"
             );
         }
     }

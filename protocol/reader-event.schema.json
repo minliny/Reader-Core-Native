@@ -326,6 +326,53 @@
         "http": { "$ref": "#/$defs/RemoteHttpDiagnosticsData" }
       }
     },
+    "BookTocEntryData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index", "title", "url"],
+      "description": "Stable table-of-contents entry returned by book.toc.",
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based chapter index within the table of contents."
+        },
+        "title": {
+          "type": "string",
+          "description": "Chapter title extracted by the source pipeline."
+        },
+        "url": {
+          "type": "string",
+          "description": "Source-relative chapter URL or path."
+        }
+      }
+    },
+    "BookTocData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "bookId", "toc"],
+      "description": "Result data for book.toc.",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Source identifier used by the toc command."
+        },
+        "bookId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Book identifier used by the toc command."
+        },
+        "toc": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/BookTocEntryData" },
+          "description": "Table-of-contents entries extracted from the toc response."
+        },
+        "http": { "$ref": "#/$defs/RemoteHttpDiagnosticsData" }
+      }
+    },
     "ReadingProgressUpdateData": {
       "type": "object",
       "additionalProperties": false,
