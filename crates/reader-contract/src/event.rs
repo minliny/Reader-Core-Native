@@ -24,7 +24,7 @@ fn assert_token_path(field: &str, value: &str) {
 ///
 /// Discriminated by the `type` field (`"result"` / `"error"` / `"host.request"`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", deny_unknown_fields)]
 pub enum Event {
     #[serde(rename = "result")]
     Result {
@@ -164,5 +164,44 @@ mod tests {
             "host.smoke.echo",
             serde_json::json!(["not", "an", "object"]),
         );
+    }
+
+    #[test]
+    fn event_deserialize_rejects_unknown_top_level_fields() {
+        for event in [
+            serde_json::json!({
+                "protocolVersion": 1,
+                "requestId": 1,
+                "type": "result",
+                "data": {},
+                "extra": true
+            }),
+            serde_json::json!({
+                "protocolVersion": 1,
+                "requestId": 1,
+                "type": "error",
+                "error": {
+                    "code": "INTERNAL",
+                    "message": "failed",
+                    "retryable": true
+                },
+                "extra": true
+            }),
+            serde_json::json!({
+                "protocolVersion": 1,
+                "requestId": 1,
+                "type": "host.request",
+                "operationId": 1,
+                "capability": "host.smoke.echo",
+                "params": {},
+                "extra": true
+            }),
+        ] {
+            let err = serde_json::from_value::<Event>(event).unwrap_err();
+            assert!(
+                err.to_string().contains("unknown field"),
+                "unexpected event parse error: {err}"
+            );
+        }
     }
 }

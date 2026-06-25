@@ -479,6 +479,21 @@ mod tests {
         );
     }
 
+    #[test]
+    fn event_schema_rejects_unknown_top_level_fields() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+
+        for event_def in ["ResultEvent", "ErrorEvent", "HostRequestEvent"] {
+            assert_eq!(
+                schema["$defs"][event_def]["additionalProperties"],
+                serde_json::json!(false),
+                "{event_def} must reject unknown top-level fields"
+            );
+        }
+    }
+
     fn strings_at<'a>(value: &'a Value, key: &str) -> Vec<&'a str> {
         value[key]
             .as_array()
