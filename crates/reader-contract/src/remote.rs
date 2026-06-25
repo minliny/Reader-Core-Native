@@ -74,6 +74,23 @@ fn validate_http_headers_shape(value: &Value) -> Result<(), &'static str> {
     }
 }
 
+fn deserialize_non_blank_source_name<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = String::deserialize(deserializer)?;
+    validate_source_name_scalar(&value).map_err(de::Error::custom)?;
+    Ok(value)
+}
+
+fn validate_source_name_scalar(value: &str) -> Result<(), &'static str> {
+    if value.trim().is_empty() {
+        Err("source.import name must be non-empty")
+    } else {
+        Ok(())
+    }
+}
+
 fn deserialize_chapter_progress<'de, D>(deserializer: D) -> Result<f64, D::Error>
 where
     D: Deserializer<'de>,
@@ -189,6 +206,7 @@ pub struct SourceImportParams {
     /// Stable source identifier. If omitted, one is assigned.
     #[serde(default = "empty_string")]
     pub source_id: String,
+    #[serde(deserialize_with = "deserialize_non_blank_source_name")]
     pub name: String,
     #[serde(default = "empty_string")]
     pub base_url: String,
@@ -450,6 +468,26 @@ mod tests {
             err.details["source"]
                 .as_str()
                 .is_some_and(|source| source.contains("unknown field")),
+            "unexpected source detail: {}",
+            err.details["source"]
+        );
+
+        let command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/invalid-source-import-name-whitespace.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let err =
+            parse_params::<SourceImportParams>(crate::methods::SOURCE_IMPORT, &command.params)
+                .unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert_eq!(err.details["method"], crate::methods::SOURCE_IMPORT);
+        assert!(
+            err.details["source"]
+                .as_str()
+                .is_some_and(|source| source.contains("name")),
             "unexpected source detail: {}",
             err.details["source"]
         );

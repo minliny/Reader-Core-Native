@@ -348,6 +348,7 @@
         "name": {
           "type": "string",
           "minLength": 1,
+          "pattern": "\\S",
           "description": "Human-readable source name. Runtime validation rejects blank or whitespace-only names."
         },
         "baseUrl": {

@@ -724,6 +724,25 @@ int main() {
     return fail("host.error invalid params left synchronous last_error");
   }
 
+  // --- invalid source.import params -> async INVALID_PARAMS -------------
+  std::string invalid_source_import =
+      R"({"protocolVersion":1,"requestId":319,"method":"source.import","params":{"sourceId":"ffi-source","name":"   ","baseUrl":"https://books.example.test"}})";
+  if (send_str(rt, invalid_source_import) != RC_SEND_OK) {
+    return fail("source.import whitespace name send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":319") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "name")) {
+    std::cerr << "source.import whitespace name error: " << event << '\n';
+    return fail("source.import whitespace name error shape");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("source.import whitespace name left synchronous last_error");
+  }
+
   // --- invalid remote http.execute request method -> async INVALID_PARAMS
   std::string empty_http_method =
       R"({"protocolVersion":1,"requestId":316,"method":"book.search","params":{"sourceId":"ffi-http-src","searchRequest":{"url":"https://books.example.test/search?q=empty-method","method":""},"source":{"sourceId":"ffi-http-src","name":"FFI HTTP Source","baseUrl":"https://books.example.test","rules":{"search":[{"kind":"jsonPath","path":"$.books[*]"}]}}}})";
