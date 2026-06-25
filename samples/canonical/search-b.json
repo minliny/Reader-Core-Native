@@ -1,0 +1,9 @@
+{
+  "timestamp": 1700001234,
+  "keyword": "fox",
+  "type": "search",
+  "results": [
+    {"bookUrl": "https://demo.test/b1", "author": "A B", "name": "Brown Fox"},
+    {"bookUrl": "https://demo.test/b2", "author": "C D", "name": "Lazy Dog"}
+  ]
+}

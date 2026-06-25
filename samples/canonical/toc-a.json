@@ -1,0 +1,9 @@
+{
+  "type": "toc",
+  "bookName": "Demo Book",
+  "chapters": [
+    {"name": "Ch&nbsp;1", "url": "https://demo.test/c1/"},
+    {"name": "Ch&nbsp;2", "url": "https://demo.test/c2/"}
+  ],
+  "updated_at": "2024-01-01T00:00:00Z"
+}

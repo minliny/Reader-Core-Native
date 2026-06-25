@@ -1,0 +1,11 @@
+{
+  "type": "detail",
+  "name": "Demo &amp; Co",
+  "author": "Author&nbsp;X",
+  "coverUrl": "https://demo.test/cover.jpg",
+  "intro": "Line1\r\nLine2\r\nLine3",
+  "category": "Fiction",
+  "wordCount": 12345,
+  "updated_at": "2024-01-01T00:00:00Z",
+  "lastChapter": "https://demo.test/c99/"
+}
