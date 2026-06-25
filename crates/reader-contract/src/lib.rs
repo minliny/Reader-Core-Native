@@ -211,6 +211,16 @@ mod tests {
     }
 
     #[test]
+    fn command_schema_requires_host_complete_result_object() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+        let result = &schema["$defs"]["HostCompleteParams"]["properties"]["result"];
+
+        assert_eq!(result["type"], serde_json::json!("object"));
+    }
+
+    #[test]
     fn command_schema_binds_source_import_to_param_def() {
         let schema: Value =
             serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))

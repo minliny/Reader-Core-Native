@@ -123,6 +123,8 @@ const HOST_UNKNOWN_COMPLETE: &str =
     include_str!("../../../protocol/fixtures/conformance/host/unknown-complete.json");
 const HOST_COMPLETE_UNKNOWN_FIELD: &str =
     include_str!("../../../protocol/fixtures/conformance/host/complete-unknown-field.json");
+const HOST_COMPLETE_RESULT_NOT_OBJECT: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/complete-result-not-object.json");
 const HOST_COMPLETE_OPERATION_ZERO: &str =
     include_str!("../../../protocol/fixtures/conformance/host/complete-operation-zero.json");
 const HOST_ERROR_OPERATION_ZERO: &str =
@@ -617,6 +619,15 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         let (_runtime, rx) = send_to_fresh_runtime(HOST_COMPLETE_UNKNOWN_FIELD)?;
         expect_event_error(&rx, 314, ErrorCode::InvalidParams)
     });
+
+    record(
+        &mut report,
+        "host-complete-rejects-non-object-result",
+        || {
+            let (_runtime, rx) = send_to_fresh_runtime(HOST_COMPLETE_RESULT_NOT_OBJECT)?;
+            expect_event_error(&rx, 422, ErrorCode::InvalidParams)
+        },
+    );
 
     record(&mut report, "host-complete-zero-operation-id", || {
         let (_runtime, rx) = send_to_fresh_runtime(HOST_COMPLETE_OPERATION_ZERO)?;

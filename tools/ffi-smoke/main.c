@@ -851,6 +851,24 @@ int main(void) {
     return fail("zero operation host.complete error shape");
   }
   if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":422,\"method\":\"host."
+               "complete\",\"params\":{\"operationId\":1,\"result\":[\"not\","
+               "\"an\",\"object\"]}}") != RC_SEND_OK) {
+    return fail("non-object result host.complete send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for non-object result host.complete");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":422") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "host.complete result")) {
+    fprintf(stderr, "non-object result host.complete error: %s\n", event);
+    return fail("non-object result host.complete error shape");
+  }
+  if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":314,\"method\":\"host."
                "complete\",\"params\":{\"operationId\":1,\"result\":{\"status\":"
                "\"ok\"},\"completedAt\":123}}") != RC_SEND_OK) {

@@ -26,6 +26,20 @@ where
     }
 }
 
+fn deserialize_host_complete_result<'de, D>(deserializer: D) -> Result<Value, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+    if value.is_object() {
+        Ok(value)
+    } else {
+        Err(de::Error::custom(
+            "host.complete result must be a JSON object",
+        ))
+    }
+}
+
 /// Parameters for `runtime.hostSmoke`, a local driver method that exercises the
 /// host bus without involving reader business modules.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -124,6 +138,7 @@ pub struct RuntimeStatus {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostCompleteParams {
     pub operation_id: u64,
+    #[serde(deserialize_with = "deserialize_host_complete_result")]
     pub result: Value,
 }
 
@@ -270,6 +285,20 @@ mod tests {
         let err =
             serde_json::from_value::<HostCompleteParams>(complete_command.params).unwrap_err();
         assert!(err.to_string().contains("unknown field"));
+
+        let complete_command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/host/complete-result-not-object.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let err =
+            serde_json::from_value::<HostCompleteParams>(complete_command.params).unwrap_err();
+        assert!(
+            err.to_string().contains("host.complete result"),
+            "unexpected host.complete result error: {err}"
+        );
 
         let error_command: crate::Command = crate::Command::from_json_bytes(
             include_str!("../../../protocol/fixtures/conformance/host/error-unknown-field.json")

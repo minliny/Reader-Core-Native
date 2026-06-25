@@ -675,6 +675,20 @@ int main() {
     std::cerr << "zero operation host.complete error: " << event << '\n';
     return fail("zero operation host.complete error shape");
   }
+  std::string result_not_object_complete =
+      R"({"protocolVersion":1,"requestId":422,"method":"host.complete","params":{"operationId":1,"result":["not","an","object"]}})";
+  if (send_str(rt, result_not_object_complete) != RC_SEND_OK) {
+    return fail("non-object result host.complete send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":422") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "host.complete result")) {
+    std::cerr << "non-object result host.complete error: " << event << '\n';
+    return fail("non-object result host.complete error shape");
+  }
   std::string unknown_field_complete =
       R"({"protocolVersion":1,"requestId":314,"method":"host.complete","params":{"operationId":1,"result":{"status":"ok"},"completedAt":123}})";
   if (send_str(rt, unknown_field_complete) != RC_SEND_OK) {
