@@ -2,7 +2,9 @@
 
 > **Reader 三平台统一内核 — Rust 实现**
 >
-> 以 [ARCHITECTURE.md](./ARCHITECTURE.md) 为唯一实施规划来源。
+> 全量开发目标与路线以
+> [docs/FULL_DEVELOPMENT_ROADMAP.md](./docs/FULL_DEVELOPMENT_ROADMAP.md)
+> 为准；当前代码架构以 [ARCHITECTURE.md](./ARCHITECTURE.md) 为准。
 
 ## 快速开始
 
@@ -65,7 +67,8 @@ smoke（`core.info` / `runtime.ping`）；URLSession/WebView/App 侧接入仍是
 
 ## 目录
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md) — 完整架构与实施规划（**唯一权威文档**）
+- [docs/FULL_DEVELOPMENT_ROADMAP.md](./docs/FULL_DEVELOPMENT_ROADMAP.md) — Legado 兼容、旧 Reader-Core 迁移、Native/C ABI、corpus benchmark 的全量目标与路线
+- [ARCHITECTURE.md](./ARCHITECTURE.md) — 当前代码架构与 Core/Host 边界
 - [FEATURE_MATRIX.md](./FEATURE_MATRIX.md) — 能力归属表
 - [MIGRATION_MAP.md](./MIGRATION_MAP.md) — 各平台迁移进度
 - [docs/ROLLING_INTEGRATION.md](./docs/ROLLING_INTEGRATION.md) — 并行 agent 滚动集成队列

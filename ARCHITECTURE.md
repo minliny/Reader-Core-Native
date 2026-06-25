@@ -1,8 +1,14 @@
 # Reader-Core-Native Architecture
 
-This document describes the current product architecture in branch HEAD. A
-capability is marked complete only when it has a code path or verification
-command in this repository, or a named branch fact verified by Git.
+This document describes the current code architecture in branch HEAD. The full
+product goal and development route are maintained in
+`docs/FULL_DEVELOPMENT_ROADMAP.md`.
+
+A capability is marked complete here only when it has a code path or
+verification command in this repository, or a named branch fact verified by Git.
+Roadmap-level parity claims still require the Legado capability ledger,
+Reader-Core migration ledger, Native/C ABI evidence, and corpus benchmark proof
+defined by the full roadmap.
 
 ## Current Baseline
 
