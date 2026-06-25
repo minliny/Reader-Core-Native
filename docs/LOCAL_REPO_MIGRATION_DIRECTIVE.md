@@ -85,12 +85,12 @@ git -C <repo> log -5 --oneline
 
 | 仓库 | 分支 | 状态摘要 | 最新提交摘要 |
 | --- | --- | --- | --- |
-| `/Users/minliny/Documents/Reader-Core-Native` | `codex/full-branch-directory-consolidation` | clean，checkpoint base；BookSource 纠偏分支为 `codex/booksource-compat-protocol` / PR #4 | `436db55 chore: checkpoint native integration workspace` |
+| `/Users/minliny/Documents/Reader-Core-Native` | `main` / `fc5fb57` | 当前 Rust 主线；PR #15/#14/#13/#2/#12 已合并，JS lane 为 PR #16 | `fc5fb57 Merge pull request #12 from minliny/codex/ios-rust-host-adapter` |
 | `/Users/minliny/Documents/Reader-Core` | `main` | clean，旧核心迁移源 | `a6db53e0 docs: add Reader-Core to Rust migration ledger` |
 | `/Users/minliny/Documents/legado` | `master` | clean，只读 Legado 兼容语义基线 | `da17bb2be 优化 #5784` |
-| `/Users/minliny/Documents/Reader for iOS` | `codex/ios-rust-host-adapter` | clean，iOS 宿主迁移目标 | `7dabaae Update STATUS.md with Round 6 commit hash` |
+| `/Users/minliny/Documents/Reader for iOS` | `codex/ios-rust-host-adapter` | iOS 宿主迁移目标；Native `bindings/ios` shell smoke 证据已由 PR #12 进入主线 | `7dabaae Update STATUS.md with Round 6 commit hash` |
 | `/Users/minliny/Documents/Reader for Android` | `main` | clean | `ef73081 修复: 移除残留 UI 包引用 (ProjectSkeletonTest + ContractReport)` |
-| `/Users/minliny/Documents/Reader for HarmonyOS` | `codex/harmony-napi-runtime` | clean，HarmonyOS 宿主迁移目标 | `5a69ed1 docs: record HarmonyOS HostBus simulator evidence` |
+| `/Users/minliny/Documents/Reader for HarmonyOS` | `codex/harmony-napi-runtime` | clean，HarmonyOS 宿主迁移目标；PR #2 draft，已有 headless/simulator/package 证据，无 real-device proof | `b504686 docs: refresh NAPI smoke report to three-tier state` |
 
 ## 当前工程目标
 

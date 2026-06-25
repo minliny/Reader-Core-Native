@@ -40,6 +40,24 @@
 
 远程 README、历史讨论、旧架构报告只能补充上下文，不能覆盖本地代码。
 
+## 当前主线进度快照
+
+最近一次快照：2026-06-25，`Reader-Core-Native` `origin/main` =
+`fc5fb57`。
+
+| 主线项 | 当前状态 |
+| --- | --- |
+| checkpoint base | PR #3 已合入。 |
+| Legado BookSource raw object / unknown field / raw rule 保真 | PR #4 已合入；后续继续扩字段和样本，不代表完整执行能力。 |
+| Legado CSS DSL executor | PR #15 已合入；`RuleStepSpec` 仍保持结构化 V1，不接收 raw DSL 字符串。 |
+| JS helper/runtime 兼容 | PR #16 `codex/reader-js-compat-runtime` 已打开；只覆盖 `crates/reader-js/**`，不实现真实网络/WebView。 |
+| request descriptor / host capability | 仍待 `codex/request-host-contract` 或后续分支扩展。 |
+| storage/local-book fixture gates | PR #14 已合入；RSS/WebDAV/sync/TTS 仍待扩展。 |
+| corpus release gate 工具基础 | PR #13 已合入；这只是工具基础，不是三端 benchmark 完成。 |
+| Android Native host evidence | PR #2 已合入；JVM host adapter 证据不是 `.so`/AAR/设备 proof。 |
+| iOS Native host evidence | PR #12 已合入；shell smoke 不是 iOS App/模拟器/真机 proof。 |
+| HarmonyOS host evidence | HarmonyOS PR #2 保持 draft；已有 headless/simulator/package 证据，缺 real-device proof。 |
+
 ## 总体架构
 
 ```text
@@ -300,7 +318,16 @@ HarmonyOS：
 
 ## 当前状态声明
 
-当前仓库已经有 Rust runtime、C ABI、iOS/Android/Harmony wrapper、data/rule/corpus
-等基础工作，但这些只表示 Rust 目标仓库已有可用基础。是否已经完成迁移，必须重新
-由本地 `Reader-Core`、`Reader for iOS`、`Reader for Android`、`Reader for HarmonyOS`
-的实际代码和跨平台验证结果判定。
+当前仓库已经有 Rust runtime、C ABI、iOS/Android/Harmony wrapper、BookSource raw
+兼容、Legado DSL executor、storage/local-book fixture gates、corpus gate 工具等基础
+工作。但这些只表示 Rust 目标仓库已有可用基础。是否已经完成迁移，必须重新由本地
+`Reader-Core`、`Reader for iOS`、`Reader for Android`、`Reader for HarmonyOS` 的实际
+代码和跨平台验证结果判定。
+
+当前仍不能声明完成的关键项：
+
+- request descriptor / cookie / redirect / retry / charset 的 Core-host 契约未完整闭环。
+- JS lane 只处理 pure/runtime helper，不处理真实网络、WebView、验证码或文件能力。
+- iOS/Android 已有 Native 侧 smoke 证据，但都还不是 host App/device proof。
+- HarmonyOS 缺签名 HAP real-device proof。
+- corpus 工具已合入，但还没有 CLI + iOS + Android + HarmonyOS 同一 corpus 的零差异结果。

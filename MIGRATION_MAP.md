@@ -15,10 +15,22 @@
 | --- | --- | --- |
 | `Reader-Core` | `main` | clean，旧核心迁移源；最新提交 `a6db53e0 docs: add Reader-Core to Rust migration ledger` |
 | `legado` | `master` | clean，只读 Legado 兼容语义基线；最新提交 `da17bb2be 优化 #5784` |
-| `Reader for iOS` | `codex/ios-rust-host-adapter` | clean，iOS 宿主迁移目标；最新提交 `7dabaae Update STATUS.md with Round 6 commit hash` |
+| `Reader for iOS` | `codex/ios-rust-host-adapter` | iOS 宿主迁移目标；Native 侧 `bindings/ios` host smoke 证据已通过 PR #12 进入 `main` |
 | `Reader for Android` | `main` | clean，Android 宿主迁移目标 |
-| `Reader for HarmonyOS` | `codex/harmony-napi-runtime` | clean，HarmonyOS 宿主迁移目标；最新提交 `5a69ed1 docs: record HarmonyOS HostBus simulator evidence` |
-| Rust 目标仓库 | `codex/full-branch-directory-consolidation` | clean，当前 checkpoint base 为 `Reader-Core-Native`；BookSource 纠偏在 `codex/booksource-compat-protocol` / PR #4 |
+| `Reader for HarmonyOS` | `codex/harmony-napi-runtime` | clean，HarmonyOS 宿主迁移目标；PR #2 保持 draft，已有 headless/simulator/package 证据，无 real-device proof |
+| Rust 目标仓库 | `main` / `fc5fb57` | `Reader-Core-Native` 当前主线；已合并 checkpoint、BookSource compat、DSL executor、data fixture gates、corpus tools、Android/iOS host evidence |
+
+## 当前 PR / 分支快照
+
+| 项目 | 状态 | 说明 |
+| --- | --- | --- |
+| Native PR #15 | 已合并 | Legado CSS DSL executor 进入主线，未让 `RuleStepSpec` 接收 raw DSL 字符串。 |
+| Native PR #14 | 已合并 | `reader-storage` migration/snapshot 测试和 `reader-local-book` TXT/EPUB fixture gates 进入主线。 |
+| Native PR #13 | 已合并 | corpus canonicalizer、cross-platform diff、run packager、release blocker register 工具基础进入主线。 |
+| Native PR #2 | 已合并 | Android host adapter JVM access path 与 capability 表进入主线；仍不是 `.so`/设备/AAR 证明。 |
+| Native PR #12 | 已合并 | iOS `bindings/ios` shell smoke 证据进入主线；仍不是 iOS App/模拟器/真机证明。 |
+| HarmonyOS PR #2 | draft | `assembleHap` 与 headless/simulator 证据已记录；`hdc list targets` 为 `[Empty]`，无 real-device proof。 |
+| Native PR #16 | open | `codex/reader-js-compat-runtime` 只改 `crates/reader-js/**`；覆盖 JS helper/runtime 边界，不实现真实网络/WebView。 |
 
 ## 阶段状态
 
@@ -27,13 +39,13 @@
 | 0 | 本地仓库定位、安全检查、dirty 状态记录 | 已完成本轮检查 |
 | 1 | 旧 `Reader-Core` 实际代码审计 | 待系统化 |
 | 2 | Rust C ABI / protocol / runtime 边界冻结 | 部分完成 |
-| 3 | Legado BookSource 兼容入口与 raw rule 保真 | 进行中 |
-| 4 | Legado DSL executor 与 JS/request/reading 核心能力迁移 | 部分完成 |
-| 5 | SQLite/cache/sync/local/RSS/TTS 契约迁移 | 部分完成 |
-| 6 | iOS strangler migration | 待 App-side 验证 |
-| 7 | Android strangler migration | 待 App-side 验证 |
-| 8 | HarmonyOS strangler migration | 待 HAP/device 验证 |
-| 9 | 三端 corpus/fixture 一致性 benchmark | 待建设 |
+| 3 | Legado BookSource 兼容入口与 raw rule 保真 | 已进入主线，仍需更多 Legado 字段/样本扩展 |
+| 4 | Legado DSL executor 与 JS/request/reading 核心能力迁移 | DSL 已进入主线；JS PR #16 已打开；request/reading 仍待扩展 |
+| 5 | SQLite/cache/sync/local/RSS/TTS 契约迁移 | storage/local-book fixture gates 已进入主线；sync/RSS/TTS 仍待扩展 |
+| 6 | iOS strangler migration | Native wrapper/host shell smoke 已进入主线；待 App-side/设备验证 |
+| 7 | Android strangler migration | Native JVM host adapter 已进入主线；待 `.so`/AAR/设备验证 |
+| 8 | HarmonyOS strangler migration | host PR draft；待签名 HAP real-device 验证 |
+| 9 | 三端 corpus/fixture 一致性 benchmark | 工具基础已进入主线；真实三端 run 仍未完成 |
 | 10 | 退役旧业务核心路径 | 未开始 |
 
 ## iOS 迁移

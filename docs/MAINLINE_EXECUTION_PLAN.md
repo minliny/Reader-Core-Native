@@ -34,20 +34,19 @@ Legado 定义要兼容什么
 
 | 仓库 | 当前角色 | 当前分支 / 状态 |
 | --- | --- | --- |
-| `/Users/minliny/Documents/Reader-Core-Native` | Rust 目标 Core | `codex/full-branch-directory-consolidation` 为 checkpoint base；BookSource 纠偏在 `codex/booksource-compat-protocol` / PR #4 |
+| `/Users/minliny/Documents/Reader-Core-Native` | Rust 目标 Core | `main` 当前为 `fc5fb57`；checkpoint、BookSource compat、DSL executor、data fixture gates、corpus tools、Android/iOS host evidence 已进入主线 |
 | `/Users/minliny/Documents/legado` | 兼容语义基线 | `master`，只读 |
 | `/Users/minliny/Documents/Reader-Core` | 旧 Core 迁移源 | `main`，只读迁移参考 |
 | `/Users/minliny/Documents/Reader for iOS` | iOS host | `codex/ios-rust-host-adapter` |
 | `/Users/minliny/Documents/Reader for Android` | Android host | `main` |
 | `/Users/minliny/Documents/Reader for HarmonyOS` | HarmonyOS host | `codex/harmony-napi-runtime` |
 
-PR 队列原则：
+当前 PR / 分支队列：
 
-- PR #3：Native checkpoint base，对 `main`。
-- PR #4：BookSource 兼容纠偏，对 PR #3。
-- PR #1 / #2：iOS / Android host adapter，对 PR #3。
-- PR #5-#11：benchmark / evidence / replay / normalization 工具，对 PR #3。
-- 工具 PR 只表示工具入队，不表示 release gate 或 corpus benchmark 完成。
+- PR #3 / #4 / #15 / #14 / #13 / #2 / #12 已按顺序合入 `main`。
+- HarmonyOS PR #2 继续保持 draft；已有 headless/simulator/package 证据，但没有 real-device proof。
+- PR #16 `codex/reader-js-compat-runtime` 已打开，范围限定 `crates/reader-js/**`。
+- 旧工具 PR #5-#11 中未合入的分支仍只能表示工具候选，不表示 release gate 或 corpus benchmark 完成。
 
 ## 3. 强制阶段顺序
 
@@ -114,6 +113,9 @@ Rust 写入范围：
   通过。
 - `cargo run -p reader-cli -- --conformance` 通过。
 
+当前快照：S1 已通过 PR #4 进入 `main`。后续只能继续扩 Legado 字段、样本和异常
+fixture，不能把保存 raw `bookSource` 误写成完整执行能力。
+
 ### S2：Legado DSL parser / executor
 
 目标：独立实现 Legado CSS 管道链 DSL，不再借 `RuleStepSpec` 规避语义差异。
@@ -166,6 +168,10 @@ Rust 写入范围：
 - 同一 fixture 有 canonical expected JSON。
 - `RuleStepSpec` guard 测试仍通过。
 
+当前快照：S2 最小 DSL executor 已通过 PR #15 进入 `main`。已建立 `reader-rule`
+DSL 路径和 `reader-content` raw string stage 执行路径；仍未覆盖完整 Legado 规则语言、
+WebView/DOM/登录或真实网络。
+
 ### S3：请求描述、JS 与 host capability 契约
 
 目标：把旧 Core 的 request descriptor、JS helper、Cookie/session/redirect 语义拆成
@@ -192,6 +198,9 @@ Host owns：
 - CLI host replay 能回放固定 HTTP/cookie/redirect fixture。
 - iOS / Android / HarmonyOS adapter 各有同一 contract 的 smoke 证据。
 - 不把 host app 能力写成 Core 已完成。
+
+当前快照：JS lane 已从 dirty/stash 中整理为 PR #16 `codex/reader-js-compat-runtime`，
+只证明 `reader-js` helper/runtime 边界；request descriptor 与 host capability 扩展仍未完成。
 
 ### S4：Remote reading end-to-end
 
@@ -237,6 +246,9 @@ Host owns：
 - 同一数据 fixture 可生成 canonical hash。
 - 本地书/RSS/WebDAV 不依赖平台 UI 才能验证核心语义。
 
+当前快照：storage migration/snapshot、canonical hash、TXT/EPUB fixture gates 已通过
+PR #14 进入 `main`。RSS/WebDAV/sync/TTS 仍需后续分支补齐。
+
 ### S6：三端 strangler migration
 
 目标：三端都通过 C ABI / JSON protocol 使用同一个 Rust Core commit。
@@ -266,19 +278,21 @@ HarmonyOS：
 - 三端最小阅读链路 smoke 使用同一 Rust Core commit。
 - wrapper smoke、simulator smoke、device proof 分开报告。
 
+当前快照：Android Native JVM host adapter 已通过 PR #2 进入 `main`；iOS Native
+`bindings/ios` shell smoke 已通过 PR #12 进入 `main`；HarmonyOS host PR #2 仍是
+draft，缺 real-device proof。三端均未完成真实 App/device 阅读链路。
+
 ### S7：Corpus benchmark / release gate
 
 目标：证明“三端真的读出同样结果”。
 
 工具入口：
 
-- PR #5：ABI symbol checker。
-- PR #6：benchmark run packager。
-- PR #7：corpus canonicalizer。
-- PR #8：cross-platform result diff。
-- PR #9：evidence fixture tooling / release blocker registry。
-- PR #10：host request replay。
-- PR #11：reader text normalization。
+- 已进入主线：PR #13 的 `scripts/corpus_canonicalize.py`、
+  `tools/cross-platform-diff/`、`tools/benchmark-run-packager/`、
+  `tools/release-blocker-register/` 和 sample/demo 文档。
+- 仍可独立评审：ABI symbol checker、host request replay、reader text normalization、
+  evidence fixture tooling 等旧工具分支。
 
 退出条件：
 
@@ -291,12 +305,13 @@ HarmonyOS：
 
 | 分支/PR | 目标 | 允许修改 | 禁止修改 | 合入前证据 |
 | --- | --- | --- | --- | --- |
-| PR #3 `codex/full-branch-directory-consolidation` | checkpoint base | docs、已整合基础代码 | 新增未验证能力声明 | `cargo test --workspace`、conformance、FFI smoke |
-| PR #4 `codex/booksource-compat-protocol` | BookSource 兼容入口 | domain/contract/runtime/protocol/CLI fixture | 用 `RuleStepSpec` 执行 raw Legado DSL | BookSource roundtrip、conformance |
-| `codex/legado-rule-dsl-executor` | Legado DSL 执行 | `reader-rule`、`reader-content`、fixtures、CLI runner | 改 C ABI、平台 binding、真实网络 | DSL parser/executor tests、CLI fixture |
-| `codex/request-js-host-contract` | request / JS / host capability | contract/runtime/js/content/protocol/CLI | host app UI、真实 socket | conformance、host replay |
-| PR #1 / #2 / Harmony host PR | 三端 adapter | 对应 binding 或 host app | Core 业务语义 | wrapper/app/device 分层证据 |
-| PR #5-#11 | benchmark/release 工具 | tools/scripts/tests/samples | 宣称 release gate 完成 | tool tests |
+| PR #3 `codex/full-branch-directory-consolidation` | checkpoint base | docs、已整合基础代码 | 新增未验证能力声明 | 已合入 |
+| PR #4 `codex/booksource-compat-protocol` | BookSource 兼容入口 | domain/contract/runtime/protocol/CLI fixture | 用 `RuleStepSpec` 执行 raw Legado DSL | 已合入 |
+| PR #15 `codex/legado-rule-dsl-executor` | Legado DSL 执行 | `reader-rule`、`reader-content`、fixtures、CLI runner | 改 C ABI、平台 binding、真实网络 | 已合入 |
+| PR #16 `codex/reader-js-compat-runtime` | JS helper/runtime 兼容 | `crates/reader-js/**` | 改 ABI/protocol/storage/bindings，或实现真实网络/WebView | `cargo test -p reader-js`、fmt、diff check |
+| `codex/request-host-contract` | request / host capability | contract/runtime/protocol/CLI replay | host app UI、真实 socket | conformance、host replay |
+| PR #2 / PR #12 / Harmony host PR #2 | 三端 adapter | 对应 binding 或 host app | Core 业务语义 | Android/iOS 已合入 shell/JVM 证据；Harmony draft，缺 real-device |
+| PR #13 / 工具分支 | benchmark/release 工具 | tools/scripts/tests/samples | 宣称 release gate 完成 | PR #13 已合入；其他工具分支按需评审 |
 
 ## 5. 防偏离规则
 
@@ -377,14 +392,16 @@ Core 不开 socket，不直接使用 WebView，不保存明文凭据。
 
 ## 7. 当前下一步
 
-下一步不是继续扩 `RuleStepSpec`，而是新开或继续一个明确的 Legado DSL executor 分支：
+下一步不是继续扩 `RuleStepSpec`，也不是把 wrapper smoke 当作三端完成。当前主线应按
+以下顺序推进：
 
 ```text
-目标：实现 Legado CSS 管道链 DSL 的最小 search/detail/toc/content 闭环。
-事实来源：本地 legado BookSource.kt/rule/*.kt、本地 Reader-Core BookSource.swift、旧 Core samples。
-写入范围：crates/reader-rule、crates/reader-content、fixtures、tools/reader-cli。
-禁止：改 C ABI、改三端 binding、让 RuleStepSpec 接收 raw DSL 字符串、声明 App/device 完成。
-验证：cargo test -p reader-rule -p reader-content；cargo run -p reader-cli -- --fixture-vertical <legado-sanitized-fixture>。
+1. 评审并合入 PR #16 `codex/reader-js-compat-runtime`：只收敛 JS helper/runtime，保持 host-owned 能力边界。
+2. 新开或恢复 `codex/request-host-contract`：补 `HostHttpRequest` 的 charset/cookie/redirect/retry、
+   fixture、CLI host replay、conformance。
+3. 在 HarmonyOS PR #2 继续补 real-device tier；无设备时保持 draft，不声明完成。
+4. 用已合入的 corpus 工具跑 CLI + iOS + Android + HarmonyOS 同一 corpus；差异进入
+   release blocker register，不能用单端结果替代三端 parity。
 ```
 
-只有这个阶段完成后，三端 adapter 和 corpus benchmark 才有可执行的核心能力可以消费。
+上述事项完成后，才能进入远程阅读链路和 release gate 的完成判定。
