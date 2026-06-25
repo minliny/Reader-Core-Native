@@ -1,0 +1,30 @@
+{
+  "version": "platform-evidence/1",
+  "records": [
+    {
+      "platform": "ios",
+      "kind": "unit",
+      "capability": "reader.rule",
+      "status": "pass",
+      "timestamp": "2026-06-25T12:00:00Z",
+      "environment": {
+        "os": "Darwin",
+        "arch": "arm64"
+      },
+      "artifact": "logs/ios/unit-rule.log"
+    },
+    {
+      "platform": "android",
+      "kind": "build",
+      "capability": "reader.ffi",
+      "status": "skipped",
+      "timestamp": "2026-06-25T12:05:00Z",
+      "environment": {
+        "os": "Linux",
+        "arch": "x86_64",
+        "toolchain": "android-ndk-26"
+      },
+      "notes": "Build skipped on this synthetic batch sample."
+    }
+  ]
+}

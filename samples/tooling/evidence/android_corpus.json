@@ -1,0 +1,16 @@
+{
+  "version": "platform-evidence/1",
+  "platform": "android",
+  "kind": "corpus",
+  "capability": "reader.toc",
+  "status": "pass",
+  "timestamp": "2026-06-25T09:30:00Z",
+  "environment": {
+    "os": "Linux",
+    "arch": "x86_64",
+    "toolchain": "android-ndk-26"
+  },
+  "fixture_id": "corpus-rss-001",
+  "artifact": "logs/android/corpus-rss-001.log",
+  "notes": "Corpus fixture corpus-rss-001; feed host feed.example.test is a placeholder."
+}
