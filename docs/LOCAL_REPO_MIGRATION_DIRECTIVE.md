@@ -77,13 +77,17 @@ git -C <repo> log -5 --oneline
 
 当前轮次已执行的检查摘要：
 
+最近一次本地扫描：2026-06-25。后续任何 agent 仍必须重新执行开工前安全检查，本表
+只记录本次 checkpoint 的事实快照。
+
 | 仓库 | 分支 | 状态摘要 | 最新提交摘要 |
 | --- | --- | --- | --- |
-| `/Users/minliny/Documents/Reader-Core-Native` | `codex/full-branch-directory-consolidation` | clean，与远端同步 | `86ecfc4 docs: localize project documentation to chinese` |
-| `/Users/minliny/Documents/Reader-Core` | `main` | dirty，大量删除/修改/新增文件 | `cc7ae849 feat: close core capability gaps` |
-| `/Users/minliny/Documents/Reader for iOS` | `main` | dirty，多处删除/修改/新增文件 | `3371d81 chore: sync Reader iOS workspace state` |
+| `/Users/minliny/Documents/Reader-Core-Native` | `codex/full-branch-directory-consolidation` | clean，checkpoint base；BookSource 纠偏分支为 `codex/booksource-compat-protocol` / PR #4 | `436db55 chore: checkpoint native integration workspace` |
+| `/Users/minliny/Documents/Reader-Core` | `main` | clean，旧核心迁移源 | `a6db53e0 docs: add Reader-Core to Rust migration ledger` |
+| `/Users/minliny/Documents/legado` | `master` | clean，只读 Legado 兼容语义基线 | `da17bb2be 优化 #5784` |
+| `/Users/minliny/Documents/Reader for iOS` | `codex/ios-rust-host-adapter` | clean，iOS 宿主迁移目标 | `7dabaae Update STATUS.md with Round 6 commit hash` |
 | `/Users/minliny/Documents/Reader for Android` | `main` | clean | `ef73081 修复: 移除残留 UI 包引用 (ProjectSkeletonTest + ContractReport)` |
-| `/Users/minliny/Documents/Reader for HarmonyOS` | `codex/harmony-napi-runtime` | dirty，多处删除/修改/新增文件 | `d7fe612 feat: wire harmony reader core napi runtime smoke` |
+| `/Users/minliny/Documents/Reader for HarmonyOS` | `codex/harmony-napi-runtime` | clean，HarmonyOS 宿主迁移目标 | `5a69ed1 docs: record HarmonyOS HostBus simulator evidence` |
 
 ## 当前工程目标
 

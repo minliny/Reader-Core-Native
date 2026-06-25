@@ -6,13 +6,17 @@
 
 ## 当前本地仓库状态
 
+最近一次本地扫描：2026-06-25。后续 agent 仍必须重新执行开工前安全检查，本表只记录
+本次 checkpoint 的事实快照。
+
 | 仓库 | 当前分支 | 状态 |
 | --- | --- | --- |
-| `Reader-Core` | `main` | dirty，旧核心迁移源 |
-| `Reader for iOS` | `main` | dirty，iOS 宿主迁移目标 |
+| `Reader-Core` | `main` | clean，旧核心迁移源；最新提交 `a6db53e0 docs: add Reader-Core to Rust migration ledger` |
+| `legado` | `master` | clean，只读 Legado 兼容语义基线；最新提交 `da17bb2be 优化 #5784` |
+| `Reader for iOS` | `codex/ios-rust-host-adapter` | clean，iOS 宿主迁移目标；最新提交 `7dabaae Update STATUS.md with Round 6 commit hash` |
 | `Reader for Android` | `main` | clean，Android 宿主迁移目标 |
-| `Reader for HarmonyOS` | `codex/harmony-napi-runtime` | dirty，HarmonyOS 宿主迁移目标 |
-| Rust 目标仓库 | `codex/full-branch-directory-consolidation` | 当前为 `Reader-Core-Native` |
+| `Reader for HarmonyOS` | `codex/harmony-napi-runtime` | clean，HarmonyOS 宿主迁移目标；最新提交 `5a69ed1 docs: record HarmonyOS HostBus simulator evidence` |
+| Rust 目标仓库 | `codex/full-branch-directory-consolidation` | clean，当前 checkpoint base 为 `Reader-Core-Native`；BookSource 纠偏在 `codex/booksource-compat-protocol` / PR #4 |
 
 ## 阶段状态
 
