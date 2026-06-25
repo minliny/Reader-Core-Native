@@ -230,6 +230,12 @@ mod tests {
                 "valid-book-toc",
                 include_str!("../../../protocol/fixtures/conformance/commands/valid-book-toc.json"),
             ),
+            (
+                "valid-chapter-content",
+                include_str!(
+                    "../../../protocol/fixtures/conformance/commands/valid-chapter-content.json"
+                ),
+            ),
         ] {
             Command::from_json_bytes(json.as_bytes())
                 .unwrap_or_else(|err| panic!("{name} should parse, got {err:?}"));

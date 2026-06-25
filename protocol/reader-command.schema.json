@@ -191,6 +191,17 @@
           "params": { "$ref": "#/$defs/BookTocParams" }
         }
       }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "chapter.content" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/ChapterContentParams" }
+        }
+      }
     }
   ],
   "$defs": {
@@ -427,6 +438,50 @@
           ],
           "default": null,
           "description": "Optional host HTTP request descriptor when tocResponse is empty."
+        },
+        "source": {
+          "type": ["object", "null"],
+          "default": null,
+          "description": "Optional inline source definition used instead of storage lookup."
+        }
+      }
+    },
+    "ChapterContentParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "bookId"],
+      "description": "Parameters for chapter.content. Extracts chapter body content for one book chapter.",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "description": "Source identifier used for storage lookup and result correlation."
+        },
+        "bookId": {
+          "type": "string",
+          "description": "Book identifier whose chapter content is being fetched."
+        },
+        "chapterTitle": {
+          "type": "string",
+          "default": "",
+          "description": "Optional chapter title surfaced in the result and cache key."
+        },
+        "chapterResponse": {
+          "type": "string",
+          "default": "",
+          "description": "Prefetched chapter response body."
+        },
+        "chapterRequest": {
+          "anyOf": [
+            { "$ref": "#/$defs/HostHttpRequest" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Optional host HTTP request descriptor when chapterResponse is empty."
+        },
+        "jsRule": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "Optional JS rule script for chapter extraction."
         },
         "source": {
           "type": ["object", "null"],

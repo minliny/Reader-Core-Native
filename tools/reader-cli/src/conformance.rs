@@ -21,6 +21,8 @@ const VALID_BOOK_DETAIL: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-book-detail.json");
 const VALID_BOOK_TOC: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-book-toc.json");
+const VALID_CHAPTER_CONTENT: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-chapter-content.json");
 const INVALID_RUNTIME_PING_UNKNOWN_FIELD: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-runtime-ping-unknown-field.json"
 );
@@ -38,6 +40,9 @@ const INVALID_BOOK_DETAIL_UNKNOWN_FIELD: &str = include_str!(
 );
 const INVALID_BOOK_TOC_UNKNOWN_FIELD: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-book-toc-unknown-field.json"
+);
+const INVALID_CHAPTER_CONTENT_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-chapter-content-unknown-field.json"
 );
 const INVALID_MALFORMED_COMMAND: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/invalid-malformed-json.json");
@@ -291,6 +296,31 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         let (_runtime, rx) = send_to_fresh_runtime(INVALID_BOOK_TOC_UNKNOWN_FIELD)?;
         expect_event_error(&rx, 408, ErrorCode::InvalidParams)
     });
+
+    record(&mut report, "valid-command-chapter-content", || {
+        let (_runtime, rx) = send_to_fresh_runtime(VALID_CHAPTER_CONTENT)?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 409
+                && data["chapterTitle"] == "C1"
+                && data["content"] == "Hello\nWorld"
+                && data["via"] == "rule" =>
+            {
+                Ok(())
+            }
+            other => Err(format!("unexpected chapter.content result {other:?}")),
+        }
+    });
+
+    record(
+        &mut report,
+        "chapter-content-rejects-unknown-params",
+        || {
+            let (_runtime, rx) = send_to_fresh_runtime(INVALID_CHAPTER_CONTENT_UNKNOWN_FIELD)?;
+            expect_event_error(&rx, 410, ErrorCode::InvalidParams)
+        },
+    );
 
     for (name, json, expected) in [
         (

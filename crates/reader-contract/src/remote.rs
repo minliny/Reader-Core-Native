@@ -393,4 +393,48 @@ mod tests {
             err.details["source"]
         );
     }
+
+    #[test]
+    fn chapter_content_params_parse_fixture_and_reject_unknown_fields() {
+        let command: crate::Command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/valid-chapter-content.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let params: ChapterContentParams =
+            parse_params(crate::methods::CHAPTER_CONTENT, &command.params)
+                .expect("valid chapter.content params should parse");
+        assert_eq!(params.source_id, "conformance-source");
+        assert_eq!(params.book_id, "1");
+        assert_eq!(params.chapter_title, "C1");
+        assert!(params.chapter_response.contains("Hello"));
+        assert!(params.chapter_request.is_none());
+        assert!(params.js_rule.is_none());
+        assert_eq!(
+            params.source.as_ref().unwrap()["sourceId"],
+            "conformance-source"
+        );
+
+        let command = crate::Command::from_json_bytes(
+            include_str!(
+                "../../../protocol/fixtures/conformance/commands/invalid-chapter-content-unknown-field.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let err =
+            parse_params::<ChapterContentParams>(crate::methods::CHAPTER_CONTENT, &command.params)
+                .unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert_eq!(err.details["method"], crate::methods::CHAPTER_CONTENT);
+        assert!(
+            err.details["source"]
+                .as_str()
+                .is_some_and(|source| source.contains("unknown field")),
+            "unexpected source detail: {}",
+            err.details["source"]
+        );
+    }
 }
