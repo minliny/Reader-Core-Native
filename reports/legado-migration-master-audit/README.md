@@ -1,163 +1,117 @@
-# Legado Migration Master Audit
+# Legado 迁移主审计
 
-Date: 2026-06-25
+日期：2026-06-25
 
-Branch: `codex/legado-migration-master-audit`
+原审计分支：`codex/legado-migration-master-audit`
 
-Baseline: `origin/codex/core-product-integration` at `fb4c3a7`
+原基线：`origin/codex/core-product-integration` at `fb4c3a7`
 
-This audit corrects the project direction: Reader-Core-Native is not a generic
-new reading engine. It is a Legado-capability parity and Reader-Core migration
-project. The target is a single native Core that can be loaded by iOS, Android,
-HarmonyOS, CLI, and future hosts while preserving the behavior assets already
-built in the existing Reader-Core.
+本审计修正项目方向：Reader-Core-Native 不是泛化的新阅读引擎，而是
+Legado 能力兼容 + 旧 Reader-Core 迁移 + Native/C ABI 全平台接入 + corpus
+benchmark 证明的重建项目。
 
-## Executive Decision
+## 核心决策
 
-The project target is:
+项目目标顺序：
 
-1. Use local Legado source to define what must be compatible.
-2. Use existing Reader-Core to define what can be migrated, replayed, or used as
-   behavior evidence.
-3. Use Reader-Core-Native plus a versioned C ABI to solve real cross-platform
-   consumption.
-4. Use sanitized and approved corpus benchmarks to prove that the same source,
-   request chain, and chapter read flow produce the same canonical results on
-   all three platforms.
+1. 用本地 Legado 源码定义必须兼容什么。
+2. 用已有 Reader-Core 定义哪些能力可以迁移、回放或作为行为证据。
+3. 用 Reader-Core-Native 和版本化 C ABI 解决真实跨平台消费。
+4. 用已脱敏、已审批的 corpus benchmark 证明同一 source、request chain、
+   chapter read flow 在三端得到同一 canonical result。
 
-Any plan that starts from "make an abstract cross-platform reading core" is the
-wrong direction. Any plan that treats existing Reader-Core as disposable is also
-wrong. The old Core is a behavior and evidence asset; Native Core is the
-cross-platform execution vehicle.
+任何从“做一个抽象跨平台阅读 Core”出发的计划都是错误方向。任何把旧 Reader-Core
+当作可丢弃历史的计划也错误。旧 Core 是行为和证据资产；Native Core 是跨平台执行
+载体。
 
-## Source Inventory
+## 来源清单
 
-| Source | Path | Current status | How it is used |
+| Source | 路径 | 当时状态 | 用途 |
 | --- | --- | --- | --- |
-| Legado baseline | `/Users/minliny/Documents/legado` | clean `master`, head `da17bb2be` | Read-only capability baseline. No GPL code copy, translate, or rewrite. |
-| Existing Reader-Core | `/Users/minliny/Documents/Reader-Core` | dirty `main`, head `cc7ae849`, many archived planning artifacts | Migration/evidence source; do not treat dirty state as stable production truth without checking the archived artifacts. |
-| Native main worktree | `/Users/minliny/Documents/Reader-Core-Native` | clean when this audit branch was created; active development elsewhere | Current Rust/C ABI repo. |
-| C ABI worktree | `/Users/minliny/Documents/Reader-Core-Native-c-abi-worktree` | `codex/reader-core-c-abi-stable-boundary`, clean | Completed ABI boundary work to audit and later merge. |
-| Data subsystem worktree | `/Users/minliny/Documents/Reader-Core-Native-data-subsystem-storage` | `codex/data-subsystem-storage-cache-coverage`, clean | Completed data/content/storage/sync work to audit and later merge. |
-| Harmony NAPI worktree | `/Users/minliny/Documents/Reader-Core-Native-harmony-napi-integration` | `codex/harmony-napi-integration`, clean, ahead 13 | Completed Harmony binding/NAPI smoke work to audit and later merge. |
-| Rule/JS worktree | `/Users/minliny/Documents/Reader-Core-Native-rule-js-compat-clean` | dirty | Still active; do not integrate until committed and validated. |
-| Android JNI worktree | `/Users/minliny/Documents/Reader-Core-Native/.claude/worktrees/android-jni-sdk` | `codex/android-jni-sdk`, clean, ahead 1 | Completed Android JNI first slice to audit and later merge. |
-| Sanitized corpus worktree | `/Users/minliny/Documents/Reader-Core-Native/.wt-goal-sanitized-corpus` | `codex/goal-sanitized-corpus`, clean, ahead 1 | Seed corpus scaffold and first synthetic fixtures. |
-| CI gates worktree | `/private/tmp/ci-gate-design-wt` | `codex/goal-ci-gate-design`, clean, ahead 2 | CI gate design only. |
-| Release evidence worktree | `/private/tmp/release-evidence-wt` | `codex/goal-release-evidence`, clean, ahead 1 | Release readiness evidence pack. |
-| Host contract worktree | `/private/tmp/goal-host-app-contracts-wt` | `codex/goal-host-app-contracts`, clean, ahead 2 | Host/Core responsibility contracts. |
-| iOS host app | `/Users/minliny/Documents/Reader for iOS` | dirty `main` | Host-app state, not Native Core truth. Use as integration evidence only when committed. |
-| Android host app | `/Users/minliny/Documents/Reader for Android` | clean `main` | Host-app integration target. |
-| Harmony host app | `/Users/minliny/Documents/Reader for HarmonyOS` | dirty `codex/harmony-napi-runtime` | Host-app state, not Native Core truth. Use as integration evidence only when committed. |
+| Legado baseline | `/Users/minliny/Documents/legado` | clean `master`，head `da17bb2be` | 只读能力基线；禁止复制、翻译或改写 GPL 实现 |
+| Existing Reader-Core | `/Users/minliny/Documents/Reader-Core` | dirty `main`，head `cc7ae849` | 迁移/证据来源；dirty state 需逐项核实 |
+| Native 主 worktree | `/Users/minliny/Documents/Reader-Core-Native` | 审计时 clean | 当前 Rust/C ABI 仓库 |
+| C ABI worktree | `/Users/minliny/Documents/Reader-Core-Native-c-abi-worktree` | clean | ABI boundary 工作 |
+| Data subsystem worktree | `/Users/minliny/Documents/Reader-Core-Native-data-subsystem-storage` | clean | content/local/RSS/storage/sync 工作 |
+| Harmony NAPI worktree | `/Users/minliny/Documents/Reader-Core-Native-harmony-napi-integration` | clean | Harmony binding/NAPI smoke 工作 |
+| Rule/JS worktree | `/Users/minliny/Documents/Reader-Core-Native-rule-js-compat-clean` | 当时 dirty | rule 与 JS compatibility lane |
+| Android JNI worktree | `.claude/worktrees/android-jni-sdk` | clean | Android JNI first slice |
+| 脱敏 corpus worktree | `.wt-goal-sanitized-corpus` | clean | seed corpus 脚手架 |
+| Host apps | `Reader for iOS`、`Reader for Android`、`Reader for HarmonyOS` | 状态各异 | 平台集成目标和证据来源 |
 
-## Completed Branch Merge Audit
+后续这些 Native worktree 已合并清理，最终状态见
+`reports/full-consolidation/2026-06-25.md`。
 
-These are not all safe to merge blindly. Some branches contain useful completed
-work but also have overlapping history from earlier agent runs.
+## Legado 定义要兼容什么
 
-| Branch | Ahead of base | Status | Main content | Merge readiness |
-| --- | ---: | --- | --- | --- |
-| `codex/reader-core-runtime-protocol` | 15 | clean at audit start | Runtime status/shutdown, HTTP host completion validation, conformance fixtures; history also includes iOS/Harmony/Android changes | Needs careful integration split. Treat runtime/protocol changes as core-owned; platform files should be compared against platform branches before merge. |
-| `codex/reader-core-c-abi-stable-boundary` | 15 | clean | `reader_core.h`, FFI status/last_error/panic guard, C/C++ smoke strengthening, Swift wrapper support | High value. Merge after protocol branch or replay ABI-only commits to avoid cross-branch conflicts. |
-| `codex/data-subsystem-storage-cache-coverage` | 15 | clean | Storage snapshots, bookshelf queries, local book library snapshots, RSS snapshot import/export, sync package/journal, cache coverage planning | High value, but includes prior ABI/protocol carry-over. Needs path-level cherry-pick or conflict-aware merge. |
-| `codex/harmony-napi-integration` | 13 | clean | Harmony NAPI wrapper, ArkTS SDK helpers, lifecycle smoke, timeout guards, smoke report artifact | Merge into Harmony lane after Core/ABI stabilizes. Does not prove HAP/device parity. |
-| `codex/android-jni-sdk` | 1 | clean | JNI lifecycle, command/event bridge, host.complete, CMake build, Kotlin sample | Merge into Android lane. Still NDK/device validation dependent. |
-| `codex/reader-rule-js-compat-clean` | 5 plus dirty files | active | JSONPath/CSS/JS boundary tests and compatibility work | Not merge-ready. Needs commit, `cargo test -p reader-rule -p reader-js`, and diff audit. |
-| `codex/goal-ci-gate-design` | 2 | clean | `docs/ci-gates/**`, fail-closed CI gate design | Merge independently; docs-only. |
-| `codex/goal-host-app-contracts` | 2 | clean | network/session and local storage/sync host contracts | Merge independently; docs-only. |
-| `codex/goal-release-evidence` | 1 | clean | release readiness evidence pack | Merge independently; docs-only. |
-| `codex/goal-sanitized-corpus` | 1 | clean | first sanitized corpus batch and audit report | Merge independently; data-only. |
+审计到的 Legado 只读源码区域：
 
-## Documents Cleanup / Consolidation
-
-The relevant "Documents" material is not a few root-level files. It is spread
-across worktrees and archived directories:
-
-- Existing Reader-Core archive:
-  `/Users/minliny/Documents/Reader-Core/_archived_planning_2026-06-24`
-- Native side worktrees:
-  `/Users/minliny/Documents/Reader-Core-Native-*`
-- Nested agent worktrees:
-  `/Users/minliny/Documents/Reader-Core-Native/.claude/worktrees/*`
-  and `/Users/minliny/Documents/Reader-Core-Native/.wt-*`
-- Host app repositories:
-  `Reader for iOS`, `Reader for Android`, `Reader for HarmonyOS`
-
-This audit consolidates those materials by reference. It does not move or delete
-the original files, because old Reader-Core and host app repos are dirty and
-must not be modified during a Native Core audit.
-
-## Legado Defines What Must Be Compatible
-
-Legado read-only source areas observed:
-
-| Capability area | Legado source paths |
+| 能力区域 | Legado 源路径 |
 | --- | --- |
-| Rule parsing and rule data | `app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeRule.kt`, `RuleAnalyzer.kt`, `RuleData.kt`, `RuleDataInterface.kt` |
-| JSONPath / CSS / XPath / Regex | `AnalyzeByJSonPath.kt`, `AnalyzeByJSoup.kt`, `AnalyzeByXPath.kt`, `AnalyzeByRegex.kt` |
-| URL/request DSL | `AnalyzeUrl.kt`, `CustomUrl.kt`, `app/src/main/java/io/legado/app/help/http/*` |
-| Web book vertical | `app/src/main/java/io/legado/app/model/webBook/{SearchModel,BookList,BookInfo,BookChapterList,BookContent,WebBook}.kt` |
-| Book source models | `app/src/main/java/io/legado/app/data/entities/BookSource.kt`, `BookSourcePart.kt`, source helper and debug UI paths |
-| RSS | `app/src/main/java/io/legado/app/model/rss/*`, `RssSource.kt`, RSS source controllers/debug paths |
-| Local book formats | `app/src/main/java/io/legado/app/model/localBook/{TextFile,EpubFile,PdfFile,MobiFile,UmdFile,LocalBook}.kt`, `modules/book/**` |
-| HTTP/Cookie/session | `app/src/main/java/io/legado/app/help/http/{CookieManager,CookieStore,HttpHelper,OkHttpUtils,Cronet,BackstageWebView}.kt` |
-| WebDAV/sync | `app/src/main/java/io/legado/app/lib/webdav/*` |
-| Data model / Room-like persistence | `app/src/main/java/io/legado/app/data/dao/*`, `data/entities/*` |
-| Web API / source web UI | `api.md`, `app/src/main/java/io/legado/app/api/**`, `modules/web/src/**` |
+| Rule parsing 与 rule data | `AnalyzeRule.kt`、`RuleAnalyzer.kt`、`RuleData.kt`、`RuleDataInterface.kt` |
+| JSONPath / CSS / XPath / Regex | `AnalyzeByJSonPath.kt`、`AnalyzeByJSoup.kt`、`AnalyzeByXPath.kt`、`AnalyzeByRegex.kt` |
+| URL/request DSL | `AnalyzeUrl.kt`、`CustomUrl.kt`、`help/http/*` |
+| Web book vertical | `model/webBook/{SearchModel,BookList,BookInfo,BookChapterList,BookContent,WebBook}.kt` |
+| 书源模型 | `data/entities/BookSource.kt`、`BookSourcePart.kt` |
+| RSS | `model/rss/*`、`RssSource.kt` |
+| 本地书格式 | `model/localBook/*`、`modules/book/**` |
+| HTTP/Cookie/session | `CookieManager`、`CookieStore`、`HttpHelper`、`OkHttpUtils`、`Cronet`、`BackstageWebView` |
+| WebDAV/sync | `lib/webdav/*` |
+| Data model / persistence | `data/dao/*`、`data/entities/*` |
+| Web API / source web UI | `api.md`、`app/api/**`、`modules/web/src/**` |
 
-The compatibility ledger must therefore cover at least:
+兼容账本至少必须覆盖：
 
-1. Rule DSL syntax and chained execution semantics.
-2. JS/Rhino-like helper compatibility and host callback behavior.
-3. Request DSL: method, headers, body, charset, redirect, retry, error policy.
-4. Full webBook chain: search -> detail -> toc -> content -> pagination.
-5. Chapter identity, ordering, duplicate detection, canonical URL stability.
-6. Cookie/session/login/WebView-hosted flows.
-7. RSS source import, parse, update, and reading flow.
-8. Local book import, format detection, chapter/resource reads, lazy reading.
-9. WebDAV backup/sync and conflict behavior.
-10. Data schema, migrations, cache/progress/bookmark/download queue behavior.
-11. Web API/export/import/admin surfaces.
+1. Rule DSL 语法和链式执行语义。
+2. JS/Rhino-like helper 和 host callback 行为。
+3. Request DSL：method、headers、body、charset、redirect、retry、error policy。
+4. webBook 链路：search -> detail -> toc -> content -> pagination。
+5. chapter identity、ordering、duplicate detection、canonical URL stability。
+6. cookie/session/login/WebView-hosted flow。
+7. RSS source import、parse、update、reading flow。
+8. local book import、format detection、chapter/resource read、lazy reading。
+9. WebDAV backup/sync 与 conflict behavior。
+10. data schema、migration、cache/progress/bookmark/download queue。
+11. Web API/export/import/admin surface。
 
-## Existing Reader-Core Defines Migration Assets
+## 旧 Reader-Core 定义迁移资产
 
-Reader-Core archive and tests show it is not just legacy code. It already has
-behavior assets that should be migrated or replayed.
+旧 Reader-Core 不是废弃代码。它已经有大量行为资产，应迁移或回放。
 
-Important archived facts:
+重要 archive 事实：
 
 - `LEGADO_FULL_CAPABILITY_MATRIX_V2_SOURCE_BACKED_SUMMARY.md`
-  - 51 total capability entries.
-  - 25 Core-denominator capabilities.
-  - 11 host-app scope capabilities.
-  - 11 product-gated capabilities.
-  - `productionReady=false`, `legadoParityComplete=false`,
-    `coreParityComplete=false`.
-  - real corpus benchmark was not available.
+  - 51 个 capability entry。
+  - 25 个 Core-denominator capability。
+  - 11 个 host-app scope capability。
+  - 11 个 product-gated capability。
+  - `productionReady=false`、`legadoParityComplete=false`、
+    `coreParityComplete=false`。
+  - 当时没有真实 corpus benchmark。
 - `LEGADO-COMPAT-1_CAPABILITY_GAP_MATRIX_SUMMARY.md`
-  - 82 capability entries.
-  - 8 supported, 35 partial, 3 missing, 10 product-approval, 11 policy-no-go,
-    11 not measured.
-  - 62 high-risk parity gaps.
-  - top blockers are real rule-chain and corpus parity: search->detail,
-    detail->toc, toc->content, chapter identity/order, duplicate chapter
-    detection, canonical URL stability.
+  - 82 个 capability entry。
+  - 8 supported、35 partial、3 missing、10 product-approval、11 policy-no-go、
+    11 not measured。
+  - 62 个 high-risk parity gap。
+  - 最高风险是 rule-chain 和 corpus parity：search->detail、detail->toc、
+    toc->content、chapter identity/order、duplicate chapter detection、
+    canonical URL stability。
 - `LEGADO-COMPAT-11_EXTERNAL_APPROVAL_ATTESTATION_RESPONSE_GAP_AUDIT_SUMMARY.md`
-  - 258 follow-up response decisions missing.
-  - approval captured count remained zero.
-  - benchmark-ready corpus count remained zero.
+  - 258 个 follow-up response decision 缺失。
+  - approval captured count 仍为 0。
+  - benchmark-ready corpus count 仍为 0。
 
-Important Recovery assets:
+关键 RECOVERY 输入：
 
-| Recovery | What it proves in old Reader-Core | Native migration meaning |
+| RECOVERY | 旧 Reader-Core 已证明什么 | Native 迁移含义 |
 | --- | --- | --- |
-| RECOVERY-29 | JS executor, WebView DOM executor, runtime binding results | Migrate JS/runtime behavior carefully; WebView remains host adapter. |
-| RECOVERY-30 | cookie jar/session/login bridge results | Native Core must own cookie/session semantics, host must supply WebView/cookie acquisition. |
-| RECOVERY-31 | local book ingestion: TXT/EPUB/PDF format/encoding/chapter/resource work | Native local book should migrate behavior and tests, not restart from scratch. |
-| RECOVERY-32 | local book library runtime: catalog, duplicate/change decisions, lazy chapter/resource reads, progress/cache | Native storage/content work should preserve these semantics. |
-| RECOVERY-33 | unified remote/local reading runtime, offline cache, TOC refresh/update, downloads, progress remap | Native runtime/storage should target this unified behavior, not only smoke. |
+| RECOVERY-29 | JS executor、WebView DOM executor、runtime binding result | JS/runtime 行为需谨慎迁移；WebView 仍由 host adapter 负责 |
+| RECOVERY-30 | cookie jar、session、login bridge | Core 应拥有 cookie/session 语义；host 提供 WebView/cookie 获取 |
+| RECOVERY-31 | TXT/EPUB/PDF format、encoding、chapter/resource | local book 行为和测试不能重做时丢失 |
+| RECOVERY-32 | catalog、duplicate/change、lazy chapter/resource、progress/cache | storage/content 工作应保留这些语义 |
+| RECOVERY-33 | unified remote/local runtime、offline cache、TOC refresh、downloads、progress remap | Native runtime/storage 应以 unified behavior 为目标 |
 
-Existing Reader-Core test assets observed include:
+旧 Core 测试资产包括：
 
 - `Tests/ReaderCoreParserTests/*`
 - `Tests/ReaderCoreNetworkTests/*`
@@ -165,64 +119,46 @@ Existing Reader-Core test assets observed include:
 - `Tests/ReaderCoreModelsTests/*`
 - `Tests/ReaderCoreJSRendererTests/*`
 - `samples/reports/latest/**`
-- Apple adapters under `Adapters/Apple/**`
-- HTTP adapter under `Adapters/HTTP/**`
+- `Adapters/Apple/**`
+- `Adapters/HTTP/**`
 
-These are migration inputs. They are not automatically production evidence for
-Native Core, but they are the best source of expected behavior.
+这些是迁移输入，不是 Native 的自动生产证据。
 
-## Native Core / C ABI Solves Platform Consumption
+## Native Core / C ABI 解决平台消费
 
-The old Core did not become a single platform-loadable engine for all targets.
-Native Core must solve that, but only after the compatibility target is clear.
+旧 Core 没有成为三端统一加载的引擎。Native Core 必须解决这个问题，但必须在兼容
+目标清楚后进行。
 
-The correct boundary:
+边界：
 
-| Layer | Native Core owns | Host owns |
+| 层 | Native Core 负责 | Host 负责 |
 | --- | --- | --- |
-| Protocol | command/event schema, request correlation, conformance | Sending commands and consuming events |
-| Runtime | lifecycle, status, shutdown, cancel, pending host operation registry | App lifecycle scheduling and threading integration |
-| ABI | C ABI, error/status codes, panic guard, last_error, event payload handling | Swift/JNI/NAPI wrappers |
-| Rule/request semantics | rule execution, request descriptor construction, redirect/cookie/encoding policy | Actual TLS/socket/WebView/file permission |
-| Data semantics | book/source/progress/cache/download/sync models | OS sandbox directory, secure storage handle, background scheduling |
-| WebView/login/captcha | host request contract and redacted session import semantics | UI interaction, WebView DOM, captcha/manual approval |
+| Protocol | command/event schema、request correlation、conformance | 发送 command、消费 event |
+| Runtime | lifecycle、status、shutdown、cancel、pending host operation registry | App lifecycle scheduling、threading integration |
+| ABI | C ABI、status/error、panic guard、last_error、event payload | Swift/JNI/NAPI wrapper |
+| Rule/request | rule execution、request descriptor、redirect/cookie/encoding policy | TLS/socket/WebView/file permission |
+| Data | book/source/progress/cache/download/sync model | OS sandbox directory、secure storage handle、background scheduling |
+| WebView/login/captcha | host request contract 与 redacted session import | UI、WebView DOM、captcha/manual approval |
 
-Current Native evidence:
+## Corpus benchmark 证明三端结果一致
 
-- C ABI branch has strengthened event protocol version, command shape status,
-  host event assertions, empty command rejection, cancel no-op semantics,
-  last-error boundary, default config creation, and panic-guard strategy docs.
-- Runtime/protocol branch has status/shutdown/cancel/host completion
-  conformance work, but its history contains platform changes too.
-- Android JNI branch has a first JNI lifecycle/command/event/host.complete slice.
-- Harmony branch has NAPI/ArkTS SDK helpers, lifecycle smoke, timeout guards,
-  native event validation, and smoke artifacts.
-- Release evidence currently distinguishes Core-side smoke from App/device
-  proof; Android/Harmony/iOS host-app completion remains unproven.
+当前 seed corpus 有 5 个 synthetic fixture：
 
-## Corpus Benchmark Proves Cross-Platform Behavior
+- `bs-001` book-source JSON
+- `wp-001` static HTML page
+- `ja-001` JSON API response
+- `xf-001` XML/OPDS-style feed
+- `rf-001` RSS feed
 
-Current corpus state:
+这只是起点，不是 parity 证明。完整 benchmark 需要：
 
-- `codex/goal-sanitized-corpus` seeded 5 synthetic fixtures:
-  - `bs-001` book-source JSON
-  - `wp-001` static HTML page
-  - `ja-001` JSON API response
-  - `xf-001` XML/OPDS-style feed
-  - `rf-001` RSS feed
-- All have manifests with source type, sanitization, capability tags,
-  privacy checks, and consumer branches.
+1. Legado-defined capability corpus。
+2. Reader-Core 期望行为 replay corpus。
+3. Native CLI canonical result corpus。
+4. iOS/Android/Harmony wrapper 执行 corpus。
+5. Cross-platform canonical DTO comparison。
 
-This is a start, not parity proof. To prove "the three platforms really read
-the same thing", the benchmark must evolve into:
-
-1. Legado-defined capability corpus.
-2. Reader-Core expected behavior replay corpus.
-3. Native CLI canonical result corpus.
-4. iOS/Android/Harmony wrapper execution corpus.
-5. Cross-platform canonical DTO comparison.
-
-Minimum benchmark result schema:
+最小结果 schema：
 
 ```json
 {
@@ -250,216 +186,48 @@ Minimum benchmark result schema:
 }
 ```
 
-Release cannot claim Legado parity until this exists for the critical paths.
-
-## Correct Full Development Route
-
-### Phase 0: Freeze Source-of-Truth and Branch Hygiene
-
-Goal: prevent more planning drift.
-
-Required outputs:
-
-- A Legado capability ledger.
-- A Reader-Core migration ledger.
-- A Native branch integration ledger.
-- A rule that Legado is read-only and existing Reader-Core dirty state is not
-  edited by Native agents.
-
-### Phase 1: Legado Capability Ledger
-
-Goal: define what must be compatible before implementing more features.
-
-Work items:
-
-- Enumerate source-backed capability areas from Legado paths above.
-- For each capability: assign Core / host / product-gated / out-of-scope.
-- Attach expected evidence type: unit test, conformance fixture, corpus replay,
-  host-app proof, manual approval, or policy no-go.
-- Carry forward the old matrix counts but do not trust them blindly:
-  `LEGADO_FULL_CAPABILITY_MATRIX_V2` is a starting point, not the final ledger.
-
-### Phase 2: Reader-Core Migration Ledger
-
-Goal: preserve existing behavior work.
-
-For every old Reader-Core area:
-
-- `migrate`: behavior/test should be ported to Native.
-- `replay`: test/corpus should be used as expected output only.
-- `host`: platform adapter behavior should remain outside Core.
-- `archive`: not part of Native parity.
-
-Priority migration groups:
-
-1. Parser/rule DSL tests.
-2. Network/request DSL and URLSession behavior.
-3. Cookie/session redacted behavior.
-4. Local book RECOVERY-31/32.
-5. Unified reading runtime RECOVERY-33.
-6. WebDAV and backup/sync models.
-
-### Phase 3: Protocol and C ABI Foundation
-
-Goal: make a single Native Core consumable.
-
-Order:
-
-1. Merge/replay `reader-core-runtime-protocol` core-only commits.
-2. Merge/replay `reader-core-c-abi-stable-boundary` ABI-only commits.
-3. Resolve schema/status/error/cancel/host operation conflicts.
-4. Run:
-   - `cargo test -p reader-contract -p reader-runtime -p reader-ffi`
-   - `cargo run -p reader-cli -- --conformance`
-   - `./scripts/ffi-smoke.sh`
-
-Exit condition:
-
-- CLI and C ABI can drive status, shutdown, cancel, host.request, host.complete,
-  host.error, and structured errors.
-
-### Phase 4: Rule / JS / Request Compatibility
-
-Goal: close Legado high-risk rule-chain gaps.
-
-Order:
-
-1. Finish dirty `reader-rule-js-compat-clean`.
-2. Add benchmark cases for JSONPath filters, slices, unions, recursive descent,
-   CSS attributes/text, XPath namespaces/predicates, regex extraction/replace.
-3. Add JS host callback behavior from old Reader-Core tests.
-4. Define QuickJS vs host WebView split.
-
-Exit condition:
-
-- Rule chain search->detail->toc->content works on sanitized corpus.
-- JS/WebView-only paths fail closed with host-required errors, not fake pass.
-
-### Phase 5: Remote Reading Chain
-
-Goal: reproduce Legado webBook vertical semantics.
-
-Required chain:
-
-1. source import
-2. search
-3. detail
-4. toc
-5. chapter content
-6. pagination
-7. cache/offline read
-8. progress remap
-
-Exit condition:
-
-- Same corpus source yields same canonical DTO through CLI and at least one
-  platform wrapper.
-
-### Phase 6: Local Book / RSS / WebDAV / Storage
-
-Goal: migrate old Reader-Core RECOVERY-31/32/33 and Legado non-webBook
-capabilities.
-
-Work items:
-
-- TXT/EPUB/PDF/MOBI/UMD classification and support policy.
-- RSS import/parse/update.
-- storage schema, progress, cache, downloads.
-- WebDAV sync and backup/restore.
-
-Exit condition:
-
-- Data subsystem tests pass.
-- Storage snapshot/import/export behavior is deterministic.
-- Unsupported local formats fail with explicit policy.
-
-### Phase 7: Platform Real Consumption
-
-Goal: all platforms load the same Native Core commit.
-
-Required platform proof:
-
-- iOS: XCFramework + Swift SDK + URLSession/WebView/session host adapters.
-- Android: JNI + Kotlin/Java SDK + NDK build + App bridge smoke.
-- Harmony: NAPI + ArkTS SDK + HAP/device or platform-real runner.
-
-Exit condition:
-
-- Each platform runs the same corpus cases and returns the same canonical hash.
-- Smoke is not enough for App/device release claims.
-
-### Phase 8: Corpus Benchmark and Release Gate
-
-Goal: prove parity, not merely implementation volume.
-
-Required outputs:
-
-- authorized/sanitized corpus with privacy approvals.
-- per-capability benchmark score.
-- cross-platform canonical DTO comparison.
-- release blocker register.
-- CI gate matrix.
-
-Exit condition:
-
-- `coreParityComplete`, `legadoParityComplete`, and `productionReady` can only
-  move after benchmark evidence and host-app proof exist.
-
-## Immediate Integration Order
-
-Do not merge all current branches at once. Use this order:
-
-1. Docs/data-only branches:
-   - `goal-ci-gate-design`
-   - `goal-host-app-contracts`
-   - `goal-release-evidence`
-   - `goal-sanitized-corpus`
-2. Core runtime/protocol branch, after path-level audit removes platform drift.
-3. C ABI branch, after protocol shape is fixed.
-4. Android JNI branch into Android lane.
-5. Harmony NAPI branch into Harmony lane.
-6. Data subsystem branch, with ABI/protocol conflict resolution.
-7. Rule/JS branch only after dirty work is committed and validated.
-
-## Next Missing Long-Running Goals
-
-These are the missing goals that should exist before more feature coding:
-
-1. `codex/goal-legado-capability-ledger`
-   - output: source-backed capability ledger from local Legado.
-2. `codex/goal-reader-core-migration-ledger`
-   - output: migrate/replay/host/archive table for old Reader-Core assets.
-3. `codex/goal-legado-rule-chain-benchmark`
-   - output: search->detail->toc->content benchmark cases.
-4. `codex/goal-network-session-compat`
-   - output: request DSL, cookie/session, redirect/retry/charset parity.
-5. `codex/goal-webdav-backup-webapi-parity`
-   - output: WebDAV, backup/restore, web API parity matrix and fixtures.
-
-## Non-Negotiable Guardrails
-
-- Legado remains read-only.
-- No GPL implementation code is copied, translated, or rewritten.
-- Existing Reader-Core dirty state is not modified by Native audit agents.
-- Host-app repos are evidence sources only unless a task explicitly targets that
-  repo.
-- Core-side smoke must never be reported as App/device parity.
-- Static reports do not replace runtime or corpus proof.
-- Real corpus requires approval, privacy review, and redaction.
-
-## Current Conclusion
-
-The Native repo now has meaningful progress in runtime/protocol, C ABI,
-storage/content/sync, Harmony NAPI, Android JNI, CI design, host contracts,
-release evidence, and seed corpus. However, the project is not yet aligned to a
-single Legado parity ledger, and the old Reader-Core migration assets are not
-yet systematically mapped into Native work.
-
-The next engineering move should not be another generic feature branch. It
-should be the two ledgers:
-
-1. Legado capability ledger.
-2. Reader-Core migration ledger.
-
-Only after those ledgers exist should implementation branches be judged as
-"closing parity" rather than "adding capability".
+关键路径没有这类证据时，不能声明 Legado parity。
+
+## 正确全量路线
+
+完整路线已经整理到 `docs/FULL_DEVELOPMENT_ROADMAP.md`。核心阶段：
+
+1. 合并基线与分支卫生。
+2. Legado 能力账本。
+3. Reader-Core 迁移账本。
+4. Protocol 与 C ABI foundation。
+5. Rule / JS / request compatibility。
+6. 远程阅读链路。
+7. Local book / RSS / WebDAV / storage。
+8. 真实平台消费。
+9. Corpus benchmark 与 release gate。
+
+## 必须新增的长期 goal
+
+- `codex/goal-legado-compat-ledger`
+- `codex/goal-reader-core-migration-ledger`
+- `codex/goal-rule-js-request-parity`
+- `codex/goal-remote-reading-corpus-runner`
+- `codex/goal-data-local-rss-sync-parity`
+- `codex/goal-platform-sdk-host-adapters`
+- `codex/goal-release-ci-evidence-governance`
+
+具体写入边界、限制和提示词见 `docs/FULL_DEVELOPMENT_ROADMAP.md`。
+
+## 不可妥协的守则
+
+- Legado 只读。
+- 不复制、翻译或改写 GPL 实现代码。
+- Native 审计 agent 不修改 dirty 旧 Reader-Core。
+- 宿主 App 仓库默认只是证据来源。
+- Core-side smoke 不得报告为 App/device parity。
+- 静态报告不能替代 runtime 或 corpus proof。
+- 真实 corpus 需要 approval、privacy review 和 redaction。
+
+## 当前结论
+
+Native repo 已经在 runtime/protocol、C ABI、storage/content/sync、Harmony NAPI、
+Android JNI、CI design、host contracts、release evidence、seed corpus 上有实质进展。
+但项目还必须用单一 Legado parity 账本和旧 Reader-Core 迁移账本重新锚定
+所有实现。后续分支不能只说“增加能力”，必须说明它关闭了哪条兼容行、迁移了哪个旧
+Core 资产，并通过哪一个 corpus case 证明。

@@ -3,7 +3,7 @@
 > 主题域：HTTP transport、重定向、Cookie 策略与持久化、响应编码、响应体解析归属。
 > 状态：🟡 契约已立（未实现）。本文件不声明任何实现完成。
 
-## 1. Scope
+## 1. 范围
 
 **覆盖：**
 
@@ -162,7 +162,7 @@ body"。但 Core 要做重定向判断与 cookie 捕获，必须消费 `finalUrl
 jar。该命令跨 01/03 两个主题域，在 03 立约时最终确定。→ 后续 owner:
 protocol schema + 03 login/auth。
 
-## 4. Acceptance evidence requirements
+## 4. 验收证据要求
 
 > 以下为 *契约成立所需的证据*，不是实现完成的声明。任何"已完成"措辞
 > 仅指证据本身存在，不指实现已交付。

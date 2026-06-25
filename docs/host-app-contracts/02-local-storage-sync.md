@@ -1,10 +1,10 @@
-# 02 — Local Storage / Sync
+# 02：本地存储 / 同步
 
 > 主题域：SQLite schema、缓存、阅读进度、下载队列、最近历史、WebDAV、
 > 备份/恢复、同步/冲突解决。
 > 状态：🟡 契约已立（未实现）。本文件不声明任何实现完成。
 
-## 1. Scope
+## 1. 范围
 
 **覆盖：**
 
@@ -177,7 +177,7 @@ protocol schema + 03 login/auth。
   cookie 写入 Core jar；Core 在 `dataDirectory/cookies/` 持久化。
 - Core jar 不得与平台 HTTP cookie 存储互通（`usePlatformCookieJar=false`）。
 
-## 4. Acceptance evidence requirements
+## 4. 验收证据要求
 
 > 以下为 *契约成立所需的证据*，不是实现完成的声明。
 

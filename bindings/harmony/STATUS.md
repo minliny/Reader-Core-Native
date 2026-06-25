@@ -1,94 +1,72 @@
-# Harmony NAPI Status
+# Harmony NAPI 状态
 
-## Scope
+## 范围
 
-This status file tracks the Harmony wrapper only. The current work is limited
-to `bindings/harmony/**`, `scripts/build-harmony-napi.sh`, and
-`scripts/build-ohos.sh`.
+本文只跟踪 Harmony wrapper。当前工作范围限制在 `bindings/harmony/**`、
+`scripts/build-harmony-napi.sh`、`scripts/build-ohos.sh`。
 
-## Closed In This Line
+## 本线已闭环
 
-- Runtime lifecycle: NAPI can create and release a Reader-Core runtime handle.
-- Lifecycle smoke: NAPI exposes `lifecycleSmoke(iterations)` to repeatedly
-  create a runtime, send `runtime.ping`, read a result event, and destroy the
-  runtime.
-- Command/event path: NAPI can send JSON commands and read copied Core events
-  from a thread-safe queue.
-- Command guard: the SDK rejects empty command methods, non-object command
-  params, and non-object `host.complete` results before dispatching to native.
-- Timeout guard: the SDK rejects negative/non-integer `timeoutMs` and non-positive
-  `pollMs` values before native polling.
-- Cancellation: NAPI exposes `cancelRequest`, backed by `rc_runtime_cancel`.
-- Host bus minimum loop: `host.request` can be read and answered with
-  `host.complete`; the SDK helper can auto-complete host requests while waiting
-  for the original request result.
-- Interleaved event handling: the SDK keeps unrelated events queued while
-  waiting for a specific request result, so a pending `host.request` from
-  another request does not break the current command/result flow.
-- Event validation: SDK event parsing rejects malformed `result`, `error`, and
-  `host.request` payloads before they enter request waiting or host completion
-  logic.
-- Host error path: NAPI exposes `failHostRequest`, backed by the `host.error`
-  JSON command path; the SDK sends `host.error` automatically if a host request
-  handler throws.
-- SDK behavior smoke: `bindings/harmony/sdk/reader_core.test.ts` uses a fake
-  native module to verify `runtime.ping`, `host.complete`, handler failure to
-  `host.error`, command input rejection, timeout option rejection, unrelated
-  event queuing, malformed native event rejection, and `cancelRequest` dispatch.
-- ArkTS package entry: `bindings/harmony/Index.ets` imports
-  `libreader_core_napi.so` and exposes `createReaderCoreRuntime` plus
-  `runHarmonyNapiSmoke`.
-- Device smoke report entry: `captureHarmonyNapiSmokeReport` validates the
-  HAP-side smoke result and returns a formatted-report-compatible pass/fail
-  structure that can be archived beside local build evidence, including a
-  structured failure report if native loading or runtime execution throws.
-  `runHarmonyNapiSmokeReport` keeps the same checks but throws on failure for
-  gate-style callers.
-- Device smoke artifact entry: `captureHarmonyNapiSmokeArtifact` wraps the
-  report with a stable artifact name, pass/fail summary, and raw report payload
-  for device-log archival; `runHarmonyNapiSmokeArtifact` keeps gate-style
-  failure semantics.
-- Build evidence: OHOS and Harmony scripts emit deterministic artifact paths,
-  SHA-256 hashes, byte sizes, tool versions, NAPI symbol evidence, and a
-  package-ready Harmony directory manifest.
+- Runtime lifecycle：NAPI 可以创建和释放 Reader-Core runtime handle。
+- Lifecycle smoke：NAPI 暴露 `lifecycleSmoke(iterations)`，可反复 create runtime、
+  send `runtime.ping`、读取 result event、destroy runtime。
+- Command/event path：NAPI 可以发送 JSON command，并从 thread-safe queue 读取已复制的
+  Core event。
+- Command guard：SDK 在 dispatch 到 native 前拒绝 empty command method、non-object
+  command params、non-object `host.complete` result。
+- Timeout guard：SDK 在 native polling 前拒绝负数/非整数 `timeoutMs` 和非正 `pollMs`。
+- Cancellation：NAPI 暴露 `cancelRequest`，底层调用 `rc_runtime_cancel`。
+- Host bus 最小回路：`host.request` 可读取并用 `host.complete` 回复；SDK helper 等待
+  原 request result 时可自动完成 host request。
+- 交错 event 处理：SDK 等待指定 request result 时会保留 unrelated events，
+  避免其他 request 的 pending `host.request` 破坏当前 command/result flow。
+- Event validation：SDK event parsing 会在进入 request waiting 或 host completion 逻辑前
+  拒绝 malformed `result`、`error`、`host.request` payload。
+- Host error path：NAPI 暴露 `failHostRequest`，通过 `host.error` JSON command path；
+  host request handler 抛错时 SDK 会自动发送 `host.error`。
+- SDK behavior smoke：`bindings/harmony/sdk/reader_core.test.ts` 使用 fake native module
+  验证 `runtime.ping`、`host.complete`、handler failure -> `host.error`、command input
+  rejection、timeout option rejection、unrelated event queuing、malformed native event
+  rejection、`cancelRequest` dispatch。
+- ArkTS package entry：`bindings/harmony/Index.ets` 导入 `libreader_core_napi.so` 并暴露
+  `createReaderCoreRuntime` 与 `runHarmonyNapiSmoke`。
+- Device smoke report 入口：`captureHarmonyNapiSmokeReport` 验证 HAP-side smoke result，
+  返回可归档的 pass/fail structure；native loading 或 runtime execution 抛错时也返回
+  structured failure report。`runHarmonyNapiSmokeReport` 保持同样检查，但失败时抛错。
+- Device smoke artifact 入口：`captureHarmonyNapiSmokeArtifact` 包装稳定 artifact name、
+  pass/fail summary 和 raw report payload；`runHarmonyNapiSmokeArtifact` 保持 gate-style
+  failure semantics。
+- Build evidence：OHOS 与 Harmony scripts 输出 deterministic artifact path、SHA-256、
+  byte size、tool version、NAPI symbol evidence、package-ready Harmony directory manifest。
 
-## Current SDK Surface
+## 当前 SDK surface
 
-- Native NAPI exports: `abiVersion`, `createRuntime`, `releaseRuntime`,
-  `sendCommand`, `cancelRequest`, `readEvent`, `pendingEventCount`,
-  `completeHostRequest`, `failHostRequest`, `pingSmoke`, `hostSmoke`, and
-  `lifecycleSmoke`.
-- TypeScript/ArkTS wrapper: `bindings/harmony/sdk/reader_core.ts` wraps native
-  exports into `ReaderCoreRuntime`, including `coreInfo`, `ping`, `hostSmoke`,
-  generic `request`, explicit `readEvent`, explicit `completeHostRequest`, and
-  explicit `failHostRequest`.
-- Smoke report helper: `bindings/harmony/sdk/smoke_report.ts` validates
-  lifecycle, `core.info`, `runtime.ping`, and `runtime.hostSmoke` output and
-  formats a deterministic JSON report for device-log archival, including an
-  `execution` failure check for early runtime/native errors and an artifact
-  wrapper with stable pass/fail counts.
-- Package entry: `bindings/harmony/oh-package.json5` points to `Index.ets`.
-- Package artifact: `scripts/build-harmony-napi.sh` assembles
-  `target/harmony-napi/arm64-v8a/package` with the `.so`, ArkTS entry, non-test
-  SDK files, and status/readme files, then emits
-  `harmony-package-manifest.sha256`.
+- Native NAPI exports：`abiVersion`、`createRuntime`、`releaseRuntime`、`sendCommand`、
+  `cancelRequest`、`readEvent`、`pendingEventCount`、`completeHostRequest`、
+  `failHostRequest`、`pingSmoke`、`hostSmoke`、`lifecycleSmoke`。
+- TypeScript/ArkTS wrapper：`bindings/harmony/sdk/reader_core.ts` 将 native exports 包成
+  `ReaderCoreRuntime`，包括 `coreInfo`、`ping`、`hostSmoke`、generic `request`、
+  explicit `readEvent`、explicit `completeHostRequest`、explicit `failHostRequest`。
+- Smoke report helper：`bindings/harmony/sdk/smoke_report.ts` 校验 lifecycle、
+  `core.info`、`runtime.ping`、`runtime.hostSmoke` 输出，并生成 deterministic JSON report，
+  可用于 device-log archival。
+- Package entry：`bindings/harmony/oh-package.json5` 指向 `Index.ets`。
+- Package artifact：`scripts/build-harmony-napi.sh` 组装
+  `target/harmony-napi/arm64-v8a/package`，包含 `.so`、ArkTS entry、非测试 SDK 文件和
+  status/readme 文件，并生成 `harmony-package-manifest.sha256`。
 
-## ABI Constraints
+## ABI 约束
 
-- ABI v1 returns only integer status codes from `rc_runtime_create`,
-  `rc_runtime_send`, and `rc_runtime_cancel`. Harmony cannot expose a structured
-  synchronous failure object unless Core/FFI adds a last-error or direct
-  out-buffer ABI. This is not changed here because Core/FFI edits are forbidden.
-- ABI v1 events are callback-only borrowed buffers. Harmony copies event bytes
-  into a NAPI-owned queue before the callback returns, then exposes polling
-  through `readEvent`.
-- `host.complete` is intentionally sent through the JSON command protocol via
-  `rc_runtime_send`; there is no separate C ABI function for host completion in
-  v1.
-- `host.error` follows the same v1 constraint: Harmony sends it through
-  `rc_runtime_send`; there is no separate C ABI function for host failure.
+- ABI v1 的 `rc_runtime_create`、`rc_runtime_send`、`rc_runtime_cancel` 只返回 integer
+  status code。除非 Core/FFI 增加 last-error 或 direct out-buffer ABI，否则 Harmony 无法
+  暴露 structured synchronous failure object。本 lane 不改 Core/FFI。
+- ABI v1 event 是 callback-only borrowed buffer。Harmony 在 callback 返回前把 event
+  bytes 复制到 NAPI-owned queue，再通过 `readEvent` 暴露 polling。
+- `host.complete` 有意通过 `rc_runtime_send` 发送 JSON command；v1 没有单独的 host
+  completion C ABI function。
+- `host.error` 同样受 v1 约束，通过 `rc_runtime_send` 发送。
 
-## Open Harmony Work
+## 未完成 Harmony 工作
 
-- Run `captureHarmonyNapiSmokeArtifact` in a signed HAP on device and archive
-  the formatted artifact output beside the local OHOS/Harmony build evidence.
+- 在签名 HAP 中于设备上运行 `captureHarmonyNapiSmokeArtifact`，并将 formatted artifact
+  output 与本地 OHOS/Harmony build evidence 一起归档。

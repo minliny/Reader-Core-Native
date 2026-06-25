@@ -1,73 +1,72 @@
-# Branch Integration Ledger
+# 分支集成账本
 
-Date: 2026-06-25
+日期：2026-06-25
 
-This ledger turns the current completed branch inventory into a merge strategy.
-It does not merge branches directly because several branches share earlier
-cross-agent history. The right next step is path-level integration or selective
-replay, not blind merge.
+本文把当时已完成的分支清单转成集成策略。原始审计时并未直接合并全部分支，因为
+多条分支带有早期 agent 的重叠历史。正确做法是 path-level integration 或 selective
+replay，而不是盲目 merge。
 
-## Merge Classes
+后续完整合并结果见 `reports/full-consolidation/2026-06-25.md`。
 
-### Class A: independent, low-risk consolidation
+## 分支类别
 
-These branches are documentation or corpus-data lanes and can be merged or
-replayed independently once the target base is selected:
+### A 类：独立、低风险整合
 
-| Branch | Worktree | Scope | Required validation |
+这些分支是文档或 corpus-data lane，选定目标基线后可独立合并或 replay：
+
+| 分支 | 原 worktree | 范围 | 验证 |
 | --- | --- | --- | --- |
-| `codex/goal-ci-gate-design` | `/private/tmp/ci-gate-design-wt` | CI gate design under `docs/ci-gates/**` | Markdown review, no runtime validation required. |
-| `codex/goal-host-app-contracts` | `/private/tmp/goal-host-app-contracts-wt` | host/Core responsibility contracts under `docs/host-app-contracts/**` | Markdown review plus consistency with C ABI events. |
-| `codex/goal-release-evidence` | `/private/tmp/release-evidence-wt` | release readiness evidence under `evidence/release-readiness/**` | Check that it does not claim App/device parity. |
-| `codex/goal-sanitized-corpus` | `/Users/minliny/Documents/Reader-Core-Native/.wt-goal-sanitized-corpus` | sanitized seed fixtures and audit report | Privacy grep, manifest schema check, corpus runner stub once available. |
+| `codex/goal-ci-gate-design` | `/private/tmp/ci-gate-design-wt` | `docs/ci-gates/**` | Markdown review |
+| `codex/goal-host-app-contracts` | `/private/tmp/goal-host-app-contracts-wt` | `docs/host-app-contracts/**` | 与 C ABI event 保持一致 |
+| `codex/goal-release-evidence` | `/private/tmp/release-evidence-wt` | `evidence/release-readiness/**` | 不声明 App/device parity |
+| `codex/goal-sanitized-corpus` | `.wt-goal-sanitized-corpus` | `fixtures/sanitized-corpus/**`、`reports/corpus-audit/**` | privacy grep、manifest 检查 |
 
-### Class B: core foundation, merge with path-level audit
+### B 类：Core foundation，需要 path-level audit
 
-These branches are high value but overlap with previous agent history:
+这些分支价值高，但与早期 agent history 重叠：
 
-| Branch | Worktree | Scope | Required validation |
+| 分支 | 原 worktree | 范围 | 验证 |
 | --- | --- | --- | --- |
-| `codex/reader-core-runtime-protocol` | `/Users/minliny/Documents/Reader-Core-Native` | runtime status/shutdown, cancel, host completions, protocol conformance | `cargo test -p reader-contract -p reader-runtime`; inspect platform files before merge. |
-| `codex/reader-core-c-abi-stable-boundary` | `/Users/minliny/Documents/Reader-Core-Native-c-abi-worktree` | `include/reader_core.h`, `crates/reader-ffi`, iOS module map, FFI smoke | `cargo test -p reader-ffi`; `./scripts/ffi-smoke.sh`; ABI header review. |
-| `codex/data-subsystem-storage-cache-coverage` | `/Users/minliny/Documents/Reader-Core-Native-data-subsystem-storage` | content/local-book/RSS/storage/sync crates and cache coverage planning | `cargo test -p reader-content -p reader-local-book -p reader-rss -p reader-storage -p reader-sync`; compare ABI/protocol carry-over before merge. |
+| `codex/reader-core-runtime-protocol` | 主 Native worktree | runtime status/shutdown、cancel、host completion、protocol conformance | `cargo test -p reader-contract -p reader-runtime` |
+| `codex/reader-core-c-abi-stable-boundary` | `Reader-Core-Native-c-abi-worktree` | `include/reader_core.h`、`crates/reader-ffi`、iOS module map、FFI smoke | `cargo test -p reader-ffi`、`./scripts/ffi-smoke.sh` |
+| `codex/data-subsystem-storage-cache-coverage` | `Reader-Core-Native-data-subsystem-storage` | content/local-book/RSS/storage/sync | 对应 data crate tests |
 
-### Class C: platform lanes, integrate after core ABI shape freezes
+### C 类：平台 lane，等 Core/ABI shape 稳定后集成
 
-These should not set Core semantics. They consume the stable Core/ABI shape:
+平台分支消费 ABI，不设置 Core 语义：
 
-| Branch | Worktree | Scope | Required validation |
+| 分支 | 原 worktree | 范围 | 验证 |
 | --- | --- | --- | --- |
-| `codex/android-jni-sdk` | `/Users/minliny/Documents/Reader-Core-Native/.claude/worktrees/android-jni-sdk` | JNI bridge, CMake, Kotlin sample, command/event bridge | NDK build, JNI smoke, Android app adapter smoke. |
-| `codex/harmony-napi-integration` | `/Users/minliny/Documents/Reader-Core-Native-harmony-napi-integration` | NAPI wrapper, ArkTS SDK helpers, Harmony smoke artifacts | OHOS build script, NAPI smoke, HAP/device proof before release claims. |
+| `codex/android-jni-sdk` | `.claude/worktrees/android-jni-sdk` | JNI bridge、CMake、Kotlin sample、command/event bridge | NDK build、JNI smoke、Android App adapter smoke |
+| `codex/harmony-napi-integration` | `Reader-Core-Native-harmony-napi-integration` | NAPI wrapper、ArkTS SDK helper、Harmony smoke 产物 | OHOS build、NAPI smoke、HAP/device proof |
 
-### Class D: active, do not merge yet
+### D 类：当时仍活跃，暂不合并
 
-| Branch | Worktree | Scope | Blocker |
+| 分支 | 原 worktree | 范围 | 当时 blocker |
 | --- | --- | --- | --- |
-| `codex/reader-rule-js-compat-clean` | `/Users/minliny/Documents/Reader-Core-Native-rule-js-compat-clean` | rule and JS compatibility work | Dirty files: `crates/reader-rule/src/lib.rs`, `crates/reader-rule/tests/rule_parity.rs`; needs commit and focused tests first. |
+| `codex/reader-rule-js-compat-clean` | `Reader-Core-Native-rule-js-compat-clean` | rule 和 JS compatibility | dirty 文件需先提交并跑 focused tests |
 
-## Recommended Integration Order
+该分支随后已提交为 `feat(rule): complete js compatibility parity cases`，并已合并到
+全量集成分支。
 
-1. Consolidate Class A first so the project has source-truth, host-contract, CI,
-   release, and corpus scaffolding in one base.
-2. Integrate runtime/protocol core-only work from
-   `codex/reader-core-runtime-protocol`.
-3. Integrate C ABI stable boundary from
-   `codex/reader-core-c-abi-stable-boundary`.
-4. Integrate Android and Harmony platform lanes against the frozen ABI.
-5. Integrate data subsystem once protocol/ABI conflicts are resolved.
-6. Finish and validate rule/JS branch, then integrate it as the Legado
-   compatibility execution lane.
+## 原建议集成顺序
 
-## Required Merge Review Checks
+1. 先合并 A 类，形成 source truth、host contract、CI、release、corpus scaffold。
+2. 集成 `reader-core-runtime-protocol` 的 core-only 工作。
+3. 集成 `reader-core-c-abi-stable-boundary`。
+4. 在 frozen ABI 上集成 Android 和 Harmony 平台 lane。
+5. 解决 protocol/ABI 冲突后集成 data subsystem。
+6. 完成并验证 rule/JS 分支后，将其作为 Legado 兼容执行 lane 集成。
 
-Every integration PR should answer:
+## 合并审查问题
 
-1. Which Legado compatibility capability does this close?
-2. Which existing Reader-Core asset did it migrate, replay, host, or archive?
-3. Which Native/C ABI contract did it change?
-4. Which platform wrappers must be updated?
-5. Which corpus benchmark case proves identical canonical results?
+每次集成都必须回答：
 
-If the answer to item 5 is "none", the branch can be merged as infrastructure,
-but it cannot be counted as Legado parity closure.
+1. 关闭了哪条 Legado 兼容能力？
+2. 迁移、回放、host 化或归档了哪个旧 Reader-Core asset？
+3. 修改了哪个 Native/C ABI contract？
+4. 哪些 platform wrapper 必须更新？
+5. 哪个 corpus benchmark case 证明 canonical result 一致？
+
+如果第 5 项答案是“没有”，该分支可以作为 infrastructure 合并，但不能计入 Legado
+parity closure。

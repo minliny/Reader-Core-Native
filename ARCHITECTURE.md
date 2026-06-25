@@ -1,41 +1,30 @@
-# Reader-Core-Native Architecture
+# Reader-Core-Native 架构
 
-This document describes the current code architecture in branch HEAD. The full
-product goal and development route are maintained in
-`docs/FULL_DEVELOPMENT_ROADMAP.md`.
+本文描述当前分支 HEAD 的代码架构。全量产品目标和开发路线见
+`docs/FULL_DEVELOPMENT_ROADMAP.md`。
 
-A capability is marked complete here only when it has a code path or
-verification command in this repository, or a named branch fact verified by Git.
-Roadmap-level parity claims still require the Legado capability ledger,
-Reader-Core migration ledger, Native/C ABI evidence, and corpus benchmark proof
-defined by the full roadmap.
+本文只在能力有当前仓库代码路径、验证命令，或可由 Git 证明的分支事实时，才将
+能力标记为完成。路线级 parity 声明仍必须满足全量路线中定义的 Legado 能力账本、
+Reader-Core 迁移账本、Native/C ABI 证据和 corpus benchmark 证明。
 
-## Current Baseline
+## 当前基线
 
-The branch baseline is `origin/codex/core-product-integration` at `fb4c3a7`.
-Verified branch facts:
+当前分支基线来自 `codex/full-branch-directory-consolidation`。它已经合并此前分散的
+runtime/protocol、C ABI、Android JNI、Harmony NAPI、iOS wrapper、data subsystem、
+rule/JS、corpus、CI/evidence 文档等工作。
+
+已验证的主 gate：
 
 ```bash
-git log --oneline --first-parent -n 20 origin/codex/core-product-integration
-git branch -r --contains origin/codex/core-product-integration
-git log --oneline HEAD..origin/codex/android-integration --
-git ls-tree -r HEAD | rg 'bindings/android|build-android-jni'
-git ls-tree -r origin/codex/android-jni-smoke | rg 'bindings/android|build-android-jni'
+git diff --check
+cargo run -p reader-cli -- --conformance
+./scripts/ffi-smoke.sh
+cargo test --workspace
 ```
 
-Observed state:
+已知验证结果记录见 `reports/full-consolidation/2026-06-25.md`。
 
-- `remote-reading-vertical`, `http-host-contract`, `cli-host-http-smoke`,
-  `ios-swift-client-smoke`, `ios-xcframework-smoke`,
-  `ios-swift-wrapper-smoke`, `quickjs-runtime`, `rule-engine-nonjs`, and
-  `rule-engine-edgecases` are merged into the current Core product baseline.
-- `origin/codex/android-integration` contains the current baseline plus
-  `origin/codex/android-jni-smoke`; the Android JNI files are not present in
-  branch HEAD.
-- The repository tree has iOS and Harmony binding lanes, but Android is only
-  `bindings/android/.gitkeep` in this baseline.
-
-## Runtime Shape
+## Runtime 形态
 
 ```text
 Platform app
@@ -48,15 +37,16 @@ Platform app
   -> host.request events for platform-owned capabilities
 ```
 
-The ABI exposes a single opaque runtime handle and JSON command/event messages.
-Evidence:
+ABI 暴露一个 opaque runtime handle，并通过 JSON command/event 交换消息。
+
+主要证据：
 
 - `include/reader_core.h`
 - `crates/reader-ffi/src/lib.rs`
 - `crates/reader-ffi/src/runtime.rs`
 - `crates/reader-runtime/src/runtime.rs`
 
-Exported ABI v1 functions:
+ABI v1 导出函数：
 
 - `rc_abi_version`
 - `rc_runtime_create`
@@ -64,27 +54,30 @@ Exported ABI v1 functions:
 - `rc_runtime_cancel`
 - `rc_runtime_destroy`
 
-There is no `rc_buffer_free` in ABI v1. Event callback buffers are borrowed for
-the callback duration only; hosts must copy bytes they keep.
+ABI v1 没有 `rc_buffer_free`。事件 callback 中的 buffer 只在 callback 生命周期内
+借用；宿主如需保存，必须复制 bytes。
 
-## Protocol And Capabilities
+## Protocol 与 capability
 
-Protocol v1 is represented by `crates/reader-contract` and the JSON schemas in
-`protocol/`.
+Protocol v1 由 `crates/reader-contract` 和 `protocol/` 中的 JSON schema 表示。
 
-Evidence:
+证据：
 
 - `crates/reader-contract/src/lib.rs`
 - `crates/reader-contract/src/command.rs`
 - `crates/reader-contract/src/event.rs`
 - `protocol/reader-command.schema.json`
 - `protocol/reader-event.schema.json`
+- `protocol/compatibility.md`
 
-Advertised v1 capabilities:
+当前 capability：
 
 - `core.info`
 - `runtime.ping`
 - `runtime.hostSmoke`
+- `runtime.status`
+- `runtime.shutdown`
+- `runtime.cancel`
 - `host.complete`
 - `host.error`
 - `host.bus.v1`
@@ -92,76 +85,76 @@ Advertised v1 capabilities:
 - `runtime.config.v1`
 - `remote.reading.v1`
 
-`core.ping` remains accepted only as a bootstrap alias in runtime dispatch; it
-is intentionally absent from `core.info.capabilities` and command-schema method
-examples.
+`core.ping` 只作为 bootstrap alias 被 runtime dispatch 接受，不作为正式 capability
+对外声明。
 
-## Implemented Core-Owned Capabilities
+## 已实现的 Core-owned 能力
 
-| Capability | Current status | Evidence |
+| 能力 | 当前状态 | 证据 |
 | --- | --- | --- |
-| Command/event protocol v1 | Implemented | `crates/reader-contract/src/*.rs`, `protocol/*.schema.json`, `cargo run -p reader-cli -- --conformance` |
-| Runtime worker, request IDs, duplicate-active rejection, cancellation | Implemented | `crates/reader-runtime/src/runtime.rs`, `cargo test -p reader-runtime` |
-| Host bus request/complete/error routing | Implemented | `crates/reader-runtime/src/runtime.rs`, `protocol/fixtures/conformance/host/*.json`, `cargo run -p reader-cli -- --host-smoke` |
-| C ABI lifecycle | Implemented | `include/reader_core.h`, `crates/reader-ffi/src/*.rs`, `./scripts/ffi-smoke.sh` |
-| Non-JS rule primitives | Implemented for V1 primitive set: regex, JSONPath, CSS text/attr, XPath, fallback, chaining | `crates/reader-rule/src/lib.rs`, `crates/reader-rule/tests/*.rs`, `cargo test -p reader-rule` |
-| QuickJS sandbox | Implemented as a sandbox with JSON conversion, console capture, timeout/cancel support, and host callback registry | `crates/reader-js/src/lib.rs`, `cargo test -p reader-js` |
-| Remote-reading V1 vertical | Implemented for source import, search, detail, toc, chapter content, progress update | `crates/reader-runtime/src/remote.rs`, `tools/reader-cli/tests/fixture_vertical.rs`, `cargo run -p reader-cli -- --fixture-vertical tests/fixtures/remote_source/basic_source.json` |
-| HTTP transport contract | Implemented as host capability request/completion, not as Core sockets | `crates/reader-contract/src/remote.rs`, `crates/reader-runtime/src/remote.rs`, `protocol/compatibility.md` |
-| V1 cache/progress/source/book storage | Implemented in memory only | `crates/reader-storage/src/lib.rs` |
-| iOS Core-side wrapper smoke | Implemented for ABI lifecycle, `core.info`, `runtime.ping` | `bindings/ios/Sources/ReaderCoreClient/ReaderCoreClient.swift`, `scripts/check-ios-swift-wrapper.sh` |
-| Harmony Core-side NAPI build smoke | Implemented as build lane requiring OHOS SDK | `bindings/harmony/native/reader_napi.cpp`, `scripts/build-harmony-napi.sh` |
+| Command/event protocol v1 | 已实现 | `crates/reader-contract/src/*.rs`、`protocol/*.schema.json`、`cargo run -p reader-cli -- --conformance` |
+| Runtime worker、request id、重复 active 拒绝、cancel | 已实现 | `crates/reader-runtime/src/runtime.rs`、`cargo test -p reader-runtime` |
+| Runtime status/shutdown | 已实现 | `protocol/fixtures/conformance/commands/*runtime-status*`、`*runtime-shutdown*` |
+| Host bus request/complete/error 路由 | 已实现 | `crates/reader-runtime/src/runtime.rs`、`protocol/fixtures/conformance/host/*.json` |
+| C ABI lifecycle | 已实现 | `include/reader_core.h`、`crates/reader-ffi/src/*.rs`、`./scripts/ffi-smoke.sh` |
+| Structured last-error 与 panic guard | 已实现 | `crates/reader-ffi/src/last_error.rs`、`crates/reader-ffi/src/panic_guard.rs` |
+| Rule primitives | 已实现一个兼容子集 | `crates/reader-rule/src/lib.rs`、`crates/reader-rule/tests/*.rs` |
+| QuickJS sandbox | 已实现基础能力 | `crates/reader-js/src/lib.rs`、`cargo test -p reader-js` |
+| Remote-reading V1 vertical | 已实现 Core-side 纵切 | `crates/reader-runtime/src/remote.rs`、`tools/reader-cli/tests/fixture_vertical.rs` |
+| HTTP transport contract | 已实现 host capability contract | `crates/reader-contract/src/remote.rs`、`crates/reader-runtime/src/remote.rs` |
+| Data/storage snapshot | 已实现基础状态机 | `crates/reader-storage/src/lib.rs` |
+| TXT local book | 已实现基础解析和 library snapshot | `crates/reader-local-book/src/lib.rs`、`crates/reader-local-book/src/txt.rs` |
+| RSS state | 已实现基础 parse/subscription state | `crates/reader-rss/src/lib.rs` |
+| Sync package/journal | 已实现基础 merge/backup model | `crates/reader-sync/src/lib.rs` |
+| iOS wrapper smoke | 已实现 ABI lifecycle、`core.info`、`runtime.ping` | `bindings/ios/**`、`scripts/check-ios-swift-wrapper.sh` |
+| Android JNI wrapper shape | 已合并 | `bindings/android/**`、`build-android-jni.sh` |
+| Harmony NAPI wrapper shape | 已合并 | `bindings/harmony/**`、`scripts/build-harmony-napi.sh` |
 
-## Known Gaps
+## 已知 gap
 
-These are not product-complete in the current baseline, and each gap has a code
-or branch reason:
-
-| Gap | Owner | Evidence |
+| Gap | Owner | 说明 |
 | --- | --- | --- |
-| SQLite-backed persistent store, schema migration, durable cache/progress | Core | `crates/reader-storage/src/lib.rs` documents V1 in-memory only |
-| Applying runtime config through the C ABI create path | Core | `crates/reader-ffi/src/runtime.rs` ignores `_config_json`/`_config_length`; pure Rust config exists in `crates/reader-contract/src/config.rs` |
-| TXT/EPUB parsing | Core | `crates/reader-local-book/src/lib.rs` is a placeholder |
-| RSS parsing/subscription state | Core | `crates/reader-rss/src/lib.rs` is a placeholder |
-| WebDAV/sync/backup/conflict logic | Core | `crates/reader-sync/src/lib.rs` is a placeholder |
-| Full Legado/Swift Core rule parity | Core | Current evidence covers primitive rule tests and V1 fixture vertical only; no sample-corpus parity runner is present |
-| JS network through runtime host bus | Core plus host | JS sandbox supports host callbacks, but remote V1 default path reports `unsupported` for unregistered `java.get`/`java.post`; see `crates/reader-content/src/lib.rs` and `tools/reader-cli/tests/fixture_vertical.rs` |
-| Real HTTP/TLS/socket behavior | Host/app | Core emits `http.execute`; platform hosts must execute sockets and return `host.complete` |
-| WebView login, captcha, cookie extraction | Host/app | No WebView adapter exists in this Core repo; only host capability protocol exists |
-| Keychain/Keystore/Secure Store | Host/app | No secure storage adapter exists in this Core repo |
-| File picker and sandbox permission grants | Host/app | No platform file picker code exists in this Core repo |
-| TTS playback, notifications, UI/navigation/theme | Host/app | Out of Core tree by design |
-| Android JNI in current Core baseline | Integration pending | Current `HEAD` only has `bindings/android/.gitkeep`; files exist on `origin/codex/android-jni-smoke` |
-| App-side iOS/Harmony/Android runtime integration | Host/app | This repo has Core-side smokes only; app repos own loading, lifecycle, adapters, and UI flows |
+| Legado 全量能力账本 | Core/规划 | 尚未形成 source-backed ledger |
+| 旧 Reader-Core 迁移账本 | Core/规划 | 尚未系统映射 migrate/replay/host/archive |
+| runtime config 通过 C ABI create path 完整接入 | Core | schema 和 Rust config 已存在，仍需持续核对 ABI 创建路径 |
+| SQLite-backed persistent store 和 migration | Core | 现有 storage 更偏确定性状态机和 snapshot，需补持久化策略 |
+| EPUB/PDF/MOBI/UMD 支持 | Core/策略 | 当前 TXT 有基础实现，其余格式需明确支持或 policy error |
+| Full Legado rule/request/JS parity | Core | 需要能力账本和 corpus runner 证明 |
+| JS network 与 WebView-only 行为 | Core + host | sandbox 有 host callback 基础，WebView/login/captcha 必须由 host contract 表达 |
+| Real HTTP/TLS/socket | Host/app | Core 只发出 `http.execute`，平台执行网络 |
+| WebView login、captcha、cookie extraction | Host/app | Core 不内置 WebView UI |
+| Keychain/Keystore/Secure Store | Host/app | Core 不持有平台安全存储实现 |
+| File picker 和 sandbox grants | Host/app | Core 不实现平台权限 UI |
+| TTS、notification、UI/navigation/theme | Host/app | 不属于 Core |
+| App/device proof | Host/app | wrapper smoke 不等于 App/device 完成 |
+| 跨平台 corpus benchmark | Core + host | 仍需 CLI/iOS/Android/Harmony canonical result 对比 |
 
-## Core-Owned Versus Host-Owned Boundary
+## Core-owned 与 host-owned 边界
 
-Core owns deterministic product semantics:
+Core 负责确定性产品语义：
 
-- Protocol DTOs, method names, capability advertisement, structured errors.
-- Rule execution primitives and content extraction.
-- QuickJS sandbox behavior and structured unsupported errors.
-- Remote-reading state machine and host operation continuation.
-- Storage semantics once persistent storage is implemented.
-- Source/book/toc/chapter/progress domain models.
+- Protocol DTO、method name、capability advertisement、structured error。
+- Rule execution、content extraction、QuickJS sandbox 行为。
+- Remote-reading state machine 与 host operation continuation。
+- Storage/local/RSS/sync 的数据语义、snapshot、migration、hash。
+- Source、book、toc、chapter、progress domain model。
 
-Host/app owns platform capability and user experience:
+Host/app 负责平台能力与用户体验：
 
-- HTTP/TLS/socket execution and platform network policy.
-- WebView login, captcha, cookie capture, and platform session stores.
-- Secure credential storage.
-- File picker, sandbox grants, and platform document access.
-- TTS audio playback and platform media session.
-- Background execution, notifications, app lifecycle, UI, navigation, theme.
-- App packaging, signing, crash reporting, and store distribution.
+- HTTP/TLS/socket 执行与平台网络策略。
+- WebView login、captcha、cookie capture、platform session store。
+- 安全凭据存储。
+- File picker、sandbox grants、document access。
+- TTS playback、media session、notification。
+- Background execution、app lifecycle、UI、navigation、theme。
+- Packaging、signing、crash reporting、store distribution。
 
-The boundary is enforced in current code by the host bus: Core emits
-`host.request` and never opens a socket itself. Hosts answer with
-`host.complete` or `host.error`.
+当前边界通过 host bus 体现：Core 发出 `host.request`，宿主以 `host.complete`
+或 `host.error` 回复。
 
-## Verification Commands
+## 验证命令
 
-Core-local gates:
+Core-local gate：
 
 ```bash
 cargo fmt --check
@@ -173,22 +166,20 @@ cargo run -p reader-cli -- --fixture-vertical tests/fixtures/remote_source/basic
 ./scripts/build-local.sh
 ```
 
-Platform-smoke gates:
+平台 smoke gate：
 
 ```bash
 rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 ./scripts/check-ios-swift-wrapper.sh
 
+rustup target add aarch64-linux-android
+./scripts/build-android-jni.sh
+
 OHOS_SDK_HOME=/path/to/ohos-sdk ./scripts/build-harmony-napi.sh
 ```
 
-Branch-fact gates:
+## 与全量路线的关系
 
-```bash
-git merge-base --is-ancestor origin/codex/android-jni-smoke HEAD
-git log --oneline HEAD..origin/codex/android-integration --
-git ls-tree -r origin/codex/android-jni-smoke | rg 'bindings/android|build-android-jni'
-```
-
-In this checkout, the first command returns non-zero because Android JNI smoke
-is not merged into the current Core product baseline.
+本文件说明“当前代码长什么样”。是否达到 Legado parity、Core parity 或 production
+ready，只能由 `docs/FULL_DEVELOPMENT_ROADMAP.md` 中要求的 ledger、migration、
+ABI、platform proof 和 corpus benchmark 共同判定。

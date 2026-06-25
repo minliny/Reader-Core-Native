@@ -1,12 +1,11 @@
 # ReaderCore Android JNI Binding
 
-This binding lane packages the C ABI static library and `reader_core.h` into an
-Android JNI shared library, plus a small Java wrapper that can drive the Core
-runtime lifecycle, send JSON commands, poll callback-delivered events, cancel
-requests, and answer `host.request` operations with `host.complete` or
-`host.error`.
+该 binding lane 将 C ABI 静态库和 `reader_core.h` 打包成 Android JNI shared
+library，并提供一个最小 Java wrapper。wrapper 可以驱动 Core runtime 生命周期、
+发送 JSON command、轮询 callback 传回的 event、取消 request，并用 `host.complete`
+或 `host.error` 回复 `host.request`。
 
-The Android wrapper does not add or change the Core ABI. It uses ABI v1:
+Android wrapper 不新增也不修改 Core ABI。它消费 ABI v1：
 
 - `rc_abi_version`
 - `rc_runtime_create`
@@ -14,41 +13,37 @@ The Android wrapper does not add or change the Core ABI. It uses ABI v1:
 - `rc_runtime_cancel`
 - `rc_runtime_destroy`
 
-## Build
+## 构建
 
-Install the Android NDK, CMake, and the Rust Android targets you want to build,
-then run:
+安装 Android NDK、CMake 和所需 Rust Android target 后执行：
 
 ```bash
 ./build-android-jni.sh
 ```
 
-Defaults:
+默认值：
 
-- ABIs: `arm64-v8a x86_64`
-- Android API: `24`
-- Output: `target/android-jni/libs/<abi>/libreader_core_jni.so`
+- ABI：`arm64-v8a x86_64`
+- Android API：`24`
+- 输出：`target/android-jni/libs/<abi>/libreader_core_jni.so`
 
-Override with:
+可通过环境变量覆盖：
 
 ```bash
 ANDROID_ABIS="arm64-v8a armeabi-v7a x86_64 x86" ANDROID_API=24 ./build-android-jni.sh
 ```
 
-The script fails closed when the Android NDK, CMake, or a requested Rust target
-is missing. It does not mark Android JNI as built without a real NDK link.
-Before the native gate, it compiles the Java wrapper and Java sample. When
-`kotlinc` is available, it also compiles the Kotlin sample.
+脚本在缺少 Android NDK、CMake 或 Rust target 时 fail-closed，不会在没有真实 NDK
+link 的情况下把 Android JNI 标成已构建。native gate 前会编译 Java wrapper 和 Java
+sample；如果 `kotlinc` 可用，也会编译 Kotlin sample。
 
-The merged SDK intentionally has a single JNI class:
-`com.reader.core.NativeCoreBridge`. Earlier branches had both Java and Kotlin
-definitions for that class; the consolidated branch keeps the Java definition
-as the canonical JNI owner and exposes both API styles from it.
+合并后的 SDK 只保留一个 JNI class：`com.reader.core.NativeCoreBridge`。早期分支曾有
+Java 与 Kotlin 两个同名定义；当前分支保留 Java 定义作为 canonical JNI owner，并从中
+暴露两种 API 形态。
 
 ## Java API
 
-`bindings/android/src/main/java/com/reader/core/ReaderCoreRuntime.java` is the
-minimal SDK surface:
+`bindings/android/src/main/java/com/reader/core/ReaderCoreRuntime.java` 是最小 SDK surface：
 
 - `abiVersion()`
 - `new ReaderCoreRuntime(configJson)`
@@ -59,18 +54,17 @@ minimal SDK surface:
 - `sendHostError(operationId, code, message, retryable, requestId)`
 - `close()`
 
-Events are callback-only at the ABI layer. The JNI layer copies the event bytes
-inside the callback and buffers them in a native queue for Java polling.
+ABI 层 event 只通过 callback 传递。JNI 层在 callback 内复制 event bytes，并放入 native
+queue，供 Java 轮询。
 
-See:
+示例：
 
 - `bindings/android/samples/java/MinimalReaderCore.java`
 - `bindings/android/samples/kotlin/MinimalReaderCore.kt`
 
 ## Direct Kotlin API
 
-Kotlin hosts that want callback-style events can call the public direct API on
-`NativeCoreBridge`:
+需要 callback-style event 的 Kotlin host 可直接调用 `NativeCoreBridge` 的 public API：
 
 - `pingSmoke()`
 - `runtimeCreate(configJson, listener)`
@@ -78,23 +72,22 @@ Kotlin hosts that want callback-style events can call the public direct API on
 - `runtimeCancel(handle, requestId)`
 - `runtimeDestroy(handle)`
 
-`bindings/android/src/main/kotlin/com/reader/core/ReaderEventListener.kt`
-defines the listener contract, and
-`bindings/android/sample/ReaderCoreSample.kt` shows the direct listener flow.
-This is a wrapper shape only; host completion still goes through
-`runtimeSend(... host.complete ...)` and does not add a new C ABI symbol.
+`bindings/android/src/main/kotlin/com/reader/core/ReaderEventListener.kt` 定义 listener
+contract，`bindings/android/sample/ReaderCoreSample.kt` 展示 direct listener flow。
+这只是 wrapper 形态；host completion 仍通过 `runtimeSend(... host.complete ...)` 完成，
+不会新增 C ABI symbol。
 
-## Host Requests
+## Host request
 
-Core emits a `host.request` event for platform-owned capabilities such as
-`http.execute`. The Android host should:
+Core 会为 `http.execute` 等 platform-owned capability 发出 `host.request` event。
+Android host 应：
 
-1. Poll the event.
-2. Parse `operationId`, `capability`, and `params` on the Java/Kotlin side.
-3. Execute the platform operation.
-4. Call `sendHostComplete(...)` or `sendHostError(...)`.
+1. 轮询 event。
+2. 在 Java/Kotlin 侧解析 `operationId`、`capability`、`params`。
+3. 执行平台操作。
+4. 调用 `sendHostComplete(...)` 或 `sendHostError(...)`。
 
-There is intentionally no `rc_host_complete` FFI function in ABI v1. Host
-completion is a normal JSON command sent through `rc_runtime_send`.
+ABI v1 有意不提供 `rc_host_complete`。host completion 是通过 `rc_runtime_send` 发送的
+普通 JSON command。
 
-See `STATUS.md` for the current gate state and ABI-gap notes.
+当前 gate 状态和 ABI gap 见 `STATUS.md`。

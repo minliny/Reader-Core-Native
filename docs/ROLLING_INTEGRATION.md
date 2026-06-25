@@ -1,110 +1,91 @@
-# Rolling Integration
+# 滚动集成
 
-Reader-Core-Native uses rolling integration while multiple agents work in
-parallel. Do not wait for every branch in a batch to finish. Integrate each
-completed commit into the smallest lane that can validate it.
+Reader-Core-Native 使用滚动集成来支撑多个 agent 并行开发。不要等待一批分支全部
+结束后再前进；每个完成分支都应合入能验证它的最小 integration lane。
 
-## Lanes
+当前更高层的目标和长期分支拆分见 `docs/FULL_DEVELOPMENT_ROADMAP.md`。本文只描述
+如何把已完成工作安全接入集成分支。
 
-| Lane | Branch | Purpose | Waits for |
+## Integration lane
+
+| Lane | 分支 | 目的 | 等待条件 |
 | --- | --- | --- | --- |
-| Core foundation | `codex/core-foundation-integration` | Protocol, runtime, rule engine, QuickJS, ABI smoke | Only completed foundation branches |
-| Core product | `codex/core-product-integration` | Remote reading vertical, content, storage, progress | Core foundation plus the completed product branch |
-| Android | `codex/android-integration` | JNI bridge and Android host smoke | Core product baseline plus completed Android JNI branch |
-| iOS | `codex/ios-integration` | Swift wrapper runtime smoke and iOS host proof | Core product baseline plus completed iOS wrapper/runtime branch |
-| HarmonyOS | `codex/harmony-integration` | NAPI, ArkTS bridge, HAP package proof | Core product baseline and HarmonyOS whitelisted changes |
+| Core foundation | `codex/core-foundation-integration` | protocol、runtime、rule、QuickJS、ABI smoke | 只等已完成 foundation 分支 |
+| Core product | `codex/core-product-integration` | remote reading、content、storage、progress | foundation 加已完成 product 分支 |
+| Android | `codex/android-integration` | JNI bridge 与 Android host smoke | product baseline 加 Android JNI 分支 |
+| iOS | `codex/ios-integration` | Swift wrapper runtime smoke 与 iOS host proof | product baseline 加 iOS wrapper/runtime 分支 |
+| HarmonyOS | `codex/harmony-integration` | NAPI、ArkTS bridge、HAP proof | product baseline 加 Harmony 白名单变更 |
 
-## Current Foundation Baseline
+当前 `codex/full-branch-directory-consolidation` 已经把此前散落分支合并到一个基线。
+后续新 work 应优先从这个基线或用户指定的新 integration base 开始。
 
-`codex/core-foundation-integration` currently includes:
+## 当前 Core-side 基线
 
-- `codex/core-protocol-runtime`
-- `codex/protocol-runtime-hardening`
-- `codex/rule-engine-nonjs`
-- `codex/rule-engine-edgecases`
-- `codex/quickjs-runtime`
-- `codex/quickjs-sandbox-hardening`
+当前基线已包含：
 
-Validated gates:
+- `remote.reading.v1`
+- `http.execute`
+- source import、search、detail、TOC、chapter content、progress update
+- fixture/inline response 与 host request/complete 回路
+- C ABI lifecycle、status、last-error、panic guard
+- iOS/Android/Harmony wrapper smoke 或 wrapper shape
+- local TXT、RSS、storage、sync 基础数据层
 
-- `cargo fmt --check`
-- `./scripts/check-local.sh`
-- `./scripts/build-local.sh`
-- `./scripts/build-ohos.sh`
-- `./scripts/build-harmony-napi.sh`
+注意：这些仍然主要是 Core-side 或 wrapper-side 证据，不等于平台 App/device 完成。
 
-## Current Product Baseline
+## 集成命令模式
 
-`codex/core-product-integration` currently includes the remote-reading vertical,
-host HTTP contract, iOS Swift client smoke, and product status docs on top of
-the foundation baseline. The product lane is complete for Core-side smoke:
-
-- `remote.reading.v1` capability is declared in the JSON command schema.
-- `http.execute` is declared as the host HTTP transport capability.
-- Runtime commands cover source import, search, detail, toc, chapter content,
-  and reading progress update.
-- Remote commands support both fixture/inline responses and host
-  request/complete response bodies.
-- Content/storage/progress evidence is Core-side only; storage is V1 in-memory
-  cache/progress, not a durable platform database.
-- iOS Swift wrapper smoke compiles, links, and runs `core.info` /
-  `runtime.ping` against the Core ABI, but it is not App/device integration.
-- No platform App/device completion is claimed by this lane.
-
-Recorded product-lane gates:
-
-- `cargo test`
-- `./scripts/check-local.sh`
-- `./scripts/build-local.sh`
-- `./scripts/build-ohos.sh`
-- `./scripts/build-harmony-napi.sh`
-- `./scripts/check-ios-swift-wrapper.sh`
-
-## Command Pattern
-
-Use `scripts/integration-queue.sh` when a branch is ready:
+当一个分支准备好时，使用 `scripts/integration-queue.sh`：
 
 ```bash
 scripts/integration-queue.sh \
   codex/android-integration \
-  origin/codex/core-product-integration \
+  origin/codex/full-branch-directory-consolidation \
   origin/codex/<android-jni-branch>
 ```
 
-Optional gates:
+可选 gate：
 
 ```bash
 RUN_OHOS=1 RUN_NAPI=1 PUSH=1 scripts/integration-queue.sh \
   codex/harmony-integration \
-  origin/codex/core-product-integration \
+  origin/codex/full-branch-directory-consolidation \
   origin/codex/<harmony-app-integration-branch>
 ```
 
-## Rules
+## 规则
 
-- Never integrate from a dirty worktree.
-- Use a separate worktree for each integration lane.
-- Merge source branches in dependency order.
-- Stop on the first conflict or failing gate; fix the integration branch, not
-  the source branch, unless the source branch itself is wrong.
-- Do not move the HarmonyOS lane based on HAP packaging alone. Device/runtime
-  claims require platform-real evidence.
-- Do not merge unreviewed HarmonyOS repository-wide dirty changes. Stage only
-  task-owned NAPI/ArkTS/HAP files.
-- Do not mark Android JNI complete from local placeholder branches. Require a
-  clean pushed branch with JNI smoke evidence.
-- Do not treat iOS Swift wrapper smoke as host adapter or App/device proof.
-  URLSession/WebView/App integration needs separate evidence.
+- 不从 dirty worktree 集成。
+- 每个 integration lane 使用独立 worktree。
+- 按依赖顺序合并 source branch。
+- 遇到冲突或 gate 失败时先停下，在 integration 分支修复；只有 source branch 自身
+  错误时才回源头修改。
+- HarmonyOS 不能只凭 HAP packaging 声明 device/runtime parity。
+- 不合并未经审计的 HarmonyOS 仓库级 dirty changes；只 stage 任务拥有的
+  NAPI/ArkTS/HAP 文件。
+- 不用本地 placeholder branch 声明 Android JNI 完成；需要 clean pushed branch 和
+  JNI smoke evidence。
+- iOS Swift wrapper smoke 不等于 URLSession/WebView/App 集成证明。
 
-## Next Trigger
+## 分支合并前必须回答的问题
 
-The product lane has already integrated the Core-side remote-reading vertical.
-The next rolling triggers are platform integration branches:
+每个集成 PR 或合并提交都要回答：
 
-- Android JNI: integrate a clean pushed JNI smoke branch into
-  `codex/android-integration` on top of `origin/codex/core-product-integration`.
-- iOS host transport: integrate only after URLSession/WebView/App-side evidence,
-  not from Core-side wrapper smoke alone.
-- HarmonyOS app-side integration: integrate NAPI/ArkTS/HAP changes only after
-  whitelisted App-side evidence; do not claim device/runtime parity without
-  platform-real proof.
+1. 关闭了哪条 Legado capability？
+2. 迁移、回放、host 化或归档了哪个旧 Reader-Core asset？
+3. 修改了哪个 Native/C ABI contract？
+4. 哪些 platform wrapper 必须更新？
+5. 哪个 corpus benchmark case 能证明三端 canonical result 一致？
+
+如果第 5 项答案是“没有”，该分支可以作为 infrastructure 合并，但不能计入 Legado
+parity closure。
+
+## 下一步触发器
+
+更细的长期路线见 `docs/FULL_DEVELOPMENT_ROADMAP.md`。短期滚动触发器：
+
+- Legado 能力账本完成后，所有实现分支要绑定 capability row。
+- Reader-Core 迁移账本完成后，所有实现分支要绑定 migrate/replay/host/archive
+  决策。
+- Corpus runner 一旦可用，feature 分支必须尽量附带 canonical DTO/hash evidence。
+- Platform wrapper 分支只证明消费 ABI，不定义 Core 语义。

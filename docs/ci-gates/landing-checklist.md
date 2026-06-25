@@ -39,7 +39,7 @@
 | fail-closed 要求 | NAPI `.so` gate（已存在）止步于产物；任何"HAP gate / 真机 gate"在落地前必须 `exit 1` + 提示 `HAP 打包未实现`。**禁止**用 `.so` 存在冒充真机 parity |
 | 建议归属分支 | `codex/harmony-app-*`（HAP/ArkTS）；CI 守门归 `codex/ci-harmony-gate` |
 | 验收标准 | (a) HAP 打包脚本存在；(b) 缺 DevEco/签名工具时 `exit 1`；(c) release HAP 真机可加载；(d) 连续 create/destroy runtime 不崩溃；(e) Rust worker 回调 ArkTS 不悬空（对应 `ARCHITECTURE.md` 阶段 1 退出条件） |
-| 边界声明 | 严格遵循 `docs/ROLLING_INTEGRATION.md`："Do not move the HarmonyOS lane based on HAP packaging alone. Device/runtime claims require platform-real evidence." |
+| 边界声明 | 严格遵循 `docs/ROLLING_INTEGRATION.md`：不能只凭 HAP 打包推进 HarmonyOS lane；device/runtime 声明必须有真实平台证据。 |
 
 ## Gap C — iOS App / URLSession / WebView gate 不存在
 
@@ -50,7 +50,7 @@
 | fail-closed 要求 | wrapper smoke（已存在）不得冒充 App proof。任何"iOS App gate"在 host 仓库协同落地前必须 `exit 1` + 提示 `App 集成需 host 仓库` |
 | 建议归属分支 | iOS host 仓库（非本仓库）；本仓库 CI 守门归 `codex/ci-ios-app-gate`（仅占位 fail-closed） |
 | 验收标准 | (a) App gate 脚本存在；(b) 缺 host 仓库/真机时 `exit 1`；(c) URLSession HTTP transport 走 `http.execute` host 回路；(d) WebView 登录 Cookie 导入 Core |
-| 边界声明 | 按 `docs/ROLLING_INTEGRATION.md`："Do not treat iOS Swift wrapper smoke as host adapter or App/device proof." |
+| 边界声明 | 按 `docs/ROLLING_INTEGRATION.md`：不能把 iOS Swift wrapper smoke 当作 host adapter 或 App/device proof。 |
 
 ## Gap D — OHOS libclang 缺失仅间接闭环
 

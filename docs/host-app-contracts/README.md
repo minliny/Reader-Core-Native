@@ -60,7 +60,7 @@
 2. **Capability inventory** — 表格：子能力 | 归属类别 | 当前事实来源。
 3. **Contracts** — 对每条 Shared-contract 给出 params / result / error
    契约草案，并标注与现行 `protocol/compatibility.md` 的 gap。
-4. **Acceptance evidence requirements** — 验收该契约成立所需的 *证据*，
+4. **验收证据要求** — 验收该契约成立所需的 *证据*，
    而非实现本身（例如：conformance fixture、三端 host adapter 冒烟日志、
    `runtime.status` 快照）。不声明实现完成。
 5. **Risks** — 跨平台行为漂移、协议破坏、生命周期泄漏等。

@@ -1,4 +1,4 @@
-# Release Readiness Evidence
+# 发布 readiness 证据
 
 > 长期 goal 分支：`codex/goal-release-evidence`
 > 基线：`origin/codex/core-product-integration`（首轮回采 sha `fb4c3a7`）

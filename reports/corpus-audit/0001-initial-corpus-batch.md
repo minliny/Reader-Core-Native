@@ -1,82 +1,94 @@
-# Corpus Audit Report — Round 1
+# Corpus 审计报告：第 1 轮
 
-- **Branch:** `codex/goal-sanitized-corpus`
-- **Baseline:** `origin/codex/core-product-integration` (HEAD `fb4c3a7`)
-- **Round:** 1 (initial batch)
-- **Date:** 2026-06-25
-- **Scope:** Establish the sanitized corpus scaffold and seed one fixture per supported source type. No code is touched on this branch.
+- **分支：** `codex/goal-sanitized-corpus`
+- **基线：** `origin/codex/core-product-integration` at `fb4c3a7`
+- **轮次：** 1，初始 batch
+- **日期：** 2026-06-25
+- **范围：** 建立 sanitized corpus 目录结构，并为每种已规划 source type 放入一个
+  seed fixture。本分支不修改代码。
 
-## 1. Corpus items added this round
+## 1. 本轮新增 corpus item
 
-| ID | Type | Format | Fixture | Manifest | Primary consumer |
-|----|------|--------|---------|----------|------------------|
-| bs-001 | book-source | json | `fixtures/sanitized-corpus/book-source/bs-001-fixture.json` | `bs-001.manifest.json` | `codex/rule-engine-parity` |
-| wp-001 | web-page | html | `fixtures/sanitized-corpus/web-page/wp-001-fixture.html` | `wp-001.manifest.json` | `codex/rule-engine-parity` |
-| ja-001 | json-api | json | `fixtures/sanitized-corpus/json-api/ja-001-fixture.json` | `ja-001.manifest.json` | `codex/rule-engine-parity` |
-| xf-001 | xml-feed | xml | `fixtures/sanitized-corpus/xml-feed/xf-001-fixture.xml` | `xf-001.manifest.json` | `codex/rule-engine-parity` |
-| rf-001 | rss-feed | xml | `fixtures/sanitized-corpus/rss-feed/rf-001-fixture.xml` | `rf-001.manifest.json` | `codex/remote-reading-vertical` |
+| ID | 类型 | 格式 | Fixture | Manifest | 主要消费分支 |
+| --- | --- | --- | --- | --- | --- |
+| `bs-001` | book-source | json | `fixtures/sanitized-corpus/book-source/bs-001-fixture.json` | `bs-001.manifest.json` | `codex/rule-engine-parity` |
+| `wp-001` | web-page | html | `fixtures/sanitized-corpus/web-page/wp-001-fixture.html` | `wp-001.manifest.json` | `codex/rule-engine-parity` |
+| `ja-001` | json-api | json | `fixtures/sanitized-corpus/json-api/ja-001-fixture.json` | `ja-001.manifest.json` | `codex/rule-engine-parity` |
+| `xf-001` | xml-feed | xml | `fixtures/sanitized-corpus/xml-feed/xf-001-fixture.xml` | `xf-001.manifest.json` | `codex/rule-engine-parity` |
+| `rf-001` | rss-feed | xml | `fixtures/sanitized-corpus/rss-feed/rf-001-fixture.xml` | `rf-001.manifest.json` | `codex/remote-reading-vertical` |
 
-Each manifest records: `id`, `source_type`, `source_description` (来源类型说明), `sanitization` (脱敏说明), `capability_tags` (预期能力标签), `privacy_check` (隐私检查结果), `consumer_branch` (后续消费分支), `fixture_file`, `format`, and `added_in_round`.
+每个 manifest 记录 `id`、`source_type`、`source_description`、`sanitization`、
+`capability_tags`、`privacy_check`、`consumer_branch`、`fixture_file`、`format`、
+`added_in_round`。
 
-## 2. Capability coverage
+## 2. 能力覆盖
 
-- **Rule engine (`codex/rule-engine-parity`):** JSONPath (`bs-001`, `ja-001`), CSS selectors + HTML entities + missing-href (`wp-001`), XML/namespace-aware parsing (`xf-001`), book-source rule sets for search/detail/toc/content (`bs-001`).
-- **Remote reading (`codex/remote-reading-vertical`):** RSS feed iteration + field extraction (`rf-001`), book-source end-to-end sample (`bs-001`), JSON search API (`ja-001`).
-- **Local content parsing (`codex/local-content-runtime`):** static HTML listing (`wp-001`), Atom/OPDS catalog (`xf-001`).
+- Rule engine：`bs-001`、`ja-001` 覆盖 JSONPath；`wp-001` 覆盖 CSS selector、
+  HTML entity、missing href；`xf-001` 覆盖 XML/namespace-aware parsing；
+  `bs-001` 覆盖 book-source 的 search/detail/toc/content rule set。
+- Remote reading：`rf-001` 覆盖 RSS feed iteration 和字段抽取；`bs-001` 覆盖
+  book-source end-to-end sample；`ja-001` 覆盖 JSON search API。
+- 本地内容解析：`wp-001` 覆盖 static HTML listing；`xf-001` 覆盖
+  Atom/OPDS catalog。
 
-`ja-001` is intentionally structured to also cover future JSONPath filter expressions (`[?(@.meta.rating>4.0)]`) and slice/recursive-descent paths once those land on `codex/rule-engine-parity`.
+`ja-001` 特意保留可扩展结构，用于后续 JSONPath filter
+`[?(@.meta.rating>4.0)]`、slice、recursive-descent、union 表达式测试。
 
-## 3. Privacy verification
+## 3. 隐私验证
 
-All five items passed privacy checks. For each item the manifest's `privacy_check.checked_for` list was reviewed against the fixture content:
+五个 item 均通过隐私检查。检查项包括：
 
-| Check | bs-001 | wp-001 | ja-001 | xf-001 | rf-001 |
-|-------|:-----:|:-----:|:-----:|:-----:|:-----:|
-| Real tokens / API keys | pass | pass | pass | pass | pass |
-| Cookies / auth headers | pass | pass | pass | pass | pass |
-| Account credentials | pass | pass | pass | pass | pass |
-| Private content | pass | pass | pass | pass | pass |
-| Copyrighted long text | pass | pass | pass | pass | pass |
-| Tracking scripts (HTML) | n/a | pass | n/a | n/a | n/a |
+| 检查项 | `bs-001` | `wp-001` | `ja-001` | `xf-001` | `rf-001` |
+| --- | :---: | :---: | :---: | :---: | :---: |
+| 真实 token / API key | pass | pass | pass | pass | pass |
+| Cookie / auth header | pass | pass | pass | pass | pass |
+| 账号凭据 | pass | pass | pass | pass | pass |
+| 私有内容 | pass | pass | pass | pass | pass |
+| 长版权文本 | pass | pass | pass | pass | pass |
+| HTML tracking script | n/a | pass | n/a | n/a | n/a |
 
-**Result:** No real tokens, cookies, accounts, private body text, or copyrighted long text are present. All hostnames use `example.test` / `img.example.test` / `feed.example.test` or relative URLs. All titles, authors, and prose are synthetic placeholders (e.g. "Sample Volume One", "Author Alpha"). Sample chapter content is two short fictional sentences.
+结论：fixture 中不包含真实 token、cookie、账号、私有正文或长版权文本。hostname 使用
+`example.test`、`img.example.test`、`feed.example.test` 或相对 URL。标题、作者和正文
+均为合成占位内容。
 
-## 4. Path / scope compliance
+## 4. 路径和范围合规
 
-Allowed roots touched this round (and only these):
+本轮只触碰允许路径：
 
-- `fixtures/sanitized-corpus/**` — 10 new files (5 fixtures + 5 manifests)
-- `reports/corpus-audit/**` — 1 new file (this report)
+- `fixtures/sanitized-corpus/**`：10 个新文件，5 个 fixture 和 5 个 manifest
+- `reports/corpus-audit/**`：1 个审计报告
 
-Forbidden paths verified untouched:
+确认未修改：
 
-- `tests/**` — not modified
-- `crates/**` — not modified
-- `protocol/**` — not modified
-- `bindings/**` — not modified
-- `scripts/**` — not modified
-- `tools/**` — not modified
-- `Cargo.*` — not modified
+- `tests/**`
+- `crates/**`
+- `protocol/**`
+- `bindings/**`
+- `scripts/**`
+- `tools/**`
+- `Cargo.*`
 
-No code is wired up on this branch; the corpus is data-only and intended for consumption by other long-term branches.
+本分支没有接入代码；corpus 只是数据，供后续长期分支消费。
 
-## 5. Layout convention established
+## 5. 目录约定
 
-```
+```text
 fixtures/sanitized-corpus/
   <source-type>/
-    <id>-fixture.<ext>      # the sanitized payload
-    <id>.manifest.json      # metadata required by the goal spec
+    <id>-fixture.<ext>
+    <id>.manifest.json
 reports/corpus-audit/
-  <NNNN>-<slug>.md          # per-round audit report
+  <NNNN>-<slug>.md
 ```
 
-IDs are zero-padded within their source type (`bs-001`, `wp-001`, ...). Round numbers are zero-padded in report filenames (`0001-...`).
+ID 在 source type 内补零，例如 `bs-001`、`wp-001`。报告文件轮次也补零，例如
+`0001-...`。
 
-## 6. Next steps (future rounds, not in this commit)
+## 6. 后续轮次
 
-- Add a book-source fixture that exercises `@text` / `@html` pseudo-attribute selectors and `:contains(...)` once those are validated on `codex/rule-engine-parity`.
-- Add a JSON fixture targeting JSONPath filter `[?(...)]` and union `[a,b]` / `[0,1]` expressions.
-- Add a multi-page HTML fixture (pagination + next-link) for remote reading.
-- Add a sanitized RSS-with-enclosure fixture for download/cover extraction paths.
-- Each future round = one new group + one audit report + one commit, same constraints.
+- 增加覆盖 `@text` / `@html` pseudo-attribute selector 与 `:contains(...)` 的
+  book-source fixture。
+- 增加覆盖 JSONPath filter、union、slice 的 JSON fixture。
+- 增加覆盖 pagination 与 next-link 的 multi-page HTML fixture。
+- 增加覆盖 download/cover extraction 的 sanitized RSS-with-enclosure fixture。
+- 后续每轮保持一个新 group、一个审计报告、一个 commit。
