@@ -134,6 +134,32 @@ class HostRuntimeTest {
         assertFalse(rt.isRunning());
     }
 
+    @Test
+    void stopFailsPendingSendAndAwaitPromptly() throws Exception {
+        // No reply is ever enqueued, so sendAndAwait would block until timeout.
+        // Calling stop() from another thread must fail the pending future
+        // promptly with an error, well before the 5s timeout.
+        ScriptedTransport transport = new ScriptedTransport();
+        HostRuntime rt = HostRuntime.over(transport, 50L).start();
+
+        long t0 = System.currentTimeMillis();
+        Thread stopper = new Thread(() -> {
+            try { Thread.sleep(150); } catch (InterruptedException e) {
+                Thread.currentThread().interrupt(); return;
+            }
+            rt.stop();
+        });
+        stopper.start();
+
+        CommandResult res = rt.sendAndAwait("runtime.ping", "{}", 5000L);
+        long elapsed = System.currentTimeMillis() - t0;
+
+        assertTrue(res.isError(), "pending sendAndAwait should be failed on stop");
+        assertTrue(res.errorJson().contains("runtime stopped"));
+        assertTrue(elapsed < 2000, "should return promptly after stop, took " + elapsed + "ms");
+        stopper.join(2000);
+    }
+
     @SuppressWarnings("unchecked")
     private static long requestIdOf(String commandJson) {
         Object root = Json.parse(commandJson);

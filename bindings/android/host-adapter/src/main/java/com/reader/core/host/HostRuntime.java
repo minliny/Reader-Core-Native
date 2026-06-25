@@ -129,7 +129,11 @@ public final class HostRuntime {
         return this;
     }
 
-    /** Stop the poll thread. Idempotent. */
+    /**
+     * Stop the poll thread and fail any pending {@code sendAndAwait} futures
+     * promptly with a shutdown error, so blocked callers do not wait for their
+     * timeout. Idempotent.
+     */
     public synchronized void stop() {
         running = false;
         if (worker != null) {
@@ -140,6 +144,17 @@ public final class HostRuntime {
                 Thread.currentThread().interrupt();
             }
             worker = null;
+        }
+        failPendingOnShutdown();
+    }
+
+    private void failPendingOnShutdown() {
+        java.util.Map<Long, CompletableFuture<CommandResult>> snapshot =
+                new java.util.HashMap<>(pending);
+        pending.clear();
+        for (java.util.Map.Entry<Long, CompletableFuture<CommandResult>> e : snapshot.entrySet()) {
+            e.getValue().complete(CommandResult.error(e.getKey(),
+                    "{\"code\":\"INTERNAL\",\"message\":\"runtime stopped\",\"retryable\":true}"));
         }
     }
 
