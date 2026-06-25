@@ -2060,6 +2060,11 @@ mod tests {
                     "name": "Vertical Test Source",
                     "baseUrl": "https://books.example.test",
                     "rules": vertical_source()["rules"].clone(),
+                    "bookSource": {
+                        "bookSourceName": "Vertical Test Source",
+                        "bookSourceUrl": "https://books.example.test",
+                        "ruleSearch": "div.list&&div.item;div.name&&a@text"
+                    },
                 }),
             ),
         );
@@ -2078,6 +2083,10 @@ mod tests {
             .unwrap()
             .expect("source stored");
         assert_eq!(stored.name, "Vertical Test Source");
+        assert_eq!(
+            stored.book_source["ruleSearch"],
+            "div.list&&div.item;div.name&&a@text"
+        );
     }
 
     #[test]

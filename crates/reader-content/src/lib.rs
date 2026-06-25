@@ -1314,6 +1314,7 @@ mod tests {
             name: "Sample".into(),
             base_url: "https://example.test".into(),
             rules: SourceRules::default(),
+            book_source: serde_json::Value::Null,
         }
     }
 

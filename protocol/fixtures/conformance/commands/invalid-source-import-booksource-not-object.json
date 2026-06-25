@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "requestId": 321,
+  "method": "source.import",
+  "params": {
+    "sourceId": "bad-legado-source",
+    "name": "Bad Legado Source",
+    "baseUrl": "https://books.example.test",
+    "rules": {},
+    "bookSource": "div.list&&div.item"
+  }
+}

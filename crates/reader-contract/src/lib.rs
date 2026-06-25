@@ -380,6 +380,17 @@ mod tests {
     }
 
     #[test]
+    fn command_schema_allows_source_import_raw_legado_book_source() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+        let book_source = &schema["$defs"]["SourceImportParams"]["properties"]["bookSource"];
+
+        assert_eq!(book_source["type"], serde_json::json!(["object", "null"]));
+        assert_eq!(book_source["default"], serde_json::json!(null));
+    }
+
+    #[test]
     fn command_schema_requires_remote_inline_source_object_or_null() {
         let schema: Value =
             serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))

@@ -1,0 +1,25 @@
+{
+  "protocolVersion": 1,
+  "requestId": 411,
+  "method": "source.import",
+  "params": {
+    "sourceId": "legado-compat-source",
+    "name": "Legado Compat Source",
+    "baseUrl": "https://books.example.test",
+    "rules": {},
+    "bookSource": {
+      "bookSourceName": "Legado Compat Source",
+      "bookSourceUrl": "https://books.example.test",
+      "searchUrl": "/search?q={{key}}",
+      "ruleSearch": "div.list&&div.item;div.name&&a@text",
+      "ruleToc": "div.chapter&&a@href",
+      "ruleContent": "div.content@html",
+      "enabled": true,
+      "enabledExplore": false,
+      "enabledCookieJar": true,
+      "header": {
+        "User-Agent": "ReaderCoreTest"
+      }
+    }
+  }
+}
