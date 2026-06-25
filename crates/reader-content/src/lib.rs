@@ -1334,6 +1334,17 @@ mod tests {
     }
 
     #[test]
+    fn rule_step_spec_rejects_raw_legado_dsl_strings() {
+        let err = serde_json::from_str::<RuleStepSpec>(r#""div.list&&div.item;div.name&&a@text""#)
+            .expect_err("raw Legado DSL must stay outside RuleStepSpec");
+
+        assert!(
+            err.to_string().contains("invalid type"),
+            "unexpected raw DSL parse error: {err}"
+        );
+    }
+
+    #[test]
     fn search_extracts_books_from_json() {
         let mut source = sample_source();
         source.rules.search = serde_json::json!([
