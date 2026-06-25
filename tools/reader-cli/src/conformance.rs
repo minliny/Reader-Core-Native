@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use reader_contract::{
-    methods, BookSearchData, Command, CoreError, CoreInfoData, ErrorCode, Event,
+    methods, BookDetailData, BookSearchData, Command, CoreError, CoreInfoData, ErrorCode, Event,
     PendingHostOperationStatus, ReadingProgressUpdateData, RuntimeCancelData, RuntimeConfig,
     RuntimePingData, RuntimeShutdownData, RuntimeStatus, SourceImportData, PROTOCOL_VERSION,
     V1_CAPABILITIES,
@@ -617,15 +617,125 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         match recv_event(&rx)? {
             Event::Result {
                 request_id, data, ..
-            } if request_id == 405
-                && data["book"]["title"] == "Dune"
-                && data["book"]["author"] == "Frank Herbert" =>
-            {
-                Ok(())
+            } if request_id == 405 => {
+                let data = serde_json::from_value::<BookDetailData>(data)
+                    .map_err(|err| format!("book.detail data contract parse failed: {err}"))?;
+                if data.source_id == "conformance-source"
+                    && data.book.book_id == "1"
+                    && data.book.title == "Dune"
+                    && data.book.author == "Frank Herbert"
+                    && data.book.intro.as_deref() == Some("desert")
+                    && data.http.is_none()
+                {
+                    Ok(())
+                } else {
+                    Err(format!("unexpected book.detail data {data:?}"))
+                }
             }
             other => Err(format!("unexpected book.detail result {other:?}")),
         }
     });
+
+    record(
+        &mut report,
+        "book-detail-data-rejects-invalid-result-shape",
+        || {
+            for (label, data, expected) in [
+                (
+                    "sourceId",
+                    json!({
+                        "sourceId": " ",
+                        "book": {
+                            "bookId": "1",
+                            "title": "Dune",
+                            "author": "Frank Herbert"
+                        }
+                    }),
+                    "sourceId",
+                ),
+                (
+                    "book",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "book": []
+                    }),
+                    "book",
+                ),
+                (
+                    "bookId",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "book": {
+                            "bookId": " ",
+                            "title": "Dune",
+                            "author": "Frank Herbert"
+                        }
+                    }),
+                    "bookId",
+                ),
+                (
+                    "title",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "book": {
+                            "bookId": "1",
+                            "author": "Frank Herbert"
+                        }
+                    }),
+                    "title",
+                ),
+                (
+                    "unknown book field",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "book": {
+                            "bookId": "1",
+                            "title": "Dune",
+                            "author": "Frank Herbert",
+                            "extra": true
+                        }
+                    }),
+                    "unknown field",
+                ),
+                (
+                    "http.status",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "book": {
+                            "bookId": "1",
+                            "title": "Dune",
+                            "author": "Frank Herbert"
+                        },
+                        "http": { "status": 99 }
+                    }),
+                    "status",
+                ),
+                (
+                    "unknown top-level field",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "book": {
+                            "bookId": "1",
+                            "title": "Dune",
+                            "author": "Frank Herbert"
+                        },
+                        "extra": true
+                    }),
+                    "unknown field",
+                ),
+            ] {
+                let err = serde_json::from_value::<BookDetailData>(data)
+                    .err()
+                    .ok_or_else(|| format!("expected book.detail data rejection for {label}"))?;
+                if !err.to_string().contains(expected) {
+                    return Err(format!(
+                        "unexpected book.detail data error for {label}: {err}"
+                    ));
+                }
+            }
+            Ok(())
+        },
+    );
 
     record(&mut report, "book-detail-rejects-unknown-params", || {
         let (_runtime, rx) = send_to_fresh_runtime(INVALID_BOOK_DETAIL_UNKNOWN_FIELD)?;

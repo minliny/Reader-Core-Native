@@ -36,7 +36,7 @@ Current scan date: 2026-06-25.
 | `host.error` | `HostErrorParams` | Error event | Typed params and route cases | Covered |
 | `source.import` | `SourceImportParams` | `SourceImportData` | Typed parse and negative result-shape cases | Covered in current pass |
 | `book.search` | `BookSearchParams` | `BookSearchData` | Typed parse and negative result-shape cases | Covered in current pass |
-| `book.detail` | `BookDetailParams` | Generic JSON result | Field assertions only | Open: no typed result DTO |
+| `book.detail` | `BookDetailParams` | `BookDetailData` | Typed parse and negative result-shape cases | Covered in current pass |
 | `book.toc` | `BookTocParams` | Generic JSON result | Field assertions only | Open: no typed result DTO |
 | `chapter.content` | `ChapterContentParams` | Generic JSON result | Field assertions only | Open: no typed result DTO |
 | `reading.progress.update` | `ReadingProgressUpdateParams` | `ReadingProgressUpdateData` | Typed parse and negative result-shape cases | Covered in current pass |
@@ -62,7 +62,9 @@ Current scan date: 2026-06-25.
 6. `book.search` result data contract. Closed in this pass.
    The result now has a typed top-level `sourceId`/`books` contract, a minimal
    stable book item shape, and optional host HTTP diagnostics.
-7. Larger remote-reading result contracts (`book.detail`, `book.toc`,
-   `chapter.content`).
-   These depend on domain object shapes and optional HTTP diagnostics, so they
-   should be handled after the search result contract.
+7. `book.detail` result data contract. Closed in this pass.
+   The result now has a typed top-level `sourceId`/`book` contract, a stable
+   book detail object shape, and optional host HTTP diagnostics.
+8. Larger remote-reading result contracts (`book.toc`, `chapter.content`).
+   These depend on table-of-contents and chapter body shapes, so they should
+   be handled after the detail result contract.

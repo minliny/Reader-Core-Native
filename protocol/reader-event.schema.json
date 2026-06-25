@@ -272,6 +272,60 @@
         "http": { "$ref": "#/$defs/RemoteHttpDiagnosticsData" }
       }
     },
+    "BookDetailBookData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bookId", "title", "author"],
+      "description": "Stable book detail object returned by book.detail.",
+      "properties": {
+        "bookId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Stable book identifier from the source pipeline."
+        },
+        "title": {
+          "type": "string",
+          "description": "Book title after detail metadata merge."
+        },
+        "author": {
+          "type": "string",
+          "description": "Book author after detail metadata merge."
+        },
+        "coverUrl": {
+          "type": "string",
+          "description": "Optional cover URL after detail metadata merge."
+        },
+        "intro": {
+          "type": "string",
+          "description": "Optional intro or summary after detail metadata merge."
+        },
+        "kind": {
+          "type": "string",
+          "description": "Optional category or kind after detail metadata merge."
+        },
+        "lastChapter": {
+          "type": "string",
+          "description": "Optional last-chapter hint after detail metadata merge."
+        }
+      }
+    },
+    "BookDetailData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "book"],
+      "description": "Result data for book.detail.",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Source identifier used by the detail command."
+        },
+        "book": { "$ref": "#/$defs/BookDetailBookData" },
+        "http": { "$ref": "#/$defs/RemoteHttpDiagnosticsData" }
+      }
+    },
     "ReadingProgressUpdateData": {
       "type": "object",
       "additionalProperties": false,

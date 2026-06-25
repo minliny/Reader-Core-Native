@@ -26,9 +26,10 @@ pub use host::{
     RuntimeShutdownParams, RuntimeStatus, RuntimeStatusParams,
 };
 pub use remote::{
-    BookDetailParams, BookSearchBookData, BookSearchData, BookSearchParams, BookTocParams,
-    ChapterContentParams, HostHttpRequest, HostHttpResponse, ReadingProgressUpdateData,
-    ReadingProgressUpdateParams, RemoteHttpDiagnosticsData, SourceImportData, SourceImportParams,
+    BookDetailBookData, BookDetailData, BookDetailParams, BookSearchBookData, BookSearchData,
+    BookSearchParams, BookTocParams, ChapterContentParams, HostHttpRequest, HostHttpResponse,
+    ReadingProgressUpdateData, ReadingProgressUpdateParams, RemoteHttpDiagnosticsData,
+    SourceImportData, SourceImportParams,
 };
 
 /// JSON protocol version. Bumped on non-backward-compatible schema changes.
@@ -716,6 +717,57 @@ mod tests {
         assert_eq!(
             http["properties"]["headers"]["type"],
             serde_json::json!("object")
+        );
+    }
+
+    #[test]
+    fn event_schema_defines_book_detail_data_contract() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+        let data = &schema["$defs"]["BookDetailData"];
+        let required = strings_at(data, "required");
+        let properties = &data["properties"];
+        let book = &schema["$defs"]["BookDetailBookData"];
+        let book_required = strings_at(book, "required");
+
+        assert_eq!(data["additionalProperties"], serde_json::json!(false));
+        assert_eq!(required, vec!["sourceId", "book"]);
+        assert_eq!(properties["sourceId"]["minLength"], serde_json::json!(1));
+        assert_eq!(properties["sourceId"]["pattern"], serde_json::json!("\\S"));
+        assert_eq!(
+            properties["book"]["$ref"],
+            serde_json::json!("#/$defs/BookDetailBookData")
+        );
+        assert_eq!(
+            properties["http"]["$ref"],
+            serde_json::json!("#/$defs/RemoteHttpDiagnosticsData")
+        );
+        assert_eq!(book["additionalProperties"], serde_json::json!(false));
+        assert_eq!(book_required, vec!["bookId", "title", "author"]);
+        assert_eq!(
+            book["properties"]["bookId"]["minLength"],
+            serde_json::json!(1)
+        );
+        assert_eq!(
+            book["properties"]["bookId"]["pattern"],
+            serde_json::json!("\\S")
+        );
+        assert_eq!(
+            book["properties"]["title"]["type"],
+            serde_json::json!("string")
+        );
+        assert_eq!(
+            book["properties"]["author"]["type"],
+            serde_json::json!("string")
+        );
+        assert_eq!(
+            book["properties"]["intro"]["type"],
+            serde_json::json!("string")
+        );
+        assert_eq!(
+            book["properties"]["lastChapter"]["type"],
+            serde_json::json!("string")
         );
     }
 

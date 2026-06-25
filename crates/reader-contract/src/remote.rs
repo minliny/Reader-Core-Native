@@ -142,6 +142,19 @@ where
     serde_json::from_value(value).map_err(de::Error::custom)
 }
 
+fn deserialize_book_detail_data_book<'de, D>(
+    deserializer: D,
+) -> Result<BookDetailBookData, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+    if !value.is_object() {
+        return Err(de::Error::custom("book.detail book must be an object"));
+    }
+    serde_json::from_value(value).map_err(de::Error::custom)
+}
+
 fn deserialize_remote_http_status<'de, D>(deserializer: D) -> Result<Option<u16>, D::Error>
 where
     D: Deserializer<'de>,
@@ -458,6 +471,36 @@ pub struct BookSearchData {
     pub source_id: String,
     #[serde(deserialize_with = "deserialize_book_search_books")]
     pub books: Vec<BookSearchBookData>,
+    #[serde(default, deserialize_with = "deserialize_remote_http_diagnostics")]
+    pub http: Option<RemoteHttpDiagnosticsData>,
+}
+
+/// Stable book detail object returned by `book.detail`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookDetailBookData {
+    #[serde(deserialize_with = "deserialize_non_blank_book_id")]
+    pub book_id: String,
+    pub title: String,
+    pub author: String,
+    #[serde(default)]
+    pub cover_url: Option<String>,
+    #[serde(default)]
+    pub intro: Option<String>,
+    #[serde(default)]
+    pub kind: Option<String>,
+    #[serde(default)]
+    pub last_chapter: Option<String>,
+}
+
+/// Result data for `book.detail`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookDetailData {
+    #[serde(deserialize_with = "deserialize_non_blank_source_id")]
+    pub source_id: String,
+    #[serde(deserialize_with = "deserialize_book_detail_data_book")]
+    pub book: BookDetailBookData,
     #[serde(default, deserialize_with = "deserialize_remote_http_diagnostics")]
     pub http: Option<RemoteHttpDiagnosticsData>,
 }
@@ -922,6 +965,139 @@ mod tests {
             assert!(
                 err.to_string().contains(expected),
                 "unexpected book.search data error for {label}: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn book_detail_data_parses_result_and_rejects_invalid_shape() {
+        let data: BookDetailData = serde_json::from_value(serde_json::json!({
+            "sourceId": "conformance-source",
+            "book": {
+                "bookId": "1",
+                "title": "Dune",
+                "author": "Frank Herbert",
+                "intro": "desert"
+            }
+        }))
+        .unwrap();
+        assert_eq!(data.source_id, "conformance-source");
+        assert_eq!(data.book.book_id, "1");
+        assert_eq!(data.book.title, "Dune");
+        assert_eq!(data.book.author, "Frank Herbert");
+        assert_eq!(data.book.intro.as_deref(), Some("desert"));
+        assert!(data.http.is_none());
+
+        let data: BookDetailData = serde_json::from_value(serde_json::json!({
+            "sourceId": "conformance-source",
+            "book": {
+                "bookId": "1",
+                "title": "Dune",
+                "author": "Frank Herbert"
+            },
+            "http": {
+                "status": 200,
+                "headers": { "content-type": "application/json" }
+            }
+        }))
+        .unwrap();
+        let http = data.http.expect("http diagnostics");
+        assert_eq!(http.status, Some(200));
+        assert_eq!(
+            http.headers.unwrap()["content-type"],
+            serde_json::json!("application/json")
+        );
+
+        for (label, value, expected) in [
+            (
+                "sourceId",
+                serde_json::json!({
+                    "sourceId": " ",
+                    "book": {
+                        "bookId": "1",
+                        "title": "Dune",
+                        "author": "Frank Herbert"
+                    }
+                }),
+                "sourceId",
+            ),
+            (
+                "book",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "book": []
+                }),
+                "book",
+            ),
+            (
+                "bookId",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "book": {
+                        "bookId": " ",
+                        "title": "Dune",
+                        "author": "Frank Herbert"
+                    }
+                }),
+                "bookId",
+            ),
+            (
+                "title",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "book": {
+                        "bookId": "1",
+                        "author": "Frank Herbert"
+                    }
+                }),
+                "title",
+            ),
+            (
+                "unknown book field",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "book": {
+                        "bookId": "1",
+                        "title": "Dune",
+                        "author": "Frank Herbert",
+                        "extra": true
+                    }
+                }),
+                "unknown field",
+            ),
+            (
+                "http.status",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "book": {
+                        "bookId": "1",
+                        "title": "Dune",
+                        "author": "Frank Herbert"
+                    },
+                    "http": { "status": 99 }
+                }),
+                "status",
+            ),
+            (
+                "unknown top-level field",
+                serde_json::json!({
+                    "sourceId": "conformance-source",
+                    "book": {
+                        "bookId": "1",
+                        "title": "Dune",
+                        "author": "Frank Herbert"
+                    },
+                    "extra": true
+                }),
+                "unknown field",
+            ),
+        ] {
+            let err = serde_json::from_value::<BookDetailData>(value)
+                .err()
+                .unwrap_or_else(|| panic!("expected rejection for {label}"));
+            assert!(
+                err.to_string().contains(expected),
+                "unexpected book.detail data error for {label}: {err}"
             );
         }
     }
