@@ -63,19 +63,22 @@
 `host.request` event 到 host capability，并编码 `host.complete` / `host.error`
 command 经现有 `rc_runtime_send` 通道回 Core。**不触碰 C ABI**，只消费协议。
 
-- 组件：`HostEventLoop` / `HostTransport` / `ReaderCoreHostTransport` /
+- 组件：`HostBus` / `HostEventLoop` / `HostTransport` / `ReaderCoreHostTransport` /
   `HostRequest` / `HostReply` / `CapabilityHandler` / `HostAdapter` /
   `HostReplyCodec` / `HttpExecuteHandler` / `HttpFetch` / `HttpRequest` /
   `HttpResponse` / `HostSmokeEchoHandler` / 零依赖 `Json`。
 - 闭环：`HostEventLoop.tick` 做 poll → 过滤 `host.request` → dispatch → encode →
   send；`ReaderCoreHostTransport` 把 loop 接到现有 `ReaderCoreRuntime`（JNI → C ABI）。
+- 产品 surface：`HostBus.over(transport).register(cap, handler).start()/stop()` 把
+  transport + adapter + loop 打包成 host app 的一站式接入点，含 daemon 轮询线程与
+  同步 `tick`/`drain` 脚本入口。
 - 真实 capability：`HttpExecuteHandler` 实现 `http.execute` shared-contract
   （请求 `{url,method,headers,body}` → 结果 `{status,body}` 或 `{status,headers,body}`），
   通过可注入 `HttpFetch` 把 TLS/socket/网络策略留在 host 侧；`HostSmokeEchoHandler`
   实现 `host.smoke.echo` conformance smoke capability。
 - Gradle gate：`bindings/android/host-adapter` 下 `gradle test`（JDK 17、
   Gradle 9.5.1 验证；`--offline` 可复跑）。模块通过 `sourceSets` 编译引用现有
-  Java JNI wrapper，不修改 wrapper 源。40 tests pass。
+  Java JNI wrapper，不修改 wrapper 源。45 tests pass。
 - Contract evidence：`HostReplyCodecTest` / `HostEventLoopTest` /
   `HttpExecuteHandlerTest` 用拷贝 fixture 做单元级验证；`ProtocolConformanceTest`
   **直接读取上游 `protocol/fixtures/conformance/host/`**（经 Gradle system property

@@ -40,6 +40,7 @@ HostRequest.parse  -->  HostAdapter.dispatch(capability)  -->  CapabilityHandler
 
 | 类 | 职责 |
 | --- | --- |
+| `HostBus` | host app 一站式接入点：`over(transport).register(...).start()/stop()`，含 daemon 轮询线程与同步 `tick`/`drain`。 |
 | `HostEventLoop` | 闭环：poll → 过滤 `host.request` → dispatch → encode → send；忽略 result/error event。 |
 | `HostTransport` | poll/send 抽象接口，使 loop 纯 JVM 可单测。 |
 | `ReaderCoreHostTransport` | 生产 wiring：把 `HostTransport` 接到现有 `ReaderCoreRuntime`（JNI → C ABI）。 |
@@ -83,6 +84,9 @@ JAVA_HOME=<jdk17> gradle --offline test # 依赖已缓存，可离线复跑
   `complete/error/http-complete-with-metadata/http-complete-invalid-status` fixture
   逐字节一致（modulo outbound requestId），拒绝 `*-operation-zero` 负 fixture，校验
   `request.json` smoke 参数形状与 invalid-capability 负 fixture —— 协议变更即断测。
+- `HostBusTest` 覆盖产品 surface：同步 `tick`/`drain` 脚本、unsupported capability →
+  `host.error`、`start`/`stop` 幂等，并用阻塞型 fake transport 驱动 daemon 轮询线程
+  端到端验证异步 host.request 处理。
 
 这是本 lane 每轮提交的可验证 contract evidence（Gradle `test` task，纯 JVM，无需
 NDK/设备）。模块通过 `sourceSets` 编译引用现有 Java JNI wrapper（`ReaderCoreRuntime`
