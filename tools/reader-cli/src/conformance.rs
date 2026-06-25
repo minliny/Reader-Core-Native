@@ -548,6 +548,9 @@ pub(crate) fn run_conformance() -> ConformanceReport {
                 ..
             } if *request_id == 301
                 && *operation_id == 1
+                && event_json["operationId"]
+                    .as_u64()
+                    .is_some_and(|operation_id| operation_id > 0)
                 && capability == "host.smoke.echo"
                 && params["message"] == "conformance host request"
                 && event_json["params"].is_object() =>

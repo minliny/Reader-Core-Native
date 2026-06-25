@@ -8,6 +8,10 @@ fn assert_object_payload(field: &str, value: &Value) {
     assert!(value.is_object(), "{field} must be a JSON object");
 }
 
+fn assert_positive_id(field: &str, value: u64) {
+    assert!(value > 0, "{field} must be greater than 0");
+}
+
 /// Core → platform event. Mirrors `reader-event.schema.json`.
 ///
 /// Discriminated by the `type` field (`"result"` / `"error"` / `"host.request"`).
@@ -72,6 +76,7 @@ impl Event {
         capability: impl Into<String>,
         params: Value,
     ) -> Self {
+        assert_positive_id("host.request operationId", operation_id);
         assert_object_payload("host.request params", &params);
         Event::HostRequest {
             protocol_version: PROTOCOL_VERSION,
@@ -109,8 +114,15 @@ mod tests {
         let json = serde_json::to_value(event).expect("event must serialize");
 
         assert_eq!(json["type"], "host.request");
+        assert_eq!(json["operationId"], 2);
         assert!(json["params"].is_object());
         assert_eq!(json["params"]["ok"], true);
+    }
+
+    #[test]
+    #[should_panic(expected = "host.request operationId must be greater than 0")]
+    fn host_request_event_rejects_zero_operation_id() {
+        let _event = Event::host_request(1, 0, "host.smoke.echo", serde_json::json!({}));
     }
 
     #[test]

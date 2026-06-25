@@ -570,6 +570,7 @@ int main(void) {
   ev++;
   uint64_t op60 = 0;
   if (!json_u64(event, "operationId", &op60) ||
+      op60 == 0 ||
       !contains(event, "\"protocolVersion\":1") ||
       !contains(event, "\"type\":\"host.request\"") ||
       !contains(event, "\"capability\":\"host.smoke.echo\"") ||
