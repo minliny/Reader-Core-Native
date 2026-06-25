@@ -76,6 +76,32 @@ tasks.register('compileSample', JavaCompile) {
     destinationDirectory = layout.buildDirectory.dir('classes/java/sample')
 }
 
+// Packaging prep: a sources jar and a javadoc jar, so the host-adapter ships as
+// a consumable Maven/Gradle artifact (documentation + sources for IDEs). Pure
+// JVM — does not pull the Android Gradle plugin (AAR packaging is host-app
+// work per STATUS.md). Wired into `assemble` and `check`.
+tasks.register('sourcesJar', Jar) {
+    archiveClassifier = 'sources'
+    from sourceSets.main.allJava
+}
+
+tasks.register('javadocJar', Jar) {
+    archiveClassifier = 'javadoc'
+    from tasks.named('javadoc')
+}
+
+tasks.named('jar') {
+    dependsOn sourcesJar, javadocJar
+}
+
+artifacts {
+    archives sourcesJar, javadocJar
+}
+
+tasks.named('assemble') {
+    dependsOn sourcesJar, javadocJar
+}
+
 tasks.named('check') {
     dependsOn 'compileSample'
 }
