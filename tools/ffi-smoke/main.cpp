@@ -399,6 +399,25 @@ int main() {
     return fail("unknown host.complete send left synchronous last_error");
   }
 
+  // --- method-specific invalid params -> async INVALID_PARAMS ------------
+  std::string invalid_progress =
+      R"({"protocolVersion":1,"requestId":26,"method":"reading.progress.update","params":{"bookId":"1","chapterIndex":2,"chapterOffset":128,"chapterProgress":0.5,"syncToken":"host-owned"}})";
+  if (send_str(rt, invalid_progress) != RC_SEND_OK) {
+    return fail("reading.progress.update invalid params send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":26") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "reading.progress.update")) {
+    std::cerr << "invalid reading.progress.update error: " << event << '\n';
+    return fail("invalid reading.progress.update error shape");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("invalid reading.progress.update send left synchronous last_error");
+  }
+
   // --- cancel a pending host.request ------------------------------------
   if (send_str(rt,
                R"({"protocolVersion":1,"requestId":24,"method":"runtime.hostSmoke","params":{"capability":"host.smoke.echo","params":{}}})") !=

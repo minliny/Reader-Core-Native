@@ -610,6 +610,37 @@ mod tests {
     }
 
     #[test]
+    fn method_specific_invalid_params_emit_error_event_via_c_abi() {
+        let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
+        let handle = make_runtime(&events);
+
+        let cmd = include_bytes!(
+            "../../../protocol/fixtures/conformance/commands/invalid-reading-progress-update-unknown-field.json"
+        );
+        assert_eq!(unsafe { send(handle, cmd.as_ptr(), cmd.len()) }, 0);
+        assert_eq!(last_error_code(), 0);
+
+        let evs = wait_events(&events, 1);
+        let err: serde_json::Value = serde_json::from_slice(&evs[0]).unwrap();
+        assert_eq!(err["type"], "error");
+        assert_eq!(err["protocolVersion"], 1);
+        assert_eq!(err["requestId"], 412);
+        assert_eq!(err["error"]["code"], "INVALID_PARAMS");
+        assert_eq!(
+            err["error"]["details"]["method"],
+            reader_contract::methods::READING_PROGRESS_UPDATE
+        );
+        assert!(
+            err["error"]["details"]["source"]
+                .as_str()
+                .is_some_and(|source| source.contains("unknown field")),
+            "unexpected error event: {err}"
+        );
+
+        assert_eq!(unsafe { destroy(handle) }, 0);
+    }
+
+    #[test]
     fn cancelling_pending_host_request_emits_cancelled_via_c_abi() {
         let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
         let handle = make_runtime(&events);

@@ -525,6 +525,32 @@ int main(void) {
     return fail("unknown host.complete send left synchronous last_error");
   }
 
+  // --- method-specific invalid params -> async INVALID_PARAMS ------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":67,\"method\":\"reading."
+               "progress.update\",\"params\":{\"bookId\":\"1\","
+               "\"chapterIndex\":2,\"chapterOffset\":128,"
+               "\"chapterProgress\":0.5,\"syncToken\":\"host-owned\"}}") !=
+      RC_SEND_OK) {
+    return fail("reading.progress.update invalid params send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no error event for invalid reading.progress.update params");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":67") ||
+      !contains(event, "\"INVALID_PARAMS\"") ||
+      !contains(event, "reading.progress.update")) {
+    fprintf(stderr, "invalid reading.progress.update error: %s\n", event);
+    return fail("invalid reading.progress.update error shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("invalid reading.progress.update send left synchronous last_error");
+  }
+
   // --- unknown method -> async error event ------------------------------
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":64,\"method\":\"no.such."
