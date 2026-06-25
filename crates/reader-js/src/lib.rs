@@ -358,6 +358,7 @@ impl QuickJsSandbox {
         )?;
         java.set("base64Encode", make_base64_encode_callback(ctx.clone())?)?;
         java.set("base64Decode", make_base64_decode_callback(ctx.clone())?)?;
+        java.set("base64Decoder", make_base64_decode_callback(ctx.clone())?)?;
         java.set(
             "base64DecodeToByteArray",
             make_base64_decode_to_byte_array_callback(ctx.clone())?,
@@ -383,6 +384,27 @@ impl QuickJsSandbox {
         java.set("hmacHex", make_hmac_digest_callback(ctx.clone())?)?;
         java.set("HMacBase64", make_hmac_base64_callback(ctx.clone())?)?;
         java.set("hmacBase64", make_hmac_base64_callback(ctx.clone())?)?;
+        java.set("createSign", make_create_sign_callback(ctx.clone())?)?;
+        java.set(
+            "createSymmetricCrypto",
+            make_create_symmetric_crypto_callback(ctx.clone())?,
+        )?;
+        java.set(
+            "aesBase64DecodeToString",
+            make_aes_base64_decode_to_string_callback(ctx.clone())?,
+        )?;
+        java.set(
+            "aesEncodeToBase64String",
+            make_aes_encode_to_base64_string_callback(ctx.clone())?,
+        )?;
+        java.set(
+            "desEncodeToBase64String",
+            make_des_encode_to_base64_string_callback(ctx.clone())?,
+        )?;
+        java.set(
+            "tripleDESEncodeBase64Str",
+            make_triple_des_encode_base64_str_callback(ctx.clone())?,
+        )?;
         java.set("strToBytes", make_str_to_bytes_callback(ctx.clone())?)?;
         java.set("bytesToStr", make_bytes_to_str_callback(ctx.clone())?)?;
         java.set("encodeURI", make_encode_uri_callback(ctx.clone())?)?;
@@ -418,6 +440,8 @@ impl QuickJsSandbox {
             make_host_dispatch_callback(ctx.clone(), self.host_callbacks.clone())?,
         )?;
         ctx.globals().set("java", java)?;
+        ctx.globals()
+            .set("Buffer", make_buffer_object(ctx.clone())?)?;
         ctx.globals().set(
             "ajax",
             make_host_callback(ctx.clone(), HostMethod::Ajax, self.host_callbacks.clone())?,
@@ -434,6 +458,8 @@ impl QuickJsSandbox {
             .set("base64Encode", make_base64_encode_callback(ctx.clone())?)?;
         ctx.globals()
             .set("base64Decode", make_base64_decode_callback(ctx.clone())?)?;
+        ctx.globals()
+            .set("base64Decoder", make_base64_decode_callback(ctx.clone())?)?;
         ctx.globals().set(
             "base64DecodeToByteArray",
             make_base64_decode_to_byte_array_callback(ctx.clone())?,
@@ -466,6 +492,20 @@ impl QuickJsSandbox {
             .set("HMacBase64", make_hmac_base64_callback(ctx.clone())?)?;
         ctx.globals()
             .set("hmacBase64", make_hmac_base64_callback(ctx.clone())?)?;
+        ctx.globals()
+            .set("createSign", make_create_sign_callback(ctx.clone())?)?;
+        ctx.globals().set(
+            "createSymmetricCrypto",
+            make_create_symmetric_crypto_callback(ctx.clone())?,
+        )?;
+        ctx.globals().set(
+            "aesBase64DecodeToString",
+            make_aes_base64_decode_to_string_callback(ctx.clone())?,
+        )?;
+        ctx.globals().set(
+            "aesEncodeToBase64String",
+            make_aes_encode_to_base64_string_callback(ctx.clone())?,
+        )?;
         ctx.globals()
             .set("strToBytes", make_str_to_bytes_callback(ctx.clone())?)?;
         ctx.globals()
@@ -841,6 +881,56 @@ fn make_host_callback<'js>(
     )
 }
 
+fn make_buffer_object<'js>(ctx: Ctx<'js>) -> Result<rquickjs::Object<'js>, QuickJsError> {
+    let buffer = rquickjs::Object::new(ctx.clone())?;
+    buffer.set(
+        "concat",
+        rquickjs::Function::new(
+            ctx,
+            |ctx: Ctx<'js>,
+             args: Rest<QuickJsValue<'js>>|
+             -> Result<QuickJsValue<'js>, QuickJsError> {
+                let Some(chunks_value) = args.0.first() else {
+                    return json_to_quickjs(&ctx, &JsonValue::Array(Vec::new()));
+                };
+                let chunks = match quickjs_value_to_json(chunks_value, 0) {
+                    Ok(JsonValue::Array(chunks)) => chunks,
+                    Ok(_) => {
+                        return Err(Exception::throw_type(
+                            &ctx,
+                            "Buffer.concat list argument must be an array",
+                        ));
+                    }
+                    Err(error) => {
+                        return Err(Exception::throw_type(
+                            &ctx,
+                            format!("Buffer.concat list is not JSON-compatible: {error}").as_str(),
+                        ));
+                    }
+                };
+
+                let mut bytes = chunks
+                    .into_iter()
+                    .flat_map(json_value_to_byte_array)
+                    .collect::<Vec<_>>();
+
+                if let Some(total_length) = args
+                    .0
+                    .get(1)
+                    .and_then(|value| quickjs_value_to_json(value, 0).ok())
+                    .and_then(|value| value.as_u64())
+                    .and_then(|value| usize::try_from(value).ok())
+                {
+                    bytes.resize(total_length, 0);
+                }
+
+                json_to_quickjs(&ctx, &bytes_to_json_array(bytes))
+            },
+        )?,
+    )?;
+    Ok(buffer)
+}
+
 fn make_base64_encode_callback<'js>(
     ctx: Ctx<'js>,
 ) -> Result<rquickjs::Function<'js>, QuickJsError> {
@@ -981,13 +1071,8 @@ fn make_md5_encode16_callback<'js>(ctx: Ctx<'js>) -> Result<rquickjs::Function<'
 fn make_hash_digest_callback<'js>(ctx: Ctx<'js>) -> Result<rquickjs::Function<'js>, QuickJsError> {
     rquickjs::Function::new(
         ctx,
-        |ctx: Ctx<'js>, input: String, algorithm: String| -> Result<String, QuickJsError> {
-            hash_digest_hex(input.as_bytes(), &algorithm).ok_or_else(|| {
-                Exception::throw_type(
-                    &ctx,
-                    format!("hashDigest unsupported algorithm: {algorithm}").as_str(),
-                )
-            })
+        |_ctx: Ctx<'js>, input: String, algorithm: String| -> Result<String, QuickJsError> {
+            Ok(hash_digest_hex(input.as_bytes(), &algorithm).unwrap_or_default())
         },
     )
 }
@@ -997,13 +1082,8 @@ fn make_hash_digest_base64_callback<'js>(
 ) -> Result<rquickjs::Function<'js>, QuickJsError> {
     rquickjs::Function::new(
         ctx,
-        |ctx: Ctx<'js>, input: String, algorithm: String| -> Result<String, QuickJsError> {
-            hash_digest_base64(input.as_bytes(), &algorithm).ok_or_else(|| {
-                Exception::throw_type(
-                    &ctx,
-                    format!("digestBase64Str unsupported algorithm: {algorithm}").as_str(),
-                )
-            })
+        |_ctx: Ctx<'js>, input: String, algorithm: String| -> Result<String, QuickJsError> {
+            Ok(hash_digest_base64(input.as_bytes(), &algorithm).unwrap_or_default())
         },
     )
 }
@@ -1041,6 +1121,349 @@ fn make_hmac_base64_callback<'js>(ctx: Ctx<'js>) -> Result<rquickjs::Function<'j
                 )
             })
         },
+    )
+}
+
+fn make_create_sign_callback<'js>(ctx: Ctx<'js>) -> Result<rquickjs::Function<'js>, QuickJsError> {
+    rquickjs::Function::new(
+        ctx,
+        |ctx: Ctx<'js>, args: Rest<QuickJsValue<'js>>| -> Result<String, QuickJsError> {
+            let Some(params_value) = args.0.first() else {
+                return Ok(String::new());
+            };
+            let params = quickjs_value_to_json(params_value, 0).map_err(|error| {
+                Exception::throw_type(
+                    &ctx,
+                    format!("createSign params are not JSON-compatible: {error}").as_str(),
+                )
+            })?;
+            let key = args
+                .0
+                .get(1)
+                .map(|value| quickjs_value_to_string(value))
+                .transpose()
+                .map_err(|error| {
+                    Exception::throw_type(
+                        &ctx,
+                        format!("createSign key is not JSON-compatible: {error}").as_str(),
+                    )
+                })?
+                .unwrap_or_default();
+            let algorithm = args
+                .0
+                .get(2)
+                .map(|value| quickjs_value_to_string(value))
+                .transpose()
+                .map_err(|error| {
+                    Exception::throw_type(
+                        &ctx,
+                        format!("createSign algorithm is not JSON-compatible: {error}").as_str(),
+                    )
+                })?
+                .filter(|value| !value.is_empty())
+                .unwrap_or_else(|| "HMAC-MD5".to_string());
+            let payload = create_sign_payload(&params);
+            if payload.is_empty() || key.is_empty() {
+                return Ok(String::new());
+            }
+
+            hmac_digest_hex(payload.as_bytes(), &algorithm, key.as_bytes()).ok_or_else(|| {
+                Exception::throw_type(
+                    &ctx,
+                    format!("createSign unsupported algorithm: {algorithm}").as_str(),
+                )
+            })
+        },
+    )
+}
+
+fn make_create_symmetric_crypto_callback<'js>(
+    ctx: Ctx<'js>,
+) -> Result<rquickjs::Function<'js>, QuickJsError> {
+    rquickjs::Function::new(
+        ctx,
+        |ctx: Ctx<'js>,
+         args: Rest<QuickJsValue<'js>>|
+         -> Result<rquickjs::Object<'js>, QuickJsError> {
+            let transformation = optional_quickjs_string(args.0.first(), "AES/CBC/PKCS7Padding");
+            let key =
+                optional_symmetric_key_bytes(&ctx, args.0.get(1), "createSymmetricCrypto key")?;
+            let iv = optional_symmetric_key_bytes(&ctx, args.0.get(2), "createSymmetricCrypto iv")?;
+
+            let crypto = rquickjs::Object::new(ctx.clone())?;
+            let encrypt_transformation = transformation.clone();
+            let encrypt_key = key.clone();
+            let encrypt_iv = iv.clone();
+            crypto.set(
+                "encrypt",
+                rquickjs::Function::new(ctx.clone(), move |input: String| -> String {
+                    symmetric_encrypt_base64_with_key_bytes(
+                        &encrypt_transformation,
+                        &encrypt_key,
+                        &encrypt_iv,
+                        input.as_bytes(),
+                    )
+                    .unwrap_or_default()
+                })?,
+            )?;
+
+            let encrypt_base64_transformation = transformation.clone();
+            let encrypt_base64_key = key.clone();
+            let encrypt_base64_iv = iv.clone();
+            crypto.set(
+                "encryptBase64",
+                rquickjs::Function::new(ctx.clone(), move |input: String| -> String {
+                    symmetric_encrypt_base64_with_key_bytes(
+                        &encrypt_base64_transformation,
+                        &encrypt_base64_key,
+                        &encrypt_base64_iv,
+                        input.as_bytes(),
+                    )
+                    .unwrap_or_default()
+                })?,
+            )?;
+
+            let encrypt_hex_transformation = transformation.clone();
+            let encrypt_hex_key = key.clone();
+            let encrypt_hex_iv = iv.clone();
+            crypto.set(
+                "encryptHex",
+                rquickjs::Function::new(ctx.clone(), move |input: String| -> String {
+                    symmetric_encrypt_hex_with_key_bytes(
+                        &encrypt_hex_transformation,
+                        &encrypt_hex_key,
+                        &encrypt_hex_iv,
+                        input.as_bytes(),
+                    )
+                    .unwrap_or_default()
+                })?,
+            )?;
+
+            let decrypt_hex_transformation = transformation.clone();
+            let decrypt_hex_key = key.clone();
+            let decrypt_hex_iv = iv.clone();
+            crypto.set(
+                "decryptHex",
+                rquickjs::Function::new(ctx.clone(), move |input: String| -> String {
+                    let encrypted = hex_decode(&input);
+                    let decrypted = symmetric_decrypt_cipher_bytes_with_key_bytes(
+                        &decrypt_hex_transformation,
+                        &decrypt_hex_key,
+                        &decrypt_hex_iv,
+                        &encrypted,
+                    )
+                    .unwrap_or_default();
+                    String::from_utf8(decrypted).unwrap_or_default()
+                })?,
+            )?;
+
+            let decrypt_transformation = transformation.clone();
+            let decrypt_key = key.clone();
+            let decrypt_iv = iv.clone();
+            crypto.set(
+                "decryptStr",
+                rquickjs::Function::new(
+                    ctx.clone(),
+                    move |ctx: Ctx<'js>,
+                          args: Rest<QuickJsValue<'js>>|
+                          -> Result<String, QuickJsError> {
+                        let Some(input_value) = args.0.first() else {
+                            return Ok(String::new());
+                        };
+                        let encrypted =
+                            symmetric_cipher_input_bytes(&ctx, input_value, "decryptStr")?;
+                        let decrypted = symmetric_decrypt_cipher_bytes_with_key_bytes(
+                            &decrypt_transformation,
+                            &decrypt_key,
+                            &decrypt_iv,
+                            &encrypted,
+                        )
+                        .unwrap_or_default();
+
+                        Ok(String::from_utf8(decrypted).unwrap_or_default())
+                    },
+                )?,
+            )?;
+
+            let decrypt_alias_transformation = transformation;
+            let decrypt_alias_key = key;
+            let decrypt_alias_iv = iv;
+            crypto.set(
+                "decrypt",
+                rquickjs::Function::new(
+                    ctx,
+                    move |ctx: Ctx<'js>,
+                          args: Rest<QuickJsValue<'js>>|
+                          -> Result<QuickJsValue<'js>, QuickJsError> {
+                        let Some(input_value) = args.0.first() else {
+                            return json_to_quickjs(&ctx, &JsonValue::Array(Vec::new()));
+                        };
+                        let input_was_string = input_value.is_string();
+                        let encrypted = symmetric_cipher_input_bytes(&ctx, input_value, "decrypt")?;
+                        let decrypted = symmetric_decrypt_cipher_bytes_with_key_bytes(
+                            &decrypt_alias_transformation,
+                            &decrypt_alias_key,
+                            &decrypt_alias_iv,
+                            &encrypted,
+                        )
+                        .unwrap_or_default();
+
+                        if input_was_string {
+                            return json_to_quickjs(
+                                &ctx,
+                                &JsonValue::String(
+                                    String::from_utf8(decrypted).unwrap_or_default(),
+                                ),
+                            );
+                        }
+
+                        json_to_quickjs(&ctx, &bytes_to_json_array(decrypted))
+                    },
+                )?,
+            )?;
+            Ok(crypto)
+        },
+    )
+}
+
+fn make_aes_base64_decode_to_string_callback<'js>(
+    ctx: Ctx<'js>,
+) -> Result<rquickjs::Function<'js>, QuickJsError> {
+    rquickjs::Function::new(
+        ctx,
+        |args: Rest<QuickJsValue<'js>>| -> Result<String, QuickJsError> {
+            let data = optional_quickjs_string(args.0.first(), "");
+            let key = optional_quickjs_string(args.0.get(1), "");
+            let transformation = optional_quickjs_string(args.0.get(2), "AES/CBC/PKCS7Padding");
+            let iv = optional_quickjs_string(args.0.get(3), "");
+
+            Ok(
+                symmetric_decrypt_base64_to_string(&transformation, &key, &iv, &data)
+                    .unwrap_or_default(),
+            )
+        },
+    )
+}
+
+fn make_aes_encode_to_base64_string_callback<'js>(
+    ctx: Ctx<'js>,
+) -> Result<rquickjs::Function<'js>, QuickJsError> {
+    rquickjs::Function::new(
+        ctx,
+        |args: Rest<QuickJsValue<'js>>| -> Result<String, QuickJsError> {
+            let data = optional_quickjs_string(args.0.first(), "");
+            let key = optional_quickjs_string(args.0.get(1), "");
+            let transformation = optional_quickjs_string(args.0.get(2), "AES/CBC/PKCS7Padding");
+            let iv = optional_quickjs_string(args.0.get(3), "");
+
+            Ok(
+                symmetric_encrypt_base64(&transformation, &key, &iv, data.as_bytes())
+                    .unwrap_or_default(),
+            )
+        },
+    )
+}
+
+fn make_des_encode_to_base64_string_callback<'js>(
+    ctx: Ctx<'js>,
+) -> Result<rquickjs::Function<'js>, QuickJsError> {
+    rquickjs::Function::new(
+        ctx,
+        |args: Rest<QuickJsValue<'js>>| -> Result<String, QuickJsError> {
+            let data = optional_quickjs_string(args.0.first(), "");
+            let key = optional_quickjs_string(args.0.get(1), "");
+            let transformation = optional_quickjs_string(args.0.get(2), "DES/CBC/PKCS5Padding");
+            let iv = optional_quickjs_string(args.0.get(3), "");
+
+            Ok(
+                symmetric_encrypt_base64(&transformation, &key, &iv, data.as_bytes())
+                    .unwrap_or_default(),
+            )
+        },
+    )
+}
+
+fn make_triple_des_encode_base64_str_callback<'js>(
+    ctx: Ctx<'js>,
+) -> Result<rquickjs::Function<'js>, QuickJsError> {
+    rquickjs::Function::new(
+        ctx,
+        |args: Rest<QuickJsValue<'js>>| -> Result<String, QuickJsError> {
+            let data = optional_quickjs_string(args.0.first(), "");
+            let key = optional_quickjs_string(args.0.get(1), "");
+            let mode = optional_quickjs_string(args.0.get(2), "CBC");
+            let padding = optional_quickjs_string(args.0.get(3), "PKCS5Padding");
+            let iv = optional_quickjs_string(args.0.get(4), "");
+            let transformation = format!("DESede/{mode}/{padding}");
+
+            Ok(
+                symmetric_encrypt_base64(&transformation, &key, &iv, data.as_bytes())
+                    .unwrap_or_default(),
+            )
+        },
+    )
+}
+
+fn symmetric_cipher_input_bytes(
+    ctx: &Ctx<'_>,
+    value: &QuickJsValue<'_>,
+    helper_name: &str,
+) -> Result<Vec<u8>, QuickJsError> {
+    match quickjs_value_to_json(value, 0) {
+        Ok(JsonValue::String(value)) => Ok(base64_decode_with_flags(&value, 0).unwrap_or_default()),
+        Ok(value) => Ok(json_value_to_byte_array(value)),
+        Err(error) => Err(Exception::throw_type(
+            ctx,
+            format!("{helper_name} input is not JSON-compatible: {error}").as_str(),
+        )),
+    }
+}
+
+fn optional_symmetric_key_bytes(
+    ctx: &Ctx<'_>,
+    value: Option<&QuickJsValue<'_>>,
+    helper_name: &str,
+) -> Result<Vec<u8>, QuickJsError> {
+    let Some(value) = value else {
+        return Ok(Vec::new());
+    };
+
+    match quickjs_value_to_json(value, 0) {
+        Ok(JsonValue::Null) => Ok(Vec::new()),
+        Ok(JsonValue::String(value)) => Ok(value.into_bytes()),
+        Ok(value @ (JsonValue::Array(_) | JsonValue::Number(_))) => {
+            Ok(json_value_to_byte_array(value))
+        }
+        Ok(_) => Ok(Vec::new()),
+        Err(error) => Err(Exception::throw_type(
+            ctx,
+            format!("{helper_name} is not JSON-compatible: {error}").as_str(),
+        )),
+    }
+}
+
+fn json_value_to_byte_array(value: JsonValue) -> Vec<u8> {
+    match value {
+        JsonValue::Array(items) => items
+            .into_iter()
+            .filter_map(|item| item.as_i64().map(|value| (value & 0xff) as u8))
+            .collect(),
+        JsonValue::Number(value) => value
+            .as_i64()
+            .map(|value| vec![(value & 0xff) as u8])
+            .unwrap_or_default(),
+        JsonValue::Null => Vec::new(),
+        JsonValue::String(value) => value.into_bytes(),
+        _ => Vec::new(),
+    }
+}
+
+fn bytes_to_json_array(bytes: Vec<u8>) -> JsonValue {
+    JsonValue::Array(
+        bytes
+            .into_iter()
+            .map(|byte| JsonValue::Number(JsonNumber::from(byte)))
+            .collect(),
     )
 }
 
@@ -1252,9 +1675,7 @@ fn make_html_format_callback<'js>(ctx: Ctx<'js>) -> Result<rquickjs::Function<'j
 fn make_to_url_callback<'js>(ctx: Ctx<'js>) -> Result<rquickjs::Function<'js>, QuickJsError> {
     rquickjs::Function::new(
         ctx,
-        |ctx: Ctx<'js>,
-         args: Rest<QuickJsValue<'js>>|
-         -> Result<rquickjs::Object<'js>, QuickJsError> {
+        |ctx: Ctx<'js>, args: Rest<QuickJsValue<'js>>| -> Result<QuickJsValue<'js>, QuickJsError> {
             let Some(url_value) = args.0.first() else {
                 return Err(Exception::throw_type(
                     &ctx,
@@ -1271,15 +1692,27 @@ fn make_to_url_callback<'js>(ctx: Ctx<'js>) -> Result<rquickjs::Function<'js>, Q
                     ));
                 }
             };
+            let url = url.trim().to_string();
+            if url.is_empty() {
+                return json_to_quickjs(&ctx, &JsonValue::String(String::new()));
+            }
             let base_url = args
                 .0
                 .get(1)
                 .and_then(|value| quickjs_value_to_json(value, 0).ok())
                 .and_then(|value| value.as_str().map(ToOwned::to_owned));
+            if !is_absolute_url(&url) {
+                let Some(base_url) = base_url.as_deref().filter(|value| !value.is_empty()) else {
+                    return json_to_quickjs(&ctx, &JsonValue::String(url));
+                };
+                if parse_absolute_url(base_url).is_err() {
+                    return json_to_quickjs(&ctx, &JsonValue::String(url));
+                }
+            }
             let parts = resolve_js_url(&url, base_url.as_deref()).map_err(|message| {
                 Exception::throw_type(&ctx, format!("toURL failed: {message}").as_str())
             })?;
-            js_url_to_object(&ctx, parts)
+            Ok(js_url_to_object(&ctx, parts)?.into_value())
         },
     )
 }
@@ -1674,6 +2107,1052 @@ fn hex_value(byte: u8) -> Option<u8> {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SymmetricMode {
+    Cbc,
+    Ecb,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SymmetricAlgorithm {
+    Aes,
+    Des,
+    TripleDes,
+    Sm4,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SymmetricPadding {
+    Pkcs7,
+    NoPadding,
+    ZeroPadding,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct SymmetricTransformation {
+    algorithm: SymmetricAlgorithm,
+    mode: SymmetricMode,
+    padding: SymmetricPadding,
+}
+
+fn symmetric_encrypt_base64(
+    transformation: &str,
+    key: &str,
+    iv: &str,
+    input: &[u8],
+) -> Option<String> {
+    symmetric_encrypt_base64_with_key_bytes(transformation, key.as_bytes(), iv.as_bytes(), input)
+}
+
+fn symmetric_encrypt_base64_with_key_bytes(
+    transformation: &str,
+    key: &[u8],
+    iv: &[u8],
+    input: &[u8],
+) -> Option<String> {
+    let encrypted = symmetric_encrypt_bytes_with_key_bytes(transformation, key, iv, input)?;
+    Some(base64_encode_with_flags(&encrypted, 0))
+}
+
+fn symmetric_encrypt_hex_with_key_bytes(
+    transformation: &str,
+    key: &[u8],
+    iv: &[u8],
+    input: &[u8],
+) -> Option<String> {
+    let encrypted = symmetric_encrypt_bytes_with_key_bytes(transformation, key, iv, input)?;
+    Some(hex_encode(&encrypted))
+}
+
+fn symmetric_encrypt_bytes_with_key_bytes(
+    transformation: &str,
+    key: &[u8],
+    iv: &[u8],
+    input: &[u8],
+) -> Option<Vec<u8>> {
+    let transformation = parse_symmetric_transformation(transformation)?;
+    match transformation.algorithm {
+        SymmetricAlgorithm::Aes => aes_encrypt_bytes(input, key, iv, transformation),
+        SymmetricAlgorithm::Des => des_encrypt_bytes(input, key, iv, transformation),
+        SymmetricAlgorithm::TripleDes => triple_des_encrypt_bytes(input, key, iv, transformation),
+        SymmetricAlgorithm::Sm4 => sm4_encrypt_bytes(input, key, iv, transformation),
+    }
+}
+
+fn symmetric_decrypt_base64_to_string(
+    transformation: &str,
+    key: &str,
+    iv: &str,
+    input: &str,
+) -> Option<String> {
+    let encrypted = base64_decode_with_flags(input, 0)?;
+    let decrypted = symmetric_decrypt_cipher_bytes(transformation, key, iv, &encrypted)?;
+    String::from_utf8(decrypted).ok()
+}
+
+fn symmetric_decrypt_cipher_bytes(
+    transformation: &str,
+    key: &str,
+    iv: &str,
+    encrypted: &[u8],
+) -> Option<Vec<u8>> {
+    symmetric_decrypt_cipher_bytes_with_key_bytes(
+        transformation,
+        key.as_bytes(),
+        iv.as_bytes(),
+        encrypted,
+    )
+}
+
+fn symmetric_decrypt_cipher_bytes_with_key_bytes(
+    transformation: &str,
+    key: &[u8],
+    iv: &[u8],
+    encrypted: &[u8],
+) -> Option<Vec<u8>> {
+    let transformation = parse_symmetric_transformation(transformation)?;
+    match transformation.algorithm {
+        SymmetricAlgorithm::Aes => aes_decrypt_bytes(encrypted, key, iv, transformation),
+        SymmetricAlgorithm::Des => des_decrypt_bytes(encrypted, key, iv, transformation),
+        SymmetricAlgorithm::TripleDes => {
+            triple_des_decrypt_bytes(encrypted, key, iv, transformation)
+        }
+        SymmetricAlgorithm::Sm4 => sm4_decrypt_bytes(encrypted, key, iv, transformation),
+    }
+}
+
+fn parse_symmetric_transformation(raw: &str) -> Option<SymmetricTransformation> {
+    let parts = raw.trim().split('/').collect::<Vec<_>>();
+    let algorithm = match normalize_crypto_part(parts.first().copied().unwrap_or("AES")).as_str() {
+        "AES" => SymmetricAlgorithm::Aes,
+        "DES" => SymmetricAlgorithm::Des,
+        "DESEDE" | "DESEDE3" | "3DES" | "TRIPLEDES" | "DES3" => SymmetricAlgorithm::TripleDes,
+        "SM4" => SymmetricAlgorithm::Sm4,
+        _ => return None,
+    };
+
+    let mode = match normalize_crypto_part(parts.get(1).copied().unwrap_or("CBC")).as_str() {
+        "CBC" => SymmetricMode::Cbc,
+        "ECB" => SymmetricMode::Ecb,
+        _ => return None,
+    };
+    let padding =
+        match normalize_crypto_part(parts.get(2).copied().unwrap_or("PKCS7PADDING")).as_str() {
+            "PKCS7PADDING" | "PKCS5PADDING" | "PKCS7" | "PKCS5" => SymmetricPadding::Pkcs7,
+            "NOPADDING" => SymmetricPadding::NoPadding,
+            "ZEROPADDING" | "ZERO" => SymmetricPadding::ZeroPadding,
+            _ => return None,
+        };
+
+    Some(SymmetricTransformation {
+        algorithm,
+        mode,
+        padding,
+    })
+}
+
+fn normalize_crypto_part(input: &str) -> String {
+    input
+        .trim()
+        .chars()
+        .filter(|ch| *ch != '-' && *ch != '_' && !ch.is_ascii_whitespace())
+        .flat_map(char::to_uppercase)
+        .collect()
+}
+
+fn aes_encrypt_bytes(
+    input: &[u8],
+    key: &[u8],
+    iv: &[u8],
+    transformation: SymmetricTransformation,
+) -> Option<Vec<u8>> {
+    if !matches!(key.len(), 16 | 24 | 32) {
+        return None;
+    }
+    if transformation.mode == SymmetricMode::Cbc && iv.len() != 16 {
+        return None;
+    }
+
+    let mut input = input.to_vec();
+    apply_symmetric_padding(&mut input, transformation.padding, 16)?;
+    let round_keys = expand_aes_key(key)?;
+    let rounds = aes_rounds_for_key(key)?;
+    let mut previous = [0u8; 16];
+    if transformation.mode == SymmetricMode::Cbc {
+        previous.copy_from_slice(iv);
+    }
+
+    let mut output = Vec::with_capacity(input.len());
+    for chunk in input.chunks_exact(16) {
+        let mut block = [0u8; 16];
+        block.copy_from_slice(chunk);
+        if transformation.mode == SymmetricMode::Cbc {
+            for (byte, previous_byte) in block.iter_mut().zip(previous.iter()) {
+                *byte ^= *previous_byte;
+            }
+        }
+        aes_encrypt_block(&mut block, &round_keys, rounds);
+        if transformation.mode == SymmetricMode::Cbc {
+            previous = block;
+        }
+        output.extend_from_slice(&block);
+    }
+
+    Some(output)
+}
+
+fn aes_decrypt_bytes(
+    input: &[u8],
+    key: &[u8],
+    iv: &[u8],
+    transformation: SymmetricTransformation,
+) -> Option<Vec<u8>> {
+    if !matches!(key.len(), 16 | 24 | 32) || input.len() % 16 != 0 {
+        return None;
+    }
+    if transformation.mode == SymmetricMode::Cbc && iv.len() != 16 {
+        return None;
+    }
+
+    let round_keys = expand_aes_key(key)?;
+    let rounds = aes_rounds_for_key(key)?;
+    let mut previous = [0u8; 16];
+    if transformation.mode == SymmetricMode::Cbc {
+        previous.copy_from_slice(iv);
+    }
+
+    let mut output = Vec::with_capacity(input.len());
+    for chunk in input.chunks_exact(16) {
+        let mut block = [0u8; 16];
+        block.copy_from_slice(chunk);
+        let encrypted_block = block;
+        aes_decrypt_block(&mut block, &round_keys, rounds);
+        if transformation.mode == SymmetricMode::Cbc {
+            for (byte, previous_byte) in block.iter_mut().zip(previous.iter()) {
+                *byte ^= *previous_byte;
+            }
+            previous = encrypted_block;
+        }
+        output.extend_from_slice(&block);
+    }
+
+    remove_symmetric_padding(&mut output, transformation.padding, 16)?;
+    Some(output)
+}
+
+fn apply_symmetric_padding(
+    input: &mut Vec<u8>,
+    padding: SymmetricPadding,
+    block_size: usize,
+) -> Option<()> {
+    match padding {
+        SymmetricPadding::NoPadding => (input.len() % block_size == 0).then_some(()),
+        SymmetricPadding::ZeroPadding => {
+            let remainder = input.len() % block_size;
+            if remainder != 0 {
+                input.extend(std::iter::repeat(0).take(block_size - remainder));
+            }
+            Some(())
+        }
+        SymmetricPadding::Pkcs7 => {
+            let pad_len = block_size - (input.len() % block_size);
+            let pad_len = if pad_len == 0 { block_size } else { pad_len };
+            input.extend(std::iter::repeat(pad_len as u8).take(pad_len));
+            Some(())
+        }
+    }
+}
+
+fn remove_symmetric_padding(
+    input: &mut Vec<u8>,
+    padding: SymmetricPadding,
+    block_size: usize,
+) -> Option<()> {
+    match padding {
+        SymmetricPadding::NoPadding => Some(()),
+        SymmetricPadding::ZeroPadding => {
+            while input.last().is_some_and(|byte| *byte == 0) {
+                input.pop();
+            }
+            Some(())
+        }
+        SymmetricPadding::Pkcs7 => {
+            let pad_len = usize::from(*input.last()?);
+            if pad_len == 0 || pad_len > block_size || pad_len > input.len() {
+                return None;
+            }
+            if !input[input.len() - pad_len..]
+                .iter()
+                .all(|byte| usize::from(*byte) == pad_len)
+            {
+                return None;
+            }
+            input.truncate(input.len() - pad_len);
+            Some(())
+        }
+    }
+}
+
+fn des_encrypt_bytes(
+    input: &[u8],
+    key: &[u8],
+    iv: &[u8],
+    transformation: SymmetricTransformation,
+) -> Option<Vec<u8>> {
+    if key.len() != 8 {
+        return None;
+    }
+    if transformation.mode == SymmetricMode::Cbc && iv.len() != 8 {
+        return None;
+    }
+
+    let mut input = input.to_vec();
+    apply_symmetric_padding(&mut input, transformation.padding, 8)?;
+    let subkeys = expand_des_key(key)?;
+    let mut previous = [0u8; 8];
+    if transformation.mode == SymmetricMode::Cbc {
+        previous.copy_from_slice(iv);
+    }
+
+    let mut output = Vec::with_capacity(input.len());
+    for chunk in input.chunks_exact(8) {
+        let mut block = [0u8; 8];
+        block.copy_from_slice(chunk);
+        if transformation.mode == SymmetricMode::Cbc {
+            for (byte, previous_byte) in block.iter_mut().zip(previous.iter()) {
+                *byte ^= *previous_byte;
+            }
+        }
+        des_crypt_block(&mut block, &subkeys, false);
+        if transformation.mode == SymmetricMode::Cbc {
+            previous = block;
+        }
+        output.extend_from_slice(&block);
+    }
+
+    Some(output)
+}
+
+fn des_decrypt_bytes(
+    input: &[u8],
+    key: &[u8],
+    iv: &[u8],
+    transformation: SymmetricTransformation,
+) -> Option<Vec<u8>> {
+    if key.len() != 8 || input.len() % 8 != 0 {
+        return None;
+    }
+    if transformation.mode == SymmetricMode::Cbc && iv.len() != 8 {
+        return None;
+    }
+
+    let subkeys = expand_des_key(key)?;
+    let mut previous = [0u8; 8];
+    if transformation.mode == SymmetricMode::Cbc {
+        previous.copy_from_slice(iv);
+    }
+
+    let mut output = Vec::with_capacity(input.len());
+    for chunk in input.chunks_exact(8) {
+        let mut block = [0u8; 8];
+        block.copy_from_slice(chunk);
+        let encrypted_block = block;
+        des_crypt_block(&mut block, &subkeys, true);
+        if transformation.mode == SymmetricMode::Cbc {
+            for (byte, previous_byte) in block.iter_mut().zip(previous.iter()) {
+                *byte ^= *previous_byte;
+            }
+            previous = encrypted_block;
+        }
+        output.extend_from_slice(&block);
+    }
+
+    remove_symmetric_padding(&mut output, transformation.padding, 8)?;
+    Some(output)
+}
+
+fn triple_des_encrypt_bytes(
+    input: &[u8],
+    key: &[u8],
+    iv: &[u8],
+    transformation: SymmetricTransformation,
+) -> Option<Vec<u8>> {
+    if !matches!(key.len(), 16 | 24) {
+        return None;
+    }
+    if transformation.mode == SymmetricMode::Cbc && iv.len() != 8 {
+        return None;
+    }
+
+    let mut input = input.to_vec();
+    apply_symmetric_padding(&mut input, transformation.padding, 8)?;
+    let key_schedule = expand_triple_des_key(key)?;
+    let mut previous = [0u8; 8];
+    if transformation.mode == SymmetricMode::Cbc {
+        previous.copy_from_slice(iv);
+    }
+
+    let mut output = Vec::with_capacity(input.len());
+    for chunk in input.chunks_exact(8) {
+        let mut block = [0u8; 8];
+        block.copy_from_slice(chunk);
+        if transformation.mode == SymmetricMode::Cbc {
+            for (byte, previous_byte) in block.iter_mut().zip(previous.iter()) {
+                *byte ^= *previous_byte;
+            }
+        }
+        triple_des_crypt_block(&mut block, &key_schedule, false);
+        if transformation.mode == SymmetricMode::Cbc {
+            previous = block;
+        }
+        output.extend_from_slice(&block);
+    }
+
+    Some(output)
+}
+
+fn triple_des_decrypt_bytes(
+    input: &[u8],
+    key: &[u8],
+    iv: &[u8],
+    transformation: SymmetricTransformation,
+) -> Option<Vec<u8>> {
+    if !matches!(key.len(), 16 | 24) || input.len() % 8 != 0 {
+        return None;
+    }
+    if transformation.mode == SymmetricMode::Cbc && iv.len() != 8 {
+        return None;
+    }
+
+    let key_schedule = expand_triple_des_key(key)?;
+    let mut previous = [0u8; 8];
+    if transformation.mode == SymmetricMode::Cbc {
+        previous.copy_from_slice(iv);
+    }
+
+    let mut output = Vec::with_capacity(input.len());
+    for chunk in input.chunks_exact(8) {
+        let mut block = [0u8; 8];
+        block.copy_from_slice(chunk);
+        let encrypted_block = block;
+        triple_des_crypt_block(&mut block, &key_schedule, true);
+        if transformation.mode == SymmetricMode::Cbc {
+            for (byte, previous_byte) in block.iter_mut().zip(previous.iter()) {
+                *byte ^= *previous_byte;
+            }
+            previous = encrypted_block;
+        }
+        output.extend_from_slice(&block);
+    }
+
+    remove_symmetric_padding(&mut output, transformation.padding, 8)?;
+    Some(output)
+}
+
+fn sm4_encrypt_bytes(
+    input: &[u8],
+    key: &[u8],
+    iv: &[u8],
+    transformation: SymmetricTransformation,
+) -> Option<Vec<u8>> {
+    if key.len() != 16 {
+        return None;
+    }
+    if transformation.mode == SymmetricMode::Cbc && iv.len() != 16 {
+        return None;
+    }
+
+    let mut input = input.to_vec();
+    apply_symmetric_padding(&mut input, transformation.padding, 16)?;
+    let round_keys = expand_sm4_key(key)?;
+    let mut previous = [0u8; 16];
+    if transformation.mode == SymmetricMode::Cbc {
+        previous.copy_from_slice(iv);
+    }
+
+    let mut output = Vec::with_capacity(input.len());
+    for chunk in input.chunks_exact(16) {
+        let mut block = [0u8; 16];
+        block.copy_from_slice(chunk);
+        if transformation.mode == SymmetricMode::Cbc {
+            for (byte, previous_byte) in block.iter_mut().zip(previous.iter()) {
+                *byte ^= *previous_byte;
+            }
+        }
+        sm4_crypt_block(&mut block, &round_keys);
+        if transformation.mode == SymmetricMode::Cbc {
+            previous = block;
+        }
+        output.extend_from_slice(&block);
+    }
+
+    Some(output)
+}
+
+fn sm4_decrypt_bytes(
+    input: &[u8],
+    key: &[u8],
+    iv: &[u8],
+    transformation: SymmetricTransformation,
+) -> Option<Vec<u8>> {
+    if key.len() != 16 || input.len() % 16 != 0 {
+        return None;
+    }
+    if transformation.mode == SymmetricMode::Cbc && iv.len() != 16 {
+        return None;
+    }
+
+    let mut round_keys = expand_sm4_key(key)?;
+    round_keys.reverse();
+    let mut previous = [0u8; 16];
+    if transformation.mode == SymmetricMode::Cbc {
+        previous.copy_from_slice(iv);
+    }
+
+    let mut output = Vec::with_capacity(input.len());
+    for chunk in input.chunks_exact(16) {
+        let mut block = [0u8; 16];
+        block.copy_from_slice(chunk);
+        let encrypted_block = block;
+        sm4_crypt_block(&mut block, &round_keys);
+        if transformation.mode == SymmetricMode::Cbc {
+            for (byte, previous_byte) in block.iter_mut().zip(previous.iter()) {
+                *byte ^= *previous_byte;
+            }
+            previous = encrypted_block;
+        }
+        output.extend_from_slice(&block);
+    }
+
+    remove_symmetric_padding(&mut output, transformation.padding, 16)?;
+    Some(output)
+}
+
+fn expand_des_key(key: &[u8]) -> Option<[u64; 16]> {
+    let key: [u8; 8] = key.try_into().ok()?;
+    let permuted = des_permute(u64::from_be_bytes(key), 64, &DES_PC1);
+    let mut c = ((permuted >> 28) & 0x0fff_ffff) as u32;
+    let mut d = (permuted & 0x0fff_ffff) as u32;
+    let mut subkeys = [0u64; 16];
+
+    for (round, shift) in DES_KEY_SHIFTS.iter().copied().enumerate() {
+        c = des_rotate_28(c, shift);
+        d = des_rotate_28(d, shift);
+        let combined = ((u64::from(c)) << 28) | u64::from(d);
+        subkeys[round] = des_permute(combined, 56, &DES_PC2);
+    }
+
+    Some(subkeys)
+}
+
+fn expand_triple_des_key(key: &[u8]) -> Option<[[u64; 16]; 3]> {
+    let first = expand_des_key(key.get(0..8)?)?;
+    let second = expand_des_key(key.get(8..16)?)?;
+    let third = if key.len() == 24 {
+        expand_des_key(key.get(16..24)?)?
+    } else {
+        first
+    };
+
+    Some([first, second, third])
+}
+
+fn triple_des_crypt_block(block: &mut [u8; 8], key_schedule: &[[u64; 16]; 3], decrypt: bool) {
+    if decrypt {
+        des_crypt_block(block, &key_schedule[2], true);
+        des_crypt_block(block, &key_schedule[1], false);
+        des_crypt_block(block, &key_schedule[0], true);
+    } else {
+        des_crypt_block(block, &key_schedule[0], false);
+        des_crypt_block(block, &key_schedule[1], true);
+        des_crypt_block(block, &key_schedule[2], false);
+    }
+}
+
+fn expand_sm4_key(key: &[u8]) -> Option<[u32; 32]> {
+    let key: [u8; 16] = key.try_into().ok()?;
+    let mut state = [0u32; 36];
+    for index in 0..4 {
+        state[index] = load_be_u32(&key, index * 4) ^ SM4_FK[index];
+    }
+
+    let mut round_keys = [0u32; 32];
+    for index in 0..32 {
+        let next = state[index]
+            ^ sm4_key_transform(
+                state[index + 1] ^ state[index + 2] ^ state[index + 3] ^ SM4_CK[index],
+            );
+        state[index + 4] = next;
+        round_keys[index] = next;
+    }
+
+    Some(round_keys)
+}
+
+fn sm4_crypt_block(block: &mut [u8; 16], round_keys: &[u32; 32]) {
+    let mut state = [0u32; 36];
+    for index in 0..4 {
+        state[index] = load_be_u32(block, index * 4);
+    }
+    for index in 0..32 {
+        state[index + 4] = state[index]
+            ^ sm4_round_transform(
+                state[index + 1] ^ state[index + 2] ^ state[index + 3] ^ round_keys[index],
+            );
+    }
+
+    store_be_u32(&mut block[0..4], state[35]);
+    store_be_u32(&mut block[4..8], state[34]);
+    store_be_u32(&mut block[8..12], state[33]);
+    store_be_u32(&mut block[12..16], state[32]);
+}
+
+fn sm4_round_transform(value: u32) -> u32 {
+    let substituted = sm4_substitute(value);
+    substituted
+        ^ substituted.rotate_left(2)
+        ^ substituted.rotate_left(10)
+        ^ substituted.rotate_left(18)
+        ^ substituted.rotate_left(24)
+}
+
+fn sm4_key_transform(value: u32) -> u32 {
+    let substituted = sm4_substitute(value);
+    substituted ^ substituted.rotate_left(13) ^ substituted.rotate_left(23)
+}
+
+fn sm4_substitute(value: u32) -> u32 {
+    let b0 = u32::from(SM4_SBOX[((value >> 24) & 0xff) as usize]);
+    let b1 = u32::from(SM4_SBOX[((value >> 16) & 0xff) as usize]);
+    let b2 = u32::from(SM4_SBOX[((value >> 8) & 0xff) as usize]);
+    let b3 = u32::from(SM4_SBOX[(value & 0xff) as usize]);
+    (b0 << 24) | (b1 << 16) | (b2 << 8) | b3
+}
+
+fn load_be_u32(bytes: &[u8], offset: usize) -> u32 {
+    (u32::from(bytes[offset]) << 24)
+        | (u32::from(bytes[offset + 1]) << 16)
+        | (u32::from(bytes[offset + 2]) << 8)
+        | u32::from(bytes[offset + 3])
+}
+
+fn store_be_u32(output: &mut [u8], value: u32) {
+    output[0] = ((value >> 24) & 0xff) as u8;
+    output[1] = ((value >> 16) & 0xff) as u8;
+    output[2] = ((value >> 8) & 0xff) as u8;
+    output[3] = (value & 0xff) as u8;
+}
+
+fn des_rotate_28(value: u32, shift: u8) -> u32 {
+    ((value << shift) | (value >> (28 - shift))) & 0x0fff_ffff
+}
+
+fn des_crypt_block(block: &mut [u8; 8], subkeys: &[u64; 16], decrypt: bool) {
+    let permuted = des_permute(u64::from_be_bytes(*block), 64, &DES_IP);
+    let mut left = (permuted >> 32) as u32;
+    let mut right = permuted as u32;
+
+    for round in 0..16 {
+        let subkey = if decrypt {
+            subkeys[15 - round]
+        } else {
+            subkeys[round]
+        };
+        let next_left = right;
+        let next_right = left ^ des_feistel(right, subkey);
+        left = next_left;
+        right = next_right;
+    }
+
+    let preoutput = (u64::from(right) << 32) | u64::from(left);
+    *block = des_permute(preoutput, 64, &DES_FP).to_be_bytes();
+}
+
+fn des_feistel(right: u32, subkey: u64) -> u32 {
+    let expanded = des_permute(u64::from(right), 32, &DES_E) ^ subkey;
+    let mut sboxed = 0u32;
+    for box_index in 0..8 {
+        let shift = 42usize - (box_index * 6);
+        let value = ((expanded >> shift) & 0x3f) as u8;
+        let row = usize::from(((value & 0x20) >> 4) | (value & 0x01));
+        let column = usize::from((value >> 1) & 0x0f);
+        sboxed = (sboxed << 4) | u32::from(DES_SBOXES[box_index][row * 16 + column]);
+    }
+
+    des_permute(u64::from(sboxed), 32, &DES_P) as u32
+}
+
+fn des_permute(input: u64, input_bits: u8, table: &[u8]) -> u64 {
+    let mut output = 0u64;
+    for position in table.iter().copied() {
+        output <<= 1;
+        output |= (input >> usize::from(input_bits - position)) & 1;
+    }
+    output
+}
+
+fn aes_rounds_for_key(key: &[u8]) -> Option<usize> {
+    match key.len() {
+        16 => Some(10),
+        24 => Some(12),
+        32 => Some(14),
+        _ => None,
+    }
+}
+
+fn expand_aes_key(key: &[u8]) -> Option<Vec<u8>> {
+    let key_words = key.len() / 4;
+    let rounds = aes_rounds_for_key(key)?;
+    let expanded_len = 16 * (rounds + 1);
+    let mut expanded = vec![0u8; expanded_len];
+    expanded[..key.len()].copy_from_slice(key);
+
+    let mut bytes_generated = key.len();
+    let mut rcon_index = 1usize;
+    let mut temp = [0u8; 4];
+    while bytes_generated < expanded_len {
+        temp.copy_from_slice(&expanded[bytes_generated - 4..bytes_generated]);
+        if bytes_generated % key.len() == 0 {
+            temp.rotate_left(1);
+            for byte in temp.iter_mut() {
+                *byte = AES_SBOX[usize::from(*byte)];
+            }
+            temp[0] ^= AES_RCON[rcon_index];
+            rcon_index += 1;
+        } else if key_words > 6 && bytes_generated % key.len() == 16 {
+            for byte in temp.iter_mut() {
+                *byte = AES_SBOX[usize::from(*byte)];
+            }
+        }
+
+        for temp_byte in temp {
+            expanded[bytes_generated] = expanded[bytes_generated - key.len()] ^ temp_byte;
+            bytes_generated += 1;
+        }
+    }
+
+    Some(expanded)
+}
+
+fn aes_encrypt_block(state: &mut [u8; 16], round_keys: &[u8], rounds: usize) {
+    aes_add_round_key(state, round_keys, 0);
+    for round in 1..rounds {
+        aes_sub_bytes(state);
+        aes_shift_rows(state);
+        aes_mix_columns(state);
+        aes_add_round_key(state, round_keys, round);
+    }
+    aes_sub_bytes(state);
+    aes_shift_rows(state);
+    aes_add_round_key(state, round_keys, rounds);
+}
+
+fn aes_decrypt_block(state: &mut [u8; 16], round_keys: &[u8], rounds: usize) {
+    aes_add_round_key(state, round_keys, rounds);
+    for round in (1..rounds).rev() {
+        aes_inv_shift_rows(state);
+        aes_inv_sub_bytes(state);
+        aes_add_round_key(state, round_keys, round);
+        aes_inv_mix_columns(state);
+    }
+    aes_inv_shift_rows(state);
+    aes_inv_sub_bytes(state);
+    aes_add_round_key(state, round_keys, 0);
+}
+
+fn aes_add_round_key(state: &mut [u8; 16], round_keys: &[u8], round: usize) {
+    let offset = round * 16;
+    for (index, byte) in state.iter_mut().enumerate() {
+        *byte ^= round_keys[offset + index];
+    }
+}
+
+fn aes_sub_bytes(state: &mut [u8; 16]) {
+    for byte in state.iter_mut() {
+        *byte = AES_SBOX[usize::from(*byte)];
+    }
+}
+
+fn aes_inv_sub_bytes(state: &mut [u8; 16]) {
+    for byte in state.iter_mut() {
+        *byte = AES_INV_SBOX[usize::from(*byte)];
+    }
+}
+
+fn aes_shift_rows(state: &mut [u8; 16]) {
+    let original = *state;
+    state[1] = original[5];
+    state[5] = original[9];
+    state[9] = original[13];
+    state[13] = original[1];
+    state[2] = original[10];
+    state[6] = original[14];
+    state[10] = original[2];
+    state[14] = original[6];
+    state[3] = original[15];
+    state[7] = original[3];
+    state[11] = original[7];
+    state[15] = original[11];
+}
+
+fn aes_inv_shift_rows(state: &mut [u8; 16]) {
+    let original = *state;
+    state[1] = original[13];
+    state[5] = original[1];
+    state[9] = original[5];
+    state[13] = original[9];
+    state[2] = original[10];
+    state[6] = original[14];
+    state[10] = original[2];
+    state[14] = original[6];
+    state[3] = original[7];
+    state[7] = original[11];
+    state[11] = original[15];
+    state[15] = original[3];
+}
+
+fn aes_mix_columns(state: &mut [u8; 16]) {
+    for column in 0..4 {
+        let offset = column * 4;
+        let a0 = state[offset];
+        let a1 = state[offset + 1];
+        let a2 = state[offset + 2];
+        let a3 = state[offset + 3];
+        state[offset] = aes_gmul(a0, 2) ^ aes_gmul(a1, 3) ^ a2 ^ a3;
+        state[offset + 1] = a0 ^ aes_gmul(a1, 2) ^ aes_gmul(a2, 3) ^ a3;
+        state[offset + 2] = a0 ^ a1 ^ aes_gmul(a2, 2) ^ aes_gmul(a3, 3);
+        state[offset + 3] = aes_gmul(a0, 3) ^ a1 ^ a2 ^ aes_gmul(a3, 2);
+    }
+}
+
+fn aes_inv_mix_columns(state: &mut [u8; 16]) {
+    for column in 0..4 {
+        let offset = column * 4;
+        let a0 = state[offset];
+        let a1 = state[offset + 1];
+        let a2 = state[offset + 2];
+        let a3 = state[offset + 3];
+        state[offset] = aes_gmul(a0, 14) ^ aes_gmul(a1, 11) ^ aes_gmul(a2, 13) ^ aes_gmul(a3, 9);
+        state[offset + 1] =
+            aes_gmul(a0, 9) ^ aes_gmul(a1, 14) ^ aes_gmul(a2, 11) ^ aes_gmul(a3, 13);
+        state[offset + 2] =
+            aes_gmul(a0, 13) ^ aes_gmul(a1, 9) ^ aes_gmul(a2, 14) ^ aes_gmul(a3, 11);
+        state[offset + 3] =
+            aes_gmul(a0, 11) ^ aes_gmul(a1, 13) ^ aes_gmul(a2, 9) ^ aes_gmul(a3, 14);
+    }
+}
+
+fn aes_gmul(mut a: u8, mut b: u8) -> u8 {
+    let mut product = 0u8;
+    for _ in 0..8 {
+        if b & 1 != 0 {
+            product ^= a;
+        }
+        let high_bit = a & 0x80;
+        a <<= 1;
+        if high_bit != 0 {
+            a ^= 0x1b;
+        }
+        b >>= 1;
+    }
+    product
+}
+
+const DES_IP: [u8; 64] = [
+    58, 50, 42, 34, 26, 18, 10, 2, 60, 52, 44, 36, 28, 20, 12, 4, 62, 54, 46, 38, 30, 22, 14, 6,
+    64, 56, 48, 40, 32, 24, 16, 8, 57, 49, 41, 33, 25, 17, 9, 1, 59, 51, 43, 35, 27, 19, 11, 3, 61,
+    53, 45, 37, 29, 21, 13, 5, 63, 55, 47, 39, 31, 23, 15, 7,
+];
+
+const DES_FP: [u8; 64] = [
+    40, 8, 48, 16, 56, 24, 64, 32, 39, 7, 47, 15, 55, 23, 63, 31, 38, 6, 46, 14, 54, 22, 62, 30,
+    37, 5, 45, 13, 53, 21, 61, 29, 36, 4, 44, 12, 52, 20, 60, 28, 35, 3, 43, 11, 51, 19, 59, 27,
+    34, 2, 42, 10, 50, 18, 58, 26, 33, 1, 41, 9, 49, 17, 57, 25,
+];
+
+const DES_E: [u8; 48] = [
+    32, 1, 2, 3, 4, 5, 4, 5, 6, 7, 8, 9, 8, 9, 10, 11, 12, 13, 12, 13, 14, 15, 16, 17, 16, 17, 18,
+    19, 20, 21, 20, 21, 22, 23, 24, 25, 24, 25, 26, 27, 28, 29, 28, 29, 30, 31, 32, 1,
+];
+
+const DES_P: [u8; 32] = [
+    16, 7, 20, 21, 29, 12, 28, 17, 1, 15, 23, 26, 5, 18, 31, 10, 2, 8, 24, 14, 32, 27, 3, 9, 19,
+    13, 30, 6, 22, 11, 4, 25,
+];
+
+const DES_PC1: [u8; 56] = [
+    57, 49, 41, 33, 25, 17, 9, 1, 58, 50, 42, 34, 26, 18, 10, 2, 59, 51, 43, 35, 27, 19, 11, 3, 60,
+    52, 44, 36, 63, 55, 47, 39, 31, 23, 15, 7, 62, 54, 46, 38, 30, 22, 14, 6, 61, 53, 45, 37, 29,
+    21, 13, 5, 28, 20, 12, 4,
+];
+
+const DES_PC2: [u8; 48] = [
+    14, 17, 11, 24, 1, 5, 3, 28, 15, 6, 21, 10, 23, 19, 12, 4, 26, 8, 16, 7, 27, 20, 13, 2, 41, 52,
+    31, 37, 47, 55, 30, 40, 51, 45, 33, 48, 44, 49, 39, 56, 34, 53, 46, 42, 50, 36, 29, 32,
+];
+
+const DES_KEY_SHIFTS: [u8; 16] = [1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1];
+
+const DES_SBOXES: [[u8; 64]; 8] = [
+    [
+        14, 4, 13, 1, 2, 15, 11, 8, 3, 10, 6, 12, 5, 9, 0, 7, 0, 15, 7, 4, 14, 2, 13, 1, 10, 6, 12,
+        11, 9, 5, 3, 8, 4, 1, 14, 8, 13, 6, 2, 11, 15, 12, 9, 7, 3, 10, 5, 0, 15, 12, 8, 2, 4, 9,
+        1, 7, 5, 11, 3, 14, 10, 0, 6, 13,
+    ],
+    [
+        15, 1, 8, 14, 6, 11, 3, 4, 9, 7, 2, 13, 12, 0, 5, 10, 3, 13, 4, 7, 15, 2, 8, 14, 12, 0, 1,
+        10, 6, 9, 11, 5, 0, 14, 7, 11, 10, 4, 13, 1, 5, 8, 12, 6, 9, 3, 2, 15, 13, 8, 10, 1, 3, 15,
+        4, 2, 11, 6, 7, 12, 0, 5, 14, 9,
+    ],
+    [
+        10, 0, 9, 14, 6, 3, 15, 5, 1, 13, 12, 7, 11, 4, 2, 8, 13, 7, 0, 9, 3, 4, 6, 10, 2, 8, 5,
+        14, 12, 11, 15, 1, 13, 6, 4, 9, 8, 15, 3, 0, 11, 1, 2, 12, 5, 10, 14, 7, 1, 10, 13, 0, 6,
+        9, 8, 7, 4, 15, 14, 3, 11, 5, 2, 12,
+    ],
+    [
+        7, 13, 14, 3, 0, 6, 9, 10, 1, 2, 8, 5, 11, 12, 4, 15, 13, 8, 11, 5, 6, 15, 0, 3, 4, 7, 2,
+        12, 1, 10, 14, 9, 10, 6, 9, 0, 12, 11, 7, 13, 15, 1, 3, 14, 5, 2, 8, 4, 3, 15, 0, 6, 10, 1,
+        13, 8, 9, 4, 5, 11, 12, 7, 2, 14,
+    ],
+    [
+        2, 12, 4, 1, 7, 10, 11, 6, 8, 5, 3, 15, 13, 0, 14, 9, 14, 11, 2, 12, 4, 7, 13, 1, 5, 0, 15,
+        10, 3, 9, 8, 6, 4, 2, 1, 11, 10, 13, 7, 8, 15, 9, 12, 5, 6, 3, 0, 14, 11, 8, 12, 7, 1, 14,
+        2, 13, 6, 15, 0, 9, 10, 4, 5, 3,
+    ],
+    [
+        12, 1, 10, 15, 9, 2, 6, 8, 0, 13, 3, 4, 14, 7, 5, 11, 10, 15, 4, 2, 7, 12, 9, 5, 6, 1, 13,
+        14, 0, 11, 3, 8, 9, 14, 15, 5, 2, 8, 12, 3, 7, 0, 4, 10, 1, 13, 11, 6, 4, 3, 2, 12, 9, 5,
+        15, 10, 11, 14, 1, 7, 6, 0, 8, 13,
+    ],
+    [
+        4, 11, 2, 14, 15, 0, 8, 13, 3, 12, 9, 7, 5, 10, 6, 1, 13, 0, 11, 7, 4, 9, 1, 10, 14, 3, 5,
+        12, 2, 15, 8, 6, 1, 4, 11, 13, 12, 3, 7, 14, 10, 15, 6, 8, 0, 5, 9, 2, 6, 11, 13, 8, 1, 4,
+        10, 7, 9, 5, 0, 15, 14, 2, 3, 12,
+    ],
+    [
+        13, 2, 8, 4, 6, 15, 11, 1, 10, 9, 3, 14, 5, 0, 12, 7, 1, 15, 13, 8, 10, 3, 7, 4, 12, 5, 6,
+        11, 0, 14, 9, 2, 7, 11, 4, 1, 9, 12, 14, 2, 0, 6, 10, 13, 15, 3, 5, 8, 2, 1, 14, 7, 4, 10,
+        8, 13, 15, 12, 9, 0, 3, 5, 6, 11,
+    ],
+];
+
+const SM4_FK: [u32; 4] = [0xa3b1_bac6, 0x56aa_3350, 0x677d_9197, 0xb270_22dc];
+
+const SM4_CK: [u32; 32] = [
+    0x0007_0e15,
+    0x1c23_2a31,
+    0x383f_464d,
+    0x545b_6269,
+    0x7077_7e85,
+    0x8c93_9aa1,
+    0xa8af_b6bd,
+    0xc4cb_d2d9,
+    0xe0e7_eef5,
+    0xfc03_0a11,
+    0x181f_262d,
+    0x343b_4249,
+    0x5057_5e65,
+    0x6c73_7a81,
+    0x888f_969d,
+    0xa4ab_b2b9,
+    0xc0c7_ced5,
+    0xdce3_eaf1,
+    0xf8ff_060d,
+    0x141b_2229,
+    0x3037_3e45,
+    0x4c53_5a61,
+    0x686f_767d,
+    0x848b_9299,
+    0xa0a7_aeb5,
+    0xbcc3_cad1,
+    0xd8df_e6ed,
+    0xf4fb_0209,
+    0x1017_1e25,
+    0x2c33_3a41,
+    0x484f_565d,
+    0x646b_7279,
+];
+
+const SM4_SBOX: [u8; 256] = [
+    0xd6, 0x90, 0xe9, 0xfe, 0xcc, 0xe1, 0x3d, 0xb7, 0x16, 0xb6, 0x14, 0xc2, 0x28, 0xfb, 0x2c, 0x05,
+    0x2b, 0x67, 0x9a, 0x76, 0x2a, 0xbe, 0x04, 0xc3, 0xaa, 0x44, 0x13, 0x26, 0x49, 0x86, 0x06, 0x99,
+    0x9c, 0x42, 0x50, 0xf4, 0x91, 0xef, 0x98, 0x7a, 0x33, 0x54, 0x0b, 0x43, 0xed, 0xcf, 0xac, 0x62,
+    0xe4, 0xb3, 0x1c, 0xa9, 0xc9, 0x08, 0xe8, 0x95, 0x80, 0xdf, 0x94, 0xfa, 0x75, 0x8f, 0x3f, 0xa6,
+    0x47, 0x07, 0xa7, 0xfc, 0xf3, 0x73, 0x17, 0xba, 0x83, 0x59, 0x3c, 0x19, 0xe6, 0x85, 0x4f, 0xa8,
+    0x68, 0x6b, 0x81, 0xb2, 0x71, 0x64, 0xda, 0x8b, 0xf8, 0xeb, 0x0f, 0x4b, 0x70, 0x56, 0x9d, 0x35,
+    0x1e, 0x24, 0x0e, 0x5e, 0x63, 0x58, 0xd1, 0xa2, 0x25, 0x22, 0x7c, 0x3b, 0x01, 0x21, 0x78, 0x87,
+    0xd4, 0x00, 0x46, 0x57, 0x9f, 0xd3, 0x27, 0x52, 0x4c, 0x36, 0x02, 0xe7, 0xa0, 0xc4, 0xc8, 0x9e,
+    0xea, 0xbf, 0x8a, 0xd2, 0x40, 0xc7, 0x38, 0xb5, 0xa3, 0xf7, 0xf2, 0xce, 0xf9, 0x61, 0x15, 0xa1,
+    0xe0, 0xae, 0x5d, 0xa4, 0x9b, 0x34, 0x1a, 0x55, 0xad, 0x93, 0x32, 0x30, 0xf5, 0x8c, 0xb1, 0xe3,
+    0x1d, 0xf6, 0xe2, 0x2e, 0x82, 0x66, 0xca, 0x60, 0xc0, 0x29, 0x23, 0xab, 0x0d, 0x53, 0x4e, 0x6f,
+    0xd5, 0xdb, 0x37, 0x45, 0xde, 0xfd, 0x8e, 0x2f, 0x03, 0xff, 0x6a, 0x72, 0x6d, 0x6c, 0x5b, 0x51,
+    0x8d, 0x1b, 0xaf, 0x92, 0xbb, 0xdd, 0xbc, 0x7f, 0x11, 0xd9, 0x5c, 0x41, 0x1f, 0x10, 0x5a, 0xd8,
+    0x0a, 0xc1, 0x31, 0x88, 0xa5, 0xcd, 0x7b, 0xbd, 0x2d, 0x74, 0xd0, 0x12, 0xb8, 0xe5, 0xb4, 0xb0,
+    0x89, 0x69, 0x97, 0x4a, 0x0c, 0x96, 0x77, 0x7e, 0x65, 0xb9, 0xf1, 0x09, 0xc5, 0x6e, 0xc6, 0x84,
+    0x18, 0xf0, 0x7d, 0xec, 0x3a, 0xdc, 0x4d, 0x20, 0x79, 0xee, 0x5f, 0x3e, 0xd7, 0xcb, 0x39, 0x48,
+];
+
+const AES_RCON: [u8; 15] = [
+    0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d,
+];
+
+const AES_SBOX: [u8; 256] = [
+    0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
+    0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
+    0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15,
+    0x04, 0xc7, 0x23, 0xc3, 0x18, 0x96, 0x05, 0x9a, 0x07, 0x12, 0x80, 0xe2, 0xeb, 0x27, 0xb2, 0x75,
+    0x09, 0x83, 0x2c, 0x1a, 0x1b, 0x6e, 0x5a, 0xa0, 0x52, 0x3b, 0xd6, 0xb3, 0x29, 0xe3, 0x2f, 0x84,
+    0x53, 0xd1, 0x00, 0xed, 0x20, 0xfc, 0xb1, 0x5b, 0x6a, 0xcb, 0xbe, 0x39, 0x4a, 0x4c, 0x58, 0xcf,
+    0xd0, 0xef, 0xaa, 0xfb, 0x43, 0x4d, 0x33, 0x85, 0x45, 0xf9, 0x02, 0x7f, 0x50, 0x3c, 0x9f, 0xa8,
+    0x51, 0xa3, 0x40, 0x8f, 0x92, 0x9d, 0x38, 0xf5, 0xbc, 0xb6, 0xda, 0x21, 0x10, 0xff, 0xf3, 0xd2,
+    0xcd, 0x0c, 0x13, 0xec, 0x5f, 0x97, 0x44, 0x17, 0xc4, 0xa7, 0x7e, 0x3d, 0x64, 0x5d, 0x19, 0x73,
+    0x60, 0x81, 0x4f, 0xdc, 0x22, 0x2a, 0x90, 0x88, 0x46, 0xee, 0xb8, 0x14, 0xde, 0x5e, 0x0b, 0xdb,
+    0xe0, 0x32, 0x3a, 0x0a, 0x49, 0x06, 0x24, 0x5c, 0xc2, 0xd3, 0xac, 0x62, 0x91, 0x95, 0xe4, 0x79,
+    0xe7, 0xc8, 0x37, 0x6d, 0x8d, 0xd5, 0x4e, 0xa9, 0x6c, 0x56, 0xf4, 0xea, 0x65, 0x7a, 0xae, 0x08,
+    0xba, 0x78, 0x25, 0x2e, 0x1c, 0xa6, 0xb4, 0xc6, 0xe8, 0xdd, 0x74, 0x1f, 0x4b, 0xbd, 0x8b, 0x8a,
+    0x70, 0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e, 0x61, 0x35, 0x57, 0xb9, 0x86, 0xc1, 0x1d, 0x9e,
+    0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf,
+    0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16,
+];
+
+const AES_INV_SBOX: [u8; 256] = [
+    0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb,
+    0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87, 0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb,
+    0x54, 0x7b, 0x94, 0x32, 0xa6, 0xc2, 0x23, 0x3d, 0xee, 0x4c, 0x95, 0x0b, 0x42, 0xfa, 0xc3, 0x4e,
+    0x08, 0x2e, 0xa1, 0x66, 0x28, 0xd9, 0x24, 0xb2, 0x76, 0x5b, 0xa2, 0x49, 0x6d, 0x8b, 0xd1, 0x25,
+    0x72, 0xf8, 0xf6, 0x64, 0x86, 0x68, 0x98, 0x16, 0xd4, 0xa4, 0x5c, 0xcc, 0x5d, 0x65, 0xb6, 0x92,
+    0x6c, 0x70, 0x48, 0x50, 0xfd, 0xed, 0xb9, 0xda, 0x5e, 0x15, 0x46, 0x57, 0xa7, 0x8d, 0x9d, 0x84,
+    0x90, 0xd8, 0xab, 0x00, 0x8c, 0xbc, 0xd3, 0x0a, 0xf7, 0xe4, 0x58, 0x05, 0xb8, 0xb3, 0x45, 0x06,
+    0xd0, 0x2c, 0x1e, 0x8f, 0xca, 0x3f, 0x0f, 0x02, 0xc1, 0xaf, 0xbd, 0x03, 0x01, 0x13, 0x8a, 0x6b,
+    0x3a, 0x91, 0x11, 0x41, 0x4f, 0x67, 0xdc, 0xea, 0x97, 0xf2, 0xcf, 0xce, 0xf0, 0xb4, 0xe6, 0x73,
+    0x96, 0xac, 0x74, 0x22, 0xe7, 0xad, 0x35, 0x85, 0xe2, 0xf9, 0x37, 0xe8, 0x1c, 0x75, 0xdf, 0x6e,
+    0x47, 0xf1, 0x1a, 0x71, 0x1d, 0x29, 0xc5, 0x89, 0x6f, 0xb7, 0x62, 0x0e, 0xaa, 0x18, 0xbe, 0x1b,
+    0xfc, 0x56, 0x3e, 0x4b, 0xc6, 0xd2, 0x79, 0x20, 0x9a, 0xdb, 0xc0, 0xfe, 0x78, 0xcd, 0x5a, 0xf4,
+    0x1f, 0xdd, 0xa8, 0x33, 0x88, 0x07, 0xc7, 0x31, 0xb1, 0x12, 0x10, 0x59, 0x27, 0x80, 0xec, 0x5f,
+    0x60, 0x51, 0x7f, 0xa9, 0x19, 0xb5, 0x4a, 0x0d, 0x2d, 0xe5, 0x7a, 0x9f, 0x93, 0xc9, 0x9c, 0xef,
+    0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5, 0xb0, 0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61,
+    0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d,
+];
+
+const SHA1_INITIAL_HASH: [u32; 5] = [
+    0x6745_2301,
+    0xefcd_ab89,
+    0x98ba_dcfe,
+    0x1032_5476,
+    0xc3d2_e1f0,
+];
+
+const SM3_INITIAL_HASH: [u32; 8] = [
+    0x7380_166f,
+    0x4914_b2b9,
+    0x1724_42d7,
+    0xda8a_0600,
+    0xa96f_30bc,
+    0x1631_38aa,
+    0xe38d_ee4d,
+    0xb0fb_0e4e,
+];
+
 const SHA256_INITIAL_HASH: [u32; 8] = [
     0x6a09_e667,
     0xbb67_ae85,
@@ -1752,6 +3231,100 @@ const SHA256_ROUND_CONSTANTS: [u32; 64] = [
     0xc671_78f2,
 ];
 
+const SHA512_INITIAL_HASH: [u64; 8] = [
+    0x6a09_e667_f3bc_c908,
+    0xbb67_ae85_84ca_a73b,
+    0x3c6e_f372_fe94_f82b,
+    0xa54f_f53a_5f1d_36f1,
+    0x510e_527f_ade6_82d1,
+    0x9b05_688c_2b3e_6c1f,
+    0x1f83_d9ab_fb41_bd6b,
+    0x5be0_cd19_137e_2179,
+];
+
+const SHA512_ROUND_CONSTANTS: [u64; 80] = [
+    0x428a_2f98_d728_ae22,
+    0x7137_4491_23ef_65cd,
+    0xb5c0_fbcf_ec4d_3b2f,
+    0xe9b5_dba5_8189_dbbc,
+    0x3956_c25b_f348_b538,
+    0x59f1_11f1_b605_d019,
+    0x923f_82a4_af19_4f9b,
+    0xab1c_5ed5_da6d_8118,
+    0xd807_aa98_a303_0242,
+    0x1283_5b01_4570_6fbe,
+    0x2431_85be_4ee4_b28c,
+    0x550c_7dc3_d5ff_b4e2,
+    0x72be_5d74_f27b_896f,
+    0x80de_b1fe_3b16_96b1,
+    0x9bdc_06a7_25c7_1235,
+    0xc19b_f174_cf69_2694,
+    0xe49b_69c1_9ef1_4ad2,
+    0xefbe_4786_384f_25e3,
+    0x0fc1_9dc6_8b8c_d5b5,
+    0x240c_a1cc_77ac_9c65,
+    0x2de9_2c6f_592b_0275,
+    0x4a74_84aa_6ea6_e483,
+    0x5cb0_a9dc_bd41_fbd4,
+    0x76f9_88da_8311_53b5,
+    0x983e_5152_ee66_dfab,
+    0xa831_c66d_2db4_3210,
+    0xb003_27c8_98fb_213f,
+    0xbf59_7fc7_beef_0ee4,
+    0xc6e0_0bf3_3da8_8fc2,
+    0xd5a7_9147_930a_a725,
+    0x06ca_6351_e003_826f,
+    0x1429_2967_0a0e_6e70,
+    0x27b7_0a85_46d2_2ffc,
+    0x2e1b_2138_5c26_c926,
+    0x4d2c_6dfc_5ac4_2aed,
+    0x5338_0d13_9d95_b3df,
+    0x650a_7354_8baf_63de,
+    0x766a_0abb_3c77_b2a8,
+    0x81c2_c92e_47ed_aee6,
+    0x9272_2c85_1482_353b,
+    0xa2bf_e8a1_4cf1_0364,
+    0xa81a_664b_bc42_3001,
+    0xc24b_8b70_d0f8_9791,
+    0xc76c_51a3_0654_be30,
+    0xd192_e819_d6ef_5218,
+    0xd699_0624_5565_a910,
+    0xf40e_3585_5771_202a,
+    0x106a_a070_32bb_d1b8,
+    0x19a4_c116_b8d2_d0c8,
+    0x1e37_6c08_5141_ab53,
+    0x2748_774c_df8e_eb99,
+    0x34b0_bcb5_e19b_48a8,
+    0x391c_0cb3_c5c9_5a63,
+    0x4ed8_aa4a_e341_8acb,
+    0x5b9c_ca4f_7763_e373,
+    0x682e_6ff3_d6b2_b8a3,
+    0x748f_82ee_5def_b2fc,
+    0x78a5_636f_4317_2f60,
+    0x84c8_7814_a1f0_ab72,
+    0x8cc7_0208_1a64_39ec,
+    0x90be_fffa_2363_1e28,
+    0xa450_6ceb_de82_bde9,
+    0xbef9_a3f7_b2c6_7915,
+    0xc671_78f2_e372_532b,
+    0xca27_3ece_ea26_619c,
+    0xd186_b8c7_21c0_c207,
+    0xeada_7dd6_cde0_eb1e,
+    0xf57d_4f7f_ee6e_d178,
+    0x06f0_67aa_7217_6fba,
+    0x0a63_7dc5_a2c8_98a6,
+    0x113f_9804_bef9_0dae,
+    0x1b71_0b35_131c_471b,
+    0x28db_77f5_2304_7d84,
+    0x32ca_ab7b_40c7_2493,
+    0x3c9e_be0a_15c9_bebc,
+    0x431d_67c4_9c10_0d4c,
+    0x4cc5_d4be_cb3e_42b6,
+    0x597f_299c_fc65_7e2a,
+    0x5fcb_6fab_3ad6_faec,
+    0x6c44_198c_4a47_5817,
+];
+
 fn hash_digest_hex(input: &[u8], algorithm: &str) -> Option<String> {
     hash_digest_bytes(input, algorithm).map(|bytes| hex_encode(&bytes))
 }
@@ -1763,7 +3336,10 @@ fn hash_digest_base64(input: &[u8], algorithm: &str) -> Option<String> {
 fn hash_digest_bytes(input: &[u8], algorithm: &str) -> Option<Vec<u8>> {
     match normalize_digest_algorithm(algorithm).as_str() {
         "md5" => Some(md5_digest(input).to_vec()),
+        "sm3" => Some(sm3_digest(input).to_vec()),
+        "sha1" => Some(sha1_digest(input).to_vec()),
         "sha256" => Some(sha256_digest(input).to_vec()),
+        "sha512" => Some(sha512_digest(input).to_vec()),
         _ => None,
     }
 }
@@ -1778,7 +3354,10 @@ fn hmac_digest_base64(input: &[u8], algorithm: &str, key: &[u8]) -> Option<Strin
 
 fn hmac_digest_bytes(input: &[u8], algorithm: &str, key: &[u8]) -> Option<Vec<u8>> {
     match normalize_hmac_algorithm(algorithm).as_str() {
+        "hmacmd5" => Some(hmac_md5_digest(input, key).to_vec()),
+        "hmacsha1" => Some(hmac_sha1_digest(input, key).to_vec()),
         "hmacsha256" => Some(hmac_sha256_digest(input, key).to_vec()),
+        "hmacsha512" => Some(hmac_sha512_digest(input, key).to_vec()),
         _ => None,
     }
 }
@@ -1798,6 +3377,124 @@ fn normalize_hmac_algorithm(algorithm: &str) -> String {
     } else {
         format!("hmac{normalized}")
     }
+}
+
+fn create_sign_payload(params: &JsonValue) -> String {
+    let object = match params {
+        JsonValue::Object(object) => object,
+        JsonValue::String(text) => match serde_json::from_str::<JsonValue>(text).ok() {
+            Some(JsonValue::Object(object)) => {
+                return create_sign_payload(&JsonValue::Object(object))
+            }
+            _ => return String::new(),
+        },
+        _ => return String::new(),
+    };
+
+    let mut keys = object.keys().collect::<Vec<_>>();
+    keys.sort();
+    keys.into_iter()
+        .filter_map(|key| {
+            let value = object.get(key)?;
+            json_sign_value_is_truthy(value)
+                .then(|| format!("{}={}", key, json_sign_value_to_string(value)))
+        })
+        .collect::<Vec<_>>()
+        .join("&")
+}
+
+fn json_sign_value_is_truthy(value: &JsonValue) -> bool {
+    match value {
+        JsonValue::String(value) => !value.is_empty(),
+        JsonValue::Bool(value) => *value,
+        JsonValue::Number(value) => value.as_f64().is_some_and(|value| value != 0.0),
+        JsonValue::Null => false,
+        JsonValue::Array(_) | JsonValue::Object(_) => true,
+    }
+}
+
+fn json_sign_value_to_string(value: &JsonValue) -> String {
+    match value {
+        JsonValue::String(value) => value.clone(),
+        JsonValue::Bool(value) => {
+            if *value {
+                "true".to_string()
+            } else {
+                "false".to_string()
+            }
+        }
+        JsonValue::Number(value) => value.to_string(),
+        JsonValue::Null => String::new(),
+        JsonValue::Array(_) | JsonValue::Object(_) => sorted_json_string(value),
+    }
+}
+
+fn sorted_json_string(value: &JsonValue) -> String {
+    serde_json::to_string(&sort_json_value(value)).unwrap_or_else(|_| "{}".to_string())
+}
+
+fn sort_json_value(value: &JsonValue) -> JsonValue {
+    match value {
+        JsonValue::Array(items) => JsonValue::Array(items.iter().map(sort_json_value).collect()),
+        JsonValue::Object(object) => {
+            let mut sorted = JsonMap::new();
+            let mut keys = object.keys().collect::<Vec<_>>();
+            keys.sort();
+            for key in keys {
+                if let Some(value) = object.get(key) {
+                    sorted.insert(key.clone(), sort_json_value(value));
+                }
+            }
+            JsonValue::Object(sorted)
+        }
+        _ => value.clone(),
+    }
+}
+
+fn hmac_md5_digest(input: &[u8], key: &[u8]) -> [u8; 16] {
+    const BLOCK_SIZE: usize = 64;
+
+    let mut key_block = [0u8; BLOCK_SIZE];
+    if key.len() > BLOCK_SIZE {
+        key_block[..16].copy_from_slice(&md5_digest(key));
+    } else {
+        key_block[..key.len()].copy_from_slice(key);
+    }
+
+    let mut inner = Vec::with_capacity(BLOCK_SIZE + input.len());
+    let mut outer = Vec::with_capacity(BLOCK_SIZE + 16);
+    for byte in key_block {
+        inner.push(byte ^ 0x36);
+        outer.push(byte ^ 0x5c);
+    }
+    inner.extend_from_slice(input);
+
+    let inner_digest = md5_digest(&inner);
+    outer.extend_from_slice(&inner_digest);
+    md5_digest(&outer)
+}
+
+fn hmac_sha1_digest(input: &[u8], key: &[u8]) -> [u8; 20] {
+    const BLOCK_SIZE: usize = 64;
+
+    let mut key_block = [0u8; BLOCK_SIZE];
+    if key.len() > BLOCK_SIZE {
+        key_block[..20].copy_from_slice(&sha1_digest(key));
+    } else {
+        key_block[..key.len()].copy_from_slice(key);
+    }
+
+    let mut inner = Vec::with_capacity(BLOCK_SIZE + input.len());
+    let mut outer = Vec::with_capacity(BLOCK_SIZE + 20);
+    for byte in key_block {
+        inner.push(byte ^ 0x36);
+        outer.push(byte ^ 0x5c);
+    }
+    inner.extend_from_slice(input);
+
+    let inner_digest = sha1_digest(&inner);
+    outer.extend_from_slice(&inner_digest);
+    sha1_digest(&outer)
 }
 
 fn hmac_sha256_digest(input: &[u8], key: &[u8]) -> [u8; 32] {
@@ -1821,6 +3518,213 @@ fn hmac_sha256_digest(input: &[u8], key: &[u8]) -> [u8; 32] {
     let inner_digest = sha256_digest(&inner);
     outer.extend_from_slice(&inner_digest);
     sha256_digest(&outer)
+}
+
+fn hmac_sha512_digest(input: &[u8], key: &[u8]) -> [u8; 64] {
+    const BLOCK_SIZE: usize = 128;
+
+    let mut key_block = [0u8; BLOCK_SIZE];
+    if key.len() > BLOCK_SIZE {
+        key_block[..64].copy_from_slice(&sha512_digest(key));
+    } else {
+        key_block[..key.len()].copy_from_slice(key);
+    }
+
+    let mut inner = Vec::with_capacity(BLOCK_SIZE + input.len());
+    let mut outer = Vec::with_capacity(BLOCK_SIZE + 64);
+    for byte in key_block {
+        inner.push(byte ^ 0x36);
+        outer.push(byte ^ 0x5c);
+    }
+    inner.extend_from_slice(input);
+
+    let inner_digest = sha512_digest(&inner);
+    outer.extend_from_slice(&inner_digest);
+    sha512_digest(&outer)
+}
+
+fn sm3_digest(input: &[u8]) -> [u8; 32] {
+    let bit_len = (input.len() as u64).wrapping_mul(8);
+    let mut message = Vec::with_capacity(((input.len() + 9).div_ceil(64)) * 64);
+    message.extend_from_slice(input);
+    message.push(0x80);
+    while message.len() % 64 != 56 {
+        message.push(0);
+    }
+    message.extend_from_slice(&bit_len.to_be_bytes());
+
+    let mut state = SM3_INITIAL_HASH;
+    for chunk in message.chunks_exact(64) {
+        sm3_compress(chunk, &mut state);
+    }
+
+    let mut digest = [0u8; 32];
+    for (index, word) in state.iter().enumerate() {
+        digest[index * 4..index * 4 + 4].copy_from_slice(&word.to_be_bytes());
+    }
+    digest
+}
+
+fn sm3_compress(block: &[u8], state: &mut [u32; 8]) {
+    let mut words = [0u32; 68];
+    let mut words_prime = [0u32; 64];
+
+    for (index, word) in words.iter_mut().take(16).enumerate() {
+        let offset = index * 4;
+        *word = u32::from_be_bytes([
+            block[offset],
+            block[offset + 1],
+            block[offset + 2],
+            block[offset + 3],
+        ]);
+    }
+
+    for index in 16..68 {
+        words[index] =
+            sm3_p1(words[index - 16] ^ words[index - 9] ^ words[index - 3].rotate_left(15))
+                ^ words[index - 13].rotate_left(7)
+                ^ words[index - 6];
+    }
+    for index in 0..64 {
+        words_prime[index] = words[index] ^ words[index + 4];
+    }
+
+    let mut a = state[0];
+    let mut b = state[1];
+    let mut c = state[2];
+    let mut d = state[3];
+    let mut e = state[4];
+    let mut f = state[5];
+    let mut g = state[6];
+    let mut h = state[7];
+
+    for index in 0..64 {
+        let t: u32 = if index < 16 { 0x79cc_4519 } else { 0x7a87_9d8a };
+        let ss1 = a
+            .rotate_left(12)
+            .wrapping_add(e)
+            .wrapping_add(t.rotate_left((index as u32) & 31))
+            .rotate_left(7);
+        let ss2 = ss1 ^ a.rotate_left(12);
+        let tt1 = sm3_ff(a, b, c, index)
+            .wrapping_add(d)
+            .wrapping_add(ss2)
+            .wrapping_add(words_prime[index]);
+        let tt2 = sm3_gg(e, f, g, index)
+            .wrapping_add(h)
+            .wrapping_add(ss1)
+            .wrapping_add(words[index]);
+
+        d = c;
+        c = b.rotate_left(9);
+        b = a;
+        a = tt1;
+        h = g;
+        g = f.rotate_left(19);
+        f = e;
+        e = sm3_p0(tt2);
+    }
+
+    state[0] ^= a;
+    state[1] ^= b;
+    state[2] ^= c;
+    state[3] ^= d;
+    state[4] ^= e;
+    state[5] ^= f;
+    state[6] ^= g;
+    state[7] ^= h;
+}
+
+fn sm3_ff(x: u32, y: u32, z: u32, round: usize) -> u32 {
+    if round < 16 {
+        x ^ y ^ z
+    } else {
+        (x & y) | (x & z) | (y & z)
+    }
+}
+
+fn sm3_gg(x: u32, y: u32, z: u32, round: usize) -> u32 {
+    if round < 16 {
+        x ^ y ^ z
+    } else {
+        (x & y) | ((!x) & z)
+    }
+}
+
+fn sm3_p0(value: u32) -> u32 {
+    value ^ value.rotate_left(9) ^ value.rotate_left(17)
+}
+
+fn sm3_p1(value: u32) -> u32 {
+    value ^ value.rotate_left(15) ^ value.rotate_left(23)
+}
+
+fn sha1_digest(input: &[u8]) -> [u8; 20] {
+    let bit_len = (input.len() as u64).wrapping_mul(8);
+    let mut message = Vec::with_capacity(((input.len() + 9).div_ceil(64)) * 64);
+    message.extend_from_slice(input);
+    message.push(0x80);
+    while message.len() % 64 != 56 {
+        message.push(0);
+    }
+    message.extend_from_slice(&bit_len.to_be_bytes());
+
+    let mut hash = SHA1_INITIAL_HASH;
+    for chunk in message.chunks_exact(64) {
+        let mut words = [0u32; 80];
+        for (index, word) in words.iter_mut().take(16).enumerate() {
+            let offset = index * 4;
+            *word = u32::from_be_bytes([
+                chunk[offset],
+                chunk[offset + 1],
+                chunk[offset + 2],
+                chunk[offset + 3],
+            ]);
+        }
+        for index in 16..80 {
+            words[index] =
+                (words[index - 3] ^ words[index - 8] ^ words[index - 14] ^ words[index - 16])
+                    .rotate_left(1);
+        }
+
+        let mut a = hash[0];
+        let mut b = hash[1];
+        let mut c = hash[2];
+        let mut d = hash[3];
+        let mut e = hash[4];
+
+        for (index, word) in words.iter().copied().enumerate() {
+            let (f, k) = match index {
+                0..=19 => (((b & c) | ((!b) & d)), 0x5a82_7999),
+                20..=39 => (b ^ c ^ d, 0x6ed9_eba1),
+                40..=59 => (((b & c) | (b & d) | (c & d)), 0x8f1b_bcdc),
+                _ => (b ^ c ^ d, 0xca62_c1d6),
+            };
+            let temp = a
+                .rotate_left(5)
+                .wrapping_add(f)
+                .wrapping_add(e)
+                .wrapping_add(k)
+                .wrapping_add(word);
+            e = d;
+            d = c;
+            c = b.rotate_left(30);
+            b = a;
+            a = temp;
+        }
+
+        hash[0] = hash[0].wrapping_add(a);
+        hash[1] = hash[1].wrapping_add(b);
+        hash[2] = hash[2].wrapping_add(c);
+        hash[3] = hash[3].wrapping_add(d);
+        hash[4] = hash[4].wrapping_add(e);
+    }
+
+    let mut digest = [0u8; 20];
+    for (index, word) in hash.iter().enumerate() {
+        digest[index * 4..index * 4 + 4].copy_from_slice(&word.to_be_bytes());
+    }
+    digest
 }
 
 fn sha256_digest(input: &[u8]) -> [u8; 32] {
@@ -1902,6 +3806,93 @@ fn sha256_digest(input: &[u8]) -> [u8; 32] {
     let mut digest = [0u8; 32];
     for (index, word) in hash.iter().enumerate() {
         digest[index * 4..index * 4 + 4].copy_from_slice(&word.to_be_bytes());
+    }
+    digest
+}
+
+fn sha512_digest(input: &[u8]) -> [u8; 64] {
+    let bit_len = (input.len() as u128).wrapping_mul(8);
+    let mut message = Vec::with_capacity(((input.len() + 17).div_ceil(128)) * 128);
+    message.extend_from_slice(input);
+    message.push(0x80);
+    while message.len() % 128 != 112 {
+        message.push(0);
+    }
+    message.extend_from_slice(&bit_len.to_be_bytes());
+
+    let mut hash = SHA512_INITIAL_HASH;
+    for chunk in message.chunks_exact(128) {
+        let mut words = [0u64; 80];
+        for (index, word) in words.iter_mut().take(16).enumerate() {
+            let offset = index * 8;
+            *word = u64::from_be_bytes([
+                chunk[offset],
+                chunk[offset + 1],
+                chunk[offset + 2],
+                chunk[offset + 3],
+                chunk[offset + 4],
+                chunk[offset + 5],
+                chunk[offset + 6],
+                chunk[offset + 7],
+            ]);
+        }
+        for index in 16..80 {
+            let s0 = words[index - 15].rotate_right(1)
+                ^ words[index - 15].rotate_right(8)
+                ^ (words[index - 15] >> 7);
+            let s1 = words[index - 2].rotate_right(19)
+                ^ words[index - 2].rotate_right(61)
+                ^ (words[index - 2] >> 6);
+            words[index] = words[index - 16]
+                .wrapping_add(s0)
+                .wrapping_add(words[index - 7])
+                .wrapping_add(s1);
+        }
+
+        let mut a = hash[0];
+        let mut b = hash[1];
+        let mut c = hash[2];
+        let mut d = hash[3];
+        let mut e = hash[4];
+        let mut f = hash[5];
+        let mut g = hash[6];
+        let mut h = hash[7];
+
+        for (index, word) in words.iter().copied().enumerate() {
+            let s1 = e.rotate_right(14) ^ e.rotate_right(18) ^ e.rotate_right(41);
+            let choice = (e & f) ^ ((!e) & g);
+            let temp1 = h
+                .wrapping_add(s1)
+                .wrapping_add(choice)
+                .wrapping_add(SHA512_ROUND_CONSTANTS[index])
+                .wrapping_add(word);
+            let s0 = a.rotate_right(28) ^ a.rotate_right(34) ^ a.rotate_right(39);
+            let majority = (a & b) ^ (a & c) ^ (b & c);
+            let temp2 = s0.wrapping_add(majority);
+
+            h = g;
+            g = f;
+            f = e;
+            e = d.wrapping_add(temp1);
+            d = c;
+            c = b;
+            b = a;
+            a = temp1.wrapping_add(temp2);
+        }
+
+        hash[0] = hash[0].wrapping_add(a);
+        hash[1] = hash[1].wrapping_add(b);
+        hash[2] = hash[2].wrapping_add(c);
+        hash[3] = hash[3].wrapping_add(d);
+        hash[4] = hash[4].wrapping_add(e);
+        hash[5] = hash[5].wrapping_add(f);
+        hash[6] = hash[6].wrapping_add(g);
+        hash[7] = hash[7].wrapping_add(h);
+    }
+
+    let mut digest = [0u8; 64];
+    for (index, word) in hash.iter().enumerate() {
+        digest[index * 8..index * 8 + 8].copy_from_slice(&word.to_be_bytes());
     }
     digest
 }
@@ -2146,6 +4137,13 @@ fn char_to_gbk_pair(ch: char) -> Option<(u8, u8)> {
     match ch {
         '小' => Some((0xd0, 0xa1)),
         '说' => Some((0xcb, 0xb5)),
+        '鬼' => Some((0xb9, 0xed)),
+        '吹' => Some((0xb4, 0xb5)),
+        '灯' => Some((0xb5, 0xc6)),
+        '搜' => Some((0xcb, 0xd1)),
+        '索' => Some((0xcb, 0xf7)),
+        '提' => Some((0xcc, 0xe1)),
+        '交' => Some((0xbd, 0xbb)),
         _ => None,
     }
 }
@@ -2154,6 +4152,13 @@ fn gbk_pair_to_char(lead: u8, trail: u8) -> Option<char> {
     match (lead, trail) {
         (0xd0, 0xa1) => Some('小'),
         (0xcb, 0xb5) => Some('说'),
+        (0xb9, 0xed) => Some('鬼'),
+        (0xb4, 0xb5) => Some('吹'),
+        (0xb5, 0xc6) => Some('灯'),
+        (0xcb, 0xd1) => Some('搜'),
+        (0xcb, 0xf7) => Some('索'),
+        (0xcc, 0xe1) => Some('提'),
+        (0xbd, 0xbb) => Some('交'),
         _ => None,
     }
 }
@@ -2403,6 +4408,9 @@ fn t2s_char(ch: char) -> char {
         '會' => '会',
         '說' => '说',
         '書' => '书',
+        '圖' => '图',
+        '館' => '馆',
+        '發' => '发',
         '體' => '体',
         '國' => '国',
         '語' => '语',
@@ -2427,6 +4435,9 @@ fn s2t_char(ch: char) -> char {
         '会' => '會',
         '说' => '說',
         '书' => '書',
+        '图' => '圖',
+        '馆' => '館',
+        '发' => '發',
         '体' => '體',
         '国' => '國',
         '语' => '語',
@@ -2629,7 +4640,14 @@ fn resolve_js_url(url: &str, base_url: Option<&str>) -> Result<JsUrlParts, Strin
     }
 
     let (path, suffix) = split_url_path_suffix(url);
-    let resolved_path = if path.starts_with('/') {
+    let resolved_path = if path.is_empty() && suffix.starts_with('?') {
+        base.pathname.clone()
+    } else if path.is_empty() && suffix.starts_with('#') {
+        match base.query.as_deref() {
+            Some(query) if !query.is_empty() => format!("{}?{}", base.pathname, query),
+            _ => base.pathname.clone(),
+        }
+    } else if path.starts_with('/') {
         normalize_url_path(path)
     } else {
         let base_dir = base
@@ -3001,6 +5019,20 @@ fn quickjs_value_to_json(value: &QuickJsValue<'_>, depth: usize) -> JsResult<Jso
     ))
 }
 
+fn quickjs_value_to_string(value: &QuickJsValue<'_>) -> JsResult<String> {
+    match quickjs_value_to_json(value, 0)? {
+        JsonValue::String(value) => Ok(value),
+        JsonValue::Null => Ok(String::new()),
+        value => Ok(value.to_string()),
+    }
+}
+
+fn optional_quickjs_string(value: Option<&QuickJsValue<'_>>, default: &str) -> String {
+    value
+        .and_then(|value| quickjs_value_to_string(value).ok())
+        .unwrap_or_else(|| default.to_string())
+}
+
 fn json_to_quickjs<'js>(
     ctx: &Ctx<'js>,
     value: &JsonValue,
@@ -3075,6 +5107,23 @@ mod tests {
     use super::*;
     use serde_json::json;
     use std::sync::Mutex;
+
+    #[test]
+    fn sm4_ecb_no_padding_matches_official_vector() {
+        let key = hex_decode("0123456789abcdeffedcba9876543210");
+        let plain = hex_decode("0123456789abcdeffedcba9876543210");
+        let transformation = SymmetricTransformation {
+            algorithm: SymmetricAlgorithm::Sm4,
+            mode: SymmetricMode::Ecb,
+            padding: SymmetricPadding::NoPadding,
+        };
+
+        let encrypted = sm4_encrypt_bytes(&plain, &key, &[], transformation).unwrap();
+        assert_eq!(hex_encode(&encrypted), "681edf34d206965e86b3e94f536e4246");
+
+        let decrypted = sm4_decrypt_bytes(&encrypted, &key, &[], transformation).unwrap();
+        assert_eq!(hex_encode(&decrypted), "0123456789abcdeffedcba9876543210");
+    }
 
     #[test]
     fn evaluates_js_expression_and_function_result() {
