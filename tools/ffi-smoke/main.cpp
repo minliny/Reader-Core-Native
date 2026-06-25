@@ -456,6 +456,7 @@ int main() {
       !contains(event, "\"type\":\"host.request\"") ||
       !contains(event, "\"requestId\":20") ||
       !contains(event, "\"capability\":\"host.smoke.echo\"") ||
+      !contains(event, "\"params\":{") ||
       !contains(event, "\"hello\":\"world\"") ||
       !json_u64(event, "operationId", &op)) {
     std::cerr << "host.request(20): " << event << '\n';

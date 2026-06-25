@@ -536,17 +536,21 @@ pub(crate) fn run_conformance() -> ConformanceReport {
 
     record(&mut report, "host-request-event-shape", || {
         let (_runtime, rx) = send_to_fresh_runtime(HOST_REQUEST)?;
-        match recv_event(&rx)? {
+        let event = recv_event(&rx)?;
+        let event_json =
+            serde_json::to_value(&event).map_err(|err| format!("event serialize failed: {err}"))?;
+        match &event {
             Event::HostRequest {
                 request_id,
                 operation_id,
                 capability,
                 params,
                 ..
-            } if request_id == 301
-                && operation_id == 1
+            } if *request_id == 301
+                && *operation_id == 1
                 && capability == "host.smoke.echo"
-                && params["message"] == "conformance host request" =>
+                && params["message"] == "conformance host request"
+                && event_json["params"].is_object() =>
             {
                 Ok(())
             }

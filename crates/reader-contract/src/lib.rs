@@ -446,6 +446,16 @@ mod tests {
         assert_eq!(data["type"], serde_json::json!("object"));
     }
 
+    #[test]
+    fn event_schema_requires_host_request_params_object() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+        let params = &schema["$defs"]["HostRequestEvent"]["properties"]["params"];
+
+        assert_eq!(params["type"], serde_json::json!("object"));
+    }
+
     fn strings_at<'a>(value: &'a Value, key: &str) -> Vec<&'a str> {
         value[key]
             .as_array()

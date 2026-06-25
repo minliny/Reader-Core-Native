@@ -72,6 +72,7 @@ impl Event {
         capability: impl Into<String>,
         params: Value,
     ) -> Self {
+        assert_object_payload("host.request params", &params);
         Event::HostRequest {
             protocol_version: PROTOCOL_VERSION,
             request_id,
@@ -100,5 +101,26 @@ mod tests {
     #[should_panic(expected = "result.data must be a JSON object")]
     fn result_event_rejects_non_object_data() {
         let _event = Event::result(1, serde_json::json!(["not", "an", "object"]));
+    }
+
+    #[test]
+    fn host_request_event_accepts_object_params() {
+        let event = Event::host_request(1, 2, "host.smoke.echo", serde_json::json!({ "ok": true }));
+        let json = serde_json::to_value(event).expect("event must serialize");
+
+        assert_eq!(json["type"], "host.request");
+        assert!(json["params"].is_object());
+        assert_eq!(json["params"]["ok"], true);
+    }
+
+    #[test]
+    #[should_panic(expected = "host.request params must be a JSON object")]
+    fn host_request_event_rejects_non_object_params() {
+        let _event = Event::host_request(
+            1,
+            2,
+            "host.smoke.echo",
+            serde_json::json!(["not", "an", "object"]),
+        );
     }
 }

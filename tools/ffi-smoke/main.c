@@ -571,7 +571,9 @@ int main(void) {
   uint64_t op60 = 0;
   if (!json_u64(event, "operationId", &op60) ||
       !contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
       !contains(event, "\"capability\":\"host.smoke.echo\"") ||
+      !contains(event, "\"params\":{") ||
       !contains(event, "\"hello\":\"world\"")) {
     fprintf(stderr, "host.request(60): %s\n", event);
     return fail("host.request(60) shape");
