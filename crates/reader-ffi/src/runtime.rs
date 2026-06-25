@@ -618,6 +618,50 @@ mod tests {
     }
 
     #[test]
+    fn runtime_cancel_command_cancels_pending_host_request_via_c_abi() {
+        let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
+        let handle = make_runtime(&events);
+
+        let host_request =
+            include_bytes!("../../../protocol/fixtures/conformance/host/request.json");
+        assert_eq!(
+            unsafe { send(handle, host_request.as_ptr(), host_request.len()) },
+            0
+        );
+        assert_eq!(last_error_code(), 0);
+
+        let evs = wait_events(&events, 1);
+        let req: serde_json::Value = serde_json::from_slice(&evs[0]).unwrap();
+        assert_eq!(req["type"], "host.request");
+        assert_eq!(req["protocolVersion"], 1);
+        assert_eq!(req["requestId"], 301);
+        assert_eq!(req["capability"], "host.smoke.echo");
+        assert_eq!(req["params"]["message"], "conformance host request");
+        assert!(req["operationId"].as_u64().is_some());
+
+        let cancel = include_bytes!(
+            "../../../protocol/fixtures/conformance/commands/valid-runtime-cancel.json"
+        );
+        assert_eq!(unsafe { send(handle, cancel.as_ptr(), cancel.len()) }, 0);
+        assert_eq!(last_error_code(), 0);
+
+        let evs = wait_events(&events, 3);
+        let cancelled: serde_json::Value = serde_json::from_slice(&evs[1]).unwrap();
+        assert_eq!(cancelled["type"], "error");
+        assert_eq!(cancelled["protocolVersion"], 1);
+        assert_eq!(cancelled["requestId"], 301);
+        assert_eq!(cancelled["error"]["code"], "CANCELLED");
+
+        let result: serde_json::Value = serde_json::from_slice(&evs[2]).unwrap();
+        assert_eq!(result["type"], "result");
+        assert_eq!(result["protocolVersion"], 1);
+        assert_eq!(result["requestId"], 310);
+        assert_eq!(result["data"]["cancelled"], true);
+
+        assert_eq!(unsafe { destroy(handle) }, 0);
+    }
+
+    #[test]
     fn host_error_routes_error_to_original_request_via_c_abi() {
         let events = Arc::new(CapturedEvents(Mutex::new(Vec::new())));
         let handle = make_runtime(&events);

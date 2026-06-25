@@ -546,6 +546,48 @@ int main() {
     return fail("successful cancel did not clear last_error");
   }
 
+  // --- runtime.cancel command cancels a pending host.request ------------
+  if (send_str(
+          rt,
+          R"({"protocolVersion":1,"requestId":301,"method":"runtime.hostSmoke","params":{"capability":"host.smoke.echo","params":{"message":"conformance host request"}}})") !=
+      RC_SEND_OK) {
+    return fail("hostSmoke(301) send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":301") ||
+      !contains(event, "\"capability\":\"host.smoke.echo\"") ||
+      !contains(event, "\"message\":\"conformance host request\"")) {
+    std::cerr << "host.request(301): " << event << '\n';
+    return fail("host.request(301) shape");
+  }
+  if (send_str(
+          rt,
+          R"({"protocolVersion":1,"requestId":310,"method":"runtime.cancel","params":{"requestId":301}})") !=
+      RC_SEND_OK) {
+    return fail("runtime.cancel send failed");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":301") ||
+      !contains(event, "\"CANCELLED\"")) {
+    std::cerr << "runtime.cancel cancelled event: " << event << '\n';
+    return fail("runtime.cancel cancelled event shape");
+  }
+  event = wait_event(ch, ev++);
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":310") ||
+      !contains(event, "\"cancelled\":true")) {
+    std::cerr << "runtime.cancel result: " << event << '\n';
+    return fail("runtime.cancel result shape");
+  }
+  if (!last_error_clears_message_when_ok()) {
+    return fail("runtime.cancel left synchronous last_error");
+  }
+
   // --- invalid runtime.shutdown params do not stop runtime --------------
   std::string invalid_shutdown =
       R"({"protocolVersion":1,"requestId":33,"method":"runtime.shutdown","params":{"force":true}})";

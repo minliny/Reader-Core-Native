@@ -728,6 +728,58 @@ int main(void) {
     return fail("cancelled(65) shape");
   }
 
+  // --- runtime.cancel command cancels a pending host.request ------------
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":301,\"method\":\"runtime."
+               "hostSmoke\",\"params\":{\"capability\":\"host.smoke.echo\","
+               "\"params\":{\"message\":\"conformance host request\"}}}") !=
+      RC_SEND_OK) {
+    return fail("hostSmoke(301) send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no host.request for 301");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"host.request\"") ||
+      !contains(event, "\"requestId\":301") ||
+      !contains(event, "\"capability\":\"host.smoke.echo\"") ||
+      !contains(event, "\"message\":\"conformance host request\"")) {
+    fprintf(stderr, "host.request(301): %s\n", event);
+    return fail("host.request(301) shape");
+  }
+  if (send_str(rt,
+               "{\"protocolVersion\":1,\"requestId\":310,\"method\":\"runtime."
+               "cancel\",\"params\":{\"requestId\":301}}") != RC_SEND_OK) {
+    return fail("runtime.cancel send failed");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no cancelled event for runtime.cancel");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"error\"") ||
+      !contains(event, "\"requestId\":301") ||
+      !contains(event, "\"CANCELLED\"")) {
+    fprintf(stderr, "runtime.cancel cancelled event: %s\n", event);
+    return fail("runtime.cancel cancelled event shape");
+  }
+  if (wait_event(&ch, ev, event, sizeof event) != 0) {
+    return fail("no runtime.cancel result");
+  }
+  ev++;
+  if (!contains(event, "\"protocolVersion\":1") ||
+      !contains(event, "\"type\":\"result\"") ||
+      !contains(event, "\"requestId\":310") ||
+      !contains(event, "\"cancelled\":true")) {
+    fprintf(stderr, "runtime.cancel result: %s\n", event);
+    return fail("runtime.cancel result shape");
+  }
+  strcpy(msg, "stale");
+  if (rc_last_error(msg, sizeof msg) != RC_OK || msg[0] != '\0') {
+    return fail("runtime.cancel left synchronous last_error");
+  }
+
   // --- invalid runtime.shutdown params do not stop runtime --------------
   if (send_str(rt,
                "{\"protocolVersion\":1,\"requestId\":73,\"method\":\"runtime."
