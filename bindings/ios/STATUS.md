@@ -5,9 +5,23 @@
 
 最后更新：2026-06-25
 
-分支：`codex/full-branch-directory-consolidation`
+分支：`codex/ios-rust-host-adapter`（已 rebase 到 `origin/main` 的 `fff9d0a`，隔离 worktree 复跑）
 
 Gate：`bash ./scripts/check-ios-swift-wrapper.sh`（完整）或 `--swift-only`（快路径）。
+
+## 本轮复跑（2026-06-25，隔离 worktree）
+
+在已 rebase 到 `origin/main` 的 `fff9d0a` 的干净 worktree 上执行
+`cargo build -p reader-ffi` + `bash ./scripts/check-ios-swift-wrapper.sh --swift-only`：
+
+- wrapper typecheck（iphonesimulator slice）：PASS
+- macOS host inline wrapper smoke：`swift client smoke passed`
+- 分区 ShellSmokeTests：`[core] pass=13 fail=0`、`[app-side] pass=14 fail=0`、
+  `host adapter shell smoke passed`
+
+即目标三项验收在 `codex/ios-rust-host-adapter` 分支上成立：Swift wrapper smoke、
+HostBus / `http.execute` app-side smoke、app-side 与 Core capability 分区报告。
+仍是 host build 烟雾，**非** iOS App/模拟器/真机证明。
 
 ## 作用域
 
