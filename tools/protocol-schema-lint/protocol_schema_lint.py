@@ -8,8 +8,9 @@ JSON schemas. LINT ONLY — never modifies schemas or fixtures.
 A minimal hand-rolled JSON Schema validator covers only the subset actually
 used by the real schemas: ``type``, ``required``, ``properties``,
 ``additionalProperties: false``, ``enum``, ``const``, ``oneOf``/``anyOf``/
-``allOf``, ``items``, ``minLength`` and ``$ref`` (internal ``#/...`` and
-cross-file ``sibling.schema.json#/...``). Pure Python 3.9+ standard library.
+``allOf``, ``if``/``then``/``else``, ``items``, ``minimum``/``maximum``,
+``minLength``, ``pattern`` and ``$ref`` (internal ``#/...`` and cross-file
+``sibling.schema.json#/...``). Pure Python 3.9+ standard library.
 
 CLI:
     python3 tools/protocol-schema-lint/protocol_schema_lint.py [root] [--pretty]
@@ -18,6 +19,7 @@ CLI:
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -116,6 +118,8 @@ def _type_name(obj):
 
 
 def _check_type(obj, t):
+    if isinstance(t, list):
+        return any(_check_type(obj, item) for item in t)
     if t == "object":
         return isinstance(obj, dict)
     if t == "array":
@@ -215,6 +219,25 @@ def _validate(obj, schema, path, root, base_dir):
         errors.append("%s: string shorter than minLength %d"
                       % (path, schema["minLength"]))
 
+    if "pattern" in schema and isinstance(obj, str):
+        try:
+            matched = re.search(schema["pattern"], obj) is not None
+        except re.error as exc:
+            errors.append("%s: invalid regex pattern %s: %s"
+                          % (path, json.dumps(schema["pattern"]), exc))
+            matched = True
+        if not matched:
+            errors.append("%s: string does not match pattern %s"
+                          % (path, json.dumps(schema["pattern"])))
+
+    if (not isinstance(obj, bool)) and isinstance(obj, (int, float)):
+        if "minimum" in schema and obj < schema["minimum"]:
+            errors.append("%s: number below minimum %s"
+                          % (path, json.dumps(schema["minimum"])))
+        if "maximum" in schema and obj > schema["maximum"]:
+            errors.append("%s: number above maximum %s"
+                          % (path, json.dumps(schema["maximum"])))
+
     if isinstance(obj, dict):
         for req in schema.get("required", []):
             if req not in obj:
@@ -248,6 +271,17 @@ def _validate(obj, schema, path, root, base_dir):
         if not any(not _validate(obj, sub, path, root, base_dir)
                    for sub in schema["anyOf"]):
             errors.append("%s: anyOf matched no branches" % path)
+
+    if "if" in schema:
+        condition_errors = _validate(obj, schema["if"], path, root, base_dir)
+        if not condition_errors:
+            then_schema = schema.get("then")
+            if isinstance(then_schema, dict):
+                errors.extend(_validate(obj, then_schema, path, root, base_dir))
+        else:
+            else_schema = schema.get("else")
+            if isinstance(else_schema, dict):
+                errors.extend(_validate(obj, else_schema, path, root, base_dir))
 
     if "allOf" in schema:
         for sub in schema["allOf"]:

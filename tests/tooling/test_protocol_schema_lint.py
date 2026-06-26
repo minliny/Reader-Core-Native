@@ -144,6 +144,13 @@ class ValidateTests(unittest.TestCase):
         self.assertTrue(errs)
         self.assertIn("expected type object", errs[0])
 
+    def test_validate_accepts_type_unions(self):
+        schema = {"type": ["object", "null"]}
+        self.assertEqual(psl.validate({"ok": True}, schema), [])
+        self.assertEqual(psl.validate(None, schema), [])
+        errs = psl.validate([], schema)
+        self.assertTrue(any("expected type" in e for e in errs))
+
     def test_validate_rejects_missing_required_field(self):
         schema = {
             "type": "object",
@@ -196,6 +203,60 @@ class ValidateTests(unittest.TestCase):
         schema = {"type": "string", "minLength": 1}
         errs = psl.validate("", schema)
         self.assertTrue(any("minLength" in e for e in errs))
+
+    def test_validate_rejects_string_not_matching_pattern(self):
+        schema = {"type": "string", "pattern": "\\S"}
+        self.assertEqual(psl.validate("ok", schema), [])
+        errs = psl.validate("   ", schema)
+        self.assertTrue(any("pattern" in e for e in errs))
+
+    def test_validate_rejects_numbers_outside_minimum_maximum(self):
+        schema = {"type": "integer", "minimum": 1, "maximum": 3}
+        self.assertEqual(psl.validate(1, schema), [])
+        self.assertEqual(psl.validate(3, schema), [])
+        low = psl.validate(0, schema)
+        high = psl.validate(4, schema)
+        self.assertTrue(any("minimum" in e for e in low))
+        self.assertTrue(any("maximum" in e for e in high))
+
+    def test_validate_applies_if_then_conditionals(self):
+        schema = {
+            "type": "object",
+            "required": ["method"],
+            "properties": {
+                "method": {"type": "string"},
+                "params": {"type": "object"},
+            },
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {"method": {"const": "book.detail"}},
+                        "required": ["method"],
+                    },
+                    "then": {
+                        "properties": {
+                            "params": {
+                                "type": "object",
+                                "required": ["book"],
+                                "properties": {"book": {"type": "object"}},
+                            }
+                        }
+                    },
+                }
+            ],
+        }
+        self.assertEqual(
+            psl.validate(
+                {"method": "book.detail", "params": {"book": {"bookId": "1"}}},
+                schema,
+            ),
+            [],
+        )
+        errs = psl.validate(
+            {"method": "book.detail", "params": {"book": [{"bookId": "1"}]}},
+            schema,
+        )
+        self.assertTrue(any("$.params.book" in e for e in errs))
 
     def test_validate_resolves_internal_ref(self):
         schema = {
