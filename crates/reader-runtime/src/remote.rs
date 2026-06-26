@@ -10,6 +10,7 @@
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
+use reader_content::analyze_url::{AnalyzeUrl, AnalyzeUrlContext, AnalyzeUrlError};
 use reader_content::{JsOutcome, RemoteContentPipeline};
 use reader_contract::{
     self as contract,
@@ -62,12 +63,14 @@ impl Default for RemoteState {
 }
 
 /// Outcome of a remote-reading dispatch attempt.
+#[derive(Debug)]
 pub enum RemoteDispatch {
     NotHandled,
     Finished,
     Pending(PendingHostRequest),
 }
 
+#[derive(Debug)]
 enum RemoteCommandResult {
     Complete(serde_json::Value),
     Pending(PendingHostRequest),
@@ -75,6 +78,7 @@ enum RemoteCommandResult {
 
 /// A host capability request that must complete before the original remote
 /// command can finish.
+#[derive(Debug)]
 pub struct PendingHostRequest {
     pub capability: HostCapability,
     pub params: serde_json::Value,
@@ -431,16 +435,80 @@ fn book_search(
     state: &RemoteState,
 ) -> Result<RemoteCommandResult, CoreError> {
     let params: BookSearchParams = parse_params(contract::methods::BOOK_SEARCH, &cmd.params)?;
-    if let Some(pending) = pending_or_missing_response(
-        &params.search_response,
-        params.search_request.clone(),
-        "searchResponse",
-        "searchRequest",
-        RemoteHostContinuation::BookSearch(params.clone()),
-    )? {
-        return Ok(pending);
+    // Explicit pre-fetched response wins — no host round-trip needed.
+    if !params.search_response.is_empty() {
+        return book_search_from_params(params, state).map(RemoteCommandResult::Complete);
     }
-    book_search_from_params(params, state).map(RemoteCommandResult::Complete)
+    // Explicit `searchRequest` wins over auto-build.
+    if let Some(request) = params.search_request.clone() {
+        return Ok(RemoteCommandResult::Pending(pending_http_request(
+            request,
+            RemoteHostContinuation::BookSearch(params.clone()),
+        )?));
+    }
+    // Auto-build from the source's `searchUrl` template (Legado AnalyzeUrl path).
+    if let Some(keyword) = params.keyword.as_deref() {
+        if !keyword.trim().is_empty() {
+            let request = build_search_request_from_source(state, &params, keyword)?;
+            return Ok(RemoteCommandResult::Pending(pending_http_request(
+                request,
+                RemoteHostContinuation::BookSearch(params.clone()),
+            )?));
+        }
+    }
+    // Fall back to the legacy "missing response + missing request" error.
+    Err(CoreError::invalid_params(
+        "searchResponse is required unless searchRequest or keyword is provided",
+    ))
+}
+
+/// Build a `HostHttpRequest` from a Legado book source's `searchUrl` template.
+///
+/// This is the Rust port of Swift `BookSourceRequestBuilder.makeSearchRequest`
+/// (non-JS path): expand `{{key}}`/`{{page}}`/`pageMinus`/`pagePlus`, parse the
+/// URL DSL (url + JSON options), merge source/DSL headers, resolve relative
+/// URLs against `baseUrl`, and return the assembled descriptor. The host
+/// performs the actual socket/TLS work — Core never opens a connection.
+fn build_search_request_from_source(
+    state: &RemoteState,
+    params: &BookSearchParams,
+    keyword: &str,
+) -> Result<HostHttpRequest, CoreError> {
+    let source = resolve_source(state.storage(), &params.source_id, &params.source)?;
+    let legado = source.legado_book_source().ok_or_else(|| {
+        CoreError::invalid_params(
+            "cannot auto-build searchRequest: source has no Legado bookSource payload",
+        )
+        .with_details(serde_json::json!({ "sourceId": params.source_id }))
+    })?;
+    let search_url = legado.search_url.as_deref().filter(|s| !s.is_empty()).ok_or_else(|| {
+        CoreError::invalid_params(
+            "cannot auto-build searchRequest: source.searchUrl is empty",
+        )
+        .with_details(serde_json::json!({ "sourceId": params.source_id }))
+    })?;
+    let page = params.page.unwrap_or(1).max(1);
+    let ctx = AnalyzeUrlContext::for_search(keyword, page);
+    // Source-level headers from Legado `header` field (object form). If the
+    // field is missing, null, or not an object, treat it as empty.
+    let source_headers = legado
+        .header
+        .as_ref()
+        .and_then(|h| h.as_object())
+        .cloned()
+        .unwrap_or_default();
+    AnalyzeUrl::build_request(search_url, &ctx, &source.base_url, &source_headers)
+        .map_err(analyze_url_internal)
+}
+
+fn analyze_url_internal(err: AnalyzeUrlError) -> CoreError {
+    match err {
+        AnalyzeUrlError::JsUnsupported(reason) => CoreError::internal(format!(
+            "AnalyzeUrl JS execution unsupported in this build: {reason}"
+        ))
+        .with_details(serde_json::json!({ "unsupported": true, "reason": reason })),
+        other => CoreError::invalid_params(format!("AnalyzeUrl failed: {other}")),
+    }
 }
 
 fn book_search_from_params(

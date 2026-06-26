@@ -734,6 +734,14 @@ pub struct BookSearchParams {
     /// looking up `source_id` in storage (useful for smoke tests).
     #[serde(default, deserialize_with = "deserialize_inline_source")]
     pub source: Option<Value>,
+    /// Search keyword. When `searchRequest` and `searchResponse` are both
+    /// absent, Core auto-builds the request from the source's `searchUrl`
+    /// template using this keyword (Legado `AnalyzeUrl` equivalence).
+    #[serde(default)]
+    pub keyword: Option<String>,
+    /// 1-based search page number. Defaults to 1 when auto-building.
+    #[serde(default)]
+    pub page: Option<u32>,
 }
 
 /// Optional HTTP diagnostics attached to remote-reading results that resumed
