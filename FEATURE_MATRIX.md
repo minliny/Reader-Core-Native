@@ -53,8 +53,8 @@
 | --- | --- | --- | --- |
 | TXT | Rust Core | 部分完成 | `crates/reader-local-book` |
 | EPUB | Rust Core | Gap | 需从旧 Core/平台现状审计 |
-| SQLite schema/migration | Rust Core | Gap | 需落地持久化模型 |
-| Cache/progress/history/download queue | Rust Core | 部分完成 | `crates/reader-storage` 有基础 |
+| SQLite schema/migration | Rust Core | 已完成 | `crates/reader-storage` `sqlite` feature：`SqliteStorage` + `SCHEMA_V1_DDL`（8 表）+ `PRAGMA user_version` 前向迁移 + 19 集成测试（`tests/sqlite_backend.rs`）|
+| Cache/progress/history/download queue | Rust Core | 已完成 | `crates/reader-storage` 双后端（`InMemoryStorage` + `SqliteStorage`）实现 `BookshelfStore`/`ChapterCacheStore`/`ReadingProgressStore`/`ChapterDownloadQueueStore`/`StorageSnapshotStore` 全部 5 trait，125 测试通过（106 in-memory + 19 sqlite），含 S5 退出条件 canonical snapshot hash 跨后端一致性验证 |
 | RSS | Rust Core | 部分完成 | `crates/reader-rss` |
 | WebDAV/sync/diff/recovery | Rust Core + 平台 adapter | 部分完成 | `crates/reader-sync` 有模型，平台 transport 待接入 |
 | TTS 数据契约 | Rust Core + 平台 adapter | Gap | Core 定义契约，平台执行播放 |
