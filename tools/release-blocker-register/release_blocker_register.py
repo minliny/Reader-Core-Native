@@ -39,10 +39,12 @@ Blocker entry::
       "runId": "...",
       "platform": "<candidate name>",
       "fieldPath": "<difference path>",
-      "kind": "value-mismatch | missing-in-candidate | unexpected-in-candidate",
-      "classification": "core-semantic-difference | host-capability-difference | platform-output-missing",
+      "kind": "value-mismatch | missing-in-candidate | unexpected-in-candidate |
+              missing-platform-candidate",
       "canonicalSha256": "...",
       "candidateSha256": "...",
+      "canonicalizedSha256": "...",
+      "candidateCanonicalizedSha256": "...",
       "canonicalSnippet": "...",
       "candidateSnippet": "...",
       "severity": "high | medium | low",
@@ -75,11 +77,12 @@ import sys
 
 
 TOOL_NAME = "release-blocker-register"
-TOOL_VERSION = "1.1"
+TOOL_VERSION = "1.0"
 SCHEMA_VERSION = 1
 
 PRIVATE_TMP = "/private/tmp"
 DEFAULT_REGISTER_NAME = "corpus-blocker-register.json"
+REQUIRED_PLATFORMS = ("cli", "ios", "android", "harmony")
 
 STATUS_OPEN = "open"
 STATUS_WAIVED = "waived"
@@ -90,16 +93,6 @@ SEVERITY_HIGH = "high"
 SEVERITY_MEDIUM = "medium"
 SEVERITY_LOW = "low"
 _SEVERITIES = (SEVERITY_HIGH, SEVERITY_MEDIUM, SEVERITY_LOW)
-
-CLASS_CORE_SEMANTIC = "core-semantic-difference"
-CLASS_HOST_CAPABILITY = "host-capability-difference"
-CLASS_PLATFORM_MISSING = "platform-output-missing"
-
-_CLASS_REASONS = {
-    CLASS_CORE_SEMANTIC: "Core semantic difference from canonical reference",
-    CLASS_HOST_CAPABILITY: "host capability difference from canonical reference",
-    CLASS_PLATFORM_MISSING: "platform output missing from release-gate evidence",
-}
 
 
 class RegisterError(Exception):
@@ -245,8 +238,9 @@ def _existing_keys(register):
 def blockers_from_diff(diff_result, run_id, severity):
     """Build blocker entries (without ids / timestamps) from a diff-result.
 
-    Only non-matching candidates contribute blockers; each of their
-    differences becomes one blocker.
+    Missing required platform candidates and non-matching candidates contribute
+    blockers. This prevents a single-platform or partial-platform diff-result
+    from passing the register gate just because every present candidate matched.
     """
     if not isinstance(diff_result, dict):
         raise RegisterError("diff-result is not an object")
@@ -255,39 +249,54 @@ def blockers_from_diff(diff_result, run_id, severity):
         raise RegisterError("diff-result has no 'candidates' object")
 
     canonical_sha = ""
+    canonicalized_sha = ""
     canonical = diff_result.get("canonical")
     if isinstance(canonical, dict):
         canonical_sha = canonical.get("sha256", "") or ""
+        canonicalized_sha = canonical.get("canonicalizedSha256", "") or ""
 
     entries = []
+    missing_platforms = sorted(set(REQUIRED_PLATFORMS) - set(candidates.keys()))
+    for name in missing_platforms:
+        entries.append({
+            "runId": run_id,
+            "platform": name,
+            "fieldPath": "<candidate>",
+            "kind": "missing-platform-candidate",
+            "canonicalSha256": canonical_sha,
+            "candidateSha256": "",
+            "canonicalizedSha256": canonicalized_sha,
+            "candidateCanonicalizedSha256": "",
+            "canonicalSnippet": None,
+            "candidateSnippet": None,
+            "severity": severity,
+            "status": STATUS_OPEN,
+            "reason": "required four-platform candidate missing from diff-result",
+            "waiver": None,
+        })
+
     for name in sorted(candidates.keys()):
         info = candidates[name]
         if not isinstance(info, dict) or info.get("match"):
             continue
         candidate_sha = info.get("sha256", "") or ""
+        candidate_canonicalized_sha = info.get("canonicalizedSha256", "") or ""
         for diff in info.get("differences", []):
             field_path = diff.get("path", "") if isinstance(diff, dict) else ""
-            classification = (
-                diff.get("classification", CLASS_CORE_SEMANTIC)
-                if isinstance(diff, dict)
-                else CLASS_CORE_SEMANTIC
-            )
             entries.append({
                 "runId": run_id,
                 "platform": name,
                 "fieldPath": field_path,
                 "kind": diff.get("kind", "value-mismatch") if isinstance(diff, dict) else "value-mismatch",
-                "classification": classification,
                 "canonicalSha256": canonical_sha,
                 "candidateSha256": candidate_sha,
+                "canonicalizedSha256": canonicalized_sha,
+                "candidateCanonicalizedSha256": candidate_canonicalized_sha,
                 "canonicalSnippet": (diff.get("canonical") if isinstance(diff, dict) else None),
                 "candidateSnippet": (diff.get("candidate") if isinstance(diff, dict) else None),
                 "severity": severity,
                 "status": STATUS_OPEN,
-                "reason": _CLASS_REASONS.get(
-                    classification,
-                    "cross-platform divergence from canonical reference",
-                ),
+                "reason": "cross-platform divergence from canonical reference",
                 "waiver": None,
             })
     return entries
@@ -313,16 +322,18 @@ def add_blockers_from_diff(register, diff_result, run_id, severity):
 
 
 def add_manual_blocker(register, run_id, platform, field_path, severity, reason,
-                        canonical_sha="", candidate_sha=""):
+                        canonical_sha="", candidate_sha="",
+                        canonicalized_sha="", candidate_canonicalized_sha=""):
     entry = {
         "id": _new_id(register),
         "runId": run_id,
         "platform": platform,
         "fieldPath": field_path,
         "kind": "value-mismatch",
-        "classification": CLASS_CORE_SEMANTIC,
         "canonicalSha256": canonical_sha,
         "candidateSha256": candidate_sha,
+        "canonicalizedSha256": canonicalized_sha,
+        "candidateCanonicalizedSha256": candidate_canonicalized_sha,
         "canonicalSnippet": None,
         "candidateSnippet": None,
         "severity": severity,
@@ -426,10 +437,15 @@ def render_blocker_detail(entry):
         "  platform: {0}".format(entry.get("platform") or "-"),
         "  fieldPath: {0}".format(entry.get("fieldPath") or "-"),
         "  kind: {0}".format(entry.get("kind", "-")),
-        "  classification: {0}".format(entry.get("classification", "-")),
         "  reason: {0}".format(entry.get("reason", "-")),
         "  canonicalSha256: {0}".format(entry.get("canonicalSha256") or "-"),
         "  candidateSha256: {0}".format(entry.get("candidateSha256") or "-"),
+        "  canonicalizedSha256: {0}".format(
+            entry.get("canonicalizedSha256") or "-"
+        ),
+        "  candidateCanonicalizedSha256: {0}".format(
+            entry.get("candidateCanonicalizedSha256") or "-"
+        ),
         "  canonicalSnippet: {0}".format(entry.get("canonicalSnippet")),
         "  candidateSnippet: {0}".format(entry.get("candidateSnippet")),
         "  createdAt: {0}".format(entry.get("createdAt", "-")),
@@ -521,6 +537,8 @@ def parse_args(argv):
     p_manual.add_argument("--reason", default=None)
     p_manual.add_argument("--canonical-sha256", default="")
     p_manual.add_argument("--candidate-sha256", default="")
+    p_manual.add_argument("--canonicalized-sha256", default="")
+    p_manual.add_argument("--candidate-canonicalized-sha256", default="")
 
     p_list = sub.add_parser("list", help="List blockers (optionally filtered).")
     p_list.add_argument("--status", choices=_STATUSES, default=None)
@@ -598,6 +616,8 @@ def main(argv=None):
                 reason=args.reason,
                 canonical_sha=args.canonical_sha256,
                 candidate_sha=args.candidate_sha256,
+                canonicalized_sha=args.canonicalized_sha256,
+                candidate_canonicalized_sha=args.candidate_canonicalized_sha256,
             )
             save_register(register_path, register)
             sys.stdout.write(render_blocker_detail(entry))

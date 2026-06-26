@@ -7,6 +7,7 @@ or:
 """
 
 import json
+import hashlib
 import os
 import shutil
 import sys
@@ -24,11 +25,28 @@ import benchmark_run_packager as brp  # noqa: E402
 
 
 PRIVATE_TMP = "/private/tmp"
+PLATFORMS = ("android", "cli", "harmony", "ios")
+CORE_IDENTITY = {
+    "businessKernel": "reader-core-native-rust",
+    "coreCommit": "090b96f",
+    "abiVersion": 1,
+    "protocolVersion": 1,
+}
 
 
 def _write_json(path, value):
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(value, handle)
+
+
+def _sha256_text(value):
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _sha256_content(value):
+    if isinstance(value, (dict, list)):
+        return _sha256_text(json.dumps(value))
+    return _sha256_text(value)
 
 
 def _make_run_dir(files):
@@ -67,6 +85,244 @@ def _complete_files(diff_total=0):
     }
 
 
+def _collector_manifest(hashes=None):
+    hashes = hashes or {}
+    platform_runs = {
+        platform: dict(CORE_IDENTITY)
+        for platform in PLATFORMS
+    }
+    candidates = {
+        platform: {
+            "rawPath": "raw/{0}-result.json".format(platform),
+            "canonicalizedPath": "candidates/{0}-result.json".format(platform),
+            "sourceSha256": hashes.get(
+                "raw/{0}-result.json".format(platform),
+                platform[0] * 64,
+            ),
+            "rawSha256": hashes.get(
+                "raw/{0}-result.json".format(platform),
+                platform[0] * 64,
+            ),
+            "canonicalizedSha256": platform[-1] * 64,
+            "canonicalizedFileSha256": hashes.get(
+                "candidates/{0}-result.json".format(platform),
+                platform[1] * 64,
+            ),
+        }
+        for platform in PLATFORMS
+    }
+    return {
+        "runId": "collector-run",
+        "scenario": "four-platform-search",
+        "sourceManifest": {
+            "coreIdentity": dict(CORE_IDENTITY),
+            "platformRuns": platform_runs,
+        },
+        "sourceManifestFile": {
+            "packagePath": "raw/source-manifest.json",
+            "sourceSha256": hashes.get("raw/source-manifest.json", "m" * 64),
+            "packageSha256": hashes.get("raw/source-manifest.json", "n" * 64),
+        },
+        "input": {
+            "packagePath": "input.json",
+            "packageSha256": hashes.get("input.json", "i" * 64),
+        },
+        "canonical": {
+            "rawPath": "raw/canonical-result.json",
+            "packagePath": "canonical-result.json",
+            "sourceSha256": hashes.get("raw/canonical-result.json", "r" * 64),
+            "packageSha256": hashes.get("canonical-result.json", "c" * 64),
+            "canonicalizedFileSha256": hashes.get("canonical-result.json", "c" * 64),
+        },
+        "hostParity": {
+            "requiredPlatforms": ["ios", "android", "harmony"],
+            "allPresent": True,
+            "match": True,
+            "total": 0,
+            "byPlatform": {
+                "ios": {"present": True, "match": True, "total": 0},
+                "android": {"present": True, "match": True, "total": 0},
+                "harmony": {"present": True, "match": True, "total": 0},
+            },
+        },
+        "diffSummary": {
+            "match": True,
+            "total": 0,
+            "byPlatform": {
+                platform: {"match": True, "total": 0}
+                for platform in PLATFORMS
+            },
+        },
+        "corpusProof": {
+            "type": "corpus-same-result-proof",
+            "status": "pass",
+            "reasons": [],
+            "conditions": {
+                "sourceManifestPresent": True,
+                "schemaVersionBound": True,
+                "coreIdentityBound": True,
+                "artifactHashesBound": True,
+                "runBindingDeclared": True,
+                "runBindingMatches": True,
+                "scenarioBindingDeclared": True,
+                "scenarioBindingMatches": True,
+                "expectedDeclared": True,
+                "fullDiffExpectedDeclared": True,
+                "byPlatformExpectedDeclared": True,
+                "hostParityExpectedDeclared": True,
+                "fourPlatformCandidatesPresent": True,
+                "fourPlatformSummaryPresent": True,
+                "fullDiffMatch": True,
+                "hostParityMatch": True,
+                "openBlockers": 0,
+            },
+            "missingCandidates": [],
+            "missingSummary": [],
+        },
+        "candidates": candidates,
+        "artifacts": {
+            "platformResult": "platform-result.json",
+            "canonicalResult": "canonical-result.json",
+            "diffResult": "diff-result.json",
+            "environment": "environment.json",
+            "blockerRegister": "corpus-blocker-register.json",
+        },
+        "blockers": {
+            "registerPath": "/private/tmp/collector-run/corpus-blocker-register.json",
+            "added": 0,
+            "open": 0,
+            "openByPlatform": {},
+        },
+    }
+
+
+def _collector_files():
+    files = {
+        "platform-result.json": '{"platform":"cli"}\n',
+        "canonical-result.json": '{"results":[]}\n',
+        "diff-result.json": {
+            "tool": "cross-platform-diff",
+            "match": True,
+            "total": 0,
+            "summary": {
+                platform: {"match": True, "total": 0}
+                for platform in PLATFORMS
+            },
+            "candidates": {
+                platform: {
+                    "match": True,
+                    "total": 0,
+                    "differences": [],
+                    "sha256": platform[0] * 64,
+                    "canonicalizedSha256": platform[-1] * 64,
+                }
+                for platform in PLATFORMS
+            },
+        },
+        "environment.json": '{"tool":"collector"}\n',
+        "corpus-blocker-register.json": {
+            "schemaVersion": 1,
+            "tool": "release-blocker-register",
+            "version": "1.0",
+            "nextId": 1,
+            "blockers": [],
+        },
+        "input.json": '{"query":"river"}\n',
+        "raw/source-manifest.json": '{"schemaVersion":1}\n',
+        "raw/canonical-result.json": '{"results":[]}\n',
+    }
+    for platform in PLATFORMS:
+        files["raw/{0}-result.json".format(platform)] = (
+            '{{"platform":"{0}","raw":true}}\n'.format(platform)
+        )
+        files["candidates/{0}-result.json".format(platform)] = (
+            '{{"platform":"{0}","canonical":true}}\n'.format(platform)
+        )
+    hashes = {
+        rel: _sha256_content(content)
+        for rel, content in files.items()
+    }
+    files["manifest.json"] = _collector_manifest(hashes)
+    return files
+
+
+def _collector_blocked_files():
+    files = _collector_files()
+    diff_result = files["diff-result.json"]
+    diff_result["match"] = False
+    diff_result["total"] = 1
+    diff_result["summary"]["android"] = {"match": False, "total": 1}
+    diff_result["candidates"]["android"]["match"] = False
+    diff_result["candidates"]["android"]["total"] = 1
+    diff_result["candidates"]["android"]["differences"] = [{
+        "path": "results[0].title",
+        "expected": "canonical",
+        "actual": "android",
+    }]
+
+    register = files["corpus-blocker-register.json"]
+    register["nextId"] = 2
+    register["blockers"].append({
+        "id": "BLK-0001",
+        "runId": "collector-run",
+        "scenario": "four-platform-search",
+        "platform": "android",
+        "fieldPath": "results[0].title",
+        "status": "open",
+    })
+
+    manifest = files["manifest.json"]
+    manifest["diffSummary"] = {
+        "match": False,
+        "total": 1,
+        "byPlatform": diff_result["summary"],
+    }
+    manifest["hostParity"] = {
+        "requiredPlatforms": ["ios", "android", "harmony"],
+        "allPresent": True,
+        "match": False,
+        "total": 1,
+        "byPlatform": {
+            "ios": {"present": True, "match": True, "total": 0},
+            "android": {"present": True, "match": False, "total": 1},
+            "harmony": {"present": True, "match": True, "total": 0},
+        },
+    }
+    manifest["blockers"] = {
+        "registerPath": "/private/tmp/collector-run/corpus-blocker-register.json",
+        "added": 1,
+        "open": 1,
+        "openByPlatform": {"android": 1},
+    }
+    manifest["corpusProof"]["status"] = "blocked"
+    manifest["corpusProof"]["reasons"] = [
+        "full-diff-mismatch",
+        "host-parity-mismatch",
+        "open-blockers",
+    ]
+    manifest["corpusProof"]["conditions"]["fullDiffMatch"] = False
+    manifest["corpusProof"]["conditions"]["hostParityMatch"] = False
+    manifest["corpusProof"]["conditions"]["openBlockers"] = 1
+    return files
+
+
+def _tamper_packaged_diff_result_to_android_mismatch(out_dir):
+    diff_path = os.path.join(out_dir, "diff-result.json")
+    with open(diff_path, "r", encoding="utf-8") as handle:
+        diff_result = json.load(handle)
+    diff_result["match"] = False
+    diff_result["total"] = 1
+    diff_result["summary"]["android"] = {"match": False, "total": 1}
+    diff_result["candidates"]["android"]["match"] = False
+    diff_result["candidates"]["android"]["total"] = 1
+    diff_result["candidates"]["android"]["differences"] = [{
+        "path": "results[0].title",
+        "expected": "canonical",
+        "actual": "android",
+    }]
+    _write_json(diff_path, diff_result)
+
+
 class ValidateRunDirTests(unittest.TestCase):
     def test_complete_run_dir_validates(self):
         run_dir = _make_run_dir(_complete_files())
@@ -81,6 +337,117 @@ class ValidateRunDirTests(unittest.TestCase):
             for key in ("manifest", "platform-result", "canonical-result",
                         "diff-result"):
                 self.assertIn(key, loaded)
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
+
+    def test_collector_artifact_integrity_validates(self):
+        run_dir = _make_run_dir(_collector_files())
+        try:
+            validation, _loaded = brp.validate_run_dir(run_dir)
+            self.assertTrue(validation["ok"])
+            collector_artifacts = validation["collectorArtifacts"]
+            self.assertTrue(collector_artifacts["checked"])
+            self.assertTrue(collector_artifacts["ok"])
+            self.assertTrue(validation["collectorConsistency"]["checked"])
+            self.assertTrue(validation["collectorConsistency"]["ok"])
+            self.assertIn("sourceManifestFile", collector_artifacts["artifacts"])
+            self.assertIn("candidate.ios.raw", collector_artifacts["artifacts"])
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
+
+    def test_collector_missing_declared_artifact_fails_validation(self):
+        run_dir = _make_run_dir(_collector_files())
+        try:
+            os.remove(os.path.join(run_dir, "raw", "source-manifest.json"))
+
+            validation, _loaded = brp.validate_run_dir(run_dir)
+
+            self.assertFalse(validation["ok"])
+            self.assertFalse(validation["collectorArtifacts"]["ok"])
+            self.assertTrue(any(
+                "sourceManifestFile" in error
+                for error in validation["collectorArtifacts"]["errors"]
+            ))
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
+
+    def test_collector_missing_artifact_declarations_fail_validation(self):
+        files = _complete_files()
+        files["manifest.json"] = {
+            "sourceManifest": {
+                "coreIdentity": dict(CORE_IDENTITY),
+                "platformRuns": {"ios": dict(CORE_IDENTITY)},
+            }
+        }
+        run_dir = _make_run_dir(files)
+        try:
+            validation, _loaded = brp.validate_run_dir(run_dir)
+
+            self.assertFalse(validation["ok"])
+            self.assertIn(
+                "collector artifact declaration missing: sourceManifestFile",
+                validation["collectorArtifacts"]["errors"],
+            )
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
+
+    def test_collector_diff_summary_mismatch_fails_validation(self):
+        files = _collector_files()
+        files["manifest.json"]["diffSummary"]["total"] = 1
+        run_dir = _make_run_dir(files)
+        try:
+            validation, _loaded = brp.validate_run_dir(run_dir)
+
+            self.assertFalse(validation["ok"])
+            self.assertIn(
+                "collector manifest diffSummary does not match diff-result.json",
+                validation["collectorConsistency"]["errors"],
+            )
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
+
+    def test_collector_host_parity_mismatch_fails_validation(self):
+        files = _collector_files()
+        files["manifest.json"]["hostParity"]["total"] = 1
+        run_dir = _make_run_dir(files)
+        try:
+            validation, _loaded = brp.validate_run_dir(run_dir)
+
+            self.assertFalse(validation["ok"])
+            self.assertIn(
+                "collector manifest hostParity does not match diff-result.json",
+                validation["collectorConsistency"]["errors"],
+            )
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
+
+    def test_collector_register_open_mismatch_fails_packaging(self):
+        files = _collector_files()
+        files["corpus-blocker-register.json"]["blockers"].append({
+            "id": "BLK-0001",
+            "runId": "collector-run",
+            "platform": "android",
+            "fieldPath": "results[1].name",
+            "status": "open",
+        })
+        run_dir = _make_run_dir(files)
+        try:
+            with self.assertRaises(brp.PackagingError) as raised:
+                brp.package_run(run_dir)
+            self.assertIn("blockers.open", str(raised.exception))
+            self.assertIn("blocker register", str(raised.exception))
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
+
+    def test_collector_hash_mismatch_fails_packaging(self):
+        files = _collector_files()
+        files["raw/ios-result.json"] = '{"platform":"ios","raw":"tampered"}\n'
+        run_dir = _make_run_dir(files)
+        try:
+            with self.assertRaises(brp.PackagingError) as raised:
+                brp.package_run(run_dir)
+            self.assertIn("candidate.ios.raw", str(raised.exception))
+            self.assertIn("mismatch", str(raised.exception))
         finally:
             shutil.rmtree(run_dir, ignore_errors=True)
 
@@ -169,38 +536,29 @@ class DeriveDiffSummaryTests(unittest.TestCase):
         self.assertIsNone(result["match"])
         self.assertIsNone(result["total"])
 
-    def test_release_gate_and_class_counts_preserved(self):
-        diff = {
-            "summary": {
-                "ios": {
-                    "total": 0,
-                    "differenceClasses": {
-                        "core-semantic-difference": 0,
-                        "host-capability-difference": 0,
-                        "platform-output-missing": 0,
-                    },
-                },
-                "harmony": {
-                    "total": 1,
-                    "differenceClasses": {
-                        "platform-output-missing": 1,
-                    },
-                },
-            },
-            "releaseGate": {
-                "status": "blocked",
-                "missingCandidates": ["harmony"],
-                "blockedReasons": ["missing required platform output: harmony"],
-            },
-        }
-        result = brp.derive_diff_summary(diff)
-        self.assertFalse(result["match"])
-        self.assertEqual(result["total"], 1)
-        self.assertEqual(
-            result["differenceClasses"]["platform-output-missing"],
-            1,
-        )
-        self.assertEqual(result["releaseGate"]["status"], "blocked")
+
+class DeriveEvidenceSummaryTests(unittest.TestCase):
+    def test_missing_source_manifest_returns_none(self):
+        self.assertIsNone(brp.derive_evidence_summary({"runId": "run-42"}))
+
+    def test_extracts_core_identity_and_platform_hashes(self):
+        result = brp.derive_evidence_summary(_collector_manifest())
+
+        self.assertEqual(result["runId"], "collector-run")
+        self.assertEqual(result["scenario"], "four-platform-search")
+        self.assertEqual(result["coreIdentity"], CORE_IDENTITY)
+        self.assertTrue(result["hostParity"]["match"])
+        self.assertEqual(result["corpusProof"]["status"], "pass")
+        self.assertEqual(result["hostParity"]["requiredPlatforms"], ["ios", "android", "harmony"])
+        self.assertEqual(sorted(result["platforms"].keys()), list(PLATFORMS))
+        android = result["platforms"]["android"]
+        self.assertEqual(android["businessKernel"], "reader-core-native-rust")
+        self.assertEqual(android["coreCommit"], "090b96f")
+        self.assertEqual(android["raw"], "raw/android-result.json")
+        self.assertEqual(android["canonicalized"], "candidates/android-result.json")
+        self.assertEqual(android["sourceSha256"], "a" * 64)
+        self.assertEqual(android["canonicalizedSha256"], "d" * 64)
+        self.assertEqual(android["canonicalizedFileSha256"], "n" * 64)
 
 
 class SanitizeForPathTests(unittest.TestCase):
@@ -269,6 +627,11 @@ class PackageRunTests(unittest.TestCase):
         self.assertEqual(on_disk["runId"], "run-42")
         self.assertEqual(on_disk["tool"], brp.TOOL_NAME)
         self.assertEqual(on_disk["bundle"]["outDir"], os.path.abspath(out_dir))
+        self.assertTrue(os.path.isfile(os.path.join(out_dir, "bundle-manifest.json")))
+        self.assertTrue(os.path.isfile(os.path.join(out_dir, "bundle-manifest.sha256")))
+        self.assertTrue(brp.verify_bundle_manifest(out_dir)["ok"])
+        self.assertEqual(summary["bundle"]["manifest"]["path"], "bundle-manifest.json")
+        self.assertEqual(len(summary["bundle"]["manifest"]["sha256"]), 64)
 
     def test_summary_has_required_fields(self):
         run_dir = _make_run_dir(_complete_files())
@@ -280,11 +643,12 @@ class PackageRunTests(unittest.TestCase):
 
         for field in ("schemaVersion", "tool", "version", "packagedAt", "runId",
                       "runDir", "validation", "manifest", "diffSummary",
-                      "environment", "files", "bundle"):
+                      "evidence", "environment", "files", "bundle"):
             self.assertIn(field, summary)
         self.assertTrue(summary["validation"]["ok"])
         self.assertEqual(summary["diffSummary"]["total"], 0)
         self.assertTrue(summary["diffSummary"]["match"])
+        self.assertIsNone(summary["evidence"])
         self.assertIsNone(summary["bundle"]["zip"])
         paths = {entry["path"] for entry in summary["files"]}
         for _key, filename in brp.REQUIRED_ARTIFACTS:
@@ -293,6 +657,461 @@ class PackageRunTests(unittest.TestCase):
             self.assertIn("size", entry)
             self.assertIn("sha256", entry)
             self.assertEqual(len(entry["sha256"]), 64)
+
+    def test_bundle_manifest_detects_tampered_file(self):
+        run_dir = _make_run_dir(_complete_files())
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        with open(os.path.join(out_dir, "platform-result.json"), "w", encoding="utf-8") as handle:
+            handle.write('{"book":{"title":"tampered"}}\n')
+
+        validation = brp.verify_bundle_manifest(out_dir)
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "bundle manifest sha256 mismatch: platform-result.json",
+            validation["errors"],
+        )
+
+    def test_bundle_manifest_rejects_self_consistent_failed_summary(self):
+        run_dir = _make_run_dir(_complete_files())
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+        summary_path = os.path.join(out_dir, "summary.json")
+        with open(summary_path, "r", encoding="utf-8") as handle:
+            summary = json.load(handle)
+        summary["validation"]["ok"] = False
+        brp._write_json(summary_path, summary)
+        brp._write_bundle_manifest(out_dir, summary)
+
+        validation = brp.verify_bundle_manifest(out_dir)
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "bundle summary.json validation.ok is not true",
+            validation["errors"],
+        )
+
+    def test_bundle_zip_rejects_self_consistent_failed_summary(self):
+        run_dir = _make_run_dir(_complete_files())
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        zip_path = self._track(os.path.join(PRIVATE_TMP, "brp-bad-summary.zip"))
+        brp.package_run(run_dir, out_dir=out_dir, make_zip=True, zip_path=zip_path)
+        summary_path = os.path.join(out_dir, "summary.json")
+        with open(summary_path, "r", encoding="utf-8") as handle:
+            summary = json.load(handle)
+        summary["validation"]["ok"] = False
+        brp._write_json(summary_path, summary)
+        brp._write_bundle_manifest(out_dir, summary)
+        brp._zip_directory(out_dir, zip_path)
+
+        validation = brp.verify_bundle_zip(zip_path)
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "bundle summary.json validation.ok is not true",
+            validation["errors"],
+        )
+
+    def test_bundle_manifest_recomputes_payload_validation(self):
+        run_dir = _make_run_dir(_collector_files())
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+        summary_path = os.path.join(out_dir, "summary.json")
+        with open(summary_path, "r", encoding="utf-8") as handle:
+            summary = json.load(handle)
+        _tamper_packaged_diff_result_to_android_mismatch(out_dir)
+        brp._write_bundle_manifest(out_dir, summary)
+
+        validation = brp.verify_bundle_manifest(out_dir)
+
+        self.assertFalse(validation["ok"])
+        self.assertIn("bundle payload validation.ok is not true", validation["errors"])
+        self.assertIn(
+            "bundle payload collectorConsistency: collector manifest diffSummary "
+            "does not match diff-result.json",
+            validation["errors"],
+        )
+        self.assertIn(
+            "bundle summary.json validation does not match payload validation",
+            validation["errors"],
+        )
+        self.assertIn(
+            "bundle summary.json diffSummary does not match payload diff-result.json",
+            validation["errors"],
+        )
+
+    def test_bundle_zip_recomputes_payload_validation(self):
+        run_dir = _make_run_dir(_collector_files())
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        zip_path = self._track(os.path.join(PRIVATE_TMP, "brp-payload-tamper.zip"))
+        brp.package_run(run_dir, out_dir=out_dir, make_zip=True, zip_path=zip_path)
+        summary_path = os.path.join(out_dir, "summary.json")
+        with open(summary_path, "r", encoding="utf-8") as handle:
+            summary = json.load(handle)
+        _tamper_packaged_diff_result_to_android_mismatch(out_dir)
+        brp._write_bundle_manifest(out_dir, summary)
+        brp._zip_directory(out_dir, zip_path)
+
+        validation = brp.verify_bundle_zip(zip_path)
+
+        self.assertFalse(validation["ok"])
+        self.assertIn("bundle payload validation.ok is not true", validation["errors"])
+        self.assertIn(
+            "bundle payload collectorConsistency: collector manifest diffSummary "
+            "does not match diff-result.json",
+            validation["errors"],
+        )
+        self.assertIn(
+            "bundle summary.json validation does not match payload validation",
+            validation["errors"],
+        )
+        self.assertIn(
+            "bundle summary.json diffSummary does not match payload diff-result.json",
+            validation["errors"],
+        )
+
+    def test_bundle_verification_can_require_corpus_proof_pass(self):
+        run_dir = _make_run_dir(_collector_files())
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        validation = brp.verify_bundle_manifest(
+            out_dir,
+            require_corpus_proof_pass=True,
+        )
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["requiredCorpusProofPass"])
+
+    def test_bundle_verification_rejects_incomplete_pass_proof_when_required(self):
+        files = _collector_files()
+        files["manifest.json"]["corpusProof"]["conditions"][
+            "schemaVersionBound"
+        ] = False
+        run_dir = _make_run_dir(files)
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        plain_validation = brp.verify_bundle_manifest(out_dir)
+        strict_validation = brp.verify_bundle_manifest(
+            out_dir,
+            require_corpus_proof_pass=True,
+        )
+
+        self.assertTrue(plain_validation["ok"])
+        self.assertFalse(strict_validation["ok"])
+        self.assertIn(
+            "bundle summary.json evidence.corpusProof.conditions.schemaVersionBound "
+            "is not true",
+            strict_validation["errors"],
+        )
+
+    def test_bundle_verification_rejects_pass_proof_with_reasons_when_required(self):
+        files = _collector_files()
+        files["manifest.json"]["corpusProof"]["reasons"] = [
+            "schema-version-not-bound"
+        ]
+        run_dir = _make_run_dir(files)
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        strict_validation = brp.verify_bundle_manifest(
+            out_dir,
+            require_corpus_proof_pass=True,
+        )
+
+        self.assertFalse(strict_validation["ok"])
+        self.assertIn(
+            "bundle summary.json evidence.corpusProof.reasons must be empty",
+            strict_validation["errors"],
+        )
+
+    def test_bundle_verification_rejects_blocked_corpus_proof_when_required(self):
+        run_dir = _make_run_dir(_collector_blocked_files())
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        plain_validation = brp.verify_bundle_manifest(out_dir)
+        strict_validation = brp.verify_bundle_manifest(
+            out_dir,
+            require_corpus_proof_pass=True,
+        )
+
+        self.assertTrue(plain_validation["ok"])
+        self.assertFalse(strict_validation["ok"])
+        self.assertIn(
+            "bundle summary.json evidence.corpusProof.status is not pass",
+            strict_validation["errors"],
+        )
+
+    def test_bundle_verification_rejects_plain_bundle_when_proof_required(self):
+        run_dir = _make_run_dir(_complete_files())
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        plain_validation = brp.verify_bundle_manifest(out_dir)
+        strict_validation = brp.verify_bundle_manifest(
+            out_dir,
+            require_corpus_proof_pass=True,
+        )
+
+        self.assertTrue(plain_validation["ok"])
+        self.assertFalse(strict_validation["ok"])
+        self.assertIn(
+            "bundle summary.json evidence.corpusProof.status is not pass",
+            strict_validation["errors"],
+        )
+
+    def test_bundle_zip_verification_can_require_corpus_proof_pass(self):
+        run_dir = _make_run_dir(_collector_files())
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        zip_path = self._track(os.path.join(PRIVATE_TMP, "brp-proof-pass.zip"))
+        brp.package_run(run_dir, out_dir=out_dir, make_zip=True, zip_path=zip_path)
+
+        validation = brp.verify_bundle_zip(
+            zip_path,
+            require_corpus_proof_pass=True,
+        )
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["requiredCorpusProofPass"])
+
+    def test_bundle_verification_can_require_core_commit(self):
+        run_dir = _make_run_dir(_collector_files())
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        validation = brp.verify_bundle_manifest(
+            out_dir,
+            required_core_commit="090b96f",
+        )
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual(validation["requiredCoreCommit"], "090b96f")
+
+    def test_bundle_verification_allows_full_commit_for_short_manifest_commit(self):
+        run_dir = _make_run_dir(_collector_files())
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        validation = brp.verify_bundle_manifest(
+            out_dir,
+            required_core_commit="090b96f1234567890abcdef1234567890abcdef1",
+        )
+
+        self.assertTrue(validation["ok"])
+
+    def test_bundle_verification_rejects_wrong_core_commit(self):
+        run_dir = _make_run_dir(_collector_files())
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        plain_validation = brp.verify_bundle_manifest(out_dir)
+        strict_validation = brp.verify_bundle_manifest(
+            out_dir,
+            required_core_commit="deadbee",
+        )
+
+        self.assertTrue(plain_validation["ok"])
+        self.assertFalse(strict_validation["ok"])
+        self.assertIn(
+            "bundle summary.json evidence.coreIdentity.coreCommit does not match "
+            "required core commit: expected deadbee, got 090b96f",
+            strict_validation["errors"],
+        )
+
+    def test_bundle_verification_rejects_plain_bundle_when_core_commit_required(self):
+        run_dir = _make_run_dir(_complete_files())
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        validation = brp.verify_bundle_manifest(
+            out_dir,
+            required_core_commit="090b96f",
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "bundle summary.json evidence.coreIdentity.coreCommit is missing",
+            validation["errors"],
+        )
+
+    def test_bundle_zip_verification_can_require_core_commit(self):
+        run_dir = _make_run_dir(_collector_files())
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        zip_path = self._track(os.path.join(PRIVATE_TMP, "brp-core-commit.zip"))
+        brp.package_run(run_dir, out_dir=out_dir, make_zip=True, zip_path=zip_path)
+
+        validation = brp.verify_bundle_zip(
+            zip_path,
+            required_core_commit="090b96f",
+        )
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual(validation["requiredCoreCommit"], "090b96f")
+
+    def test_bundle_verification_can_require_run_id_and_scenario(self):
+        run_dir = _make_run_dir(_collector_files())
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        validation = brp.verify_bundle_manifest(
+            out_dir,
+            required_run_id="collector-run",
+            required_scenario="four-platform-search",
+        )
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual(validation["requiredRunId"], "collector-run")
+        self.assertEqual(validation["requiredScenario"], "four-platform-search")
+
+    def test_bundle_verification_rejects_wrong_run_id(self):
+        run_dir = _make_run_dir(_collector_files())
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        validation = brp.verify_bundle_manifest(
+            out_dir,
+            required_run_id="wrong-run",
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "bundle summary.json runId does not match required runId: "
+            "expected wrong-run, got collector-run",
+            validation["errors"],
+        )
+
+    def test_bundle_verification_rejects_wrong_scenario(self):
+        run_dir = _make_run_dir(_collector_files())
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        validation = brp.verify_bundle_manifest(
+            out_dir,
+            required_scenario="wrong-scenario",
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "bundle summary.json manifest.scenario does not match required "
+            "scenario: expected wrong-scenario, got four-platform-search",
+            validation["errors"],
+        )
+        self.assertIn(
+            "bundle summary.json evidence.scenario does not match required "
+            "scenario: expected wrong-scenario, got four-platform-search",
+            validation["errors"],
+        )
+
+    def test_bundle_verification_rejects_plain_bundle_when_scenario_required(self):
+        run_dir = _make_run_dir(_complete_files())
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        validation = brp.verify_bundle_manifest(
+            out_dir,
+            required_scenario="four-platform-search",
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "bundle summary.json manifest.scenario does not match required "
+            "scenario: expected four-platform-search, got None",
+            validation["errors"],
+        )
+
+    def test_bundle_zip_verification_can_require_run_id_and_scenario(self):
+        run_dir = _make_run_dir(_collector_files())
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+        zip_path = self._track(os.path.join(PRIVATE_TMP, "brp-run-scenario.zip"))
+        brp.package_run(run_dir, out_dir=out_dir, make_zip=True, zip_path=zip_path)
+
+        validation = brp.verify_bundle_zip(
+            zip_path,
+            required_run_id="collector-run",
+            required_scenario="four-platform-search",
+        )
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual(validation["requiredRunId"], "collector-run")
+        self.assertEqual(validation["requiredScenario"], "four-platform-search")
+
+    def test_summary_exposes_collector_core_identity_evidence(self):
+        files = _collector_files()
+        run_dir = _make_run_dir(files)
+        self._track(run_dir)
+        out_dir = self._track(tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP))
+        os.rmdir(out_dir)
+
+        summary = brp.package_run(run_dir, out_dir=out_dir)
+
+        self.assertEqual(summary["evidence"]["runId"], "collector-run")
+        self.assertEqual(summary["evidence"]["scenario"], "four-platform-search")
+        self.assertEqual(summary["evidence"]["coreIdentity"], CORE_IDENTITY)
+        self.assertEqual(
+            summary["evidence"]["sourceManifestFile"],
+            {
+                "raw": "raw/source-manifest.json",
+                "sourceSha256": _sha256_text('{"schemaVersion":1}\n'),
+                "packageSha256": _sha256_text('{"schemaVersion":1}\n'),
+            },
+        )
+        self.assertEqual(
+            sorted(summary["evidence"]["platforms"].keys()),
+            list(PLATFORMS),
+        )
+        self.assertEqual(
+            summary["evidence"]["platforms"]["ios"]["canonicalized"],
+            "candidates/ios-result.json",
+        )
+        self.assertEqual(
+            summary["evidence"]["platforms"]["ios"]["canonicalizedFileSha256"],
+            _sha256_text('{"platform":"ios","canonical":true}\n'),
+        )
 
     def test_bundle_includes_logs_and_environment(self):
         files = _complete_files()
@@ -329,6 +1148,8 @@ class PackageRunTests(unittest.TestCase):
             names = archive.namelist()
         self.assertTrue(any(n.endswith("/summary.json") for n in names))
         self.assertTrue(any(n.endswith("/manifest.json") for n in names))
+        self.assertTrue(any(n.endswith("/bundle-manifest.json") for n in names))
+        self.assertTrue(any(n.endswith("/bundle-manifest.sha256") for n in names))
         self.assertTrue(all("/" in n for n in names))
 
     def test_no_zip_by_default(self):
@@ -421,19 +1242,17 @@ class RenderSummaryTests(unittest.TestCase):
             shutil.rmtree(run_dir, ignore_errors=True)
             shutil.rmtree(out_dir, ignore_errors=True)
 
-    def test_render_mentions_release_gate_blocked(self):
-        run_dir = _make_run_dir(_complete_files())
+    def test_render_mentions_core_identity_when_present(self):
+        run_dir = _make_run_dir(_collector_files())
         out_dir = tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP)
         os.rmdir(out_dir)
         try:
             summary = brp.package_run(run_dir, out_dir=out_dir)
-            summary["diffSummary"]["releaseGate"] = {
-                "status": "blocked",
-                "blockedReasons": ["missing required platform output: harmony"],
-            }
             text = brp.render_summary(summary)
-            self.assertIn("release gate: blocked", text)
-            self.assertIn("missing required platform output: harmony", text)
+            self.assertIn("reader-core-native-rust 090b96f", text)
+            self.assertIn("platforms: android, cli, harmony, ios", text)
+            self.assertIn("host parity: match (total differences: 0)", text)
+            self.assertIn("corpus proof: pass", text)
         finally:
             shutil.rmtree(run_dir, ignore_errors=True)
             shutil.rmtree(out_dir, ignore_errors=True)
@@ -498,6 +1317,178 @@ class MainCliTests(unittest.TestCase):
             self.assertTrue(os.path.isfile(zip_path))
         finally:
             pass
+
+    def test_main_verifies_bundle_directory(self):
+        run_dir = _make_run_dir(_complete_files())
+        self._paths.append(run_dir)
+        out_dir = tempfile.mkdtemp(prefix="brp-cli-", dir=PRIVATE_TMP)
+        os.rmdir(out_dir)
+        self._paths.append(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        exit_code = brp.main(["--verify-bundle", out_dir])
+
+        self.assertEqual(exit_code, 0)
+
+    def test_main_verifies_bundle_zip(self):
+        run_dir = _make_run_dir(_complete_files())
+        self._paths.append(run_dir)
+        out_dir = tempfile.mkdtemp(prefix="brp-cli-", dir=PRIVATE_TMP)
+        os.rmdir(out_dir)
+        self._paths.append(out_dir)
+        zip_path = os.path.join(PRIVATE_TMP, "brp-cli-verify-bundle.zip")
+        self._paths.append(zip_path)
+        brp.package_run(run_dir, out_dir=out_dir, make_zip=True, zip_path=zip_path)
+
+        exit_code = brp.main(["--verify-bundle", zip_path])
+
+        self.assertEqual(exit_code, 0)
+
+    def test_main_verifies_bundle_directory_with_required_corpus_proof_pass(self):
+        run_dir = _make_run_dir(_collector_files())
+        self._paths.append(run_dir)
+        out_dir = tempfile.mkdtemp(prefix="brp-cli-", dir=PRIVATE_TMP)
+        os.rmdir(out_dir)
+        self._paths.append(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        exit_code = brp.main([
+            "--verify-bundle",
+            out_dir,
+            "--require-corpus-proof-pass",
+        ])
+
+        self.assertEqual(exit_code, 0)
+
+    def test_main_verifies_bundle_directory_with_required_core_commit(self):
+        run_dir = _make_run_dir(_collector_files())
+        self._paths.append(run_dir)
+        out_dir = tempfile.mkdtemp(prefix="brp-cli-", dir=PRIVATE_TMP)
+        os.rmdir(out_dir)
+        self._paths.append(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        exit_code = brp.main([
+            "--verify-bundle",
+            out_dir,
+            "--require-corpus-proof-pass",
+            "--require-core-commit",
+            "090b96f",
+            "--require-run-id",
+            "collector-run",
+            "--require-scenario",
+            "four-platform-search",
+        ])
+
+        self.assertEqual(exit_code, 0)
+
+    def test_main_required_core_commit_rejects_wrong_commit(self):
+        run_dir = _make_run_dir(_collector_files())
+        self._paths.append(run_dir)
+        out_dir = tempfile.mkdtemp(prefix="brp-cli-", dir=PRIVATE_TMP)
+        os.rmdir(out_dir)
+        self._paths.append(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        exit_code = brp.main([
+            "--verify-bundle",
+            out_dir,
+            "--require-core-commit",
+            "deadbee",
+        ])
+
+        self.assertNotEqual(exit_code, 0)
+
+    def test_main_required_scenario_rejects_wrong_scenario(self):
+        run_dir = _make_run_dir(_collector_files())
+        self._paths.append(run_dir)
+        out_dir = tempfile.mkdtemp(prefix="brp-cli-", dir=PRIVATE_TMP)
+        os.rmdir(out_dir)
+        self._paths.append(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        exit_code = brp.main([
+            "--verify-bundle",
+            out_dir,
+            "--require-scenario",
+            "wrong-scenario",
+        ])
+
+        self.assertNotEqual(exit_code, 0)
+
+    def test_main_required_corpus_proof_pass_rejects_blocked_bundle(self):
+        run_dir = _make_run_dir(_collector_blocked_files())
+        self._paths.append(run_dir)
+        out_dir = tempfile.mkdtemp(prefix="brp-cli-", dir=PRIVATE_TMP)
+        os.rmdir(out_dir)
+        self._paths.append(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        plain_exit = brp.main(["--verify-bundle", out_dir])
+        strict_exit = brp.main([
+            "--verify-bundle",
+            out_dir,
+            "--require-corpus-proof-pass",
+        ])
+
+        self.assertEqual(plain_exit, 0)
+        self.assertNotEqual(strict_exit, 0)
+
+    def test_main_required_corpus_proof_pass_rejects_plain_bundle(self):
+        run_dir = _make_run_dir(_complete_files())
+        self._paths.append(run_dir)
+        out_dir = tempfile.mkdtemp(prefix="brp-cli-", dir=PRIVATE_TMP)
+        os.rmdir(out_dir)
+        self._paths.append(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+
+        exit_code = brp.main([
+            "--verify-bundle",
+            out_dir,
+            "--require-corpus-proof-pass",
+        ])
+
+        self.assertNotEqual(exit_code, 0)
+
+    def test_main_rejects_required_corpus_proof_pass_without_verify_mode(self):
+        exit_code = brp.main(["--require-corpus-proof-pass"])
+
+        self.assertNotEqual(exit_code, 0)
+
+    def test_main_rejects_required_core_commit_without_verify_mode(self):
+        exit_code = brp.main(["--require-core-commit", "090b96f"])
+
+        self.assertNotEqual(exit_code, 0)
+
+    def test_main_rejects_required_run_id_without_verify_mode(self):
+        exit_code = brp.main(["--require-run-id", "collector-run"])
+
+        self.assertNotEqual(exit_code, 0)
+
+    def test_main_rejects_required_scenario_without_verify_mode(self):
+        exit_code = brp.main(["--require-scenario", "four-platform-search"])
+
+        self.assertNotEqual(exit_code, 0)
+
+    def test_main_verify_bundle_returns_nonzero_on_tamper(self):
+        run_dir = _make_run_dir(_complete_files())
+        self._paths.append(run_dir)
+        out_dir = tempfile.mkdtemp(prefix="brp-cli-", dir=PRIVATE_TMP)
+        os.rmdir(out_dir)
+        self._paths.append(out_dir)
+        brp.package_run(run_dir, out_dir=out_dir)
+        with open(os.path.join(out_dir, "platform-result.json"), "w",
+                  encoding="utf-8") as handle:
+            handle.write('{"book":{"title":"tampered"}}\n')
+
+        exit_code = brp.main(["--verify-bundle", out_dir])
+
+        self.assertNotEqual(exit_code, 0)
+
+    def test_main_requires_run_dir_without_verify_mode(self):
+        exit_code = brp.main([])
+
+        self.assertNotEqual(exit_code, 0)
 
 
 if __name__ == "__main__":

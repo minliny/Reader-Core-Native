@@ -99,7 +99,7 @@ class BookSourceOracleTests(unittest.TestCase):
         )
         self.assertEqual(
             oracle["host"]["requests"][0]["operationId"],
-            "<normalized>",
+            42,
         )
         self.assertEqual(
             oracle["pipelines"]["toc"]["data"]["toc"][0]["url"],
