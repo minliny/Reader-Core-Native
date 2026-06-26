@@ -15,7 +15,9 @@
 
 #![cfg(feature = "sqlite")]
 
-use reader_domain::{Book, ReadingProgress, Source, SourceRules};
+use reader_domain::{
+    Book, Bookmark, DictRule, ReadingProgress, ReplaceRule, Source, SourceRules, TxtTocRule,
+};
 use reader_storage::{
     BookshelfEntry, BookshelfQuery, BookshelfSortBy, BookshelfSortDirection, BookshelfStore,
     ChapterCacheEntry, ChapterCacheRetentionPolicy, ChapterCacheStats, ChapterCacheStore,
@@ -683,4 +685,168 @@ fn sqlite_canonical_snapshot_hash_changes_when_state_changes() {
     storage.put_source(test_source("s2", "src2")).unwrap();
     let after = storage.canonical_snapshot_hash(1).unwrap();
     assert_ne!(before, after, "hash must change when state changes");
+}
+
+// ---------- v2 independent entities (S5 B6) ----------
+
+fn sample_txt_toc_rule(id: i64, name: &str, serial: i32) -> TxtTocRule {
+    TxtTocRule {
+        id,
+        name: name.into(),
+        rule: r"##正文(.*)".into(),
+        example: Some("示例".into()),
+        serial_number: serial,
+        enable: true,
+    }
+}
+
+fn sample_bookmark(time: i64, book_name: &str) -> Bookmark {
+    Bookmark {
+        time,
+        book_name: book_name.into(),
+        book_author: "无名作者".into(),
+        chapter_index: 3,
+        chapter_pos: 128,
+        chapter_name: "第三章".into(),
+        book_text: "原文片段".into(),
+        content: "用户批注".into(),
+    }
+}
+
+fn sample_replace_rule(id: i64, name: &str, order: i32) -> ReplaceRule {
+    ReplaceRule {
+        id,
+        name: name.into(),
+        group: Some("净化".into()),
+        pattern: r"广告.*".into(),
+        replacement: String::new(),
+        scope: Some("book1,book2".into()),
+        scope_title: false,
+        scope_content: true,
+        exclude_scope: Some("exclude1".into()),
+        is_enabled: true,
+        is_regex: true,
+        timeout_millisecond: 3000,
+        order,
+    }
+}
+
+fn sample_dict_rule(name: &str, sort: i32) -> DictRule {
+    DictRule {
+        name: name.into(),
+        url_rule: "http://dict.example.com/?q={{key}}".into(),
+        show_rule: "##释义".into(),
+        enabled: true,
+        sort_number: sort,
+    }
+}
+
+#[test]
+fn sqlite_v2_entity_snapshot_round_trips_through_replace_and_export() {
+    let storage = SqliteStorage::open_in_memory().unwrap();
+
+    // Build a snapshot with all four v2 entity collections populated.
+    // Insert in a deliberately non-sorted order to verify the export sorts.
+    let mut snap = StorageSnapshot::empty(7_000);
+    snap.txt_toc_rules.push(sample_txt_toc_rule(2, "toc-b", 10));
+    snap.txt_toc_rules.push(sample_txt_toc_rule(1, "toc-a", 5));
+    snap.txt_toc_rules.push(sample_txt_toc_rule(3, "toc-c", 5));
+    snap.bookmarks.push(sample_bookmark(2_000, "书B"));
+    snap.bookmarks.push(sample_bookmark(1_000, "书A"));
+    snap.replace_rules.push(sample_replace_rule(200, "r2", 1));
+    snap.replace_rules.push(sample_replace_rule(100, "r1", 1));
+    snap.replace_rules.push(sample_replace_rule(300, "r3", 0));
+    snap.dict_rules.push(sample_dict_rule("dict-b", 1));
+    snap.dict_rules.push(sample_dict_rule("dict-a", 0));
+
+    storage.replace_with_snapshot(snap.clone()).unwrap();
+
+    let exported = storage.export_snapshot(7_000).unwrap();
+    assert_eq!(exported.schema_version, 2);
+    assert_eq!(exported.txt_toc_rules.len(), 3);
+    assert_eq!(exported.bookmarks.len(), 2);
+    assert_eq!(exported.replace_rules.len(), 3);
+    assert_eq!(exported.dict_rules.len(), 2);
+
+    // txt_toc_rules sorted by (serial_number, id): (5,1), (5,3), (10,2)
+    let toc_ids: Vec<i64> = exported.txt_toc_rules.iter().map(|r| r.id).collect();
+    assert_eq!(toc_ids, vec![1, 3, 2]);
+    // bookmarks sorted by time
+    let bm_times: Vec<i64> = exported.bookmarks.iter().map(|b| b.time).collect();
+    assert_eq!(bm_times, vec![1_000, 2_000]);
+    // replace_rules sorted by (order, id): (0,300), (1,100), (1,200)
+    let rp_ids: Vec<i64> = exported.replace_rules.iter().map(|r| r.id).collect();
+    assert_eq!(rp_ids, vec![300, 100, 200]);
+    // dict_rules sorted by name
+    let dn: Vec<&str> = exported
+        .dict_rules
+        .iter()
+        .map(|r| r.name.as_str())
+        .collect();
+    assert_eq!(dn, vec!["dict-a", "dict-b"]);
+
+    // Field-level fidelity: scope/group/exclude_scope round-trip (Option fields).
+    let r1 = exported.replace_rules.iter().find(|r| r.id == 100).unwrap();
+    assert_eq!(r1.group.as_deref(), Some("净化"));
+    assert_eq!(r1.scope.as_deref(), Some("book1,book2"));
+    assert_eq!(r1.exclude_scope.as_deref(), Some("exclude1"));
+    assert!(r1.scope_content);
+    assert!(!r1.scope_title);
+
+    // TxtTocRule.example (Option) round-trips.
+    let t1 = exported.txt_toc_rules.iter().find(|r| r.id == 1).unwrap();
+    assert_eq!(t1.example.as_deref(), Some("示例"));
+
+    // Bookmark full-field round-trip.
+    let b1 = exported.bookmarks.iter().find(|b| b.time == 1_000).unwrap();
+    assert_eq!(b1.book_name, "书A");
+    assert_eq!(b1.chapter_pos, 128);
+    assert_eq!(b1.content, "用户批注");
+}
+
+#[test]
+fn sqlite_v2_entity_snapshot_rejects_duplicate_pk() {
+    let mut snap = StorageSnapshot::empty(1);
+    snap.txt_toc_rules.push(sample_txt_toc_rule(1, "a", 0));
+    snap.txt_toc_rules.push(sample_txt_toc_rule(1, "b", 1)); // duplicate id
+    let err = snap.validate().unwrap_err();
+    assert!(matches!(
+        err,
+        reader_storage::StorageError::InvalidSnapshot { ref field } if field == "txt_toc_rules"
+    ));
+
+    let mut snap2 = StorageSnapshot::empty(1);
+    snap2.dict_rules.push(sample_dict_rule("dup", 0));
+    snap2.dict_rules.push(sample_dict_rule("dup", 1)); // duplicate name
+    let err2 = snap2.validate().unwrap_err();
+    assert!(matches!(
+        err2,
+        reader_storage::StorageError::InvalidSnapshot { ref field } if field == "dict_rules"
+    ));
+}
+
+#[test]
+fn sqlite_v2_entity_replace_clears_existing_rows() {
+    let storage = SqliteStorage::open_in_memory().unwrap();
+
+    let mut first = StorageSnapshot::empty(1);
+    first
+        .txt_toc_rules
+        .push(sample_txt_toc_rule(100, "old-rule", 0));
+    first.dict_rules.push(sample_dict_rule("old-dict", 0));
+    storage.replace_with_snapshot(first).unwrap();
+    assert_eq!(storage.export_snapshot(1).unwrap().txt_toc_rules.len(), 1);
+
+    // Replace with a snapshot containing different entities; the old rows
+    // must be cleared, not merged.
+    let mut second = StorageSnapshot::empty(2);
+    second
+        .txt_toc_rules
+        .push(sample_txt_toc_rule(200, "new-rule", 0));
+    storage.replace_with_snapshot(second).unwrap();
+
+    let exported = storage.export_snapshot(2).unwrap();
+    assert_eq!(exported.txt_toc_rules.len(), 1);
+    assert_eq!(exported.txt_toc_rules[0].id, 200);
+    assert!(exported.dict_rules.is_empty());
 }

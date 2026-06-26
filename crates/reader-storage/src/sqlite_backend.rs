@@ -33,7 +33,7 @@ use std::sync::Mutex;
 
 use rusqlite::{params, Connection, OptionalExtension};
 
-use reader_domain::{Book, ReadingProgress, Source};
+use reader_domain::{Book, Bookmark, DictRule, ReadingProgress, ReplaceRule, Source, TxtTocRule};
 
 use crate::{
     chapter_cache_coverage_from_entries, chapter_cache_stats_from_entries, paginate_shelf,
@@ -597,6 +597,61 @@ fn row_to_chapter_download_task(row: &rusqlite::Row<'_>) -> rusqlite::Result<Cha
         attempts: row.get::<_, i64>("attempts")? as u32,
         max_attempts: row.get::<_, i64>("max_attempts")? as u32,
         last_error: row.get("last_error")?,
+    })
+}
+
+// v2 independent-entity row mappers. Bool columns are stored as INTEGER 0/1
+// (SQLite has no native bool); convert explicitly. i32 fields are read as i64
+// then cast because SQLite stores all integers as i64.
+fn row_to_txt_toc_rule(row: &rusqlite::Row<'_>) -> rusqlite::Result<TxtTocRule> {
+    Ok(TxtTocRule {
+        id: row.get("id")?,
+        name: row.get("name")?,
+        rule: row.get("rule")?,
+        example: row.get("example")?,
+        serial_number: row.get::<_, i64>("serial_number")? as i32,
+        enable: row.get::<_, i64>("enable")? != 0,
+    })
+}
+
+fn row_to_bookmark(row: &rusqlite::Row<'_>) -> rusqlite::Result<Bookmark> {
+    Ok(Bookmark {
+        time: row.get("time")?,
+        book_name: row.get("book_name")?,
+        book_author: row.get("book_author")?,
+        chapter_index: row.get::<_, i64>("chapter_index")? as i32,
+        chapter_pos: row.get::<_, i64>("chapter_pos")? as i32,
+        chapter_name: row.get("chapter_name")?,
+        book_text: row.get("book_text")?,
+        content: row.get("content")?,
+    })
+}
+
+fn row_to_replace_rule(row: &rusqlite::Row<'_>) -> rusqlite::Result<ReplaceRule> {
+    Ok(ReplaceRule {
+        id: row.get("id")?,
+        name: row.get("name")?,
+        group: row.get("group")?,
+        pattern: row.get("pattern")?,
+        replacement: row.get("replacement")?,
+        scope: row.get("scope")?,
+        scope_title: row.get::<_, i64>("scope_title")? != 0,
+        scope_content: row.get::<_, i64>("scope_content")? != 0,
+        exclude_scope: row.get("exclude_scope")?,
+        is_enabled: row.get::<_, i64>("is_enabled")? != 0,
+        is_regex: row.get::<_, i64>("is_regex")? != 0,
+        timeout_millisecond: row.get("timeout_millisecond")?,
+        order: row.get::<_, i64>("sort_order")? as i32,
+    })
+}
+
+fn row_to_dict_rule(row: &rusqlite::Row<'_>) -> rusqlite::Result<DictRule> {
+    Ok(DictRule {
+        name: row.get("name")?,
+        url_rule: row.get("url_rule")?,
+        show_rule: row.get("show_rule")?,
+        enabled: row.get::<_, i64>("enabled")? != 0,
+        sort_number: row.get::<_, i64>("sort_number")? as i32,
     })
 }
 
@@ -1568,6 +1623,10 @@ impl StorageSnapshotStore for SqliteStorage {
             reading_progress: Vec::new(),
             reading_progress_history: Vec::new(),
             chapter_download_queue: Vec::new(),
+            txt_toc_rules: Vec::new(),
+            bookmarks: Vec::new(),
+            replace_rules: Vec::new(),
+            dict_rules: Vec::new(),
         };
 
         let mut stmt = conn
@@ -1708,6 +1767,60 @@ impl StorageSnapshotStore for SqliteStorage {
         }
         drop(stmt);
 
+        // v2 independent entities — read columns directly via row mappers
+        // (mirrors the v1 reader-domain tables). Bool columns (INTEGER 0/1)
+        // are converted in the row mappers; Option<String> columns map to
+        // NULL → None automatically.
+        let mut stmt = conn
+            .prepare(
+                "SELECT name, url_rule, show_rule, enabled, sort_number \
+                 FROM dict_rules ORDER BY name",
+            )
+            .map_err(rusqlite_error)?;
+        let dict_rows = stmt.query_map([], row_to_dict_rule);
+        for rule in dict_rows.map_err(rusqlite_error)? {
+            snapshot.dict_rules.push(rule.map_err(rusqlite_error)?);
+        }
+        drop(stmt);
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, name, rule, example, serial_number, enable \
+                 FROM txt_toc_rules ORDER BY serial_number, id",
+            )
+            .map_err(rusqlite_error)?;
+        let txt_toc_rows = stmt.query_map([], row_to_txt_toc_rule);
+        for rule in txt_toc_rows.map_err(rusqlite_error)? {
+            snapshot.txt_toc_rules.push(rule.map_err(rusqlite_error)?);
+        }
+        drop(stmt);
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT time, book_name, book_author, chapter_index, chapter_pos, \
+                 chapter_name, book_text, content FROM bookmarks ORDER BY time",
+            )
+            .map_err(rusqlite_error)?;
+        let bookmark_rows = stmt.query_map([], row_to_bookmark);
+        for bookmark in bookmark_rows.map_err(rusqlite_error)? {
+            snapshot.bookmarks.push(bookmark.map_err(rusqlite_error)?);
+        }
+        drop(stmt);
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, name, \"group\", pattern, replacement, scope, scope_title, \
+                 scope_content, exclude_scope, is_enabled, is_regex, \
+                 timeout_millisecond, sort_order FROM replace_rules \
+                 ORDER BY sort_order, id",
+            )
+            .map_err(rusqlite_error)?;
+        let replace_rows = stmt.query_map([], row_to_replace_rule);
+        for rule in replace_rows.map_err(rusqlite_error)? {
+            snapshot.replace_rules.push(rule.map_err(rusqlite_error)?);
+        }
+        drop(stmt);
+
         sort_storage_snapshot(&mut snapshot);
         snapshot.validate()?;
         Ok(snapshot)
@@ -1721,7 +1834,9 @@ impl StorageSnapshotStore for SqliteStorage {
             "DELETE FROM sources; DELETE FROM books; DELETE FROM cache; \
              DELETE FROM bookshelf; DELETE FROM chapter_cache; \
              DELETE FROM reading_progress; DELETE FROM reading_progress_history; \
-             DELETE FROM chapter_download_queue;",
+             DELETE FROM chapter_download_queue; \
+             DELETE FROM txt_toc_rules; DELETE FROM bookmarks; \
+             DELETE FROM replace_rules; DELETE FROM dict_rules;",
         )
         .map_err(rusqlite_error)?;
 
@@ -1862,6 +1977,83 @@ impl StorageSnapshotStore for SqliteStorage {
                     task.attempts,
                     task.max_attempts,
                     task.last_error,
+                ],
+            )
+            .map_err(rusqlite_error)?;
+        }
+        // v2 independent entities — direct column insert (no JSON round-trip,
+        // mirrors the v1 reader-domain tables).
+        for rule in &snapshot.txt_toc_rules {
+            tx.execute(
+                "INSERT OR REPLACE INTO txt_toc_rules \
+                 (id, name, rule, example, serial_number, enable) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![
+                    rule.id,
+                    rule.name,
+                    rule.rule,
+                    rule.example,
+                    rule.serial_number,
+                    rule.enable as i64,
+                ],
+            )
+            .map_err(rusqlite_error)?;
+        }
+        for bookmark in &snapshot.bookmarks {
+            tx.execute(
+                "INSERT OR REPLACE INTO bookmarks \
+                 (time, book_name, book_author, chapter_index, chapter_pos, \
+                 chapter_name, book_text, content) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![
+                    bookmark.time,
+                    bookmark.book_name,
+                    bookmark.book_author,
+                    bookmark.chapter_index,
+                    bookmark.chapter_pos,
+                    bookmark.chapter_name,
+                    bookmark.book_text,
+                    bookmark.content,
+                ],
+            )
+            .map_err(rusqlite_error)?;
+        }
+        for rule in &snapshot.replace_rules {
+            tx.execute(
+                "INSERT OR REPLACE INTO replace_rules \
+                 (id, name, \"group\", pattern, replacement, scope, scope_title, \
+                 scope_content, exclude_scope, is_enabled, is_regex, \
+                 timeout_millisecond, sort_order) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                params![
+                    rule.id,
+                    rule.name,
+                    rule.group,
+                    rule.pattern,
+                    rule.replacement,
+                    rule.scope,
+                    rule.scope_title as i64,
+                    rule.scope_content as i64,
+                    rule.exclude_scope,
+                    rule.is_enabled as i64,
+                    rule.is_regex as i64,
+                    rule.timeout_millisecond,
+                    rule.order,
+                ],
+            )
+            .map_err(rusqlite_error)?;
+        }
+        for rule in &snapshot.dict_rules {
+            tx.execute(
+                "INSERT OR REPLACE INTO dict_rules \
+                 (name, url_rule, show_rule, enabled, sort_number) \
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    rule.name,
+                    rule.url_rule,
+                    rule.show_rule,
+                    rule.enabled as i64,
+                    rule.sort_number,
                 ],
             )
             .map_err(rusqlite_error)?;

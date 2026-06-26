@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::sync::Mutex;
 
-use reader_domain::{Book, ReadingProgress, Source};
+use reader_domain::{Book, Bookmark, DictRule, ReadingProgress, ReplaceRule, Source, TxtTocRule};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "sqlite")]
@@ -19,7 +19,7 @@ pub mod sqlite_backend;
 pub use sqlite_backend::{SqliteStorage, SQLITE_SCHEMA_VERSION};
 
 /// Current storage snapshot schema version.
-pub const STORAGE_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
+pub const STORAGE_SNAPSHOT_SCHEMA_VERSION: u32 = 2;
 
 /// In-memory cache + source registry + progress store.
 ///
@@ -78,6 +78,18 @@ pub struct StorageSnapshot {
     pub reading_progress_history: Vec<ReadingProgressEntry>,
     #[serde(default)]
     pub chapter_download_queue: Vec<ChapterDownloadTask>,
+    /// TXT 目录规则（对照 Legado `TxtTocRule`）。v2 新增。
+    #[serde(default)]
+    pub txt_toc_rules: Vec<TxtTocRule>,
+    /// 书签（对照 Legado `Bookmark`）。v2 新增。
+    #[serde(default)]
+    pub bookmarks: Vec<Bookmark>,
+    /// 独立替换规则（对照 Legado `ReplaceRule`）。v2 新增。
+    #[serde(default)]
+    pub replace_rules: Vec<ReplaceRule>,
+    /// 字典规则（对照 Legado `DictRule`）。v2 新增。
+    #[serde(default)]
+    pub dict_rules: Vec<DictRule>,
 }
 
 impl StorageSnapshot {
@@ -94,6 +106,10 @@ impl StorageSnapshot {
             reading_progress: Vec::new(),
             reading_progress_history: Vec::new(),
             chapter_download_queue: Vec::new(),
+            txt_toc_rules: Vec::new(),
+            bookmarks: Vec::new(),
+            replace_rules: Vec::new(),
+            dict_rules: Vec::new(),
         }
     }
 
@@ -173,6 +189,31 @@ impl StorageSnapshot {
                 task.download_key(),
                 "chapter_download_queue",
             )?;
+        }
+
+        // v2 independent entities — enforce PK uniqueness at the snapshot level
+        // so a malformed import (duplicate id/time/name) is rejected rather
+        // than silently deduplicated by SQL INSERT OR REPLACE.
+        let mut unique_txt_toc_ids = HashMap::<i64, ()>::new();
+        for rule in &self.txt_toc_rules {
+            ensure_unique_snapshot_key(&mut unique_txt_toc_ids, rule.id, "txt_toc_rules")?;
+        }
+        let mut unique_bookmark_times = HashMap::<i64, ()>::new();
+        for bookmark in &self.bookmarks {
+            ensure_unique_snapshot_key(&mut unique_bookmark_times, bookmark.time, "bookmarks")?;
+        }
+        let mut unique_replace_ids = HashMap::<i64, ()>::new();
+        for rule in &self.replace_rules {
+            ensure_unique_snapshot_key(&mut unique_replace_ids, rule.id, "replace_rules")?;
+        }
+        let mut unique_dict_names = HashMap::<String, ()>::new();
+        for rule in &self.dict_rules {
+            if rule.name.trim().is_empty() {
+                return Err(StorageError::InvalidKey {
+                    field: "dict_rules.name".into(),
+                });
+            }
+            ensure_unique_snapshot_key(&mut unique_dict_names, rule.name.clone(), "dict_rules")?;
         }
 
         Ok(())
@@ -263,6 +304,19 @@ fn migrate_snapshot_step(
                 if let Some(existing) = entry.as_array_mut() {
                     existing.extend(incoming);
                 }
+            }
+            Ok(())
+        }
+        1 => {
+            // v2 adds four independent entity collections ported from Legado.
+            // A v1 snapshot has no such fields; default them to empty arrays
+            // so the typed v2 deserialize (which marks them #[serde(default)])
+            // succeeds. We insert explicitly to be robust against snapshots
+            // that happen to carry a `null` for these fields.
+            for field in ["txtTocRules", "bookmarks", "replaceRules", "dictRules"] {
+                object
+                    .entry(field.to_string())
+                    .or_insert_with(|| serde_json::Value::Array(Vec::new()));
             }
             Ok(())
         }
@@ -2740,6 +2794,15 @@ impl StorageSnapshotStore for InMemoryStorage {
                 .flat_map(|entries| entries.iter().cloned())
                 .collect(),
             chapter_download_queue: inner.chapter_download_queue.values().cloned().collect(),
+            // InMemoryStorage does not yet own the four v2 independent-entity
+            // collections (SqliteStorage does, via the v2 schema). Snapshot
+            // round-trips through InMemoryStorage therefore emit empty arrays
+            // for these fields. SqliteStorage ↔ SqliteStorage round-trips
+            // preserve them. B7 will add InMemoryStorage ownership.
+            txt_toc_rules: Vec::new(),
+            bookmarks: Vec::new(),
+            replace_rules: Vec::new(),
+            dict_rules: Vec::new(),
         };
         sort_storage_snapshot(&mut snapshot);
         snapshot.validate()?;
@@ -2751,6 +2814,9 @@ impl StorageSnapshotStore for InMemoryStorage {
         let replacement = storage_inner_from_snapshot(snapshot)?;
         let mut inner = self.lock()?;
         *inner = replacement;
+        // The four v2 entity collections are dropped on InMemoryStorage import:
+        // StorageInner has no fields for them yet (B7). SqliteStorage is the
+        // authoritative backend for v2 entities until B7 lands.
         Ok(())
     }
 }
@@ -2779,6 +2845,18 @@ pub(crate) fn sort_storage_snapshot(snapshot: &mut StorageSnapshot) {
     snapshot
         .chapter_download_queue
         .sort_by(compare_download_key);
+    // v2 independent entities — sort to match the SqliteStorage export ORDER BY
+    // clauses so backend↔backend snapshot round-trips are byte-stable.
+    snapshot.txt_toc_rules.sort_by(|a, b| {
+        a.serial_number
+            .cmp(&b.serial_number)
+            .then_with(|| a.id.cmp(&b.id))
+    });
+    snapshot.bookmarks.sort_by(|a, b| a.time.cmp(&b.time));
+    snapshot
+        .replace_rules
+        .sort_by(|a, b| a.order.cmp(&b.order).then_with(|| a.id.cmp(&b.id)));
+    snapshot.dict_rules.sort_by(|a, b| a.name.cmp(&b.name));
 }
 
 fn storage_inner_from_snapshot(snapshot: StorageSnapshot) -> Result<StorageInner, StorageError> {
@@ -4647,7 +4725,7 @@ mod tests {
     #[test]
     fn storage_snapshot_rejects_schema_duplicates_and_unknown_fields() {
         let mut wrong_schema = StorageSnapshot::empty(1);
-        wrong_schema.schema_version = 2;
+        wrong_schema.schema_version = STORAGE_SNAPSHOT_SCHEMA_VERSION + 1;
         assert_eq!(
             wrong_schema.validate().unwrap_err(),
             StorageError::InvalidSnapshot {
