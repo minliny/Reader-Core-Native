@@ -1031,6 +1031,47 @@ impl RemoteContentPipeline {
             }
         }
     }
+
+    /// Evaluate a URL-embedded JS expression with a URL-specific variable
+    /// scope. Used by `AnalyzeUrl::build_request_with_js` to run `@js:` /
+    /// `<js>...</js>` expressions found in Legado `searchUrl`/`bookUrl`/
+    /// `tocUrl`/`chapterUrl` fields.
+    ///
+    /// Exposes `key`, `page`, and `baseUrl` as top-level JS variables, mirroring
+    /// Legado `AnalyzeUrl.kt`'s `evalJS` variable scope. The result is coerced
+    /// to a string (matching Legado's `AnalyzeUrl` JS-result string coercion).
+    pub fn evaluate_url_js(
+        &self,
+        expr: &str,
+        context: &serde_json::Value,
+    ) -> Result<String, String> {
+        let key = context
+            .get("key")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .replace('\\', "\\\\")
+            .replace('\'', "\\'");
+        let page = context
+            .get("page")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(1);
+        let base_url = context
+            .get("baseUrl")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .replace('\\', "\\\\")
+            .replace('\'', "\\'");
+        // Prepend variable bindings so the expression can reference `key`/
+        // `page`/`baseUrl` as top-level globals.
+        let script = format!(
+            "var key = '{key}';\nvar page = {page};\nvar baseUrl = '{base_url}';\n{expr}"
+        );
+        let evaluation = self.js.evaluate(&script).map_err(|e| e.to_string())?;
+        Ok(match evaluation.value {
+            serde_json::Value::String(s) => s,
+            other => other.to_string(),
+        })
+    }
 }
 
 impl BookSourceRequestContext {
@@ -3149,6 +3190,190 @@ mod tests {
         match outcome {
             JsOutcome::Ok(v) => assert_eq!(v["status"], "stubbed"),
             other => panic!("expected ok, got {other:?}"),
+        }
+    }
+
+    /// S3 closure: real book-source JS rule fixture validation.
+    ///
+    /// Simulates a realistic Legado-style `<js>...</js>` chapter-fetch rule
+    /// that orchestrates multiple host-routed capabilities:
+    ///   1. `java.get(url)` — fetch chapter page (HttpGet)
+    ///   2. `java.getCookie(tag, key)` — retrieve auth cookie (GetCookie)
+    ///   3. `java.ajax(apiUrl)` — call API endpoint (Ajax)
+    ///   4. `java.getZipStringContent(url, path, charset)` — extract zip entry (GetZipStringContent)
+    ///   5. `java.queryTTF(data, useCache)` — build font map (QueryTTF)
+    ///   6. `java.replaceFont(text, errTTF, okTTF, filter)` — de-obfuscate (ReplaceFont)
+    ///
+    /// Verifies the entire pipeline routes through HostCallbackRegistry
+    /// (Core/Host boundary respected — no real network) and returns the
+    /// expected structured result. Closes requirement #4 of the S3 task:
+    /// "真实书源 JS 规则 fixture 验证".
+    #[test]
+    fn real_book_source_js_rule_fixture_routes_through_host_callbacks() {
+        use reader_js::HostDescriptor;
+        use std::sync::{Arc, Mutex};
+
+        let calls: Arc<Mutex<Vec<HostDescriptor>>> = Arc::new(Mutex::new(Vec::new()));
+
+        let mut registry = HostCallbackRegistry::new();
+
+        // 1. java.get(url) -> HttpGet -> chapter HTML
+        let s = Arc::clone(&calls);
+        registry.register("java.get", move |descriptor| {
+            s.lock().unwrap().push(descriptor.clone());
+            Ok(serde_json::json!(
+                "<html><body><div id='content'>page-body</div></body></html>"
+            ))
+        });
+
+        // 2. java.getCookie(tag, key) -> GetCookie -> session token
+        let s = Arc::clone(&calls);
+        registry.register("java.getCookie", move |descriptor| {
+            s.lock().unwrap().push(descriptor.clone());
+            Ok(serde_json::json!("session-token-abc123"))
+        });
+
+        // 3. java.ajax(url) -> Ajax -> API JSON response
+        let s = Arc::clone(&calls);
+        registry.register("java.ajax", move |descriptor| {
+            s.lock().unwrap().push(descriptor.clone());
+            Ok(serde_json::json!(
+                "{\"chapterId\":456,\"content\":\"encrypted-body\"}"
+            ))
+        });
+
+        // 4. java.getZipStringContent(url, path, charset) -> GetZipStringContent -> zip entry text
+        let s = Arc::clone(&calls);
+        registry.register("java.getZipStringContent", move |descriptor| {
+            s.lock().unwrap().push(descriptor.clone());
+            Ok(serde_json::json!("raw chapter text with obfuscated glyphs"))
+        });
+
+        // 5. java.queryTTF(data, useCache) -> QueryTTF -> font mapping object
+        let s = Arc::clone(&calls);
+        registry.register("java.queryTTF", move |descriptor| {
+            s.lock().unwrap().push(descriptor.clone());
+            Ok(serde_json::json!({ "0xF001": "的", "0xF002": "一", "0xF003": "是" }))
+        });
+
+        // 6. java.replaceFont(text, errTTF, okTTF, filter) -> ReplaceFont -> de-obfuscated text
+        let s = Arc::clone(&calls);
+        registry.register("java.replaceFont", move |descriptor| {
+            s.lock().unwrap().push(descriptor.clone());
+            // Legado: replaceFont returns the corrected String.
+            Ok(serde_json::json!("chapter text with de-obfuscated glyphs"))
+        });
+
+        let js = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
+        let pipeline = RemoteContentPipeline::with_js_sandbox(js);
+
+        // Realistic Legado-style <js>...</js> rule block. Each java.* call
+        // routes through Core -> HostDescriptor -> host callback -> JS result.
+        let script = r#"
+            (function () {
+                // 1. Fetch chapter page
+                var page = java.get("https://www.example.test/book/123/chapter/456");
+                // 2. Retrieve auth cookie
+                var cookie = java.getCookie("www.example.test", "session");
+                // 3. Call API with cookie in URL
+                var apiUrl = "https://api.example.test/chapter?id=456&token=" + cookie;
+                var apiResp = java.ajax(apiUrl);
+                // 4. Extract content from zip archive
+                var zipContent = java.getZipStringContent(
+                    "https://cdn.example.test/chapters/456.zip",
+                    "content.txt",
+                    "utf-8"
+                );
+                // 5. Build font mapping from base64 TTF
+                var ttfMap = java.queryTTF("dGVzdC10dGYtZGF0YQ==", true);
+                // 6. De-obfuscate font
+                var deobfuscated = java.replaceFont(zipContent, ttfMap, ttfMap, true);
+                // Return structured result
+                return {
+                    title: "Chapter 456",
+                    pageSnippet: page,
+                    cookieUsed: cookie,
+                    apiResponse: apiResp,
+                    rawContent: zipContent,
+                    fontMap: ttfMap,
+                    content: deobfuscated,
+                    source: "legado-style-s3-fixture"
+                };
+            })();
+        "#;
+
+        let outcome = pipeline.evaluate_js_rule(script);
+        let result = match outcome {
+            JsOutcome::Ok(v) => v,
+            JsOutcome::Unsupported { reason } => {
+                panic!("expected ok, got unsupported: {reason}")
+            }
+        };
+
+        // Verify structured result.
+        assert_eq!(result["title"], "Chapter 456");
+        assert_eq!(
+            result["pageSnippet"],
+            "<html><body><div id='content'>page-body</div></body></html>"
+        );
+        assert_eq!(result["cookieUsed"], "session-token-abc123");
+        assert_eq!(
+            result["apiResponse"],
+            "{\"chapterId\":456,\"content\":\"encrypted-body\"}"
+        );
+        assert_eq!(result["rawContent"], "raw chapter text with obfuscated glyphs");
+        assert_eq!(result["fontMap"]["0xF001"], "的");
+        assert_eq!(result["fontMap"]["0xF002"], "一");
+        assert_eq!(result["fontMap"]["0xF003"], "是");
+        assert_eq!(result["content"], "chapter text with de-obfuscated glyphs");
+        assert_eq!(result["source"], "legado-style-s3-fixture");
+
+        // Verify all 6 host calls routed through HostCallbackRegistry in order,
+        // with the correct HostDescriptor variants and argument fidelity.
+        let calls = calls.lock().unwrap();
+        assert_eq!(calls.len(), 6, "expected 6 host calls, got {}", calls.len());
+
+        match &calls[0] {
+            HostDescriptor::HttpGet { url, .. } => {
+                assert_eq!(url, "https://www.example.test/book/123/chapter/456");
+            }
+            other => panic!("expected HttpGet at call 0, got {other:?}"),
+        }
+        match &calls[1] {
+            HostDescriptor::GetCookie { tag, key } => {
+                assert_eq!(tag, "www.example.test");
+                assert_eq!(*key, Some("session".to_string()));
+            }
+            other => panic!("expected GetCookie at call 1, got {other:?}"),
+        }
+        match &calls[2] {
+            HostDescriptor::Ajax { url } => {
+                assert_eq!(
+                    url,
+                    "https://api.example.test/chapter?id=456&token=session-token-abc123"
+                );
+            }
+            other => panic!("expected Ajax at call 2, got {other:?}"),
+        }
+        match &calls[3] {
+            HostDescriptor::GetZipStringContent { url, path, charset } => {
+                assert_eq!(url, "https://cdn.example.test/chapters/456.zip");
+                assert_eq!(path, "content.txt");
+                assert_eq!(*charset, Some("utf-8".to_string()));
+            }
+            other => panic!("expected GetZipStringContent at call 3, got {other:?}"),
+        }
+        match &calls[4] {
+            HostDescriptor::QueryTTF { use_cache, .. } => {
+                assert_eq!(*use_cache, Some(true));
+            }
+            other => panic!("expected QueryTTF at call 4, got {other:?}"),
+        }
+        match &calls[5] {
+            HostDescriptor::ReplaceFont { filter, .. } => {
+                assert_eq!(*filter, Some(true));
+            }
+            other => panic!("expected ReplaceFont at call 5, got {other:?}"),
         }
     }
 }

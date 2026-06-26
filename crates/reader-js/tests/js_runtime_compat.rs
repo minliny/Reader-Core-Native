@@ -142,7 +142,10 @@ fn host_callback_stub_observes_cancellation_after_returning() {
 }
 
 #[test]
-fn webview_browser_and_captcha_apis_remain_host_bound() {
+fn webview_browser_and_captcha_apis_route_through_host_callbacks() {
+    // S3 closure: webView/webViewGetSource/startBrowser/startBrowserAwait/
+    // getVerificationCode/openUrl are now host-callback routed (not undefined).
+    // Without a registered callback, they throw a host-callback error.
     let sandbox = QuickJsSandbox::default();
 
     let result = sandbox
@@ -155,7 +158,21 @@ fn webview_browser_and_captcha_apis_remain_host_bound() {
                 startBrowserAwait: typeof java.startBrowserAwait,
                 getVerificationCode: typeof java.getVerificationCode,
                 javaOpenUrl: typeof java.openUrl,
-                globalOpenUrl: typeof openUrl
+                head: typeof java.head,
+                getCookie: typeof java.getCookie,
+                getFile: typeof java.getFile,
+                readFile: typeof java.readFile,
+                readTxtFile: typeof java.readTxtFile,
+                deleteFile: typeof java.deleteFile,
+                unzipFile: typeof java.unzipFile,
+                unArchiveFile: typeof java.unArchiveFile,
+                getTxtInFolder: typeof java.getTxtInFolder,
+                getZipStringContent: typeof java.getZipStringContent,
+                getZipByteArrayContent: typeof java.getZipByteArrayContent,
+                queryTTF: typeof java.queryTTF,
+                queryBase64TTF: typeof java.queryBase64TTF,
+                replaceFont: typeof java.replaceFont,
+                androidId: typeof java.androidId
             })
             "#,
         )
@@ -164,13 +181,27 @@ fn webview_browser_and_captcha_apis_remain_host_bound() {
     assert_eq!(
         result.value,
         json!({
-            "webView": "undefined",
-            "webViewGetSource": "undefined",
-            "startBrowser": "undefined",
-            "startBrowserAwait": "undefined",
-            "getVerificationCode": "undefined",
-            "javaOpenUrl": "undefined",
-            "globalOpenUrl": "undefined"
+            "webView": "function",
+            "webViewGetSource": "function",
+            "startBrowser": "function",
+            "startBrowserAwait": "function",
+            "getVerificationCode": "function",
+            "javaOpenUrl": "function",
+            "head": "function",
+            "getCookie": "function",
+            "getFile": "function",
+            "readFile": "function",
+            "readTxtFile": "function",
+            "deleteFile": "function",
+            "unzipFile": "function",
+            "unArchiveFile": "function",
+            "getTxtInFolder": "function",
+            "getZipStringContent": "function",
+            "getZipByteArrayContent": "function",
+            "queryTTF": "function",
+            "queryBase64TTF": "function",
+            "replaceFont": "function",
+            "androidId": "function"
         })
     );
 }

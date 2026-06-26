@@ -233,6 +233,138 @@ pub enum HostDescriptor {
     Put { key: String, value: String },
     /// `java.reGetBook()` — re-discover the book (no args, side-effect only).
     ReGetBook,
+
+    // ===== S3 network-class closure: 28 new variants vs Legado JsExtensions.kt =====
+
+    /// `java.head(urlStr, headers)` — HTTP HEAD (no body, like `get` but HEAD).
+    /// Legado JsExtensions.kt:399. `headers` is the JS object passed as 2nd arg
+    /// (legado `Map<String,String>`); reader-js passes the raw JSON through.
+    HttpHead { url: String, headers: Option<JsonValue> },
+
+    /// `java.webView(html?, url?, js?)` — load WebView, run JS, return body.
+    /// Legado JsExtensions.kt:170. All three args are nullable strings.
+    WebView {
+        html: Option<String>,
+        url: Option<String>,
+        js: Option<String>,
+    },
+    /// `java.webViewGetSource(html?, url?, js?, sourceRegex)` — WebView fetch
+    /// with source-URL regex. Legado JsExtensions.kt:188.
+    WebViewGetSource {
+        html: Option<String>,
+        url: Option<String>,
+        js: Option<String>,
+        source_regex: String,
+    },
+    /// `java.webViewGetOverrideUrl(html?, url?, js?, overrideUrlRegex)` —
+    /// WebView fetch with override-URL regex. Legado JsExtensions.kt:207.
+    WebViewGetOverrideUrl {
+        html: Option<String>,
+        url: Option<String>,
+        js: Option<String>,
+        override_url_regex: String,
+    },
+    /// `java.startBrowser(url, title)` — open in-app browser (no return value).
+    /// Legado JsExtensions.kt:233. Host returns `null` on success.
+    StartBrowser { url: String, title: String },
+    /// `java.startBrowserAwait(url, title[, refetchAfterSuccess])` — open
+    /// browser and wait for verification result. Legado JsExtensions.kt:241/249.
+    /// `refetch_after_success` defaults to `true` when omitted.
+    StartBrowserAwait {
+        url: String,
+        title: String,
+        refetch_after_success: Option<bool>,
+    },
+    /// `java.getVerificationCode(imageUrl)` — captcha image verification.
+    /// Legado JsExtensions.kt:256.
+    GetVerificationCode { image_url: String },
+    /// `java.getCookie(tag[, key])` — cookie jar read. Legado JsExtensions.kt:305/309.
+    /// `key` is `None` when only `tag` is provided (returns full cookie header).
+    GetCookie { tag: String, key: Option<String> },
+
+    /// `java.getFile(path)` — resolve a cache-relative path to a File. Legado
+    /// JsExtensions.kt:566. Host returns a JSON object with `path`/`exists`/etc.
+    GetFile { path: String },
+    /// `java.readFile(path)` — read raw bytes of a cache-relative file. Legado
+    /// JsExtensions.kt:581. Host returns base64-encoded bytes or `null`.
+    ReadFile { path: String },
+    /// `java.readTxtFile(path[, charsetName])` — read text file with optional
+    /// charset. Legado JsExtensions.kt:589/598. `charset` is `None` for auto-detect.
+    ReadTxtFile {
+        path: String,
+        charset: Option<String>,
+    },
+    /// `java.deleteFile(path)` — delete a cache-relative file. Legado JsExtensions.kt:609.
+    /// Host returns `true`/`false`.
+    DeleteFile { path: String },
+    /// `java.unzipFile(zipPath)` — extract zip. Legado JsExtensions.kt:619. Host
+    /// returns the relative extraction path.
+    UnzipFile { zip_path: String },
+    /// `java.un7zFile(zipPath)` — extract 7z. Legado JsExtensions.kt:628.
+    Un7zFile { zip_path: String },
+    /// `java.unrarFile(zipPath)` — extract rar. Legado JsExtensions.kt:637.
+    UnrarFile { zip_path: String },
+    /// `java.unArchiveFile(zipPath)` — extract any archive. Legado JsExtensions.kt:646.
+    UnArchiveFile { zip_path: String },
+    /// `java.getTxtInFolder(path)` — concat all text files in a folder. Legado
+    /// JsExtensions.kt:659.
+    GetTxtInFolder { path: String },
+    /// `java.getZipStringContent(url, path[, charsetName])` — read a file inside
+    /// a zip. Legado JsExtensions.kt:683/689. `url` may be http URL or hex string.
+    GetZipStringContent {
+        url: String,
+        path: String,
+        charset: Option<String>,
+    },
+    /// `java.getRarStringContent(url, path[, charsetName])` — Legado JsExtensions.kt:700/706.
+    GetRarStringContent {
+        url: String,
+        path: String,
+        charset: Option<String>,
+    },
+    /// `java.get7zStringContent(url, path[, charsetName])` — Legado JsExtensions.kt:717/723.
+    Get7zStringContent {
+        url: String,
+        path: String,
+        charset: Option<String>,
+    },
+    /// `java.getZipByteArrayContent(url, path)` — read raw bytes from zip entry.
+    /// Legado JsExtensions.kt:734. Host returns base64-encoded bytes or `null`.
+    GetZipByteArrayContent { url: String, path: String },
+    /// `java.getRarByteArrayContent(url, path)` — Legado JsExtensions.kt:762.
+    GetRarByteArrayContent { url: String, path: String },
+    /// `java.get7zByteArrayContent(url, path)` — Legado JsExtensions.kt:780.
+    Get7zByteArrayContent { url: String, path: String },
+
+    /// `java.queryBase64TTF(data)` — deprecated alias of `queryTTF`. Legado
+    /// JsExtensions.kt:802. Host returns a JSON handle representing the parsed
+    /// font (reader-js cannot bridge legado's live `QueryTTF` object).
+    QueryBase64TTF { data: String },
+    /// `java.queryTTF(data[, useCache])` — parse TTF font from url/file/base64/
+    /// bytes. Legado JsExtensions.kt:813/857. `use_cache` defaults to `true`.
+    QueryTTF {
+        data: JsonValue,
+        use_cache: Option<bool>,
+    },
+    /// `java.replaceFont(text, errorQueryTTF, correctQueryTTF[, filter])` —
+    /// replace obfuscated font glyphs. Legado JsExtensions.kt:867/904. The TTF
+    /// args are the JSON handles returned by `queryTTF`; `filter` defaults to
+    /// `false`.
+    ReplaceFont {
+        text: String,
+        error_query_ttf: JsonValue,
+        correct_query_ttf: JsonValue,
+        filter: Option<bool>,
+    },
+
+    /// `java.androidId()` — device ID (no args). Legado JsExtensions.kt:981.
+    AndroidId,
+    /// `java.openUrl(url[, mimeType])` — open external URL. Legado
+    /// JsExtensions.kt:985/990. `mime_type` is `None` when omitted.
+    OpenUrl {
+        url: String,
+        mime_type: Option<String>,
+    },
 }
 
 impl HostDescriptor {
@@ -254,6 +386,35 @@ impl HostDescriptor {
             Self::SetContent { .. } => "java.setContent",
             Self::Put { .. } => "java.put",
             Self::ReGetBook => "java.reGetBook",
+            // S3 network-class closure (28 new variants)
+            Self::HttpHead { .. } => "java.head",
+            Self::WebView { .. } => "java.webView",
+            Self::WebViewGetSource { .. } => "java.webViewGetSource",
+            Self::WebViewGetOverrideUrl { .. } => "java.webViewGetOverrideUrl",
+            Self::StartBrowser { .. } => "java.startBrowser",
+            Self::StartBrowserAwait { .. } => "java.startBrowserAwait",
+            Self::GetVerificationCode { .. } => "java.getVerificationCode",
+            Self::GetCookie { .. } => "java.getCookie",
+            Self::GetFile { .. } => "java.getFile",
+            Self::ReadFile { .. } => "java.readFile",
+            Self::ReadTxtFile { .. } => "java.readTxtFile",
+            Self::DeleteFile { .. } => "java.deleteFile",
+            Self::UnzipFile { .. } => "java.unzipFile",
+            Self::Un7zFile { .. } => "java.un7zFile",
+            Self::UnrarFile { .. } => "java.unrarFile",
+            Self::UnArchiveFile { .. } => "java.unArchiveFile",
+            Self::GetTxtInFolder { .. } => "java.getTxtInFolder",
+            Self::GetZipStringContent { .. } => "java.getZipStringContent",
+            Self::GetRarStringContent { .. } => "java.getRarStringContent",
+            Self::Get7zStringContent { .. } => "java.get7zStringContent",
+            Self::GetZipByteArrayContent { .. } => "java.getZipByteArrayContent",
+            Self::GetRarByteArrayContent { .. } => "java.getRarByteArrayContent",
+            Self::Get7zByteArrayContent { .. } => "java.get7zByteArrayContent",
+            Self::QueryBase64TTF { .. } => "java.queryBase64TTF",
+            Self::QueryTTF { .. } => "java.queryTTF",
+            Self::ReplaceFont { .. } => "java.replaceFont",
+            Self::AndroidId => "java.androidId",
+            Self::OpenUrl { .. } => "java.openUrl",
         }
     }
 }
@@ -7178,6 +7339,35 @@ enum ResidualArgShape {
     ContentOptBase,
     /// Exactly two string args (key, value). e.g. put.
     KeyValueStrings,
+    // ===== S3 closure: 15 new arg shapes for the 28 new methods =====
+    /// URL string + optional headers object (passes through as JSON). e.g. head.
+    UrlAndHeaders,
+    /// Three nullable strings (html, url, js). e.g. webView.
+    WebViewArgs,
+    /// Three nullable strings + required regex string. e.g. webViewGetSource/OverrideUrl.
+    WebViewRegexArgs,
+    /// URL + title strings. e.g. startBrowser.
+    UrlAndTitle,
+    /// URL + title strings + optional bool. e.g. startBrowserAwait(url, title[, refetch]).
+    UrlTitleOptBool,
+    /// Single image-URL string. e.g. getVerificationCode.
+    ImageUrl,
+    /// Tag string + optional key string. e.g. getCookie(tag[, key]).
+    TagOptKey,
+    /// Single path string. e.g. getFile, readFile, deleteFile, unzip*, getTxtInFolder.
+    PathString,
+    /// Path string + optional charset string. e.g. readTxtFile(path[, charset]).
+    PathOptCharset,
+    /// URL + inner-path strings + optional charset. e.g. getZip/Rar/7zStringContent.
+    UrlPathOptCharset,
+    /// URL + inner-path strings. e.g. getZip/Rar/7zByteArrayContent.
+    UrlPath,
+    /// Any data + optional useCache bool. e.g. queryTTF(data[, useCache]).
+    TtfDataOptBool,
+    /// text + errorTTF + correctTTF + optional filter bool. e.g. replaceFont.
+    ReplaceFontArgs,
+    /// URL string + optional mimeType string. e.g. openUrl(url[, mimeType]).
+    UrlOptMime,
 }
 
 fn require_url_string_arg<'js>(
@@ -7241,7 +7431,128 @@ fn validate_residual_args<'js>(
             }
             Ok(())
         }
+        // S3 closure shapes
+        ResidualArgShape::UrlAndHeaders => require_url_string_arg(ctx, name, args),
+        ResidualArgShape::WebViewArgs => {
+            // 3 nullable strings (html, url, js). Legado allows null/undefined
+            // for each; we accept string or null.
+            for (i, arg) in args.iter().take(3).enumerate() {
+                if !arg.is_string() && !arg.is_null() {
+                    return Err(Exception::throw_type(
+                        ctx,
+                        format!("{name} argument {} must be a string or null", i + 1).as_str(),
+                    ));
+                }
+            }
+            Ok(())
+        }
+        ResidualArgShape::WebViewRegexArgs => {
+            // 3 nullable strings + 4th required regex string
+            for (i, arg) in args.iter().take(3).enumerate() {
+                if !arg.is_string() && !arg.is_null() {
+                    return Err(Exception::throw_type(
+                        ctx,
+                        format!("{name} argument {} must be a string or null", i + 1).as_str(),
+                    ));
+                }
+            }
+            let Some(regex) = args.get(3) else {
+                return Err(Exception::throw_type(
+                    ctx,
+                    format!("{name} requires a regex string as 4th argument").as_str(),
+                ));
+            };
+            if !regex.is_string() {
+                return Err(Exception::throw_type(
+                    ctx,
+                    format!("{name} regex argument must be a string").as_str(),
+                ));
+            }
+            Ok(())
+        }
+        ResidualArgShape::UrlAndTitle => require_two_string_args(ctx, name, args),
+        ResidualArgShape::UrlTitleOptBool => {
+            require_two_string_args(ctx, name, args)?;
+            // optional 3rd bool — pass through if present
+            Ok(())
+        }
+        ResidualArgShape::ImageUrl => require_url_string_arg(ctx, name, args),
+        ResidualArgShape::TagOptKey => {
+            require_url_string_arg(ctx, name, args)?;
+            // optional 2nd key string — pass through
+            Ok(())
+        }
+        ResidualArgShape::PathString => require_url_string_arg(ctx, name, args),
+        ResidualArgShape::PathOptCharset => {
+            require_url_string_arg(ctx, name, args)?;
+            // optional 2nd charset string — pass through
+            Ok(())
+        }
+        ResidualArgShape::UrlPathOptCharset => require_two_string_args(ctx, name, args),
+        ResidualArgShape::UrlPath => require_two_string_args(ctx, name, args),
+        ResidualArgShape::TtfDataOptBool => {
+            // 1st arg required (any type: url/file/base64/bytes); optional 2nd bool
+            if args.is_empty() {
+                return Err(Exception::throw_type(
+                    ctx,
+                    format!("{name} requires a data argument").as_str(),
+                ));
+            }
+            Ok(())
+        }
+        ResidualArgShape::ReplaceFontArgs => {
+            // text + errorTTF + correctTTF required; optional filter bool
+            if args.len() < 3 {
+                return Err(Exception::throw_type(
+                    ctx,
+                    format!("{name} requires text, errorTTF, correctTTF arguments").as_str(),
+                ));
+            }
+            if !args[0].is_string() {
+                return Err(Exception::throw_type(
+                    ctx,
+                    format!("{name} text argument must be a string").as_str(),
+                ));
+            }
+            Ok(())
+        }
+        ResidualArgShape::UrlOptMime => require_url_string_arg(ctx, name, args),
     }
+}
+
+/// Require exactly two leading string arguments. Used by startBrowser(url, title),
+/// getZipStringContent(url, path), etc.
+fn require_two_string_args<'js>(
+    ctx: &Ctx<'js>,
+    name: &str,
+    args: &[JsonValue],
+) -> Result<(), QuickJsError> {
+    if args.len() < 2 {
+        return Err(Exception::throw_type(
+            ctx,
+            format!("{name} requires two string arguments").as_str(),
+        ));
+    }
+    if !args[0].is_string() || !args[1].is_string() {
+        return Err(Exception::throw_type(
+            ctx,
+            format!("{name} first two arguments must be strings").as_str(),
+        ));
+    }
+    Ok(())
+}
+
+/// Coerce a JSON value to an `Option<String>` — `null`/missing → `None`,
+/// string → `Some(s)`, anything else → `None` (legado leniency for nullable
+/// string args like webView's html/url/js).
+fn nullable_string(value: Option<&JsonValue>) -> Option<String> {
+    value.and_then(|v| {
+        if v.is_null() {
+            None
+        } else {
+            v.as_str().map(String::from)
+        }
+    })
 }
 
 fn make_residual_host_callback<'js>(
@@ -7335,6 +7646,210 @@ fn install_residual_host_routing<'js>(
     java.set(
         "reGetBook",
         make_residual_host_callback(ctx.clone(), "java.reGetBook", NoArgs, registry.clone())?,
+    )?;
+
+    // ===== S3 closure: 28 new java.* methods routed through host callbacks =====
+    // Network/HTTP
+    java.set(
+        "head",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.head",
+            UrlAndHeaders,
+            registry.clone(),
+        )?,
+    )?;
+    // WebView/Browser
+    java.set(
+        "webView",
+        make_residual_host_callback(ctx.clone(), "java.webView", WebViewArgs, registry.clone())?,
+    )?;
+    java.set(
+        "webViewGetSource",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.webViewGetSource",
+            WebViewRegexArgs,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "webViewGetOverrideUrl",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.webViewGetOverrideUrl",
+            WebViewRegexArgs,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "startBrowser",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.startBrowser",
+            UrlAndTitle,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "startBrowserAwait",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.startBrowserAwait",
+            UrlTitleOptBool,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "getVerificationCode",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.getVerificationCode",
+            ImageUrl,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "getCookie",
+        make_residual_host_callback(ctx.clone(), "java.getCookie", TagOptKey, registry.clone())?,
+    )?;
+    // File/Archive
+    java.set(
+        "getFile",
+        make_residual_host_callback(ctx.clone(), "java.getFile", PathString, registry.clone())?,
+    )?;
+    java.set(
+        "readFile",
+        make_residual_host_callback(ctx.clone(), "java.readFile", PathString, registry.clone())?,
+    )?;
+    java.set(
+        "readTxtFile",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.readTxtFile",
+            PathOptCharset,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "deleteFile",
+        make_residual_host_callback(ctx.clone(), "java.deleteFile", PathString, registry.clone())?,
+    )?;
+    java.set(
+        "unzipFile",
+        make_residual_host_callback(ctx.clone(), "java.unzipFile", PathString, registry.clone())?,
+    )?;
+    java.set(
+        "un7zFile",
+        make_residual_host_callback(ctx.clone(), "java.un7zFile", PathString, registry.clone())?,
+    )?;
+    java.set(
+        "unrarFile",
+        make_residual_host_callback(ctx.clone(), "java.unrarFile", PathString, registry.clone())?,
+    )?;
+    java.set(
+        "unArchiveFile",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.unArchiveFile",
+            PathString,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "getTxtInFolder",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.getTxtInFolder",
+            PathString,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "getZipStringContent",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.getZipStringContent",
+            UrlPathOptCharset,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "getRarStringContent",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.getRarStringContent",
+            UrlPathOptCharset,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "get7zStringContent",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.get7zStringContent",
+            UrlPathOptCharset,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "getZipByteArrayContent",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.getZipByteArrayContent",
+            UrlPath,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "getRarByteArrayContent",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.getRarByteArrayContent",
+            UrlPath,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "get7zByteArrayContent",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.get7zByteArrayContent",
+            UrlPath,
+            registry.clone(),
+        )?,
+    )?;
+    // Font/TTF
+    java.set(
+        "queryBase64TTF",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.queryBase64TTF",
+            TtfDataOptBool,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "queryTTF",
+        make_residual_host_callback(ctx.clone(), "java.queryTTF", TtfDataOptBool, registry.clone())?,
+    )?;
+    java.set(
+        "replaceFont",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.replaceFont",
+            ReplaceFontArgs,
+            registry.clone(),
+        )?,
+    )?;
+    // Device/UI
+    java.set(
+        "androidId",
+        make_residual_host_callback(ctx.clone(), "java.androidId", NoArgs, registry.clone())?,
+    )?;
+    java.set(
+        "openUrl",
+        make_residual_host_callback(ctx.clone(), "java.openUrl", UrlOptMime, registry.clone())?,
     )?;
 
     let globals = ctx.globals();
@@ -7479,11 +7994,151 @@ fn build_residual_descriptor<'js>(
                 .to_string(),
         },
         ("java.reGetBook", ResidualArgShape::NoArgs) => HostDescriptor::ReGetBook,
+        // ===== S3 closure: 28 new descriptor builders =====
+        ("java.head", ResidualArgShape::UrlAndHeaders) => HostDescriptor::HttpHead {
+            url: args[0].as_str().expect("validated URL string").to_string(),
+            headers: args.get(1).cloned(),
+        },
+        ("java.webView", ResidualArgShape::WebViewArgs) => HostDescriptor::WebView {
+            html: nullable_string(args.first()),
+            url: nullable_string(args.get(1)),
+            js: nullable_string(args.get(2)),
+        },
+        ("java.webViewGetSource", ResidualArgShape::WebViewRegexArgs) => {
+            HostDescriptor::WebViewGetSource {
+                html: nullable_string(args.first()),
+                url: nullable_string(args.get(1)),
+                js: nullable_string(args.get(2)),
+                source_regex: args[3]
+                    .as_str()
+                    .expect("validated regex string")
+                    .to_string(),
+            }
+        }
+        ("java.webViewGetOverrideUrl", ResidualArgShape::WebViewRegexArgs) => {
+            HostDescriptor::WebViewGetOverrideUrl {
+                html: nullable_string(args.first()),
+                url: nullable_string(args.get(1)),
+                js: nullable_string(args.get(2)),
+                override_url_regex: args[3]
+                    .as_str()
+                    .expect("validated regex string")
+                    .to_string(),
+            }
+        }
+        ("java.startBrowser", ResidualArgShape::UrlAndTitle) => HostDescriptor::StartBrowser {
+            url: args[0].as_str().expect("validated URL string").to_string(),
+            title: args[1].as_str().expect("validated title string").to_string(),
+        },
+        ("java.startBrowserAwait", ResidualArgShape::UrlTitleOptBool) => {
+            HostDescriptor::StartBrowserAwait {
+                url: args[0].as_str().expect("validated URL string").to_string(),
+                title: args[1].as_str().expect("validated title string").to_string(),
+                refetch_after_success: args.get(2).and_then(JsonValue::as_bool),
+            }
+        }
+        ("java.getVerificationCode", ResidualArgShape::ImageUrl) => {
+            HostDescriptor::GetVerificationCode {
+                image_url: args[0].as_str().expect("validated URL string").to_string(),
+            }
+        }
+        ("java.getCookie", ResidualArgShape::TagOptKey) => HostDescriptor::GetCookie {
+            tag: args[0].as_str().expect("validated tag string").to_string(),
+            key: args.get(1).and_then(JsonValue::as_str).map(String::from),
+        },
+        ("java.getFile", ResidualArgShape::PathString) => HostDescriptor::GetFile {
+            path: args[0].as_str().expect("validated path string").to_string(),
+        },
+        ("java.readFile", ResidualArgShape::PathString) => HostDescriptor::ReadFile {
+            path: args[0].as_str().expect("validated path string").to_string(),
+        },
+        ("java.readTxtFile", ResidualArgShape::PathOptCharset) => HostDescriptor::ReadTxtFile {
+            path: args[0].as_str().expect("validated path string").to_string(),
+            charset: args.get(1).and_then(JsonValue::as_str).map(String::from),
+        },
+        ("java.deleteFile", ResidualArgShape::PathString) => HostDescriptor::DeleteFile {
+            path: args[0].as_str().expect("validated path string").to_string(),
+        },
+        ("java.unzipFile", ResidualArgShape::PathString) => HostDescriptor::UnzipFile {
+            zip_path: args[0].as_str().expect("validated path string").to_string(),
+        },
+        ("java.un7zFile", ResidualArgShape::PathString) => HostDescriptor::Un7zFile {
+            zip_path: args[0].as_str().expect("validated path string").to_string(),
+        },
+        ("java.unrarFile", ResidualArgShape::PathString) => HostDescriptor::UnrarFile {
+            zip_path: args[0].as_str().expect("validated path string").to_string(),
+        },
+        ("java.unArchiveFile", ResidualArgShape::PathString) => HostDescriptor::UnArchiveFile {
+            zip_path: args[0].as_str().expect("validated path string").to_string(),
+        },
+        ("java.getTxtInFolder", ResidualArgShape::PathString) => HostDescriptor::GetTxtInFolder {
+            path: args[0].as_str().expect("validated path string").to_string(),
+        },
+        ("java.getZipStringContent", ResidualArgShape::UrlPathOptCharset) => {
+            HostDescriptor::GetZipStringContent {
+                url: args[0].as_str().expect("validated URL string").to_string(),
+                path: args[1].as_str().expect("validated path string").to_string(),
+                charset: args.get(2).and_then(JsonValue::as_str).map(String::from),
+            }
+        }
+        ("java.getRarStringContent", ResidualArgShape::UrlPathOptCharset) => {
+            HostDescriptor::GetRarStringContent {
+                url: args[0].as_str().expect("validated URL string").to_string(),
+                path: args[1].as_str().expect("validated path string").to_string(),
+                charset: args.get(2).and_then(JsonValue::as_str).map(String::from),
+            }
+        }
+        ("java.get7zStringContent", ResidualArgShape::UrlPathOptCharset) => {
+            HostDescriptor::Get7zStringContent {
+                url: args[0].as_str().expect("validated URL string").to_string(),
+                path: args[1].as_str().expect("validated path string").to_string(),
+                charset: args.get(2).and_then(JsonValue::as_str).map(String::from),
+            }
+        }
+        ("java.getZipByteArrayContent", ResidualArgShape::UrlPath) => {
+            HostDescriptor::GetZipByteArrayContent {
+                url: args[0].as_str().expect("validated URL string").to_string(),
+                path: args[1].as_str().expect("validated path string").to_string(),
+            }
+        }
+        ("java.getRarByteArrayContent", ResidualArgShape::UrlPath) => {
+            HostDescriptor::GetRarByteArrayContent {
+                url: args[0].as_str().expect("validated URL string").to_string(),
+                path: args[1].as_str().expect("validated path string").to_string(),
+            }
+        }
+        ("java.get7zByteArrayContent", ResidualArgShape::UrlPath) => {
+            HostDescriptor::Get7zByteArrayContent {
+                url: args[0].as_str().expect("validated URL string").to_string(),
+                path: args[1].as_str().expect("validated path string").to_string(),
+            }
+        }
+        ("java.queryBase64TTF", ResidualArgShape::TtfDataOptBool) => HostDescriptor::QueryBase64TTF {
+            data: args[0]
+                .as_str()
+                .expect("validated base64 string")
+                .to_string(),
+        },
+        ("java.queryTTF", ResidualArgShape::TtfDataOptBool) => HostDescriptor::QueryTTF {
+            data: args[0].clone(),
+            use_cache: args.get(1).and_then(JsonValue::as_bool),
+        },
+        ("java.replaceFont", ResidualArgShape::ReplaceFontArgs) => HostDescriptor::ReplaceFont {
+            text: args[0].as_str().expect("validated text string").to_string(),
+            error_query_ttf: args[1].clone(),
+            correct_query_ttf: args[2].clone(),
+            filter: args.get(3).and_then(JsonValue::as_bool),
+        },
+        ("java.androidId", ResidualArgShape::NoArgs) => HostDescriptor::AndroidId,
+        ("java.openUrl", ResidualArgShape::UrlOptMime) => HostDescriptor::OpenUrl {
+            url: args[0].as_str().expect("validated URL string").to_string(),
+            mime_type: args.get(1).and_then(JsonValue::as_str).map(String::from),
+        },
         (other_name, other_shape) => {
             return Err(Exception::throw_internal(
                 ctx,
                 // Should be unreachable: install_residual_host_routing only wires
-                // the six shapes above. Defensive — never expected to fire.
+                // the shapes above. Defensive — never expected to fire.
                 format!(
                     "build_residual_descriptor: unconfigured mapping for {other_name} ({other_shape:?})"
                 )
