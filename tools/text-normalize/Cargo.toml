@@ -1,0 +1,23 @@
+[package]
+name = "reader-text-normalize"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "Standalone dev-time text normalization for benchmark chapter-content comparison. Not integrated with reader-content."
+
+[lib]
+name = "reader_text_normalize"
+path = "src/lib.rs"
+
+[[bin]]
+name = "text-normalize"
+path = "src/main.rs"
+
+[dependencies]
+unicode-normalization = "0.1"
+
+# Detach from the root workspace so this stays a standalone dev tool and does
+# not affect (or get affected by) the main workspace build.
+[workspace]
