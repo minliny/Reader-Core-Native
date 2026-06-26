@@ -93,6 +93,129 @@ impl RuleEngine {
     ) -> RuleResult<RuleOutput> {
         Ok(RuleOutput::new(apply_legado_css(input, rule)?))
     }
+
+    /// Execute a raw Legado rule string with full prefix dispatch.
+    ///
+    /// Mirrors `AnalyzeRule.SourceRule.init` (lines 545-578): the rule mode is
+    /// detected from the string prefix and the body is routed to the matching
+    /// engine (CSS / XPath / JSONPath). `@put`/`@get`, `##regex##replacement`,
+    /// `{{...}}` and `<js>`/`@js:` handling are layered on top of this in later
+    /// tasks; for now this closes issue 1 (prefix dispatch) so XPath/JSONPath
+    /// engines become reachable from raw DSL strings.
+    ///
+    /// `scope` receives `@put:{...}` pairs and resolves `@get:{key}`. `js`
+    /// evaluates `{{...}}` / `<js>` segments. Both are optional so callers
+    /// without JS / variable support still get prefix routing.
+    pub fn execute_legado_rule(
+        &self,
+        input: &str,
+        rule: &str,
+        scope: &mut dyn RuleVariableScope,
+        js: Option<&dyn RuleJsEvaluator>,
+    ) -> RuleResult<RuleOutput> {
+        let _ = js; // wired in Task 5
+        let _ = scope; // wired in Task 4
+        let rule = rule.trim();
+        if rule.is_empty() {
+            return Ok(RuleOutput::new(Vec::new()));
+        }
+        let (mode, body) = detect_legado_rule_mode(rule);
+        match mode {
+            LegadoRuleMode::Default => self.execute_legado_css(input, body),
+            LegadoRuleMode::Xpath => {
+                let step = RuleStep::XPath(XPathRule::new(body));
+                self.execute_step(input, &step)
+            }
+            LegadoRuleMode::Json => {
+                let step = RuleStep::JsonPath(JsonPathRule::new(body));
+                self.execute_step(input, &step)
+            }
+            LegadoRuleMode::Regex => self.execute_legado_css(input, body),
+            LegadoRuleMode::Js => Ok(RuleOutput::new(Vec::new())),
+        }
+    }
+}
+
+/// Legado rule mode detected from the rule-string prefix.
+///
+/// Mirrors `AnalyzeRule.Mode`: `Default` is CSS, the others route to their
+/// dedicated engines. `Regex` / `Js` are set by `splitRegex` / `splitSourceRule`
+/// in Legado and are handled by later tasks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LegadoRuleMode {
+    Default,
+    Xpath,
+    Json,
+    Regex,
+    Js,
+}
+
+/// Variable scope for `@put` / `@get`. Implementations store `@put:{...}` pairs
+/// (Legado `putMap`) and resolve `@get:{key}` during rule evaluation
+/// (`makeUpRule` getRuleType, AnalyzeRule.kt:698).
+pub trait RuleVariableScope {
+    fn get(&self, key: &str) -> Option<String>;
+    fn put(&mut self, key: String, value: String);
+    fn entries(&self) -> Vec<(&str, &str)>;
+}
+
+/// No-op scope for tests / rules that carry no `@put` / `@get`.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct NoopVariableScope;
+impl RuleVariableScope for NoopVariableScope {
+    fn get(&self, _key: &str) -> Option<String> {
+        None
+    }
+    fn put(&mut self, _key: String, _value: String) {}
+    fn entries(&self) -> Vec<(&str, &str)> {
+        Vec::new()
+    }
+}
+
+/// JS evaluator for `{{...}}` and `<js>...</js>` segments.
+///
+/// `context` is the current extraction result (Legado binds `result` inside
+/// `evalJS`). Implementations back this with a sandbox; `reader-rule` itself
+/// stays free of any `reader-js` dependency.
+pub trait RuleJsEvaluator {
+    fn eval(&self, expr: &str, context: Option<&str>) -> Result<String, String>;
+}
+
+/// Detect Legado rule mode from the rule-string prefix.
+///
+/// Returns `(mode, body_with_prefix_stripped)`. Mirrors
+/// `AnalyzeRule.SourceRule.init` lines 546-578. `@CSS:`/`@@` switch to CSS
+/// mode and strip the prefix; `@XPath:`/`@Json:` strip the prefix and switch
+/// mode; `$.`/`$[` and a leading `/` switch to JSON / XPath without stripping.
+fn detect_legado_rule_mode(rule: &str) -> (LegadoRuleMode, &str) {
+    if let Some(rest) = rule
+        .strip_prefix("@CSS:")
+        .or_else(|| rule.strip_prefix("@css:"))
+    {
+        return (LegadoRuleMode::Default, rest);
+    }
+    if let Some(rest) = rule.strip_prefix("@@") {
+        return (LegadoRuleMode::Default, rest);
+    }
+    if let Some(rest) = rule
+        .strip_prefix("@XPath:")
+        .or_else(|| rule.strip_prefix("@xpath:"))
+    {
+        return (LegadoRuleMode::Xpath, rest);
+    }
+    if let Some(rest) = rule
+        .strip_prefix("@Json:")
+        .or_else(|| rule.strip_prefix("@json:"))
+    {
+        return (LegadoRuleMode::Json, rest);
+    }
+    if rule.starts_with("$.") || rule.starts_with("$[") {
+        return (LegadoRuleMode::Json, rule);
+    }
+    if rule.starts_with('/') {
+        return (LegadoRuleMode::Xpath, rule);
+    }
+    (LegadoRuleMode::Default, rule)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
