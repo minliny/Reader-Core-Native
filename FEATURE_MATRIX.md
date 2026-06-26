@@ -57,7 +57,7 @@
 | Cache/progress/history/download queue | Rust Core | 已完成 | `crates/reader-storage` 双后端（`InMemoryStorage` + `SqliteStorage`）实现 `BookshelfStore`/`ChapterCacheStore`/`ReadingProgressStore`/`ChapterDownloadQueueStore`/`StorageSnapshotStore` 全部 5 trait，125 测试通过（106 in-memory + 19 sqlite），含 S5 退出条件 canonical snapshot hash 跨后端一致性验证 |
 | RSS | Rust Core | 部分完成 | `crates/reader-rss` |
 | WebDAV/sync/diff/recovery | Rust Core + 平台 adapter | 部分完成 | `crates/reader-sync` 有模型，平台 transport 待接入 |
-| TTS 数据契约 | Rust Core + 平台 adapter | Gap | Core 定义契约，平台执行播放 |
+| TTS 数据契约 | Rust Core + 平台 adapter | 部分完成 | `crates/reader-contract/src/tts.rs` + schema `$defs/Tts*` + `docs/host-app-contracts/05-tts.md`；runtime/adapter 未实现 |
 
 ## 平台 wrapper
 
