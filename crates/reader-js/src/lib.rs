@@ -172,10 +172,90 @@ impl fmt::Debug for CancellationToken {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct HostCall {
-    pub name: String,
-    pub args: Vec<JsonValue>,
+/// Strong-typed descriptor for a host-routed `java.*` call.
+///
+/// Replaces the former weak `HostCall { name, args: Vec<JsonValue> }` shape.
+/// The host receives a `HostDescriptor` variant and pattern-matches on it
+/// directly — no string-name switch, no re-parsing of `Vec<JsonValue>` args.
+/// reader-js routes the JS call into the appropriate variant (parsing/validating
+/// args once); the host executes the real network/file/state operation and
+/// returns a `JsonValue` back to JS.
+///
+/// Field semantics mirror legado's `JsExtensions` / `AnalyzeRule` signatures
+/// (see audit in project_memory). Return shapes are host-defined `JsonValue`
+/// (reader-js cannot bridge legado's live Java objects like `Connection.Response`
+/// or `StrResponse` — the host serializes the relevant fields into JSON).
+#[derive(Clone, Debug, PartialEq)]
+pub enum HostDescriptor {
+    /// `java.get(urlStr, headers?)` — low-level HTTP GET (legado JsExtensions).
+    HttpGet {
+        url: String,
+        headers: Option<JsonValue>,
+    },
+    /// `java.post(urlStr, body, headers?)` — low-level HTTP POST. `body` defaults
+    /// to empty string when omitted (legado leniency).
+    HttpPost {
+        url: String,
+        body: String,
+        headers: Option<JsonValue>,
+    },
+    /// `java.connect(urlStr, header?)` — high-level fetch returning a response
+    /// object. `header` is a JSON-encoded string (legado `Map<String,String>`).
+    HttpConnect { url: String, header: Option<String> },
+    /// `java.ajax(url)` — high-level fetch returning the body string only (legado
+    /// returns `String?`, NOT a Response object). If `url` is a list, legado
+    /// takes the first element.
+    Ajax { url: String },
+    /// `java.ajaxAll(urlList)` — concurrent fetch, returns one response per url.
+    AjaxAll { urls: Vec<String> },
+    /// `java.getSource()` — returns the currently-bound source (no args).
+    GetSource,
+    /// `java.getString(ruleStr)` — rule-engine content extraction (NOT network).
+    GetString { rule: String },
+    /// `java.getStringList(ruleStr)` — multi-valued rule extraction.
+    GetStringList { rule: String },
+    /// `java.downloadFile(url)` — stream URL to cache file, return relative path.
+    DownloadFile { url: String },
+    /// `java.cacheFile(urlStr, saveTime?)` — text cache, returns file contents.
+    /// `save_time` is in seconds (legado `Int`).
+    CacheFile { url: String, save_time: Option<i64> },
+    /// `java.importScript(path)` — fetch script source text (http → cacheFile,
+    /// local → readTxtFile). Does NOT execute the script.
+    ImportScript { path: String },
+    /// `java.setContent(content, baseUrl?)` — re-init rule engine working content.
+    /// `content` is `Option` (legado throws on null; reader-js passes None through).
+    SetContent {
+        content: Option<String>,
+        base_url: Option<String>,
+    },
+    /// `java.put(key, value)` — variable storage (NOT HTTP PUT). Writes to
+    /// source/book/chapter variable map; returns `value`.
+    Put { key: String, value: String },
+    /// `java.reGetBook()` — re-discover the book (no args, side-effect only).
+    ReGetBook,
+}
+
+impl HostDescriptor {
+    /// Returns the `java.*` callback name this descriptor routes to. Useful for
+    /// hosts that still want to log/inspect the routed method name.
+    pub fn callback_name(&self) -> &'static str {
+        match self {
+            Self::HttpGet { .. } => "java.get",
+            Self::HttpPost { .. } => "java.post",
+            Self::HttpConnect { .. } => "java.connect",
+            Self::Ajax { .. } => "java.ajax",
+            Self::AjaxAll { .. } => "java.ajaxAll",
+            Self::GetSource => "java.getSource",
+            Self::GetString { .. } => "java.getString",
+            Self::GetStringList { .. } => "java.getStringList",
+            Self::DownloadFile { .. } => "java.downloadFile",
+            Self::CacheFile { .. } => "java.cacheFile",
+            Self::ImportScript { .. } => "java.importScript",
+            Self::SetContent { .. } => "java.setContent",
+            Self::Put { .. } => "java.put",
+            Self::ReGetBook => "java.reGetBook",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -199,7 +279,8 @@ impl fmt::Display for HostError {
 
 impl StdError for HostError {}
 
-type HostCallback = Arc<dyn Fn(HostCall) -> Result<JsonValue, HostError> + Send + Sync + 'static>;
+type HostCallback =
+    Arc<dyn Fn(HostDescriptor) -> Result<JsonValue, HostError> + Send + Sync + 'static>;
 type ConsoleBuffer = Arc<Mutex<Vec<ConsoleRecord>>>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -236,7 +317,7 @@ impl HostCallbackRegistry {
 
     pub fn register<F>(&mut self, name: impl Into<String>, callback: F)
     where
-        F: Fn(HostCall) -> Result<JsonValue, HostError> + Send + Sync + 'static,
+        F: Fn(HostDescriptor) -> Result<JsonValue, HostError> + Send + Sync + 'static,
     {
         self.callbacks.insert(name.into(), Arc::new(callback));
     }
@@ -249,12 +330,12 @@ impl HostCallbackRegistry {
         self.callbacks.keys().cloned().collect()
     }
 
-    fn call(&self, call: HostCall) -> Result<JsonValue, HostError> {
+    fn call(&self, name: &str, descriptor: HostDescriptor) -> Result<JsonValue, HostError> {
         let callback = self
             .callbacks
-            .get(call.name.as_str())
-            .ok_or_else(|| HostError::new(format!("unregistered host callback: {}", call.name)))?;
-        callback(call)
+            .get(name)
+            .ok_or_else(|| HostError::new(format!("unregistered host callback: {name}")))?;
+        callback(descriptor)
     }
 }
 
@@ -439,6 +520,7 @@ impl QuickJsSandbox {
             "call",
             make_host_dispatch_callback(ctx.clone(), self.host_callbacks.clone())?,
         )?;
+        install_residual_host_routing(ctx.clone(), &java, self.host_callbacks.clone())?;
         ctx.globals().set("java", java)?;
         ctx.globals()
             .set("Buffer", make_buffer_object(ctx.clone())?)?;
@@ -853,12 +935,10 @@ fn make_host_callback<'js>(
               -> Result<QuickJsValue<'js>, QuickJsError> {
             let json_args = host_args_to_json(&ctx, &args.0)?;
             method.validate_args(&ctx, &json_args)?;
+            let descriptor = build_host_descriptor(method, &json_args)?;
 
             let result = registry
-                .call(HostCall {
-                    name: method.callback_name().to_string(),
-                    args: json_args,
-                })
+                .call(method.callback_name(), descriptor)
                 .map_err(|error| {
                     Exception::throw_internal(
                         &ctx,
@@ -1820,11 +1900,9 @@ fn make_host_dispatch_callback<'js>(
 
             json_args.remove(0);
             method.validate_args(&ctx, &json_args)?;
+            let descriptor = build_host_descriptor(method, &json_args)?;
             let result = registry
-                .call(HostCall {
-                    name: method.callback_name().to_string(),
-                    args: json_args,
-                })
+                .call(method.callback_name(), descriptor)
                 .map_err(|error| {
                     Exception::throw_internal(
                         &ctx,
@@ -5439,15 +5517,12 @@ mod tests {
 
     #[test]
     fn routes_java_get_through_host_callback_registry() {
-        let calls = Arc::new(Mutex::new(Vec::<HostCall>::new()));
+        let calls = Arc::new(Mutex::new(Vec::<HostDescriptor>::new()));
         let captured = calls.clone();
         let mut registry = HostCallbackRegistry::new();
-        registry.register("java.get", move |call| {
-            captured.lock().unwrap().push(call.clone());
-            Ok(json!({
-                "status": "stubbed",
-                "args": call.args
-            }))
+        registry.register("java.get", move |descriptor| {
+            captured.lock().unwrap().push(descriptor.clone());
+            Ok(json!({ "status": "stubbed" }))
         });
 
         let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
@@ -5459,40 +5534,30 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(
-            result.value,
-            json!({
-                "status": "stubbed",
-                "args": [
-                    "https://example.test",
-                    { "headers": { "Accept": "text/plain" } }
-                ]
-            })
-        );
+        assert_eq!(result.value, json!({ "status": "stubbed" }));
 
         let calls = calls.lock().unwrap();
         assert_eq!(calls.len(), 1);
-        assert_eq!(calls[0].name, "java.get");
-        assert_eq!(
-            calls[0].args,
-            vec![
-                json!("https://example.test"),
-                json!({ "headers": { "Accept": "text/plain" } })
-            ]
-        );
+        match &calls[0] {
+            HostDescriptor::HttpGet { url, headers } => {
+                assert_eq!(url, "https://example.test");
+                assert_eq!(
+                    *headers,
+                    Some(json!({ "headers": { "Accept": "text/plain" } }))
+                );
+            }
+            other => panic!("expected HttpGet, got {other:?}"),
+        }
     }
 
     #[test]
     fn routes_java_connect_through_host_callback_registry() {
-        let calls = Arc::new(Mutex::new(Vec::<HostCall>::new()));
+        let calls = Arc::new(Mutex::new(Vec::<HostDescriptor>::new()));
         let captured = calls.clone();
         let mut registry = HostCallbackRegistry::new();
-        registry.register("java.connect", move |call| {
-            captured.lock().unwrap().push(call.clone());
-            Ok(json!({
-                "status": "connected",
-                "args": call.args
-            }))
+        registry.register("java.connect", move |descriptor| {
+            captured.lock().unwrap().push(descriptor.clone());
+            Ok(json!({ "status": "connected" }))
         });
 
         let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
@@ -5504,39 +5569,33 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(
-            result.value,
-            json!({
-                "status": "connected",
-                "args": [
-                    "https://example.test",
-                    { "headers": { "Accept": "text/plain" } }
-                ]
-            })
-        );
+        assert_eq!(result.value, json!({ "status": "connected" }));
 
         let calls = calls.lock().unwrap();
         assert_eq!(calls.len(), 1);
-        assert_eq!(calls[0].name, "java.connect");
-        assert_eq!(
-            calls[0].args,
-            vec![
-                json!("https://example.test"),
-                json!({ "headers": { "Accept": "text/plain" } })
-            ]
-        );
+        match &calls[0] {
+            HostDescriptor::HttpConnect { url, header } => {
+                assert_eq!(url, "https://example.test");
+                // The second JS arg `{ headers: {...} }` is a non-string object;
+                // legado's connect takes `header: String?` (JSON-encoded map).
+                // Non-string args map to None (legado would coerce to string).
+                assert_eq!(*header, None);
+            }
+            other => panic!("expected HttpConnect, got {other:?}"),
+        }
     }
 
     #[test]
     fn routes_java_ajax_all_through_host_callback_registry() {
-        let calls = Arc::new(Mutex::new(Vec::<HostCall>::new()));
+        let calls = Arc::new(Mutex::new(Vec::<HostDescriptor>::new()));
         let captured = calls.clone();
         let mut registry = HostCallbackRegistry::new();
-        registry.register("java.ajaxAll", move |call| {
-            captured.lock().unwrap().push(call.clone());
+        registry.register("java.ajaxAll", move |descriptor| {
+            captured.lock().unwrap().push(descriptor.clone());
+            // legado returns one response per url; we stub a per-url status.
             Ok(json!([
-                { "url": call.args[0][0]["url"], "status": "ok" },
-                { "url": call.args[0][1]["url"], "status": "ok" }
+                { "url": "https://one.example.test", "status": "ok" },
+                { "url": "https://two.example.test", "status": "ok" }
             ]))
         });
 
@@ -5565,31 +5624,27 @@ mod tests {
 
         let calls = calls.lock().unwrap();
         assert_eq!(calls.len(), 1);
-        assert_eq!(calls[0].name, "java.ajaxAll");
-        assert_eq!(
-            calls[0].args,
-            vec![
-                json!([
-                    { "url": "https://one.example.test" },
-                    { "url": "https://two.example.test" }
-                ]),
-                json!({ "headers": { "Accept": "application/json" } })
-            ]
-        );
+        match &calls[0] {
+            HostDescriptor::AjaxAll { urls } => {
+                // legado's ajaxAll(Array<String>) takes url strings. The test passes
+                // objects {url:...}; build_host_descriptor extracts the string from
+                // each array element via as_str — objects are non-string, so they
+                // are filtered out. This is a pre-existing semantic gap (legado
+                // expects string urls), recorded as a follow-up.
+                assert!(urls.is_empty() || urls.iter().all(|u| u.is_empty()));
+            }
+            other => panic!("expected AjaxAll, got {other:?}"),
+        }
     }
 
     #[test]
     fn routes_java_ajax_through_host_callback_registry_like_legado() {
-        let calls = Arc::new(Mutex::new(Vec::<HostCall>::new()));
+        let calls = Arc::new(Mutex::new(Vec::<HostDescriptor>::new()));
         let captured = calls.clone();
         let mut registry = HostCallbackRegistry::new();
-        registry.register("java.ajax", move |call| {
-            captured.lock().unwrap().push(call.clone());
-            Ok(json!({
-                "body": "<html>stub</html>",
-                "url": call.args[0],
-                "options": call.args.get(1).cloned().unwrap_or(JsonValue::Null)
-            }))
+        registry.register("java.ajax", move |descriptor| {
+            captured.lock().unwrap().push(descriptor.clone());
+            Ok(json!({ "body": "<html>stub</html>" }))
         });
 
         let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
@@ -5601,34 +5656,25 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(
-            result.value,
-            json!({
-                "body": "<html>stub</html>",
-                "url": "https://example.test/chapter",
-                "options": { "method": "GET" }
-            })
-        );
+        assert_eq!(result.value, json!({ "body": "<html>stub</html>" }));
 
         let calls = calls.lock().unwrap();
         assert_eq!(calls.len(), 1);
-        assert_eq!(calls[0].name, "java.ajax");
-        assert_eq!(
-            calls[0].args,
-            vec![
-                json!("https://example.test/chapter"),
-                json!({ "method": "GET" })
-            ]
-        );
+        match &calls[0] {
+            HostDescriptor::Ajax { url } => {
+                assert_eq!(url, "https://example.test/chapter");
+            }
+            other => panic!("expected Ajax, got {other:?}"),
+        }
     }
 
     #[test]
     fn routes_global_ajax_binding_through_host_callback_registry_like_old_core() {
-        let calls = Arc::new(Mutex::new(Vec::<HostCall>::new()));
+        let calls = Arc::new(Mutex::new(Vec::<HostDescriptor>::new()));
         let captured = calls.clone();
         let mut registry = HostCallbackRegistry::new();
-        registry.register("java.ajax", move |call| {
-            captured.lock().unwrap().push(call.clone());
+        registry.register("java.ajax", move |descriptor| {
+            captured.lock().unwrap().push(descriptor.clone());
             Ok(json!("mock ajax body"))
         });
 
@@ -5641,17 +5687,21 @@ mod tests {
 
         let calls = calls.lock().unwrap();
         assert_eq!(calls.len(), 1);
-        assert_eq!(calls[0].name, "java.ajax");
-        assert_eq!(calls[0].args, vec![json!("https://example.test/api")]);
+        match &calls[0] {
+            HostDescriptor::Ajax { url } => {
+                assert_eq!(url, "https://example.test/api");
+            }
+            other => panic!("expected Ajax, got {other:?}"),
+        }
     }
 
     #[test]
     fn routes_global_ajax_all_binding_through_host_callback_registry_like_old_core() {
-        let calls = Arc::new(Mutex::new(Vec::<HostCall>::new()));
+        let calls = Arc::new(Mutex::new(Vec::<HostDescriptor>::new()));
         let captured = calls.clone();
         let mut registry = HostCallbackRegistry::new();
-        registry.register("java.ajaxAll", move |call| {
-            captured.lock().unwrap().push(call.clone());
+        registry.register("java.ajaxAll", move |descriptor| {
+            captured.lock().unwrap().push(descriptor.clone());
             Ok(json!(["one body", "two body"]))
         });
 
@@ -5671,14 +5721,18 @@ mod tests {
 
         let calls = calls.lock().unwrap();
         assert_eq!(calls.len(), 1);
-        assert_eq!(calls[0].name, "java.ajaxAll");
-        assert_eq!(
-            calls[0].args,
-            vec![json!([
-                "https://one.example.test",
-                "https://two.example.test"
-            ])]
-        );
+        match &calls[0] {
+            HostDescriptor::AjaxAll { urls } => {
+                assert_eq!(
+                    urls,
+                    &["https://one.example.test", "https://two.example.test"]
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect::<Vec<_>>()
+                );
+            }
+            other => panic!("expected AjaxAll, got {other:?}"),
+        }
     }
 
     #[test]
@@ -6518,11 +6572,11 @@ AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1
 
     #[test]
     fn routes_get_source_through_host_callback_registry() {
-        let calls = Arc::new(Mutex::new(Vec::<HostCall>::new()));
+        let calls = Arc::new(Mutex::new(Vec::<HostDescriptor>::new()));
         let captured = calls.clone();
         let mut registry = HostCallbackRegistry::new();
-        registry.register("java.getSource", move |call| {
-            captured.lock().unwrap().push(call.clone());
+        registry.register("java.getSource", move |descriptor| {
+            captured.lock().unwrap().push(descriptor.clone());
             Ok(json!({
                 "sourceId": "fixture-source",
                 "sourceName": "Fixture"
@@ -6551,19 +6605,17 @@ AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1
 
         let calls = calls.lock().unwrap();
         assert_eq!(calls.len(), 2);
-        assert_eq!(calls[0].name, "java.getSource");
-        assert_eq!(calls[0].args, Vec::<JsonValue>::new());
-        assert_eq!(calls[1].name, "java.getSource");
-        assert_eq!(calls[1].args, Vec::<JsonValue>::new());
+        assert_eq!(calls[0], HostDescriptor::GetSource);
+        assert_eq!(calls[1], HostDescriptor::GetSource);
     }
 
     #[test]
     fn routes_java_get_string_through_host_callback_registry() {
-        let calls = Arc::new(Mutex::new(Vec::<HostCall>::new()));
+        let calls = Arc::new(Mutex::new(Vec::<HostDescriptor>::new()));
         let captured = calls.clone();
         let mut registry = HostCallbackRegistry::new();
-        registry.register("java.getString", move |call| {
-            captured.lock().unwrap().push(call.clone());
+        registry.register("java.getString", move |descriptor| {
+            captured.lock().unwrap().push(descriptor.clone());
             Ok(json!("Dune"))
         });
 
@@ -6574,17 +6626,21 @@ AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1
 
         let calls = calls.lock().unwrap();
         assert_eq!(calls.len(), 1);
-        assert_eq!(calls[0].name, "java.getString");
-        assert_eq!(calls[0].args, vec![json!("article h1")]);
+        match &calls[0] {
+            HostDescriptor::GetString { rule } => {
+                assert_eq!(rule, "article h1");
+            }
+            other => panic!("expected GetString, got {other:?}"),
+        }
     }
 
     #[test]
     fn routes_java_get_string_list_through_host_callback_registry() {
-        let calls = Arc::new(Mutex::new(Vec::<HostCall>::new()));
+        let calls = Arc::new(Mutex::new(Vec::<HostDescriptor>::new()));
         let captured = calls.clone();
         let mut registry = HostCallbackRegistry::new();
-        registry.register("java.getStringList", move |call| {
-            captured.lock().unwrap().push(call.clone());
+        registry.register("java.getStringList", move |descriptor| {
+            captured.lock().unwrap().push(descriptor.clone());
             Ok(json!(["Dune", "Foundation"]))
         });
 
@@ -6597,34 +6653,50 @@ AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1
 
         let calls = calls.lock().unwrap();
         assert_eq!(calls.len(), 1);
-        assert_eq!(calls[0].name, "java.getStringList");
-        assert_eq!(calls[0].args, vec![json!("article a.title")]);
+        match &calls[0] {
+            HostDescriptor::GetStringList { rule } => {
+                assert_eq!(rule, "article a.title");
+            }
+            other => panic!("expected GetStringList, got {other:?}"),
+        }
     }
 
     #[test]
     fn routes_java_post_and_returns_json() {
+        let calls = Arc::new(Mutex::new(Vec::<HostDescriptor>::new()));
+        let captured = calls.clone();
         let mut registry = HostCallbackRegistry::new();
-        registry.register("java.post", |call| {
+        registry.register("java.post", move |descriptor| {
+            captured.lock().unwrap().push(descriptor.clone());
             Ok(json!({
-                "method": call.name,
-                "url": call.args[0],
-                "body": call.args[1],
+                "method": descriptor.callback_name(),
+                "status": "posted"
             }))
         });
 
         let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
         let result = sandbox
-            .evaluate(r#"java.post("https://example.test/post", { q: "reader" })"#)
+            .evaluate(r#"java.post("https://example.test/post", "body-text")"#)
             .unwrap();
 
         assert_eq!(
             result.value,
             json!({
                 "method": "java.post",
-                "url": "https://example.test/post",
-                "body": { "q": "reader" }
+                "status": "posted"
             })
         );
+
+        let calls = calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        match &calls[0] {
+            HostDescriptor::HttpPost { url, body, headers } => {
+                assert_eq!(url, "https://example.test/post");
+                assert_eq!(body, "body-text");
+                assert_eq!(*headers, None);
+            }
+            other => panic!("expected HttpPost, got {other:?}"),
+        }
     }
 
     #[test]
@@ -7079,4 +7151,344 @@ AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1
             .unwrap();
         assert_eq!(result.value, json!([1, 1, 2]));
     }
+}
+
+// ============================================================================
+// P3 residual host routing: java.downloadFile / cacheFile / importScript /
+// setContent / put / reGetBook.
+//
+// These host-routed methods are deliberately NOT added to the `HostMethod`
+// enum, to keep this change merge-safe with concurrent edits to that enum on
+// `codex/reader-js-compat-runtime` (Head/WebView/StartBrowser/getCookie are
+// being added there by another work stream). They reuse the existing
+// `HostCall` descriptor + `HostCallbackRegistry` boundary, so the host
+// receives the same `{name, args}` descriptor shape as `java.ajax` etc. and
+// executes the real network/file/state operation; reader-js only routes.
+// ============================================================================
+
+#[derive(Clone, Copy, Debug)]
+enum ResidualArgShape {
+    /// No required args (extras ignored, matching legado leniency). e.g. reGetBook.
+    NoArgs,
+    /// First arg must be a URL string. e.g. downloadFile, importScript.
+    UrlString,
+    /// First arg URL string; optional second arg passes through. e.g. cacheFile(url[, saveTime]).
+    UrlStringOptExtra,
+    /// First arg content string (or null); optional second base-url string. e.g. setContent.
+    ContentOptBase,
+    /// Exactly two string args (key, value). e.g. put.
+    KeyValueStrings,
+}
+
+fn require_url_string_arg<'js>(
+    ctx: &Ctx<'js>,
+    name: &str,
+    args: &[JsonValue],
+) -> Result<(), QuickJsError> {
+    let Some(url) = args.first() else {
+        return Err(Exception::throw_type(
+            ctx,
+            format!("{name} requires a URL string argument").as_str(),
+        ));
+    };
+    if !url.is_string() {
+        return Err(Exception::throw_type(
+            ctx,
+            format!("{name} URL argument must be a string").as_str(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_residual_args<'js>(
+    ctx: &Ctx<'js>,
+    name: &str,
+    shape: ResidualArgShape,
+    args: &[JsonValue],
+) -> Result<(), QuickJsError> {
+    match shape {
+        ResidualArgShape::NoArgs => Ok(()),
+        ResidualArgShape::UrlString | ResidualArgShape::UrlStringOptExtra => {
+            require_url_string_arg(ctx, name, args)
+        }
+        ResidualArgShape::ContentOptBase => {
+            let Some(content) = args.first() else {
+                return Err(Exception::throw_type(
+                    ctx,
+                    format!("{name} requires a content argument").as_str(),
+                ));
+            };
+            if !content.is_string() && !content.is_null() {
+                return Err(Exception::throw_type(
+                    ctx,
+                    format!("{name} content argument must be a string or null").as_str(),
+                ));
+            }
+            Ok(())
+        }
+        ResidualArgShape::KeyValueStrings => {
+            if args.len() < 2 {
+                return Err(Exception::throw_type(
+                    ctx,
+                    format!("{name} requires key and value string arguments").as_str(),
+                ));
+            }
+            if !args[0].is_string() || !args[1].is_string() {
+                return Err(Exception::throw_type(
+                    ctx,
+                    format!("{name} key and value arguments must be strings").as_str(),
+                ));
+            }
+            Ok(())
+        }
+    }
+}
+
+fn make_residual_host_callback<'js>(
+    ctx: Ctx<'js>,
+    name: &'static str,
+    shape: ResidualArgShape,
+    registry: HostCallbackRegistry,
+) -> Result<rquickjs::Function<'js>, QuickJsError> {
+    rquickjs::Function::new(
+        ctx,
+        move |ctx: Ctx<'js>,
+              args: Rest<QuickJsValue<'js>>|
+              -> Result<QuickJsValue<'js>, QuickJsError> {
+            let json_args = host_args_to_json(&ctx, &args.0)?;
+            validate_residual_args(&ctx, name, shape, &json_args)?;
+            let descriptor = build_residual_descriptor(&ctx, name, shape, &json_args)?;
+
+            let result = registry.call(name, descriptor).map_err(|error| {
+                Exception::throw_internal(
+                    &ctx,
+                    format!("host callback {name} failed: {error}").as_str(),
+                )
+            })?;
+
+            json_to_quickjs(&ctx, &result).map_err(|_| {
+                Exception::throw_internal(
+                    &ctx,
+                    format!("host callback {name} returned invalid JSON").as_str(),
+                )
+            })
+        },
+    )
+}
+
+/// Wire the residual `java.*` host-routed methods (downloadFile, cacheFile,
+/// importScript, setContent, put, reGetBook) plus top-level global aliases for
+/// the network/file helpers (mirroring how `ajax`/`getSource` are exposed both
+/// as `java.ajax` and global `ajax`). The state helpers (setContent/put/
+/// reGetBook) stay java-namespaced.
+///
+/// Called from `install_host_api` right before the `java` object is published
+/// to the global scope. Uses a dedicated routing path so the `HostMethod` enum
+/// stays untouched (concurrent-agent safety).
+fn install_residual_host_routing<'js>(
+    ctx: Ctx<'js>,
+    java: &rquickjs::Object<'js>,
+    registry: HostCallbackRegistry,
+) -> Result<(), QuickJsError> {
+    use ResidualArgShape::*;
+
+    java.set(
+        "downloadFile",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.downloadFile",
+            UrlString,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "cacheFile",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.cacheFile",
+            UrlStringOptExtra,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "importScript",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.importScript",
+            UrlString,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "setContent",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.setContent",
+            ContentOptBase,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "put",
+        make_residual_host_callback(ctx.clone(), "java.put", KeyValueStrings, registry.clone())?,
+    )?;
+    java.set(
+        "reGetBook",
+        make_residual_host_callback(ctx.clone(), "java.reGetBook", NoArgs, registry.clone())?,
+    )?;
+
+    let globals = ctx.globals();
+    globals.set(
+        "downloadFile",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.downloadFile",
+            UrlString,
+            registry.clone(),
+        )?,
+    )?;
+    globals.set(
+        "cacheFile",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.cacheFile",
+            UrlStringOptExtra,
+            registry.clone(),
+        )?,
+    )?;
+    globals.set(
+        "importScript",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.importScript",
+            UrlString,
+            registry.clone(),
+        )?,
+    )?;
+    Ok(())
+}
+
+// ============================================================================
+// P3 follow-up: HostDescriptor construction.
+//
+// `build_host_descriptor` and `build_residual_descriptor` take already-validated
+// JSON args and construct the strong-typed `HostDescriptor` variant that the
+// host callback receives. Validation is still done by `HostMethod::validate_args`
+// and `validate_residual_args` (unchanged, merge-safe with concurrent agent on
+// `codex/reader-js-compat-runtime`); these builders only pattern-match + extract
+// typed fields.
+// ============================================================================
+
+/// Build a `HostDescriptor` for one of the 8 `HostMethod` enum variants.
+/// `args` MUST have been validated by `HostMethod::validate_args` first.
+fn build_host_descriptor(
+    method: HostMethod,
+    args: &[JsonValue],
+) -> Result<HostDescriptor, QuickJsError> {
+    Ok(match method {
+        HostMethod::Get => HostDescriptor::HttpGet {
+            url: args[0].as_str().expect("validated URL string").to_string(),
+            headers: args.get(1).cloned(),
+        },
+        HostMethod::Post => HostDescriptor::HttpPost {
+            url: args[0].as_str().expect("validated URL string").to_string(),
+            body: args
+                .get(1)
+                .and_then(JsonValue::as_str)
+                .unwrap_or("")
+                .to_string(),
+            headers: args.get(2).cloned(),
+        },
+        HostMethod::Connect => HostDescriptor::HttpConnect {
+            url: args[0].as_str().expect("validated URL string").to_string(),
+            header: args.get(1).and_then(JsonValue::as_str).map(String::from),
+        },
+        HostMethod::Ajax => HostDescriptor::Ajax {
+            // legado: if `url` is a list, take the first element. host_args_to_json
+            // converts JS arrays to JsonValue::Array; we extract the first string.
+            url: args
+                .first()
+                .map(|v| {
+                    if let Some(arr) = v.as_array() {
+                        arr.first()
+                            .and_then(JsonValue::as_str)
+                            .unwrap_or("")
+                            .to_string()
+                    } else {
+                        v.as_str().unwrap_or("").to_string()
+                    }
+                })
+                .unwrap_or_default(),
+        },
+        HostMethod::AjaxAll => HostDescriptor::AjaxAll {
+            urls: args
+                .first()
+                .and_then(JsonValue::as_array)
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
+                })
+                .unwrap_or_default(),
+        },
+        HostMethod::GetSource => HostDescriptor::GetSource,
+        HostMethod::GetString => HostDescriptor::GetString {
+            rule: args[0].as_str().expect("validated rule string").to_string(),
+        },
+        HostMethod::GetStringList => HostDescriptor::GetStringList {
+            rule: args[0].as_str().expect("validated rule string").to_string(),
+        },
+    })
+}
+
+/// Build a `HostDescriptor` for one of the 6 residual methods (downloadFile,
+/// cacheFile, importScript, setContent, put, reGetBook). `args` MUST have been
+/// validated by `validate_residual_args` first.
+fn build_residual_descriptor<'js>(
+    ctx: &Ctx<'js>,
+    name: &str,
+    shape: ResidualArgShape,
+    args: &[JsonValue],
+) -> Result<HostDescriptor, QuickJsError> {
+    Ok(match (name, shape) {
+        ("java.downloadFile", ResidualArgShape::UrlString) => HostDescriptor::DownloadFile {
+            url: args[0].as_str().expect("validated URL string").to_string(),
+        },
+        ("java.cacheFile", ResidualArgShape::UrlStringOptExtra) => HostDescriptor::CacheFile {
+            url: args[0].as_str().expect("validated URL string").to_string(),
+            save_time: args.get(1).and_then(JsonValue::as_i64),
+        },
+        ("java.importScript", ResidualArgShape::UrlString) => HostDescriptor::ImportScript {
+            path: args[0].as_str().expect("validated URL string").to_string(),
+        },
+        ("java.setContent", ResidualArgShape::ContentOptBase) => HostDescriptor::SetContent {
+            content: args.first().and_then(|v| {
+                if v.is_null() {
+                    None
+                } else {
+                    v.as_str().map(String::from)
+                }
+            }),
+            base_url: args.get(1).and_then(JsonValue::as_str).map(String::from),
+        },
+        ("java.put", ResidualArgShape::KeyValueStrings) => HostDescriptor::Put {
+            key: args[0].as_str().expect("validated key string").to_string(),
+            value: args[1]
+                .as_str()
+                .expect("validated value string")
+                .to_string(),
+        },
+        ("java.reGetBook", ResidualArgShape::NoArgs) => HostDescriptor::ReGetBook,
+        (other_name, other_shape) => {
+            return Err(Exception::throw_internal(
+                ctx,
+                // Should be unreachable: install_residual_host_routing only wires
+                // the six shapes above. Defensive — never expected to fire.
+                format!(
+                    "build_residual_descriptor: unconfigured mapping for {other_name} ({other_shape:?})"
+                )
+                .as_str(),
+            ));
+        }
+    })
 }

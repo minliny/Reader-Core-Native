@@ -1,6 +1,6 @@
 use reader_js::{
-    CancellationToken, HostCallbackRegistry, JsErrorKind, JsExecutionOptions, JsRuntimeConfig,
-    JsSandbox, QuickJsSandbox,
+    CancellationToken, HostCallbackRegistry, HostDescriptor, JsErrorKind, JsExecutionOptions,
+    JsRuntimeConfig, JsSandbox, QuickJsSandbox,
 };
 use serde_json::json;
 use std::{
@@ -87,9 +87,12 @@ fn host_callback_stub_routes_without_implementing_network() {
 
     let calls = calls.lock().unwrap();
     assert_eq!(calls.len(), 1);
-    assert_eq!(calls[0].name, "java.ajax");
-    assert_eq!(calls[0].args[0], json!("https://example.test/chapter"));
-    assert_eq!(calls[0].args[1], json!({"method": "GET"}));
+    match &calls[0] {
+        HostDescriptor::Ajax { url } => {
+            assert_eq!(url, "https://example.test/chapter");
+        }
+        other => panic!("expected Ajax, got {other:?}"),
+    }
 }
 
 #[test]
