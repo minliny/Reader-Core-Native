@@ -71,6 +71,8 @@ git -C <repo> log -5 --oneline
 
 ## 目录
 
+- [docs/PROJECT_CHARTER.md](./docs/PROJECT_CHARTER.md) — 项目章程（最高强制文档：背景、目标、红线）
+
 - [docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md](./docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md) — 当前迁移指令和安全要求
 - [docs/MAINLINE_EXECUTION_PLAN.md](./docs/MAINLINE_EXECUTION_PLAN.md) — 防偏离主线、阶段顺序和分支边界
 - [docs/FULL_DEVELOPMENT_ROADMAP.md](./docs/FULL_DEVELOPMENT_ROADMAP.md) — 全量开发路线
