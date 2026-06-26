@@ -1,0 +1,9 @@
+{
+  "protocolVersion": 1,
+  "requestId": 612,
+  "method": "sync.merge",
+  "params": {
+    "local": [],
+    "remote": { "snapshotId": "b", "deviceId": "d", "createdAt": 2, "records": [] }
+  }
+}

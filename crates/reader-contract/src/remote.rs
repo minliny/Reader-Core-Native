@@ -25,6 +25,10 @@ fn default_http_method() -> String {
     "GET".to_string()
 }
 
+fn default_true() -> bool {
+    true
+}
+
 fn deserialize_http_url<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: Deserializer<'de>,
@@ -944,6 +948,232 @@ pub struct ReadingProgressUpdateData {
     pub chapter_progress: f64,
     #[serde(deserialize_with = "deserialize_reading_progress_stored")]
     pub stored: bool,
+}
+
+// ===========================================================================
+// RSS vertical (V1 minimal)
+// ===========================================================================
+
+fn deserialize_non_blank_feed_xml<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = String::deserialize(deserializer)?;
+    if value.trim().is_empty() {
+        Err(de::Error::custom("rss.parse xml must be non-empty"))
+    } else {
+        Ok(value)
+    }
+}
+
+fn deserialize_non_blank_subscription_id<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = String::deserialize(deserializer)?;
+    if value.trim().is_empty() {
+        Err(de::Error::custom(
+            "rss.refresh subscriptionId must be non-empty",
+        ))
+    } else {
+        Ok(value)
+    }
+}
+
+fn deserialize_required_object<'de, D>(deserializer: D) -> Result<Value, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+    if value.is_object() {
+        Ok(value)
+    } else {
+        Err(de::Error::custom("params field must be an object"))
+    }
+}
+
+/// Parameters for `rss.parse`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RssParseParams {
+    /// Optional feed URL used to resolve relative links and self-reference guards.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub feed_url: String,
+    /// RSS/Atom XML feed text. Must be non-empty.
+    #[serde(deserialize_with = "deserialize_non_blank_feed_xml")]
+    pub xml: String,
+}
+
+/// One entry in the `rss.parse` result. Mirrors the stable fields of
+/// `reader_rss::RssEntry`; unknown feed fields are dropped at the protocol
+/// boundary to keep the V1 wire shape stable.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RssParseEntryData {
+    pub id: String,
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub published_at: Option<String>,
+}
+
+/// Result data for `rss.parse`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RssParseData {
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub feed_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub site_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub entries: Vec<RssParseEntryData>,
+}
+
+/// Parameters for `rss.refresh`. Maps directly onto `reader_rss::RssRefreshPolicy`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RssRefreshParams {
+    #[serde(deserialize_with = "deserialize_non_blank_subscription_id")]
+    pub subscription_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub update_interval_minutes: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_fetched_at: Option<i64>,
+    #[serde(default)]
+    pub force_refresh: bool,
+    #[serde(default)]
+    pub evaluated_at: i64,
+}
+
+/// Result data for `rss.refresh`. Mirrors `reader_rss::RssRefreshDecision`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RssRefreshData {
+    pub subscription_id: String,
+    pub should_fetch: bool,
+    /// Stable reason code (`disabled`/`forced`/`missingLastFetchedAt`/...).
+    pub reason: String,
+    pub evaluated_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_eligible_fetch_at: Option<i64>,
+}
+
+// ===========================================================================
+// Sync vertical (V1 minimal)
+// ===========================================================================
+
+/// Parameters for `sync.merge`. `local`/`remote` are snapshot objects validated
+/// by `reader_sync::SyncSnapshot` at runtime; the contract layer only enforces
+/// that they are JSON objects.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SyncMergeParams {
+    #[serde(deserialize_with = "deserialize_required_object")]
+    pub local: Value,
+    #[serde(deserialize_with = "deserialize_required_object")]
+    pub remote: Value,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub merged_snapshot_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub merged_device_id: String,
+    #[serde(default)]
+    pub merged_created_at: i64,
+}
+
+/// Result data for `sync.merge`. The merged snapshot is returned as a JSON
+/// object whose shape is owned by `reader_sync::SyncSnapshot`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SyncMergeData {
+    pub snapshot: Value,
+    #[serde(default)]
+    pub conflicts: Vec<Value>,
+}
+
+/// Parameters for `sync.backup`. `package`/`policy` are validated by
+/// `reader_sync` at runtime; the contract layer only enforces object shape.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SyncBackupParams {
+    #[serde(deserialize_with = "deserialize_required_object")]
+    pub package: Value,
+    #[serde(deserialize_with = "deserialize_required_object")]
+    pub policy: Value,
+}
+
+/// Result data for `sync.backup`. The restore plan is returned as a JSON
+/// object whose shape is owned by `reader_sync::BackupRestorePlan`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SyncBackupData {
+    pub plan: Value,
+}
+
+// ===========================================================================
+// Local-book vertical (V1 minimal)
+// ===========================================================================
+
+/// Parameters for `local_book.parse`. `text` is already-decoded UTF-8 content;
+/// GBK/GB18030 decoding is the host's responsibility in V1.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LocalBookParseParams {
+    #[serde(deserialize_with = "deserialize_non_blank_book_id")]
+    pub book_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_name: Option<String>,
+    /// Already-decoded TXT content. Must be non-empty.
+    #[serde(deserialize_with = "deserialize_non_blank_feed_xml")]
+    pub text: String,
+}
+
+/// Result data for `local_book.parse`. The parsed book is returned as a JSON
+/// object whose shape is owned by `reader_local_book::LocalBook`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LocalBookParseData {
+    pub book: Value,
+    pub format: String,
+    pub encoding: String,
+    pub byte_len: u64,
+    pub char_len: u64,
+    pub chapter_count: u32,
+}
+
+/// Parameters for `local_book.catalog`. Performs an upsert: replaces any
+/// existing entry with the same `stable_book_id` and returns the updated
+/// catalog snapshot.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LocalBookCatalogParams {
+    #[serde(deserialize_with = "deserialize_required_object")]
+    pub catalog: Value,
+    #[serde(deserialize_with = "deserialize_required_object")]
+    pub entry: Value,
+    #[serde(default)]
+    pub chapters: Vec<Value>,
+    #[serde(default)]
+    pub resources: Vec<Value>,
+}
+
+/// Result data for `local_book.catalog`. The updated catalog snapshot is
+/// returned as a JSON object whose shape is owned by
+/// `reader_local_book::LocalBookCatalogSnapshot`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LocalBookCatalogData {
+    pub catalog: Value,
 }
 
 /// Helper: parse a typed params object from a `Command`'s free-form params,

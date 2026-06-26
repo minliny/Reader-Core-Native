@@ -1,0 +1,9 @@
+{
+  "protocolVersion": 1,
+  "requestId": 616,
+  "method": "local_book.parse",
+  "params": {
+    "bookId": "conformance-book-1",
+    "text": "   "
+  }
+}

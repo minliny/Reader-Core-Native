@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "requestId": 605,
+  "method": "local_book.parse",
+  "params": {
+    "bookId": "conformance-book-1",
+    "title": "Conformance TXT Book",
+    "author": "Tester",
+    "fileName": "conformance.txt",
+    "text": "第一章 Intro\nHello world content."
+  }
+}

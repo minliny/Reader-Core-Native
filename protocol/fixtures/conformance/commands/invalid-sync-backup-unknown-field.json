@@ -1,0 +1,10 @@
+{
+  "protocolVersion": 1,
+  "requestId": 613,
+  "method": "sync.backup",
+  "params": {
+    "package": { "manifest": { "backupID": "x", "createdAt": 1, "entries": [], "totalBytes": 0, "bookCount": 0 } },
+    "policy": { "mode": "full", "overwriteExisting": false },
+    "extra": true
+  }
+}

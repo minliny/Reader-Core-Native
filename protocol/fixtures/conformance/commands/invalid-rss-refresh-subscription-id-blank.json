@@ -1,0 +1,9 @@
+{
+  "protocolVersion": 1,
+  "requestId": 610,
+  "method": "rss.refresh",
+  "params": {
+    "subscriptionId": "   ",
+    "evaluatedAt": 1700000000000
+  }
+}

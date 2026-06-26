@@ -6,9 +6,10 @@ use reader_contract::{
     methods, BookDetailData, BookSearchData, BookTocData, ChapterContentData, ChapterContentVia,
     Command, CoreError, CoreInfoData, ErrorCode, Event, HostCapability,
     HostWebViewEvaluateJavaScriptRequest, HostWebViewEvaluateJavaScriptResponse,
-    PendingHostOperationStatus, ReadingProgressUpdateData, RuntimeCancelData, RuntimeConfig,
-    RuntimePingData, RuntimeShutdownData, RuntimeStatus, SourceImportData, PROTOCOL_VERSION,
-    V1_CAPABILITIES,
+    LocalBookCatalogData, LocalBookParseData, PendingHostOperationStatus,
+    ReadingProgressUpdateData, RssParseData, RssRefreshData, RuntimeCancelData, RuntimeConfig,
+    RuntimePingData, RuntimeShutdownData, RuntimeStatus, SourceImportData, SyncBackupData,
+    SyncMergeData, PROTOCOL_VERSION, V1_CAPABILITIES,
 };
 use reader_runtime::{EventSink, Runtime};
 use serde_json::{json, Value};
@@ -111,6 +112,55 @@ const INVALID_METHOD_EMPTY_SEGMENT: &str = include_str!(
 );
 const INVALID_PARAMS_NOT_OBJECT: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/invalid-params-not-object.json");
+
+const VALID_RSS_PARSE: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-rss-parse.json");
+const VALID_RSS_REFRESH: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-rss-refresh.json");
+const VALID_SYNC_MERGE: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-sync-merge.json");
+const VALID_SYNC_BACKUP: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-sync-backup.json");
+const VALID_LOCAL_BOOK_PARSE: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-local-book-parse.json");
+const VALID_LOCAL_BOOK_CATALOG: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-local-book-catalog.json");
+const INVALID_RSS_PARSE_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-rss-parse-unknown-field.json"
+);
+const INVALID_RSS_PARSE_XML_BLANK: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-rss-parse-xml-blank.json"
+);
+const INVALID_RSS_REFRESH_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-rss-refresh-unknown-field.json"
+);
+const INVALID_RSS_REFRESH_SUBSCRIPTION_ID_BLANK: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-rss-refresh-subscription-id-blank.json"
+);
+const INVALID_SYNC_MERGE_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-sync-merge-unknown-field.json"
+);
+const INVALID_SYNC_MERGE_LOCAL_NOT_OBJECT: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-sync-merge-local-not-object.json"
+);
+const INVALID_SYNC_BACKUP_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-sync-backup-unknown-field.json"
+);
+const INVALID_SYNC_BACKUP_PACKAGE_NOT_OBJECT: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-sync-backup-package-not-object.json"
+);
+const INVALID_LOCAL_BOOK_PARSE_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-local-book-parse-unknown-field.json"
+);
+const INVALID_LOCAL_BOOK_PARSE_TEXT_BLANK: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-local-book-parse-text-blank.json"
+);
+const INVALID_LOCAL_BOOK_CATALOG_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-local-book-catalog-unknown-field.json"
+);
+const INVALID_LOCAL_BOOK_CATALOG_ENTRY_NOT_OBJECT: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-local-book-catalog-entry-not-object.json"
+);
 
 const VALID_CONFIG_EMPTY: &str =
     include_str!("../../../protocol/fixtures/conformance/configs/valid-empty.json");
@@ -1326,6 +1376,396 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             let (_runtime, rx) =
                 send_to_fresh_runtime(INVALID_READING_PROGRESS_UPDATE_PROGRESS_OUT_OF_RANGE)?;
             expect_event_error(&rx, 413, ErrorCode::InvalidParams)
+        },
+    );
+
+    // =======================================================================
+    // RSS / sync / local-book verticals (V1 minimal)
+    // =======================================================================
+
+    record(&mut report, "valid-command-rss-parse", || {
+        let (_runtime, rx) = send_to_fresh_runtime(VALID_RSS_PARSE)?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 601 => {
+                let data = serde_json::from_value::<RssParseData>(data)
+                    .map_err(|err| format!("rss.parse data contract parse failed: {err}"))?;
+                if data.title == "Conformance Feed"
+                    && data.entries.len() == 1
+                    && data.entries[0].id == "entry-1"
+                    && data.entries[0].title == "Entry One"
+                {
+                    Ok(())
+                } else {
+                    Err(format!("unexpected rss.parse data {data:?}"))
+                }
+            }
+            other => Err(format!("unexpected rss.parse result {other:?}")),
+        }
+    });
+
+    record(&mut report, "valid-command-rss-refresh", || {
+        let (_runtime, rx) = send_to_fresh_runtime(VALID_RSS_REFRESH)?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 602 => {
+                let data = serde_json::from_value::<RssRefreshData>(data)
+                    .map_err(|err| format!("rss.refresh data contract parse failed: {err}"))?;
+                if data.subscription_id == "conformance-sub"
+                    && data.should_fetch
+                    && data.reason == "forced"
+                {
+                    Ok(())
+                } else {
+                    Err(format!("unexpected rss.refresh data {data:?}"))
+                }
+            }
+            other => Err(format!("unexpected rss.refresh result {other:?}")),
+        }
+    });
+
+    record(&mut report, "valid-command-sync-merge", || {
+        let (_runtime, rx) = send_to_fresh_runtime(VALID_SYNC_MERGE)?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 603 => {
+                let data = serde_json::from_value::<SyncMergeData>(data)
+                    .map_err(|err| format!("sync.merge data contract parse failed: {err}"))?;
+                let snapshot_id = data.snapshot.get("snapshotId").and_then(|v| v.as_str());
+                if snapshot_id == Some("merged-1") && data.conflicts.is_empty() {
+                    Ok(())
+                } else {
+                    Err(format!("unexpected sync.merge data {data:?}"))
+                }
+            }
+            other => Err(format!("unexpected sync.merge result {other:?}")),
+        }
+    });
+
+    record(&mut report, "valid-command-sync-backup", || {
+        let (_runtime, rx) = send_to_fresh_runtime(VALID_SYNC_BACKUP)?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 604 => {
+                let data = serde_json::from_value::<SyncBackupData>(data)
+                    .map_err(|err| format!("sync.backup data contract parse failed: {err}"))?;
+                if data.plan.is_object() {
+                    Ok(())
+                } else {
+                    Err(format!("unexpected sync.backup data {data:?}"))
+                }
+            }
+            other => Err(format!("unexpected sync.backup result {other:?}")),
+        }
+    });
+
+    record(&mut report, "valid-command-local-book-parse", || {
+        let (_runtime, rx) = send_to_fresh_runtime(VALID_LOCAL_BOOK_PARSE)?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 605 => {
+                let data = serde_json::from_value::<LocalBookParseData>(data)
+                    .map_err(|err| format!("local_book.parse data contract parse failed: {err}"))?;
+                if data.format == "txt"
+                    && data.encoding == "utf8"
+                    && data.char_len > 0
+                    && data.chapter_count >= 1
+                {
+                    Ok(())
+                } else {
+                    Err(format!("unexpected local_book.parse data {data:?}"))
+                }
+            }
+            other => Err(format!("unexpected local_book.parse result {other:?}")),
+        }
+    });
+
+    record(&mut report, "valid-command-local-book-catalog", || {
+        let (_runtime, rx) = send_to_fresh_runtime(VALID_LOCAL_BOOK_CATALOG)?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 606 => {
+                let data = serde_json::from_value::<LocalBookCatalogData>(data).map_err(|err| {
+                    format!("local_book.catalog data contract parse failed: {err}")
+                })?;
+                let books = data.catalog.get("books").and_then(|v| v.as_array());
+                if let Some(books) = books {
+                    if books.iter().any(|entry| {
+                        entry.get("stableBookId").and_then(|v| v.as_str())
+                            == Some("conformance-book-1")
+                    }) {
+                        Ok(())
+                    } else {
+                        Err(format!(
+                            "local_book.catalog did not upsert conformance-book-1: {data:?}"
+                        ))
+                    }
+                } else {
+                    Err(format!("unexpected local_book.catalog data {data:?}"))
+                }
+            }
+            other => Err(format!("unexpected local_book.catalog result {other:?}")),
+        }
+    });
+
+    for (name, json, request_id) in [
+        (
+            "rss-parse-rejects-unknown-params",
+            INVALID_RSS_PARSE_UNKNOWN_FIELD,
+            607,
+        ),
+        (
+            "rss-parse-rejects-xml-blank",
+            INVALID_RSS_PARSE_XML_BLANK,
+            608,
+        ),
+        (
+            "rss-refresh-rejects-unknown-params",
+            INVALID_RSS_REFRESH_UNKNOWN_FIELD,
+            609,
+        ),
+        (
+            "rss-refresh-rejects-subscription-id-blank",
+            INVALID_RSS_REFRESH_SUBSCRIPTION_ID_BLANK,
+            610,
+        ),
+        (
+            "sync-merge-rejects-unknown-params",
+            INVALID_SYNC_MERGE_UNKNOWN_FIELD,
+            611,
+        ),
+        (
+            "sync-merge-rejects-local-not-object",
+            INVALID_SYNC_MERGE_LOCAL_NOT_OBJECT,
+            612,
+        ),
+        (
+            "sync-backup-rejects-unknown-params",
+            INVALID_SYNC_BACKUP_UNKNOWN_FIELD,
+            613,
+        ),
+        (
+            "sync-backup-rejects-package-not-object",
+            INVALID_SYNC_BACKUP_PACKAGE_NOT_OBJECT,
+            614,
+        ),
+        (
+            "local-book-parse-rejects-unknown-params",
+            INVALID_LOCAL_BOOK_PARSE_UNKNOWN_FIELD,
+            615,
+        ),
+        (
+            "local-book-parse-rejects-text-blank",
+            INVALID_LOCAL_BOOK_PARSE_TEXT_BLANK,
+            616,
+        ),
+        (
+            "local-book-catalog-rejects-unknown-params",
+            INVALID_LOCAL_BOOK_CATALOG_UNKNOWN_FIELD,
+            617,
+        ),
+        (
+            "local-book-catalog-rejects-entry-not-object",
+            INVALID_LOCAL_BOOK_CATALOG_ENTRY_NOT_OBJECT,
+            618,
+        ),
+    ] {
+        record(&mut report, name, || {
+            let (_runtime, rx) = send_to_fresh_runtime(json)?;
+            expect_event_error(&rx, request_id, ErrorCode::InvalidParams)
+        });
+    }
+
+    record(
+        &mut report,
+        "rss-parse-data-rejects-invalid-result-shape",
+        || {
+            for (label, data, expected) in [
+                ("missing title", json!({ "entries": [] }), "title"),
+                ("missing entries", json!({ "title": "x" }), "entries"),
+                (
+                    "unknown field",
+                    json!({ "title": "x", "entries": [], "extra": true }),
+                    "unknown field",
+                ),
+            ] {
+                let err = serde_json::from_value::<RssParseData>(data)
+                    .err()
+                    .ok_or_else(|| format!("expected rss.parse data rejection for {label}"))?;
+                if !err.to_string().contains(expected) {
+                    return Err(format!(
+                        "unexpected rss.parse data error for {label}: {err}"
+                    ));
+                }
+            }
+            Ok(())
+        },
+    );
+
+    record(
+        &mut report,
+        "rss-refresh-data-rejects-invalid-result-shape",
+        || {
+            for (label, data, expected) in [
+                (
+                    "missing shouldFetch",
+                    json!({
+                        "subscriptionId": "s",
+                        "reason": "forced",
+                        "evaluatedAt": 1
+                    }),
+                    "shouldFetch",
+                ),
+                (
+                    "unknown field",
+                    json!({
+                        "subscriptionId": "s",
+                        "shouldFetch": true,
+                        "reason": "forced",
+                        "evaluatedAt": 1,
+                        "extra": true
+                    }),
+                    "unknown field",
+                ),
+            ] {
+                let err = serde_json::from_value::<RssRefreshData>(data)
+                    .err()
+                    .ok_or_else(|| format!("expected rss.refresh data rejection for {label}"))?;
+                if !err.to_string().contains(expected) {
+                    return Err(format!(
+                        "unexpected rss.refresh data error for {label}: {err}"
+                    ));
+                }
+            }
+            Ok(())
+        },
+    );
+
+    record(
+        &mut report,
+        "sync-merge-data-rejects-invalid-result-shape",
+        || {
+            for (label, data, expected) in [
+                ("missing snapshot", json!({ "conflicts": [] }), "snapshot"),
+                (
+                    "unknown field",
+                    json!({ "snapshot": {}, "conflicts": [], "extra": true }),
+                    "unknown field",
+                ),
+            ] {
+                let err = serde_json::from_value::<SyncMergeData>(data)
+                    .err()
+                    .ok_or_else(|| format!("expected sync.merge data rejection for {label}"))?;
+                if !err.to_string().contains(expected) {
+                    return Err(format!(
+                        "unexpected sync.merge data error for {label}: {err}"
+                    ));
+                }
+            }
+            Ok(())
+        },
+    );
+
+    record(
+        &mut report,
+        "sync-backup-data-rejects-invalid-result-shape",
+        || {
+            for (label, data, expected) in [
+                ("missing plan", json!({}), "plan"),
+                (
+                    "unknown field",
+                    json!({ "plan": {}, "extra": true }),
+                    "unknown field",
+                ),
+            ] {
+                let err = serde_json::from_value::<SyncBackupData>(data)
+                    .err()
+                    .ok_or_else(|| format!("expected sync.backup data rejection for {label}"))?;
+                if !err.to_string().contains(expected) {
+                    return Err(format!(
+                        "unexpected sync.backup data error for {label}: {err}"
+                    ));
+                }
+            }
+            Ok(())
+        },
+    );
+
+    record(
+        &mut report,
+        "local-book-parse-data-rejects-invalid-result-shape",
+        || {
+            for (label, data, expected) in [
+                (
+                    "missing format",
+                    json!({
+                        "book": {},
+                        "encoding": "utf8",
+                        "byteLen": 0,
+                        "charLen": 0,
+                        "chapterCount": 0
+                    }),
+                    "format",
+                ),
+                (
+                    "unknown field",
+                    json!({
+                        "book": {},
+                        "format": "txt",
+                        "encoding": "utf8",
+                        "byteLen": 0,
+                        "charLen": 0,
+                        "chapterCount": 0,
+                        "extra": true
+                    }),
+                    "unknown field",
+                ),
+            ] {
+                let err = serde_json::from_value::<LocalBookParseData>(data)
+                    .err()
+                    .ok_or_else(|| {
+                        format!("expected local_book.parse data rejection for {label}")
+                    })?;
+                if !err.to_string().contains(expected) {
+                    return Err(format!(
+                        "unexpected local_book.parse data error for {label}: {err}"
+                    ));
+                }
+            }
+            Ok(())
+        },
+    );
+
+    record(
+        &mut report,
+        "local-book-catalog-data-rejects-invalid-result-shape",
+        || {
+            for (label, data, expected) in [
+                ("missing catalog", json!({}), "catalog"),
+                (
+                    "unknown field",
+                    json!({ "catalog": {}, "extra": true }),
+                    "unknown field",
+                ),
+            ] {
+                let err = serde_json::from_value::<LocalBookCatalogData>(data)
+                    .err()
+                    .ok_or_else(|| {
+                        format!("expected local_book.catalog data rejection for {label}")
+                    })?;
+                if !err.to_string().contains(expected) {
+                    return Err(format!(
+                        "unexpected local_book.catalog data error for {label}: {err}"
+                    ));
+                }
+            }
+            Ok(())
         },
     );
 

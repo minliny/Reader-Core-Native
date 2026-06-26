@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "requestId": 602,
+  "method": "rss.refresh",
+  "params": {
+    "subscriptionId": "conformance-sub",
+    "enabled": true,
+    "forceRefresh": true,
+    "evaluatedAt": 1700000000000
+  }
+}

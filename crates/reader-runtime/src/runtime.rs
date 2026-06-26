@@ -3006,4 +3006,393 @@ mod tests {
             drop(rt);
         }
     }
+
+    // ===================================================================
+    // RSS / sync / local-book vertical dispatch (V1 minimal)
+    // ===================================================================
+
+    #[test]
+    fn rss_parse_decodes_feed() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+                   <rss version=\"2.0\"><channel>\
+                   <title>RT Feed</title>\
+                   <link>https://books.example.test/feed</link>\
+                   <description>Runtime test feed</description>\
+                   <item><title>Item A</title><link>https://books.example.test/a</link>\
+                   <guid>rt-entry-1</guid><description>First</description></item>\
+                   </channel></rss>";
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                101,
+                methods::RSS_PARSE,
+                serde_json::json!({
+                    "feedUrl": "https://books.example.test/feed",
+                    "xml": xml,
+                }),
+            ),
+        );
+        match event {
+            Event::Result {
+                request_id, data, ..
+            } => {
+                assert_eq!(request_id, 101);
+                assert_eq!(data["title"], "RT Feed");
+                let entries = data["entries"].as_array().expect("entries array");
+                assert_eq!(entries.len(), 1);
+                assert_eq!(entries[0]["id"], "rt-entry-1");
+                assert_eq!(entries[0]["title"], "Item A");
+            }
+            other => panic!("expected rss.parse result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn rss_parse_rejects_blank_xml() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                102,
+                methods::RSS_PARSE,
+                serde_json::json!({
+                    "feedUrl": "https://books.example.test/feed",
+                    "xml": "   ",
+                }),
+            ),
+        );
+        match event {
+            Event::Error { error, .. } => assert_eq!(error.code, ErrorCode::InvalidParams),
+            other => panic!("expected invalid params, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn rss_refresh_returns_forced_decision() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                103,
+                methods::RSS_REFRESH,
+                serde_json::json!({
+                    "subscriptionId": "rt-sub",
+                    "enabled": true,
+                    "forceRefresh": true,
+                    "evaluatedAt": 1700000000000_i64,
+                }),
+            ),
+        );
+        match event {
+            Event::Result {
+                request_id, data, ..
+            } => {
+                assert_eq!(request_id, 103);
+                assert_eq!(data["subscriptionId"], "rt-sub");
+                assert_eq!(data["shouldFetch"], true);
+                assert_eq!(data["reason"], "forced");
+            }
+            other => panic!("expected rss.refresh result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn rss_refresh_rejects_blank_subscription_id() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                104,
+                methods::RSS_REFRESH,
+                serde_json::json!({
+                    "subscriptionId": "  ",
+                    "evaluatedAt": 1700000000000_i64,
+                }),
+            ),
+        );
+        match event {
+            Event::Error { error, .. } => assert_eq!(error.code, ErrorCode::InvalidParams),
+            other => panic!("expected invalid params, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn sync_merge_returns_merged_snapshot() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                105,
+                methods::SYNC_MERGE,
+                serde_json::json!({
+                    "local": {
+                        "snapshotId": "local-1",
+                        "deviceId": "device-a",
+                        "createdAt": 1000,
+                        "records": []
+                    },
+                    "remote": {
+                        "snapshotId": "remote-1",
+                        "deviceId": "device-b",
+                        "createdAt": 2000,
+                        "records": []
+                    },
+                    "mergedSnapshotId": "merged-rt-1",
+                    "mergedDeviceId": "device-merged",
+                    "mergedCreatedAt": 3000
+                }),
+            ),
+        );
+        match event {
+            Event::Result {
+                request_id, data, ..
+            } => {
+                assert_eq!(request_id, 105);
+                assert_eq!(data["snapshot"]["snapshotId"], "merged-rt-1");
+                assert_eq!(data["snapshot"]["deviceId"], "device-merged");
+                assert_eq!(data["conflicts"].as_array().unwrap().len(), 0);
+            }
+            other => panic!("expected sync.merge result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn sync_merge_rejects_local_not_object() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                106,
+                methods::SYNC_MERGE,
+                serde_json::json!({
+                    "local": [],
+                    "remote": {
+                        "snapshotId": "remote-1",
+                        "deviceId": "device-b",
+                        "createdAt": 2000,
+                        "records": []
+                    }
+                }),
+            ),
+        );
+        match event {
+            Event::Error { error, .. } => assert_eq!(error.code, ErrorCode::InvalidParams),
+            other => panic!("expected invalid params, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn sync_backup_returns_plan() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                107,
+                methods::SYNC_BACKUP,
+                serde_json::json!({
+                    "package": {
+                        "manifest": {
+                            "backupID": "rt-backup-1",
+                            "createdAt": 1000,
+                            "entries": [],
+                            "totalBytes": 0,
+                            "bookCount": 0
+                        }
+                    },
+                    "policy": {
+                        "mode": "full",
+                        "overwriteExisting": false
+                    }
+                }),
+            ),
+        );
+        match event {
+            Event::Result {
+                request_id, data, ..
+            } => {
+                assert_eq!(request_id, 107);
+                assert!(data["plan"].is_object());
+            }
+            other => panic!("expected sync.backup result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn sync_backup_rejects_package_not_object() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                108,
+                methods::SYNC_BACKUP,
+                serde_json::json!({
+                    "package": "not-an-object",
+                    "policy": { "mode": "full", "overwriteExisting": false }
+                }),
+            ),
+        );
+        match event {
+            Event::Error { error, .. } => assert_eq!(error.code, ErrorCode::InvalidParams),
+            other => panic!("expected invalid params, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn local_book_parse_returns_book() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                109,
+                methods::LOCAL_BOOK_PARSE,
+                serde_json::json!({
+                    "bookId": "rt-book-1",
+                    "title": "RT TXT Book",
+                    "author": "Tester",
+                    "fileName": "rt.txt",
+                    "text": "第一章 Intro\nHello world content."
+                }),
+            ),
+        );
+        match event {
+            Event::Result {
+                request_id, data, ..
+            } => {
+                assert_eq!(request_id, 109);
+                assert_eq!(data["format"], "txt");
+                assert_eq!(data["encoding"], "utf8");
+                assert!(data["charLen"].as_u64().unwrap() > 0);
+                assert!(data["chapterCount"].as_u64().unwrap() >= 1);
+                assert!(data["book"].is_object());
+            }
+            other => panic!("expected local_book.parse result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn local_book_parse_rejects_blank_text() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                110,
+                methods::LOCAL_BOOK_PARSE,
+                serde_json::json!({
+                    "bookId": "rt-book-1",
+                    "text": "   "
+                }),
+            ),
+        );
+        match event {
+            Event::Error { error, .. } => assert_eq!(error.code, ErrorCode::InvalidParams),
+            other => panic!("expected invalid params, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn local_book_catalog_upserts_entry() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                111,
+                methods::LOCAL_BOOK_CATALOG,
+                serde_json::json!({
+                    "catalog": {
+                        "schemaVersion": 1,
+                        "books": [],
+                        "chapters": [],
+                        "resources": []
+                    },
+                    "entry": {
+                        "stableBookId": "rt-book-1",
+                        "sourceFingerprint": {
+                            "byteCount": 42,
+                            "prefixChecksum": "sha256:abc",
+                            "suffixChecksum": "sha256:def",
+                            "detectedFormat": "txt"
+                        },
+                        "contentFingerprint": {
+                            "fullInputChecksum": "sha256:full",
+                            "parserConfigChecksum": "sha256:cfg",
+                            "normalizedMetadataChecksum": "sha256:meta",
+                            "chapterLocatorSequenceChecksum": "sha256:loc"
+                        },
+                        "semanticFingerprint": {
+                            "normalizedTitle": "intro",
+                            "chapterTitleSequenceChecksum": "sha256:titleseq",
+                            "chapterCount": 1,
+                            "format": "txt"
+                        }
+                    },
+                    "chapters": [],
+                    "resources": []
+                }),
+            ),
+        );
+        match event {
+            Event::Result {
+                request_id, data, ..
+            } => {
+                assert_eq!(request_id, 111);
+                let books = data["catalog"]["books"]
+                    .as_array()
+                    .expect("books array in catalog");
+                assert!(books.iter().any(|entry| {
+                    entry.get("stableBookId").and_then(|v| v.as_str()) == Some("rt-book-1")
+                }));
+            }
+            other => panic!("expected local_book.catalog result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn local_book_catalog_rejects_entry_not_object() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                112,
+                methods::LOCAL_BOOK_CATALOG,
+                serde_json::json!({
+                    "catalog": {
+                        "schemaVersion": 1,
+                        "books": [],
+                        "chapters": [],
+                        "resources": []
+                    },
+                    "entry": "not-an-object"
+                }),
+            ),
+        );
+        match event {
+            Event::Error { error, .. } => assert_eq!(error.code, ErrorCode::InvalidParams),
+            other => panic!("expected invalid params, got {other:?}"),
+        }
+    }
 }

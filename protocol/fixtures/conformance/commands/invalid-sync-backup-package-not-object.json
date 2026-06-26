@@ -1,0 +1,9 @@
+{
+  "protocolVersion": 1,
+  "requestId": 614,
+  "method": "sync.backup",
+  "params": {
+    "package": "not-an-object",
+    "policy": { "mode": "full", "overwriteExisting": false }
+  }
+}

@@ -15,7 +15,10 @@
     "host.bus.v1",
     "http.execute",
     "runtime.config.v1",
-    "remote.reading.v1"
+    "remote.reading.v1",
+    "rss.v1",
+    "sync.v1",
+    "local_book.v1"
   ],
   "x-reader-core-v1-host-capabilities": [
     "host.smoke.echo",
@@ -35,7 +38,11 @@
   ],
   "type": "object",
   "additionalProperties": false,
-  "required": ["protocolVersion", "requestId", "method"],
+  "required": [
+    "protocolVersion",
+    "requestId",
+    "method"
+  ],
   "properties": {
     "protocolVersion": {
       "type": "integer",
@@ -67,6 +74,12 @@
         "book.toc",
         "chapter.content",
         "reading.progress.update",
+        "rss.parse",
+        "rss.refresh",
+        "sync.merge",
+        "sync.backup",
+        "local_book.parse",
+        "local_book.catalog",
         "tts.slice",
         "tts.queue.status",
         "tts.chapter.plan"
@@ -81,188 +94,438 @@
   "allOf": [
     {
       "if": {
-        "properties": { "method": { "const": "core.info" } },
-        "required": ["method"]
+        "properties": {
+          "method": {
+            "const": "core.info"
+          }
+        },
+        "required": [
+          "method"
+        ]
       },
       "then": {
         "properties": {
-          "params": { "$ref": "#/$defs/EmptyParams" }
+          "params": {
+            "$ref": "#/$defs/EmptyParams"
+          }
         }
       }
     },
     {
       "if": {
-        "properties": { "method": { "const": "runtime.ping" } },
-        "required": ["method"]
+        "properties": {
+          "method": {
+            "const": "runtime.ping"
+          }
+        },
+        "required": [
+          "method"
+        ]
       },
       "then": {
         "properties": {
-          "params": { "$ref": "#/$defs/EmptyParams" }
+          "params": {
+            "$ref": "#/$defs/EmptyParams"
+          }
         }
       }
     },
     {
       "if": {
-        "properties": { "method": { "const": "runtime.hostSmoke" } },
-        "required": ["method"]
+        "properties": {
+          "method": {
+            "const": "runtime.hostSmoke"
+          }
+        },
+        "required": [
+          "method"
+        ]
       },
       "then": {
         "properties": {
-          "params": { "$ref": "#/$defs/HostSmokeParams" }
+          "params": {
+            "$ref": "#/$defs/HostSmokeParams"
+          }
         }
       }
     },
     {
       "if": {
-        "properties": { "method": { "const": "runtime.cancel" } },
-        "required": ["method"]
+        "properties": {
+          "method": {
+            "const": "runtime.cancel"
+          }
+        },
+        "required": [
+          "method"
+        ]
       },
       "then": {
         "properties": {
-          "params": { "$ref": "#/$defs/RuntimeCancelParams" }
+          "params": {
+            "$ref": "#/$defs/RuntimeCancelParams"
+          }
         }
       }
     },
     {
       "if": {
-        "properties": { "method": { "const": "runtime.status" } },
-        "required": ["method"]
+        "properties": {
+          "method": {
+            "const": "runtime.status"
+          }
+        },
+        "required": [
+          "method"
+        ]
       },
       "then": {
         "properties": {
-          "params": { "$ref": "#/$defs/RuntimeStatusParams" }
+          "params": {
+            "$ref": "#/$defs/RuntimeStatusParams"
+          }
         }
       }
     },
     {
       "if": {
-        "properties": { "method": { "const": "runtime.shutdown" } },
-        "required": ["method"]
+        "properties": {
+          "method": {
+            "const": "runtime.shutdown"
+          }
+        },
+        "required": [
+          "method"
+        ]
       },
       "then": {
         "properties": {
-          "params": { "$ref": "#/$defs/RuntimeShutdownParams" }
+          "params": {
+            "$ref": "#/$defs/RuntimeShutdownParams"
+          }
         }
       }
     },
     {
       "if": {
-        "properties": { "method": { "const": "host.complete" } },
-        "required": ["method"]
+        "properties": {
+          "method": {
+            "const": "host.complete"
+          }
+        },
+        "required": [
+          "method"
+        ]
       },
       "then": {
         "properties": {
-          "params": { "$ref": "#/$defs/HostCompleteParams" }
+          "params": {
+            "$ref": "#/$defs/HostCompleteParams"
+          }
         }
       }
     },
     {
       "if": {
-        "properties": { "method": { "const": "host.error" } },
-        "required": ["method"]
+        "properties": {
+          "method": {
+            "const": "host.error"
+          }
+        },
+        "required": [
+          "method"
+        ]
       },
       "then": {
         "properties": {
-          "params": { "$ref": "#/$defs/HostErrorParams" }
+          "params": {
+            "$ref": "#/$defs/HostErrorParams"
+          }
         }
       }
     },
     {
       "if": {
-        "properties": { "method": { "const": "source.import" } },
-        "required": ["method"]
+        "properties": {
+          "method": {
+            "const": "source.import"
+          }
+        },
+        "required": [
+          "method"
+        ]
       },
       "then": {
         "properties": {
-          "params": { "$ref": "#/$defs/SourceImportParams" }
+          "params": {
+            "$ref": "#/$defs/SourceImportParams"
+          }
         }
       }
     },
     {
       "if": {
-        "properties": { "method": { "const": "book.search" } },
-        "required": ["method"]
+        "properties": {
+          "method": {
+            "const": "book.search"
+          }
+        },
+        "required": [
+          "method"
+        ]
       },
       "then": {
         "properties": {
-          "params": { "$ref": "#/$defs/BookSearchParams" }
+          "params": {
+            "$ref": "#/$defs/BookSearchParams"
+          }
         }
       }
     },
     {
       "if": {
-        "properties": { "method": { "const": "book.detail" } },
-        "required": ["method"]
+        "properties": {
+          "method": {
+            "const": "book.detail"
+          }
+        },
+        "required": [
+          "method"
+        ]
       },
       "then": {
         "properties": {
-          "params": { "$ref": "#/$defs/BookDetailParams" }
+          "params": {
+            "$ref": "#/$defs/BookDetailParams"
+          }
         }
       }
     },
     {
       "if": {
-        "properties": { "method": { "const": "book.toc" } },
-        "required": ["method"]
+        "properties": {
+          "method": {
+            "const": "book.toc"
+          }
+        },
+        "required": [
+          "method"
+        ]
       },
       "then": {
         "properties": {
-          "params": { "$ref": "#/$defs/BookTocParams" }
+          "params": {
+            "$ref": "#/$defs/BookTocParams"
+          }
         }
       }
     },
     {
       "if": {
-        "properties": { "method": { "const": "chapter.content" } },
-        "required": ["method"]
+        "properties": {
+          "method": {
+            "const": "chapter.content"
+          }
+        },
+        "required": [
+          "method"
+        ]
       },
       "then": {
         "properties": {
-          "params": { "$ref": "#/$defs/ChapterContentParams" }
+          "params": {
+            "$ref": "#/$defs/ChapterContentParams"
+          }
         }
       }
     },
     {
       "if": {
-        "properties": { "method": { "const": "reading.progress.update" } },
-        "required": ["method"]
+        "properties": {
+          "method": {
+            "const": "reading.progress.update"
+          }
+        },
+        "required": [
+          "method"
+        ]
       },
       "then": {
         "properties": {
-          "params": { "$ref": "#/$defs/ReadingProgressUpdateParams" }
+          "params": {
+            "$ref": "#/$defs/ReadingProgressUpdateParams"
+          }
         }
       }
     },
     {
       "if": {
-        "properties": { "method": { "const": "tts.slice" } },
-        "required": ["method"]
+        "properties": {
+          "method": {
+            "const": "rss.parse"
+          }
+        },
+        "required": [
+          "method"
+        ]
       },
       "then": {
         "properties": {
-          "params": { "$ref": "#/$defs/TtsSliceParams" }
+          "params": {
+            "$ref": "#/$defs/RssParseParams"
+          }
         }
       }
     },
     {
       "if": {
-        "properties": { "method": { "const": "tts.queue.status" } },
-        "required": ["method"]
+        "properties": {
+          "method": {
+            "const": "rss.refresh"
+          }
+        },
+        "required": [
+          "method"
+        ]
       },
       "then": {
         "properties": {
-          "params": { "$ref": "#/$defs/TtsQueueStatusParams" }
+          "params": {
+            "$ref": "#/$defs/RssRefreshParams"
+          }
         }
       }
     },
     {
       "if": {
-        "properties": { "method": { "const": "tts.chapter.plan" } },
-        "required": ["method"]
+        "properties": {
+          "method": {
+            "const": "sync.merge"
+          }
+        },
+        "required": [
+          "method"
+        ]
       },
       "then": {
         "properties": {
-          "params": { "$ref": "#/$defs/TtsChapterPlanParams" }
+          "params": {
+            "$ref": "#/$defs/SyncMergeParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "sync.backup"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/SyncBackupParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "local_book.parse"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/LocalBookParseParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "local_book.catalog"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/LocalBookCatalogParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "tts.slice"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/TtsSliceParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "tts.queue.status"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/TtsQueueStatusParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "tts.chapter.plan"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/TtsChapterPlanParams"
+          }
         }
       }
     }
@@ -276,9 +539,15 @@
     "HostCompleteParams": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["operationId", "result"],
+      "required": [
+        "operationId",
+        "result"
+      ],
       "properties": {
-        "operationId": { "type": "integer", "minimum": 1 },
+        "operationId": {
+          "type": "integer",
+          "minimum": 1
+        },
         "result": {
           "description": "Host capability result payload. For http.execute remote-reading continuations, see #/$defs/HostHttpResponse.",
           "type": "object"
@@ -288,7 +557,9 @@
     "HostHttpResponse": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["body"],
+      "required": [
+        "body"
+      ],
       "description": "Result payload accepted when completing a host.request with capability http.execute.",
       "properties": {
         "body": {
@@ -302,7 +573,10 @@
           "description": "Optional HTTP status code accepted by Core for diagnostics."
         },
         "headers": {
-          "type": ["object", "null"],
+          "type": [
+            "object",
+            "null"
+          ],
           "default": {},
           "description": "Optional HTTP response headers accepted by Core for diagnostics."
         },
@@ -330,12 +604,16 @@
         },
         "redirects": {
           "type": "array",
-          "items": { "$ref": "#/$defs/HostHttpRedirect" },
+          "items": {
+            "$ref": "#/$defs/HostHttpRedirect"
+          },
           "description": "Redirect hops observed by the host HTTP stack."
         },
         "cookies": {
           "type": "array",
-          "items": { "$ref": "#/$defs/HostHttpCookie" },
+          "items": {
+            "$ref": "#/$defs/HostHttpCookie"
+          },
           "description": "Cookie metadata observed or applied by the host HTTP stack."
         }
       }
@@ -343,7 +621,9 @@
     "HostHttpRequest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["url"],
+      "required": [
+        "url"
+      ],
       "description": "Host HTTP request descriptor emitted for remote-reading commands.",
       "properties": {
         "url": {
@@ -365,7 +645,10 @@
           "description": "HTTP request headers."
         },
         "body": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "default": null,
           "description": "Optional request body."
         },
@@ -401,7 +684,9 @@
     "HostHttpRetryPolicy": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["maxAttempts"],
+      "required": [
+        "maxAttempts"
+      ],
       "properties": {
         "maxAttempts": {
           "type": "integer",
@@ -418,7 +703,9 @@
     "HostHttpSession": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -431,7 +718,11 @@
     "HostHttpRedirect": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "fromUrl", "toUrl"],
+      "required": [
+        "status",
+        "fromUrl",
+        "toUrl"
+      ],
       "properties": {
         "status": {
           "type": "integer",
@@ -457,14 +748,18 @@
     "HostHttpCookie": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
         "name": {
           "type": "string",
           "minLength": 1,
           "pattern": "\\S"
         },
-        "value": { "type": "string" },
+        "value": {
+          "type": "string"
+        },
         "domain": {
           "type": "string",
           "minLength": 1,
@@ -480,8 +775,12 @@
           "minLength": 1,
           "pattern": "\\S"
         },
-        "httpOnly": { "type": "boolean" },
-        "secure": { "type": "boolean" },
+        "httpOnly": {
+          "type": "boolean"
+        },
+        "secure": {
+          "type": "boolean"
+        },
         "sameSite": {
           "type": "string",
           "minLength": 1,
@@ -512,10 +811,18 @@
     "HostErrorParams": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["operationId", "error"],
+      "required": [
+        "operationId",
+        "error"
+      ],
       "properties": {
-        "operationId": { "type": "integer", "minimum": 1 },
-        "error": { "$ref": "reader-event.schema.json#/$defs/CoreError" },
+        "operationId": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "error": {
+          "$ref": "reader-event.schema.json#/$defs/CoreError"
+        },
         "diagnostics": {
           "$ref": "#/$defs/HostErrorDiagnostics",
           "description": "Optional host-owned execution diagnostics. Core adds operation correlation before surfacing the error."
@@ -525,11 +832,18 @@
     "HostErrorDiagnostics": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code", "phase"],
+      "required": [
+        "code",
+        "phase"
+      ],
       "description": "Typed diagnostics for a failed host capability execution. Platforms report capability facts only and must not interpret Legado rules.",
       "properties": {
-        "code": { "$ref": "#/$defs/HostErrorCode" },
-        "phase": { "$ref": "#/$defs/HostErrorPhase" },
+        "code": {
+          "$ref": "#/$defs/HostErrorCode"
+        },
+        "phase": {
+          "$ref": "#/$defs/HostErrorPhase"
+        },
         "message": {
           "type": "string",
           "description": "Optional host-side diagnostic message."
@@ -557,15 +871,27 @@
     },
     "HostErrorPhase": {
       "type": "string",
-      "enum": ["request", "transport", "response", "decode", "storage", "runtime"]
+      "enum": [
+        "request",
+        "transport",
+        "response",
+        "decode",
+        "storage",
+        "runtime"
+      ]
     },
     "HostWebViewEvaluateJavaScriptRequest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["document", "javaScript"],
+      "required": [
+        "document",
+        "javaScript"
+      ],
       "description": "Request params for webview.evaluateJavaScript. Core supplies document input and JavaScript; the host only evaluates the script in a platform WebView.",
       "properties": {
-        "document": { "$ref": "#/$defs/HostWebViewDocument" },
+        "document": {
+          "$ref": "#/$defs/HostWebViewDocument"
+        },
         "javaScript": {
           "type": "string",
           "minLength": 1,
@@ -588,12 +914,21 @@
     "HostWebViewEvaluateJavaScriptResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["value"],
+      "required": [
+        "value"
+      ],
       "description": "Result payload accepted when completing a host.request with capability webview.evaluateJavaScript.",
       "properties": {
         "value": {
           "description": "Raw JSON value returned by host JavaScript evaluation.",
-          "type": ["string", "object", "array", "number", "boolean", "null"]
+          "type": [
+            "string",
+            "object",
+            "array",
+            "number",
+            "boolean",
+            "null"
+          ]
         },
         "finalUrl": {
           "type": "string",
@@ -612,124 +947,304 @@
     "HostWebViewDocument": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind"],
+      "required": [
+        "kind"
+      ],
       "oneOf": [
         {
-          "required": ["body"],
+          "required": [
+            "body"
+          ],
           "properties": {
-            "kind": { "const": "html" },
-            "body": { "type": "string", "minLength": 1, "pattern": "\\S" },
-            "baseUrl": { "type": "string", "minLength": 1, "pattern": "\\S" }
+            "kind": {
+              "const": "html"
+            },
+            "body": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            "baseUrl": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            }
           },
-          "not": { "required": ["url"] }
+          "not": {
+            "required": [
+              "url"
+            ]
+          }
         },
         {
-          "required": ["url"],
+          "required": [
+            "url"
+          ],
           "properties": {
-            "kind": { "const": "url" },
-            "url": { "type": "string", "minLength": 1, "pattern": "\\S" }
+            "kind": {
+              "const": "url"
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            }
           },
           "not": {
             "anyOf": [
-              { "required": ["body"] },
-              { "required": ["baseUrl"] }
+              {
+                "required": [
+                  "body"
+                ]
+              },
+              {
+                "required": [
+                  "baseUrl"
+                ]
+              }
             ]
           }
         }
       ],
       "properties": {
-        "kind": { "type": "string", "enum": ["html", "url"] },
-        "body": { "type": "string" },
-        "url": { "type": "string" },
-        "baseUrl": { "type": "string" }
+        "kind": {
+          "type": "string",
+          "enum": [
+            "html",
+            "url"
+          ]
+        },
+        "body": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "baseUrl": {
+          "type": "string"
+        }
       }
     },
     "HostFileReadRequest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path"],
+      "required": [
+        "path"
+      ],
       "description": "Request params for file.read. Core supplies an opaque path and byte bounds; hosts only read bytes/content.",
       "properties": {
-        "path": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "encoding": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "byteOffset": { "type": "integer", "minimum": 0 },
-        "maxBytes": { "type": "integer", "minimum": 1 }
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "encoding": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "byteOffset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxBytes": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     },
     "HostFileReadResponse": {
       "type": "object",
       "additionalProperties": false,
       "oneOf": [
-        { "required": ["content"], "not": { "required": ["contentBase64"] } },
-        { "required": ["contentBase64"], "not": { "required": ["content"] } }
+        {
+          "required": [
+            "content"
+          ],
+          "not": {
+            "required": [
+              "contentBase64"
+            ]
+          }
+        },
+        {
+          "required": [
+            "contentBase64"
+          ],
+          "not": {
+            "required": [
+              "content"
+            ]
+          }
+        }
       ],
       "description": "Result payload accepted when completing a host.request with capability file.read.",
       "properties": {
-        "content": { "type": "string" },
-        "contentBase64": { "type": "string" },
-        "encoding": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "byteLength": { "type": "integer", "minimum": 0 }
+        "content": {
+          "type": "string"
+        },
+        "contentBase64": {
+          "type": "string"
+        },
+        "encoding": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "byteLength": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "HostFileWriteRequest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path"],
+      "required": [
+        "path"
+      ],
       "oneOf": [
-        { "required": ["content"], "not": { "required": ["contentBase64"] } },
-        { "required": ["contentBase64"], "not": { "required": ["content"] } }
+        {
+          "required": [
+            "content"
+          ],
+          "not": {
+            "required": [
+              "contentBase64"
+            ]
+          }
+        },
+        {
+          "required": [
+            "contentBase64"
+          ],
+          "not": {
+            "required": [
+              "content"
+            ]
+          }
+        }
       ],
       "description": "Request params for file.write. Core supplies the destination path and bytes/content.",
       "properties": {
-        "path": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "content": { "type": "string" },
-        "contentBase64": { "type": "string" },
-        "encoding": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "createDirectories": { "type": "boolean" },
-        "append": { "type": "boolean" }
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "content": {
+          "type": "string"
+        },
+        "contentBase64": {
+          "type": "string"
+        },
+        "encoding": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "createDirectories": {
+          "type": "boolean"
+        },
+        "append": {
+          "type": "boolean"
+        }
       }
     },
     "HostFileWriteResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["written"],
+      "required": [
+        "written"
+      ],
       "description": "Result payload accepted when completing a host.request with capability file.write.",
       "properties": {
-        "written": { "type": "boolean", "const": true },
-        "byteLength": { "type": "integer", "minimum": 0 }
+        "written": {
+          "type": "boolean",
+          "const": true
+        },
+        "byteLength": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "HostCacheGetRequest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["namespace", "key"],
+      "required": [
+        "namespace",
+        "key"
+      ],
       "description": "Request params for cache.get. Namespace and key are Core-owned opaque identifiers.",
       "properties": {
-        "namespace": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "key": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
       }
     },
     "HostCacheGetResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["hit"],
+      "required": [
+        "hit"
+      ],
       "allOf": [
         {
           "if": {
-            "properties": { "hit": { "const": true } },
-            "required": ["hit"]
+            "properties": {
+              "hit": {
+                "const": true
+              }
+            },
+            "required": [
+              "hit"
+            ]
           },
           "then": {
             "oneOf": [
-              { "required": ["value"], "not": { "required": ["valueBase64"] } },
-              { "required": ["valueBase64"], "not": { "required": ["value"] } }
+              {
+                "required": [
+                  "value"
+                ],
+                "not": {
+                  "required": [
+                    "valueBase64"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "valueBase64"
+                ],
+                "not": {
+                  "required": [
+                    "value"
+                  ]
+                }
+              }
             ]
           },
           "else": {
             "not": {
               "anyOf": [
-                { "required": ["value"] },
-                { "required": ["valueBase64"] }
+                {
+                  "required": [
+                    "value"
+                  ]
+                },
+                {
+                  "required": [
+                    "valueBase64"
+                  ]
+                }
               ]
             }
           }
@@ -737,125 +1252,284 @@
       ],
       "description": "Result payload accepted when completing a host.request with capability cache.get.",
       "properties": {
-        "hit": { "type": "boolean" },
-        "value": { "type": "string" },
-        "valueBase64": { "type": "string" },
-        "expiresAt": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        "hit": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "string"
+        },
+        "valueBase64": {
+          "type": "string"
+        },
+        "expiresAt": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
       }
     },
     "HostCachePutRequest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["namespace", "key"],
+      "required": [
+        "namespace",
+        "key"
+      ],
       "oneOf": [
-        { "required": ["value"], "not": { "required": ["valueBase64"] } },
-        { "required": ["valueBase64"], "not": { "required": ["value"] } }
+        {
+          "required": [
+            "value"
+          ],
+          "not": {
+            "required": [
+              "valueBase64"
+            ]
+          }
+        },
+        {
+          "required": [
+            "valueBase64"
+          ],
+          "not": {
+            "required": [
+              "value"
+            ]
+          }
+        }
       ],
       "description": "Request params for cache.put. Core supplies opaque namespace/key and bytes/content to store.",
       "properties": {
-        "namespace": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "key": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "value": { "type": "string" },
-        "valueBase64": { "type": "string" },
-        "ttlMillis": { "type": "integer", "minimum": 1 }
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "value": {
+          "type": "string"
+        },
+        "valueBase64": {
+          "type": "string"
+        },
+        "ttlMillis": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     },
     "HostCachePutResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["stored"],
+      "required": [
+        "stored"
+      ],
       "description": "Result payload accepted when completing a host.request with capability cache.put.",
       "properties": {
-        "stored": { "type": "boolean", "const": true },
-        "expiresAt": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        "stored": {
+          "type": "boolean",
+          "const": true
+        },
+        "expiresAt": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
       }
     },
     "HostCookieRecord": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
-        "name": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "value": { "type": "string" },
-        "domain": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "path": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "expiresAt": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "httpOnly": { "type": "boolean" },
-        "secure": { "type": "boolean" },
-        "sameSite": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "value": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "expiresAt": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "httpOnly": {
+          "type": "boolean"
+        },
+        "secure": {
+          "type": "boolean"
+        },
+        "sameSite": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
       }
     },
     "HostCookieGetRequest": {
       "type": "object",
       "additionalProperties": false,
       "anyOf": [
-        { "required": ["url"] },
-        { "required": ["domain"] },
-        { "required": ["sessionId"] }
+        {
+          "required": [
+            "url"
+          ]
+        },
+        {
+          "required": [
+            "domain"
+          ]
+        },
+        {
+          "required": [
+            "sessionId"
+          ]
+        }
       ],
       "description": "Request params for cookie.get. Core supplies lookup scope; host only returns cookie records.",
       "properties": {
-        "url": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "domain": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "name": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "sessionId": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "domain": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
       }
     },
     "HostCookieGetResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["cookies"],
+      "required": [
+        "cookies"
+      ],
       "description": "Result payload accepted when completing a host.request with capability cookie.get.",
       "properties": {
         "cookies": {
           "type": "array",
-          "items": { "$ref": "#/$defs/HostCookieRecord" }
+          "items": {
+            "$ref": "#/$defs/HostCookieRecord"
+          }
         }
       }
     },
     "HostCookieSetRequest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["cookie"],
+      "required": [
+        "cookie"
+      ],
       "description": "Request params for cookie.set. Core supplies a cookie record; host only stores it for the scoped jar.",
       "properties": {
-        "cookie": { "$ref": "#/$defs/HostCookieRecord" },
-        "url": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "sessionId": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        "cookie": {
+          "$ref": "#/$defs/HostCookieRecord"
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
       }
     },
     "HostCookieSetResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["stored"],
+      "required": [
+        "stored"
+      ],
       "description": "Result payload accepted when completing a host.request with capability cookie.set.",
       "properties": {
-        "stored": { "type": "boolean", "const": true }
+        "stored": {
+          "type": "boolean",
+          "const": true
+        }
       }
     },
     "HostLogLevel": {
       "type": "string",
-      "enum": ["trace", "debug", "info", "warn", "error"]
+      "enum": [
+        "trace",
+        "debug",
+        "info",
+        "warn",
+        "error"
+      ]
     },
     "HostLogEmitRequest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["level", "message"],
+      "required": [
+        "level",
+        "message"
+      ],
       "description": "Request params for log.emit. Core supplies structured log facts; host only emits them.",
       "properties": {
-        "level": { "$ref": "#/$defs/HostLogLevel" },
-        "message": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "target": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "fields": { "type": "object", "default": {} }
+        "level": {
+          "$ref": "#/$defs/HostLogLevel"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "fields": {
+          "type": "object",
+          "default": {}
+        }
       }
     },
     "HostLogEmitResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["emitted"],
+      "required": [
+        "emitted"
+      ],
       "description": "Result payload accepted when completing a host.request with capability log.emit.",
       "properties": {
-        "emitted": { "type": "boolean", "const": true }
+        "emitted": {
+          "type": "boolean",
+          "const": true
+        }
       }
     },
     "HostTimeNowRequest": {
@@ -863,19 +1537,41 @@
       "additionalProperties": false,
       "description": "Request params for time.now. Core may request an optional clock/timezone fact.",
       "properties": {
-        "clock": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "timezone": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        "clock": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
       }
     },
     "HostTimeNowResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["unixMillis", "iso8601"],
+      "required": [
+        "unixMillis",
+        "iso8601"
+      ],
       "description": "Result payload accepted when completing a host.request with capability time.now.",
       "properties": {
-        "unixMillis": { "type": "integer", "minimum": 0 },
-        "iso8601": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "timezone": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        "unixMillis": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "iso8601": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
       }
     },
     "HostSystemInfoRequest": {
@@ -885,7 +1581,11 @@
       "properties": {
         "keys": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1, "pattern": "\\S" },
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
           "default": []
         }
       }
@@ -893,43 +1593,92 @@
     "HostSystemInfoResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["info"],
+      "required": [
+        "info"
+      ],
       "description": "Result payload accepted when completing a host.request with capability system.info.",
       "properties": {
-        "info": { "type": "object" }
+        "info": {
+          "type": "object"
+        }
       }
     },
     "HostPersistenceGetRequest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["namespace", "key"],
+      "required": [
+        "namespace",
+        "key"
+      ],
       "description": "Request params for persistence.get. Namespace/key are Core-owned opaque identifiers.",
       "properties": {
-        "namespace": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "key": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
       }
     },
     "HostPersistenceGetResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["found"],
+      "required": [
+        "found"
+      ],
       "allOf": [
         {
           "if": {
-            "properties": { "found": { "const": true } },
-            "required": ["found"]
+            "properties": {
+              "found": {
+                "const": true
+              }
+            },
+            "required": [
+              "found"
+            ]
           },
           "then": {
             "oneOf": [
-              { "required": ["value"], "not": { "required": ["valueBase64"] } },
-              { "required": ["valueBase64"], "not": { "required": ["value"] } }
+              {
+                "required": [
+                  "value"
+                ],
+                "not": {
+                  "required": [
+                    "valueBase64"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "valueBase64"
+                ],
+                "not": {
+                  "required": [
+                    "value"
+                  ]
+                }
+              }
             ]
           },
           "else": {
             "not": {
               "anyOf": [
-                { "required": ["value"] },
-                { "required": ["valueBase64"] }
+                {
+                  "required": [
+                    "value"
+                  ]
+                },
+                {
+                  "required": [
+                    "valueBase64"
+                  ]
+                }
               ]
             }
           }
@@ -937,37 +1686,93 @@
       ],
       "description": "Result payload accepted when completing a host.request with capability persistence.get.",
       "properties": {
-        "found": { "type": "boolean" },
-        "value": { "type": "string" },
-        "valueBase64": { "type": "string" },
-        "revision": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        "found": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "string"
+        },
+        "valueBase64": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
       }
     },
     "HostPersistencePutRequest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["namespace", "key"],
+      "required": [
+        "namespace",
+        "key"
+      ],
       "oneOf": [
-        { "required": ["value"], "not": { "required": ["valueBase64"] } },
-        { "required": ["valueBase64"], "not": { "required": ["value"] } }
+        {
+          "required": [
+            "value"
+          ],
+          "not": {
+            "required": [
+              "valueBase64"
+            ]
+          }
+        },
+        {
+          "required": [
+            "valueBase64"
+          ],
+          "not": {
+            "required": [
+              "value"
+            ]
+          }
+        }
       ],
       "description": "Request params for persistence.put. Core supplies opaque namespace/key and bytes/content to store.",
       "properties": {
-        "namespace": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "key": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "value": { "type": "string" },
-        "valueBase64": { "type": "string" },
-        "expectedRevision": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "value": {
+          "type": "string"
+        },
+        "valueBase64": {
+          "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
       }
     },
     "HostPersistencePutResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["stored"],
+      "required": [
+        "stored"
+      ],
       "description": "Result payload accepted when completing a host.request with capability persistence.put.",
       "properties": {
-        "stored": { "type": "boolean", "const": true },
-        "revision": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        "stored": {
+          "type": "boolean",
+          "const": true
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
       }
     },
     "HostSmokeParams": {
@@ -977,156 +1782,228 @@
         {
           "if": {
             "properties": {
-              "capability": { "const": "webview.evaluateJavaScript" }
+              "capability": {
+                "const": "webview.evaluateJavaScript"
+              }
             },
-            "required": ["capability"]
+            "required": [
+              "capability"
+            ]
           },
           "then": {
             "properties": {
-              "params": { "$ref": "#/$defs/HostWebViewEvaluateJavaScriptRequest" }
+              "params": {
+                "$ref": "#/$defs/HostWebViewEvaluateJavaScriptRequest"
+              }
             }
           }
         },
         {
           "if": {
             "properties": {
-              "capability": { "const": "file.read" }
+              "capability": {
+                "const": "file.read"
+              }
             },
-            "required": ["capability"]
+            "required": [
+              "capability"
+            ]
           },
           "then": {
             "properties": {
-              "params": { "$ref": "#/$defs/HostFileReadRequest" }
+              "params": {
+                "$ref": "#/$defs/HostFileReadRequest"
+              }
             }
           }
         },
         {
           "if": {
             "properties": {
-              "capability": { "const": "file.write" }
+              "capability": {
+                "const": "file.write"
+              }
             },
-            "required": ["capability"]
+            "required": [
+              "capability"
+            ]
           },
           "then": {
             "properties": {
-              "params": { "$ref": "#/$defs/HostFileWriteRequest" }
+              "params": {
+                "$ref": "#/$defs/HostFileWriteRequest"
+              }
             }
           }
         },
         {
           "if": {
             "properties": {
-              "capability": { "const": "cache.get" }
+              "capability": {
+                "const": "cache.get"
+              }
             },
-            "required": ["capability"]
+            "required": [
+              "capability"
+            ]
           },
           "then": {
             "properties": {
-              "params": { "$ref": "#/$defs/HostCacheGetRequest" }
+              "params": {
+                "$ref": "#/$defs/HostCacheGetRequest"
+              }
             }
           }
         },
         {
           "if": {
             "properties": {
-              "capability": { "const": "cache.put" }
+              "capability": {
+                "const": "cache.put"
+              }
             },
-            "required": ["capability"]
+            "required": [
+              "capability"
+            ]
           },
           "then": {
             "properties": {
-              "params": { "$ref": "#/$defs/HostCachePutRequest" }
+              "params": {
+                "$ref": "#/$defs/HostCachePutRequest"
+              }
             }
           }
         },
         {
           "if": {
             "properties": {
-              "capability": { "const": "cookie.get" }
+              "capability": {
+                "const": "cookie.get"
+              }
             },
-            "required": ["capability"]
+            "required": [
+              "capability"
+            ]
           },
           "then": {
             "properties": {
-              "params": { "$ref": "#/$defs/HostCookieGetRequest" }
+              "params": {
+                "$ref": "#/$defs/HostCookieGetRequest"
+              }
             }
           }
         },
         {
           "if": {
             "properties": {
-              "capability": { "const": "cookie.set" }
+              "capability": {
+                "const": "cookie.set"
+              }
             },
-            "required": ["capability"]
+            "required": [
+              "capability"
+            ]
           },
           "then": {
             "properties": {
-              "params": { "$ref": "#/$defs/HostCookieSetRequest" }
+              "params": {
+                "$ref": "#/$defs/HostCookieSetRequest"
+              }
             }
           }
         },
         {
           "if": {
             "properties": {
-              "capability": { "const": "log.emit" }
+              "capability": {
+                "const": "log.emit"
+              }
             },
-            "required": ["capability"]
+            "required": [
+              "capability"
+            ]
           },
           "then": {
             "properties": {
-              "params": { "$ref": "#/$defs/HostLogEmitRequest" }
+              "params": {
+                "$ref": "#/$defs/HostLogEmitRequest"
+              }
             }
           }
         },
         {
           "if": {
             "properties": {
-              "capability": { "const": "time.now" }
+              "capability": {
+                "const": "time.now"
+              }
             },
-            "required": ["capability"]
+            "required": [
+              "capability"
+            ]
           },
           "then": {
             "properties": {
-              "params": { "$ref": "#/$defs/HostTimeNowRequest" }
+              "params": {
+                "$ref": "#/$defs/HostTimeNowRequest"
+              }
             }
           }
         },
         {
           "if": {
             "properties": {
-              "capability": { "const": "system.info" }
+              "capability": {
+                "const": "system.info"
+              }
             },
-            "required": ["capability"]
+            "required": [
+              "capability"
+            ]
           },
           "then": {
             "properties": {
-              "params": { "$ref": "#/$defs/HostSystemInfoRequest" }
+              "params": {
+                "$ref": "#/$defs/HostSystemInfoRequest"
+              }
             }
           }
         },
         {
           "if": {
             "properties": {
-              "capability": { "const": "persistence.get" }
+              "capability": {
+                "const": "persistence.get"
+              }
             },
-            "required": ["capability"]
+            "required": [
+              "capability"
+            ]
           },
           "then": {
             "properties": {
-              "params": { "$ref": "#/$defs/HostPersistenceGetRequest" }
+              "params": {
+                "$ref": "#/$defs/HostPersistenceGetRequest"
+              }
             }
           }
         },
         {
           "if": {
             "properties": {
-              "capability": { "const": "persistence.put" }
+              "capability": {
+                "const": "persistence.put"
+              }
             },
-            "required": ["capability"]
+            "required": [
+              "capability"
+            ]
           },
           "then": {
             "properties": {
-              "params": { "$ref": "#/$defs/HostPersistencePutRequest" }
+              "params": {
+                "$ref": "#/$defs/HostPersistencePutRequest"
+              }
             }
           }
         }
@@ -1145,7 +2022,9 @@
     "RuntimeCancelParams": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["requestId"],
+      "required": [
+        "requestId"
+      ],
       "description": "Parameters for runtime.cancel. Cancels an in-flight request by its requestId.",
       "properties": {
         "requestId": {
@@ -1168,7 +2047,9 @@
     "SourceImportParams": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "description": "Parameters for source.import. Imports one remote-reading source definition into Core runtime state.",
       "properties": {
         "sourceId": {
@@ -1188,12 +2069,18 @@
           "description": "Optional source base URL."
         },
         "rules": {
-          "type": ["object", "null"],
+          "type": [
+            "object",
+            "null"
+          ],
           "default": null,
           "description": "Optional extraction rules object keyed by remote-reading stage."
         },
         "bookSource": {
-          "type": ["object", "null"],
+          "type": [
+            "object",
+            "null"
+          ],
           "default": null,
           "description": "Optional raw Legado BookSource object preserved separately from V1 rules."
         }
@@ -1202,7 +2089,9 @@
     "BookSearchParams": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sourceId"],
+      "required": [
+        "sourceId"
+      ],
       "description": "Parameters for book.search. Uses a prefetched response or emits http.execute via searchRequest.",
       "properties": {
         "sourceId": {
@@ -1216,14 +2105,21 @@
         },
         "searchRequest": {
           "anyOf": [
-            { "$ref": "#/$defs/HostHttpRequest" },
-            { "type": "null" }
+            {
+              "$ref": "#/$defs/HostHttpRequest"
+            },
+            {
+              "type": "null"
+            }
           ],
           "default": null,
           "description": "Optional host HTTP request descriptor when searchResponse is empty."
         },
         "source": {
-          "type": ["object", "null"],
+          "type": [
+            "object",
+            "null"
+          ],
           "default": null,
           "description": "Optional inline source definition used instead of storage lookup."
         }
@@ -1232,7 +2128,10 @@
     "BookDetailParams": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sourceId", "book"],
+      "required": [
+        "sourceId",
+        "book"
+      ],
       "description": "Parameters for book.detail. Merges fetched detail metadata into a base book.",
       "properties": {
         "sourceId": {
@@ -1250,14 +2149,21 @@
         },
         "detailRequest": {
           "anyOf": [
-            { "$ref": "#/$defs/HostHttpRequest" },
-            { "type": "null" }
+            {
+              "$ref": "#/$defs/HostHttpRequest"
+            },
+            {
+              "type": "null"
+            }
           ],
           "default": null,
           "description": "Optional host HTTP request descriptor when detailResponse is empty."
         },
         "source": {
-          "type": ["object", "null"],
+          "type": [
+            "object",
+            "null"
+          ],
           "default": null,
           "description": "Optional inline source definition used instead of storage lookup."
         }
@@ -1266,7 +2172,10 @@
     "BookTocParams": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sourceId", "bookId"],
+      "required": [
+        "sourceId",
+        "bookId"
+      ],
       "description": "Parameters for book.toc. Extracts a table of contents for one book.",
       "properties": {
         "sourceId": {
@@ -1284,14 +2193,21 @@
         },
         "tocRequest": {
           "anyOf": [
-            { "$ref": "#/$defs/HostHttpRequest" },
-            { "type": "null" }
+            {
+              "$ref": "#/$defs/HostHttpRequest"
+            },
+            {
+              "type": "null"
+            }
           ],
           "default": null,
           "description": "Optional host HTTP request descriptor when tocResponse is empty."
         },
         "source": {
-          "type": ["object", "null"],
+          "type": [
+            "object",
+            "null"
+          ],
           "default": null,
           "description": "Optional inline source definition used instead of storage lookup."
         }
@@ -1300,7 +2216,10 @@
     "ChapterContentParams": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sourceId", "bookId"],
+      "required": [
+        "sourceId",
+        "bookId"
+      ],
       "description": "Parameters for chapter.content. Extracts chapter body content for one book chapter.",
       "properties": {
         "sourceId": {
@@ -1323,19 +2242,29 @@
         },
         "chapterRequest": {
           "anyOf": [
-            { "$ref": "#/$defs/HostHttpRequest" },
-            { "type": "null" }
+            {
+              "$ref": "#/$defs/HostHttpRequest"
+            },
+            {
+              "type": "null"
+            }
           ],
           "default": null,
           "description": "Optional host HTTP request descriptor when chapterResponse is empty."
         },
         "jsRule": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "default": null,
           "description": "Optional JS rule script for chapter extraction."
         },
         "source": {
-          "type": ["object", "null"],
+          "type": [
+            "object",
+            "null"
+          ],
           "default": null,
           "description": "Optional inline source definition used instead of storage lookup."
         }
@@ -1344,7 +2273,9 @@
     "ReadingProgressUpdateParams": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["bookId"],
+      "required": [
+        "bookId"
+      ],
       "description": "Parameters for reading.progress.update. Stores the current reading position for one book.",
       "properties": {
         "bookId": {
@@ -1372,10 +2303,198 @@
         }
       }
     },
+    "RssParseParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "xml"
+      ],
+      "description": "Parameters for rss.parse. Parses an RSS/Atom XML feed into entries. Pure: no network.",
+      "properties": {
+        "feedUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Optional feed URL used to resolve relative links and self-reference guards."
+        },
+        "xml": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "RSS/Atom XML feed text. Must be non-empty."
+        }
+      }
+    },
+    "RssRefreshParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subscriptionId",
+        "evaluatedAt"
+      ],
+      "description": "Parameters for rss.refresh. Pure policy decision: should the subscription be polled now?",
+      "properties": {
+        "subscriptionId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Stable subscription identifier. Must be non-empty."
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether the subscription is enabled for refresh."
+        },
+        "updateIntervalMinutes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Minimum minutes between refreshes. Omitted means no interval bound."
+        },
+        "lastFetchedAt": {
+          "type": "integer",
+          "description": "Unix-millis timestamp of the last successful fetch."
+        },
+        "forceRefresh": {
+          "type": "boolean",
+          "default": false,
+          "description": "Force a refresh decision regardless of interval."
+        },
+        "evaluatedAt": {
+          "type": "integer",
+          "description": "Unix-millis timestamp at which the decision is evaluated."
+        }
+      }
+    },
+    "SyncMergeParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "local",
+        "remote"
+      ],
+      "description": "Parameters for sync.merge. Merges two snapshots with deterministic last-write-wins. Pure.",
+      "properties": {
+        "local": {
+          "type": "object",
+          "description": "Local snapshot object (shape owned by reader_sync::SyncSnapshot)."
+        },
+        "remote": {
+          "type": "object",
+          "description": "Remote snapshot object (shape owned by reader_sync::SyncSnapshot)."
+        },
+        "mergedSnapshotId": {
+          "type": "string",
+          "default": "",
+          "description": "Optional stable id for the merged snapshot. Blank lets Core assign one."
+        },
+        "mergedDeviceId": {
+          "type": "string",
+          "default": "",
+          "description": "Optional device id for the merged snapshot."
+        },
+        "mergedCreatedAt": {
+          "type": "integer",
+          "default": 0,
+          "description": "Optional created-at timestamp for the merged snapshot."
+        }
+      }
+    },
+    "SyncBackupParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package",
+        "policy"
+      ],
+      "description": "Parameters for sync.backup. Plans backup restore from a manifest. Pure planner.",
+      "properties": {
+        "package": {
+          "type": "object",
+          "description": "Backup package object (shape owned by reader_sync::BackupPackage)."
+        },
+        "policy": {
+          "type": "object",
+          "description": "Restore policy object (shape owned by reader_sync::RestorePolicy)."
+        }
+      }
+    },
+    "LocalBookParseParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bookId",
+        "text"
+      ],
+      "description": "Parameters for local_book.parse. Parses a local TXT book into book + toc + chapters. Pure: no network.",
+      "properties": {
+        "bookId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Stable book identifier. Must be non-empty."
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional book title."
+        },
+        "author": {
+          "type": "string",
+          "description": "Optional book author."
+        },
+        "fileName": {
+          "type": "string",
+          "description": "Optional originating file name."
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Already-decoded TXT content. Must be non-empty."
+        }
+      }
+    },
+    "LocalBookCatalogParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "catalog",
+        "entry"
+      ],
+      "description": "Parameters for local_book.catalog. Upserts a fingerprint catalog entry. Pure.",
+      "properties": {
+        "catalog": {
+          "type": "object",
+          "description": "Existing catalog snapshot (shape owned by reader_local_book::LocalBookCatalogSnapshot)."
+        },
+        "entry": {
+          "type": "object",
+          "description": "Fingerprint catalog entry to upsert (shape owned by reader_local_book::LocalBookFingerprintCatalogEntry)."
+        },
+        "chapters": {
+          "type": "array",
+          "default": [],
+          "description": "Chapter index entries to add (shape owned by reader_local_book::LocalBookChapterIndexEntry).",
+          "items": {
+            "type": "object"
+          }
+        },
+        "resources": {
+          "type": "array",
+          "default": [],
+          "description": "Resource index entries to add (shape owned by reader_local_book::LocalBookResourceIndexEntry).",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
     "TtsChapterRef": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sourceId", "bookId", "chapterIndex"],
+      "required": [
+        "sourceId",
+        "bookId",
+        "chapterIndex"
+      ],
       "description": "Reference to a chapter being spoken. Mirrors the remote-reading chapter identity so TTS can advance across the TOC without re-fetching.",
       "properties": {
         "sourceId": {
@@ -1409,14 +2528,25 @@
     },
     "TtsSlicingStrategy": {
       "type": "string",
-      "enum": ["paragraph", "sentence", "paragraph-then-sentence", "line-break"],
+      "enum": [
+        "paragraph",
+        "sentence",
+        "paragraph-then-sentence",
+        "line-break"
+      ],
       "default": "paragraph",
       "description": "Strategy for slicing chapter text into speakable utterances."
     },
     "TtsSlice": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["index", "text", "charStart", "charEnd", "paragraphIndex"],
+      "required": [
+        "index",
+        "text",
+        "charStart",
+        "charEnd",
+        "paragraphIndex"
+      ],
       "description": "One speakable slice of chapter text produced by Core's slicer.",
       "properties": {
         "index": {
@@ -1449,17 +2579,25 @@
     "TtsSlicePlan": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["chapter", "slices", "sourceCharCount"],
+      "required": [
+        "chapter",
+        "slices",
+        "sourceCharCount"
+      ],
       "description": "Result of slicing one chapter's content into speakable utterances.",
       "properties": {
-        "chapter": { "$ref": "#/$defs/TtsChapterRef" },
+        "chapter": {
+          "$ref": "#/$defs/TtsChapterRef"
+        },
         "strategy": {
           "$ref": "#/$defs/TtsSlicingStrategy",
           "default": "paragraph"
         },
         "slices": {
           "type": "array",
-          "items": { "$ref": "#/$defs/TtsSlice" },
+          "items": {
+            "$ref": "#/$defs/TtsSlice"
+          },
           "description": "Ordered speakable slices."
         },
         "sourceCharCount": {
@@ -1471,23 +2609,45 @@
     },
     "TtsQueueState": {
       "type": "string",
-      "enum": ["idle", "playing", "paused", "completed", "stopped"],
+      "enum": [
+        "idle",
+        "playing",
+        "paused",
+        "completed",
+        "stopped"
+      ],
       "description": "High-level state of the TTS playback queue. Core tracks this; the host drives transitions."
     },
     "TtsSliceStatus": {
       "type": "string",
-      "enum": ["pending", "speaking", "done", "skipped", "failed"],
+      "enum": [
+        "pending",
+        "speaking",
+        "done",
+        "skipped",
+        "failed"
+      ],
       "description": "Per-slice lifecycle within the queue."
     },
     "TtsQueueSnapshot": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["state", "totalSlices", "completedSlices", "chapter"],
+      "required": [
+        "state",
+        "totalSlices",
+        "completedSlices",
+        "chapter"
+      ],
       "description": "Immutable snapshot of the queue at a point in time.",
       "properties": {
-        "state": { "$ref": "#/$defs/TtsQueueState" },
+        "state": {
+          "$ref": "#/$defs/TtsQueueState"
+        },
         "currentSliceIndex": {
-          "type": ["integer", "null"],
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 0,
           "default": null,
           "description": "Index of the current slice, or null if no plan is loaded."
@@ -1502,32 +2662,47 @@
           "minimum": 0,
           "description": "Number of slices in a terminal state (Done + Failed + Skipped)."
         },
-        "chapter": { "$ref": "#/$defs/TtsChapterRef" },
+        "chapter": {
+          "$ref": "#/$defs/TtsChapterRef"
+        },
         "sliceStatuses": {
           "type": "array",
           "default": [],
-          "items": { "$ref": "#/$defs/TtsSliceStatus" },
+          "items": {
+            "$ref": "#/$defs/TtsSliceStatus"
+          },
           "description": "Status of each slice, parallel to the plan's slices vector."
         }
       }
     },
     "TtsQueueDrainBehavior": {
       "type": "string",
-      "enum": ["stop-on-boundary", "advance-to-next"],
+      "enum": [
+        "stop-on-boundary",
+        "advance-to-next"
+      ],
       "default": "stop-on-boundary",
       "description": "Behavior when the current chapter's queue drains."
     },
     "TtsChapterTransition": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["current"],
+      "required": [
+        "current"
+      ],
       "description": "Chapter boundary transition plan.",
       "properties": {
-        "current": { "$ref": "#/$defs/TtsChapterRef" },
+        "current": {
+          "$ref": "#/$defs/TtsChapterRef"
+        },
         "next": {
           "anyOf": [
-            { "type": "null" },
-            { "$ref": "#/$defs/TtsChapterRef" }
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/TtsChapterRef"
+            }
           ],
           "default": null,
           "description": "Next chapter to preload. Null if current is the last chapter."
@@ -1541,10 +2716,15 @@
     "TtsSliceParams": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["chapter", "content"],
+      "required": [
+        "chapter",
+        "content"
+      ],
       "description": "Parameters for tts.slice. Core slices chapter content into speakable utterances.",
       "properties": {
-        "chapter": { "$ref": "#/$defs/TtsChapterRef" },
+        "chapter": {
+          "$ref": "#/$defs/TtsChapterRef"
+        },
         "content": {
           "type": "string",
           "minLength": 1,
@@ -1559,19 +2739,27 @@
     "TtsQueueStatusParams": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["chapter"],
+      "required": [
+        "chapter"
+      ],
       "description": "Parameters for tts.queue.status. Core returns the current queue snapshot.",
       "properties": {
-        "chapter": { "$ref": "#/$defs/TtsChapterRef" }
+        "chapter": {
+          "$ref": "#/$defs/TtsChapterRef"
+        }
       }
     },
     "TtsChapterPlanParams": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["chapter"],
+      "required": [
+        "chapter"
+      ],
       "description": "Parameters for tts.chapter.plan. Core returns the chapter transition plan.",
       "properties": {
-        "chapter": { "$ref": "#/$defs/TtsChapterRef" },
+        "chapter": {
+          "$ref": "#/$defs/TtsChapterRef"
+        },
         "drainBehavior": {
           "$ref": "#/$defs/TtsQueueDrainBehavior",
           "default": "stop-on-boundary"
