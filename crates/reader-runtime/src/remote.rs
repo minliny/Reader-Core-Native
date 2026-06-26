@@ -209,27 +209,6 @@ pub fn dispatch_remote(
     }
 }
 
-fn pending_or_missing_response(
-    response: &str,
-    request: Option<HostHttpRequest>,
-    response_field: &str,
-    request_field: &str,
-    continuation: RemoteHostContinuation,
-) -> Result<Option<RemoteCommandResult>, CoreError> {
-    if !response.is_empty() {
-        return Ok(None);
-    }
-    let Some(request) = request else {
-        return Err(CoreError::invalid_params(format!(
-            "{response_field} is required unless {request_field} is provided"
-        )));
-    };
-    Ok(Some(RemoteCommandResult::Pending(pending_http_request(
-        request,
-        continuation,
-    )?)))
-}
-
 fn pending_http_request(
     request: HostHttpRequest,
     continuation: RemoteHostContinuation,
@@ -501,6 +480,35 @@ fn build_search_request_from_source(
         .map_err(analyze_url_internal)
 }
 
+/// Build a `HostHttpRequest` from an explicit URL field (`bookUrl` /
+/// `tocUrl` / `chapterUrl`) plus the source's `header` field. Mirrors the
+/// Legado path that uses `AnalyzeUrl` with no `{{key}}`/`{{page}}`
+/// substitution — a plain URL (or Legado DSL form
+/// `url,{"method":"POST",...}`) is expanded with an empty context.
+fn build_request_from_url_field(
+    state: &RemoteState,
+    source_id: &str,
+    inline_source: &Option<serde_json::Value>,
+    raw_url: &str,
+) -> Result<HostHttpRequest, CoreError> {
+    let source = resolve_source(state.storage(), source_id, inline_source)?;
+    let legado = source.legado_book_source().ok_or_else(|| {
+        CoreError::invalid_params(
+            "cannot auto-build request: source has no Legado bookSource payload",
+        )
+        .with_details(serde_json::json!({ "sourceId": source_id }))
+    })?;
+    let source_headers = legado
+        .header
+        .as_ref()
+        .and_then(|h| h.as_object())
+        .cloned()
+        .unwrap_or_default();
+    let ctx = AnalyzeUrlContext::for_url();
+    AnalyzeUrl::build_request(raw_url, &ctx, &source.base_url, &source_headers)
+        .map_err(analyze_url_internal)
+}
+
 fn analyze_url_internal(err: AnalyzeUrlError) -> CoreError {
     match err {
         AnalyzeUrlError::JsUnsupported(reason) => CoreError::internal(format!(
@@ -534,16 +542,27 @@ fn book_detail(
     state: &RemoteState,
 ) -> Result<RemoteCommandResult, CoreError> {
     let params: BookDetailParams = parse_params(contract::methods::BOOK_DETAIL, &cmd.params)?;
-    if let Some(pending) = pending_or_missing_response(
-        &params.detail_response,
-        params.detail_request.clone(),
-        "detailResponse",
-        "detailRequest",
-        RemoteHostContinuation::BookDetail(params.clone()),
-    )? {
-        return Ok(pending);
+    if !params.detail_response.is_empty() {
+        return book_detail_from_params(params, state).map(RemoteCommandResult::Complete);
     }
-    book_detail_from_params(params, state).map(RemoteCommandResult::Complete)
+    if let Some(request) = params.detail_request.clone() {
+        return Ok(RemoteCommandResult::Pending(pending_http_request(
+            request,
+            RemoteHostContinuation::BookDetail(params.clone()),
+        )?));
+    }
+    if let Some(book_url) = params.book_url.as_deref() {
+        if !book_url.trim().is_empty() {
+            let request = build_request_from_url_field(state, &params.source_id, &params.source, book_url)?;
+            return Ok(RemoteCommandResult::Pending(pending_http_request(
+                request,
+                RemoteHostContinuation::BookDetail(params.clone()),
+            )?));
+        }
+    }
+    Err(CoreError::invalid_params(
+        "detailResponse is required unless detailRequest or bookUrl is provided",
+    ))
 }
 
 fn book_detail_from_params(
@@ -571,16 +590,27 @@ fn book_toc(
     state: &RemoteState,
 ) -> Result<RemoteCommandResult, CoreError> {
     let params: BookTocParams = parse_params(contract::methods::BOOK_TOC, &cmd.params)?;
-    if let Some(pending) = pending_or_missing_response(
-        &params.toc_response,
-        params.toc_request.clone(),
-        "tocResponse",
-        "tocRequest",
-        RemoteHostContinuation::BookToc(params.clone()),
-    )? {
-        return Ok(pending);
+    if !params.toc_response.is_empty() {
+        return book_toc_from_params(params, state).map(RemoteCommandResult::Complete);
     }
-    book_toc_from_params(params, state).map(RemoteCommandResult::Complete)
+    if let Some(request) = params.toc_request.clone() {
+        return Ok(RemoteCommandResult::Pending(pending_http_request(
+            request,
+            RemoteHostContinuation::BookToc(params.clone()),
+        )?));
+    }
+    if let Some(toc_url) = params.toc_url.as_deref() {
+        if !toc_url.trim().is_empty() {
+            let request = build_request_from_url_field(state, &params.source_id, &params.source, toc_url)?;
+            return Ok(RemoteCommandResult::Pending(pending_http_request(
+                request,
+                RemoteHostContinuation::BookToc(params.clone()),
+            )?));
+        }
+    }
+    Err(CoreError::invalid_params(
+        "tocResponse is required unless tocRequest or tocUrl is provided",
+    ))
 }
 
 fn book_toc_from_params(
@@ -608,18 +638,31 @@ fn chapter_content(
 ) -> Result<RemoteCommandResult, CoreError> {
     let params: ChapterContentParams =
         parse_params(contract::methods::CHAPTER_CONTENT, &cmd.params)?;
-    if params.js_rule.is_none() {
-        if let Some(pending) = pending_or_missing_response(
-            &params.chapter_response,
-            params.chapter_request.clone(),
-            "chapterResponse",
-            "chapterRequest",
+    // JS-rule path: skip auto-build entirely (existing behaviour).
+    if params.js_rule.is_some() {
+        return chapter_content_from_params(params, state).map(RemoteCommandResult::Complete);
+    }
+    if !params.chapter_response.is_empty() {
+        return chapter_content_from_params(params, state).map(RemoteCommandResult::Complete);
+    }
+    if let Some(request) = params.chapter_request.clone() {
+        return Ok(RemoteCommandResult::Pending(pending_http_request(
+            request,
             RemoteHostContinuation::ChapterContent(params.clone()),
-        )? {
-            return Ok(pending);
+        )?));
+    }
+    if let Some(chapter_url) = params.chapter_url.as_deref() {
+        if !chapter_url.trim().is_empty() {
+            let request = build_request_from_url_field(state, &params.source_id, &params.source, chapter_url)?;
+            return Ok(RemoteCommandResult::Pending(pending_http_request(
+                request,
+                RemoteHostContinuation::ChapterContent(params.clone()),
+            )?));
         }
     }
-    chapter_content_from_params(params, state).map(RemoteCommandResult::Complete)
+    Err(CoreError::invalid_params(
+        "chapterResponse is required unless chapterRequest, chapterUrl, or jsRule is provided",
+    ))
 }
 
 fn chapter_content_from_params(

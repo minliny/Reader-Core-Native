@@ -880,6 +880,12 @@ pub struct BookDetailParams {
     pub detail_request: Option<HostHttpRequest>,
     #[serde(default, deserialize_with = "deserialize_inline_source")]
     pub source: Option<Value>,
+    /// Detail-page URL. When `detailRequest` and `detailResponse` are both
+    /// absent, Core auto-builds a GET request from this URL (Legado
+    /// `AnalyzeUrl` equivalence for non-search stages). May be a Legado DSL
+    /// form (`url,{"method":"POST",...}`).
+    #[serde(default)]
+    pub book_url: Option<String>,
 }
 
 /// Parameters for `book.toc`.
@@ -895,6 +901,10 @@ pub struct BookTocParams {
     pub toc_request: Option<HostHttpRequest>,
     #[serde(default, deserialize_with = "deserialize_inline_source")]
     pub source: Option<Value>,
+    /// TOC-page URL. When `tocRequest` and `tocResponse` are both absent,
+    /// Core auto-builds a GET request from this URL. May be a Legado DSL form.
+    #[serde(default)]
+    pub toc_url: Option<String>,
 }
 
 /// Parameters for `chapter.content`.
@@ -919,6 +929,11 @@ pub struct ChapterContentParams {
     pub js_rule: Option<String>,
     #[serde(default, deserialize_with = "deserialize_inline_source")]
     pub source: Option<Value>,
+    /// Chapter-page URL. When `chapterRequest` and `chapterResponse` are
+    /// both absent and `jsRule` is not set, Core auto-builds a GET request
+    /// from this URL. May be a Legado DSL form.
+    #[serde(default)]
+    pub chapter_url: Option<String>,
 }
 
 /// Parameters for `reading.progress.update`.
