@@ -347,7 +347,7 @@
       ],
       "id": "jsonpath-\u89c4\u5219",
       "name": "Jsonpath-\u89c4\u5219",
-      "notes": "",
+      "notes": "Legado DSL dispatch wired via execute_legado_rule (@Json: prefix + $. / $[ detection)",
       "owner": "core",
       "platforms": [
         "ios",
@@ -355,7 +355,7 @@
         "harmony"
       ],
       "source": "FEATURE_MATRIX.md",
-      "status": "unknown"
+      "status": "implemented"
     },
     {
       "evidence": [
@@ -507,22 +507,6 @@
       "evidence": [
         "FEATURE_MATRIX.md"
       ],
-      "id": "tag.index",
-      "name": "Tag Index",
-      "notes": "",
-      "owner": "core",
-      "platforms": [
-        "ios",
-        "android",
-        "harmony"
-      ],
-      "source": "FEATURE_MATRIX.md",
-      "status": "unknown"
-    },
-    {
-      "evidence": [
-        "FEATURE_MATRIX.md"
-      ],
       "id": "tls-\u5b9e\u9645\u7f51\u7edc-socket",
       "name": "Tls-\u5b9e\u9645\u7f51\u7edc-Socket",
       "notes": "",
@@ -637,7 +621,7 @@
       ],
       "id": "xpath-\u89c4\u5219",
       "name": "Xpath-\u89c4\u5219",
-      "notes": "",
+      "notes": "Legado DSL dispatch wired via execute_legado_rule (@XPath: prefix + leading / detection)",
       "owner": "core",
       "platforms": [
         "ios",
@@ -645,7 +629,7 @@
         "harmony"
       ],
       "source": "FEATURE_MATRIX.md",
-      "status": "unknown"
+      "status": "implemented"
     },
     {
       "evidence": [
@@ -941,7 +925,7 @@
       ],
       "id": "\u6b63\u5219\u89c4\u5219",
       "name": "\u6b63\u5219\u89c4\u5219",
-      "notes": "",
+      "notes": "Legado DSL dispatch wired via execute_legado_rule (##regex##replacement suffix + RegexExtractRule/RegexReplaceRule engines)",
       "owner": "core",
       "platforms": [
         "ios",
@@ -949,7 +933,7 @@
         "harmony"
       ],
       "source": "FEATURE_MATRIX.md",
-      "status": "unknown"
+      "status": "implemented"
     },
     {
       "evidence": [
@@ -1099,17 +1083,17 @@
   "generated_at": "2026-06-25T07:40:32Z",
   "summary": {
     "by_owner": {
-      "core": 57,
+      "core": 56,
       "host": 11,
       "shared": 0
     },
     "by_status": {
-      "implemented": 16,
+      "implemented": 19,
       "missing": 2,
       "partial": 0,
-      "unknown": 50
+      "unknown": 46
     },
-    "total": 68
+    "total": 67
   },
   "tool": "capability-catalog-generator",
   "version": "capability-catalog/1"

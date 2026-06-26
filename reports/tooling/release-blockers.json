@@ -512,18 +512,6 @@
       ]
     },
     {
-      "capability": "tag.index",
-      "evidence_status": "unknown",
-      "id": "rb-tag.index",
-      "mitigation": "Clarify status of tag.index and add evidence",
-      "platform": "all",
-      "reason": "tag.index has unknown status with zero evidence",
-      "severity": "low",
-      "sources": [
-        "FEATURE_MATRIX.md"
-      ]
-    },
-    {
       "capability": "tts-\u6587\u672c\u5207\u7247\u548c\u64ad\u653e\u961f\u5217",
       "evidence_status": "unknown",
       "id": "rb-tts-\u6587\u672c\u5207\u7247\u548c\u64ad\u653e\u961f\u5217",
@@ -827,7 +815,7 @@
   "generated_at": "2026-06-25T07:40:32Z",
   "summary": {
     "by_platform": {
-      "all": 68,
+      "all": 67,
       "android": 0,
       "harmony": 0,
       "ios": 0,
@@ -836,10 +824,10 @@
     "by_severity": {
       "blocker": 2,
       "high": 0,
-      "low": 39,
+      "low": 38,
       "medium": 27
     },
-    "total": 68
+    "total": 67
   },
   "tool": "release-blocker-register-generator",
   "version": "release-blockers/1"

@@ -25,7 +25,10 @@ use reader_domain::{
     ReadingProgress, Source, TocEntry,
 };
 use reader_js::{JsError, JsErrorKind, JsEvaluation, JsSandbox as JsSandboxTrait, QuickJsSandbox};
-use reader_rule::{CaptureGroup, RuleEngine, RuleError, RuleOutput, RuleStep};
+use reader_rule::{
+    CaptureGroup, NoopVariableScope, RuleEngine, RuleError, RuleJsEvaluator, RuleOutput, RuleStep,
+    RuleVariableScope,
+};
 use serde::{Deserialize, Serialize};
 
 /// Current content library snapshot schema version.
@@ -225,6 +228,21 @@ impl BookSourceRequestContext {
             chapter_url: String::new(),
             variables: BTreeMap::new(),
         }
+    }
+}
+
+impl RuleVariableScope for BookSourceRequestContext {
+    fn get(&self, key: &str) -> Option<String> {
+        self.variables.get(key).cloned()
+    }
+    fn put(&mut self, key: String, value: String) {
+        self.variables.insert(key, value);
+    }
+    fn entries(&self) -> Vec<(&str, &str)> {
+        self.variables
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect()
     }
 }
 
@@ -558,6 +576,29 @@ impl Default for RemoteContentPipeline {
     }
 }
 
+/// Bridge the shared `QuickJsSandbox` into reader-rule's JS-evaluator trait so
+/// the dispatcher can eval `{{...}}` / `<js>` segments (Task 5) without a hard
+/// dependency from `reader-rule` on `reader-js`. String results are returned
+/// verbatim; all other JSON values are JSON-stringified, matching Legado's
+/// `makeUpRule` string coercion. A local newtype is required to satisfy the
+/// orphan rule (`RuleJsEvaluator` and `QuickJsSandbox` are both foreign).
+struct LegadoJsBridge<'a>(&'a QuickJsSandbox);
+
+impl RuleJsEvaluator for LegadoJsBridge<'_> {
+    fn eval(&self, expr: &str, context: Option<&str>) -> Result<String, String> {
+        let script = if let Some(ctx) = context.filter(|c| !c.is_empty()) {
+            format!("var __ctx = {ctx}; {expr}")
+        } else {
+            expr.to_string()
+        };
+        let evaluation = self.0.evaluate(&script).map_err(|e| e.to_string())?;
+        Ok(match evaluation.value {
+            serde_json::Value::String(s) => s,
+            other => other.to_string(),
+        })
+    }
+}
+
 impl RemoteContentPipeline {
     /// Create a pipeline with the default rule engine and a default
     /// (no host-callback) JS sandbox.
@@ -577,6 +618,18 @@ impl RemoteContentPipeline {
         }
     }
 
+    /// Execute a raw Legado DSL rule string through the multi-engine dispatcher
+    /// (`execute_legado_rule`). Uses a no-op variable scope — `@put`/`@get`
+    /// wiring lands in Task 4; for now `expand_template` still handles `{{key}}`
+    /// substitution before this is called. The shared JS sandbox is passed so
+    /// Task 5 can eval `{{...}}` / `<js>` segments without further plumbing.
+    fn run_raw_legado_rule(&self, input: &str, rule: &str) -> Result<RuleOutput, RuleError> {
+        let mut scope = NoopVariableScope;
+        let js_bridge = LegadoJsBridge(self.js.as_ref());
+        self.engine
+            .execute_legado_rule(input, rule, &mut scope, Some(&js_bridge))
+    }
+
     fn parse_steps(spec: &serde_json::Value) -> Result<Vec<RuleStep>, ContentError> {
         let steps: Vec<RuleStepSpec> = if spec.is_null() {
             Vec::new()
@@ -594,7 +647,7 @@ impl RemoteContentPipeline {
         rule_spec: &serde_json::Value,
     ) -> Result<RuleOutput, ContentError> {
         if let Some(rule) = rule_spec.as_str() {
-            return Ok(self.engine.execute_legado_css(input, rule)?);
+            return Ok(self.run_raw_legado_rule(input, rule)?);
         }
 
         let steps = Self::parse_steps(rule_spec)?;
@@ -888,7 +941,7 @@ impl RemoteContentPipeline {
             }
             chapters
         } else if let Some(raw) = rules.raw.as_deref() {
-            let out = self.engine.execute_legado_css(toc_response, raw)?;
+            let out = self.run_raw_legado_rule(toc_response, raw)?;
             parse_toc_output(out.values(), &context)
         } else {
             Vec::new()
@@ -915,8 +968,7 @@ impl RemoteContentPipeline {
             extract_rule_value(self, chapter_response, rules.content.as_deref(), &context)?
                 .or_else(|| {
                     rules.raw.as_deref().and_then(|raw| {
-                        self.engine
-                            .execute_legado_css(chapter_response, raw)
+                        self.run_raw_legado_rule(chapter_response, raw)
                             .ok()
                             .map(|out| out.values().join("\n"))
                     })
@@ -1147,7 +1199,7 @@ fn extract_books_from_raw_rule(
         return Ok(Vec::new());
     };
     let rule = expand_template(&raw_rule, context);
-    let out = pipeline.engine.execute_legado_css(input, &rule)?;
+    let out = pipeline.run_raw_legado_rule(input, &rule)?;
     Ok(out
         .values()
         .iter()
@@ -1182,14 +1234,11 @@ fn extract_rule_items(
     } else {
         format!("{rule}@html")
     };
-    let out = pipeline.engine.execute_legado_css(input, &item_rule)?;
+    let out = pipeline.run_raw_legado_rule(input, &item_rule)?;
     if !out.is_empty() {
         return Ok(out.into_values());
     }
-    Ok(pipeline
-        .engine
-        .execute_legado_css(input, &rule)?
-        .into_values())
+    Ok(pipeline.run_raw_legado_rule(input, &rule)?.into_values())
 }
 
 fn extract_rule_value(
@@ -1205,7 +1254,7 @@ fn extract_rule_value(
         return Ok(None);
     }
     let rule = expand_template(&rule, context);
-    let out = pipeline.engine.execute_legado_css(input, &rule)?;
+    let out = pipeline.run_raw_legado_rule(input, &rule)?;
     Ok(out
         .values()
         .iter()
@@ -2277,6 +2326,66 @@ mod tests {
         assert_eq!(books.len(), 2);
         assert_eq!(books[0].title, "Dune");
         assert_eq!(books[1].title, "Foundation");
+    }
+
+    #[test]
+    fn search_book_source_scopes_per_item_with_json_booklist() {
+        // Closes DSL migration gap 7: bookList @json: scoping.
+        //
+        // Legado `searchRule.bookList` selects a list of elements (HTML nodes
+        // or JSON array items) and each subsequent rule (`name`/`author`/...)
+        // is evaluated independently against that item — not the whole
+        // document. Before Task 1 (prefix dispatch), a `@Json:$.books[*]`
+        // bookList would have been mis-parsed as CSS and silently returned
+        // empty, breaking the per-item scoping for any JSON book source.
+        //
+        // This test builds a BookSourceSearchSemantics whose bookList is a
+        // `@Json:` rule and asserts each per-item rule resolves fields from
+        // its own JSON object, proving the dispatch + scoping chain.
+        let mut search = reader_domain::BookSourceSearchSemantics::default();
+        search.list = Some("@Json:$.books[*]".into());
+        search.name = Some("$.title".into());
+        search.author = Some("$.author".into());
+        search.detail_url = Some("$.url".into());
+
+        let semantics = BookSourceSemantics {
+            source_id: "json-src".into(),
+            name: "JSON Scoping Source".into(),
+            base_url: "https://json.example.test".into(),
+            search_url: None,
+            explore_url: None,
+            enabled: true,
+            enabled_explore: false,
+            rules: reader_domain::BookSourcePipelineRules {
+                search,
+                explore: reader_domain::BookSourceExploreSemantics::default(),
+                detail: reader_domain::BookSourceDetailSemantics::default(),
+                toc: reader_domain::BookSourceTocSemantics::default(),
+                content: reader_domain::BookSourceContentSemantics::default(),
+            },
+        };
+        let context = BookSourceRequestContext::for_semantics(&semantics);
+        let pipeline = RemoteContentPipeline::new();
+
+        let resp = r#"{"books":[
+            {"title":"Dune","author":"Herbert","url":"/book/dune"},
+            {"title":"Foundation","author":"Asimov","url":"/book/foundation"}
+        ]}"#;
+
+        let books = pipeline
+            .search_book_source(&semantics, resp, &context)
+            .unwrap();
+
+        assert_eq!(books.len(), 2);
+        assert_eq!(books[0].title, "Dune");
+        assert_eq!(books[0].author, "Herbert");
+        assert_eq!(books[0].book_id, "https://json.example.test/book/dune");
+        assert_eq!(books[1].title, "Foundation");
+        assert_eq!(books[1].author, "Asimov");
+        assert_eq!(
+            books[1].book_id,
+            "https://json.example.test/book/foundation"
+        );
     }
 
     #[test]
