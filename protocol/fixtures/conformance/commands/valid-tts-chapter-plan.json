@@ -1,0 +1,13 @@
+{
+  "protocolVersion": 1,
+  "requestId": 422,
+  "method": "tts.chapter.plan",
+  "params": {
+    "chapter": {
+      "sourceId": "src-1",
+      "bookId": "book-1",
+      "chapterIndex": 2
+    },
+    "drainBehavior": "advance-to-next"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "protocolVersion": 1,
+  "requestId": 424,
+  "method": "tts.slice",
+  "params": {
+    "chapter": {
+      "sourceId": "src-1",
+      "bookId": "book-1",
+      "chapterIndex": 0
+    },
+    "content": "text",
+    "unexpectedField": true
+  }
+}

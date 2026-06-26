@@ -971,6 +971,199 @@
         "capability": { "$ref": "#/$defs/HostCapability" },
         "state": { "type": "string", "const": "pending" }
       }
+    },
+    "TtsChapterRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "bookId", "chapterIndex"],
+      "description": "Reference to a chapter being spoken. Mirrors the remote-reading chapter identity so TTS can advance across the TOC without re-fetching.",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Source identifier that produced the chapter."
+        },
+        "bookId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Book identifier the chapter belongs to."
+        },
+        "chapterIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based chapter index within the book's TOC."
+        },
+        "chapterTitle": {
+          "type": "string",
+          "default": "",
+          "description": "Optional chapter title for UI display."
+        },
+        "chapterUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Optional chapter URL for re-fetch / preload."
+        }
+      }
+    },
+    "TtsSlicingStrategy": {
+      "type": "string",
+      "enum": ["paragraph", "sentence", "paragraph-then-sentence", "line-break"],
+      "default": "paragraph",
+      "description": "Strategy for slicing chapter text into speakable utterances."
+    },
+    "TtsSlice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index", "text", "charStart", "charEnd", "paragraphIndex"],
+      "description": "One speakable slice of chapter text produced by Core's slicer.",
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based index within the slice plan."
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Speakable text. Non-empty after normalization."
+        },
+        "charStart": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Half-open char range start in the original chapter content."
+        },
+        "charEnd": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Half-open char range end in the original chapter content."
+        },
+        "paragraphIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Paragraph index in the source chapter for UI highlight sync."
+        }
+      }
+    },
+    "TtsSlicePlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chapter", "slices", "sourceCharCount"],
+      "description": "Result of slicing one chapter's content into speakable utterances.",
+      "properties": {
+        "chapter": { "$ref": "#/$defs/TtsChapterRef" },
+        "strategy": {
+          "$ref": "#/$defs/TtsSlicingStrategy",
+          "default": "paragraph"
+        },
+        "slices": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/TtsSlice" },
+          "description": "Ordered speakable slices."
+        },
+        "sourceCharCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total char count of the source chapter content."
+        }
+      }
+    },
+    "TtsQueueState": {
+      "type": "string",
+      "enum": ["idle", "playing", "paused", "completed", "stopped"],
+      "description": "High-level state of the TTS playback queue. Core tracks this; the host drives transitions."
+    },
+    "TtsSliceStatus": {
+      "type": "string",
+      "enum": ["pending", "speaking", "done", "skipped", "failed"],
+      "description": "Per-slice lifecycle within the queue."
+    },
+    "TtsQueueSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "totalSlices", "completedSlices", "chapter"],
+      "description": "Immutable snapshot of the queue at a point in time.",
+      "properties": {
+        "state": { "$ref": "#/$defs/TtsQueueState" },
+        "currentSliceIndex": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "default": null,
+          "description": "Index of the current slice, or null if no plan is loaded."
+        },
+        "totalSlices": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total slices in the loaded plan. 0 if Idle."
+        },
+        "completedSlices": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of slices in a terminal state (Done + Failed + Skipped)."
+        },
+        "chapter": { "$ref": "#/$defs/TtsChapterRef" },
+        "sliceStatuses": {
+          "type": "array",
+          "default": [],
+          "items": { "$ref": "#/$defs/TtsSliceStatus" },
+          "description": "Status of each slice, parallel to the plan's slices vector."
+        }
+      }
+    },
+    "TtsQueueDrainBehavior": {
+      "type": "string",
+      "enum": ["stop-on-boundary", "advance-to-next"],
+      "default": "stop-on-boundary",
+      "description": "Behavior when the current chapter's queue drains."
+    },
+    "TtsChapterTransition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["current"],
+      "description": "Chapter boundary transition plan.",
+      "properties": {
+        "current": { "$ref": "#/$defs/TtsChapterRef" },
+        "next": {
+          "anyOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/TtsChapterRef" }
+          ],
+          "default": null,
+          "description": "Next chapter to preload. Null if current is the last chapter."
+        },
+        "drainBehavior": {
+          "$ref": "#/$defs/TtsQueueDrainBehavior",
+          "default": "stop-on-boundary"
+        }
+      }
+    },
+    "TtsSliceData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan"],
+      "description": "Result data for tts.slice. Core returns the slice plan; host vocalizes each slice.",
+      "properties": {
+        "plan": { "$ref": "#/$defs/TtsSlicePlan" }
+      }
+    },
+    "TtsQueueStatusData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["snapshot"],
+      "description": "Result data for tts.queue.status.",
+      "properties": {
+        "snapshot": { "$ref": "#/$defs/TtsQueueSnapshot" }
+      }
+    },
+    "TtsChapterPlanData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transition"],
+      "description": "Result data for tts.chapter.plan.",
+      "properties": {
+        "transition": { "$ref": "#/$defs/TtsChapterTransition" }
+      }
     }
   }
 }

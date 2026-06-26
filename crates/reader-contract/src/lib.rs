@@ -14,6 +14,7 @@ pub mod error;
 pub mod event;
 pub mod host;
 pub mod remote;
+pub mod tts;
 
 pub use command::{Command, EmptyParams};
 pub use config::RuntimeConfig;
@@ -40,6 +41,12 @@ pub use remote::{
     ChapterContentParams, ChapterContentVia, HostHttpCookie, HostHttpRedirect, HostHttpRequest,
     HostHttpResponse, ReadingProgressUpdateData, ReadingProgressUpdateParams,
     RemoteHttpDiagnosticsData, SourceImportData, SourceImportParams,
+};
+pub use tts::{
+    TtsChapterPlanData, TtsChapterPlanParams, TtsChapterRef, TtsChapterTransition,
+    TtsQueueDrainBehavior, TtsQueueSnapshot, TtsQueueState, TtsQueueStatusData,
+    TtsQueueStatusParams, TtsSlice, TtsSliceData, TtsSliceParams, TtsSlicePlan, TtsSliceStatus,
+    TtsSlicingStrategy,
 };
 
 /// JSON protocol version. Bumped on non-backward-compatible schema changes.
@@ -74,6 +81,16 @@ pub mod methods {
     pub const CHAPTER_CONTENT: &str = "chapter.content";
     /// Update reading progress/state for a book.
     pub const READING_PROGRESS_UPDATE: &str = "reading.progress.update";
+
+    // --- TTS vertical (V1 contract model) ----------------------------------
+    /// Slice chapter text into speakable utterances. Core owns slicing;
+    /// host owns vocalization.
+    pub const TTS_SLICE: &str = "tts.slice";
+    /// Query the current TTS playback queue snapshot.
+    pub const TTS_QUEUE_STATUS: &str = "tts.queue.status";
+    /// Compute the chapter boundary transition plan (current + next + drain
+    /// behavior) for a given chapter.
+    pub const TTS_CHAPTER_PLAN: &str = "tts.chapter.plan";
 }
 
 /// Non-method capability names advertised by `core.info` in v1.
@@ -186,6 +203,9 @@ mod tests {
                 methods::BOOK_TOC,
                 methods::CHAPTER_CONTENT,
                 methods::READING_PROGRESS_UPDATE,
+                methods::TTS_SLICE,
+                methods::TTS_QUEUE_STATUS,
+                methods::TTS_CHAPTER_PLAN,
             ]
         );
         assert!(!schema_examples.contains(&methods::LEGACY_CORE_PING));
@@ -1326,6 +1346,236 @@ mod tests {
             serde_json::json!(1)
         );
         assert_eq!(properties["stored"]["const"], serde_json::json!(true));
+    }
+
+    #[test]
+    fn command_schema_binds_tts_methods_to_param_defs() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+
+        for (method, params_ref) in [
+            (methods::TTS_SLICE, "#/$defs/TtsSliceParams"),
+            (methods::TTS_QUEUE_STATUS, "#/$defs/TtsQueueStatusParams"),
+            (methods::TTS_CHAPTER_PLAN, "#/$defs/TtsChapterPlanParams"),
+        ] {
+            assert_eq!(
+                params_ref_for_method(&schema, method),
+                Some(params_ref),
+                "{method} must use {params_ref} in command schema"
+            );
+        }
+    }
+
+    #[test]
+    fn command_schema_defines_tts_param_contracts() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+
+        let slice_params = &schema["$defs"]["TtsSliceParams"];
+        assert_eq!(
+            slice_params["additionalProperties"],
+            serde_json::json!(false)
+        );
+        assert_eq!(
+            strings_at(slice_params, "required"),
+            vec!["chapter", "content"]
+        );
+        assert_eq!(
+            slice_params["properties"]["chapter"]["$ref"],
+            serde_json::json!("#/$defs/TtsChapterRef")
+        );
+        assert_eq!(
+            slice_params["properties"]["content"]["minLength"],
+            serde_json::json!(1)
+        );
+        assert_eq!(
+            slice_params["properties"]["strategy"]["default"],
+            serde_json::json!("paragraph")
+        );
+
+        let queue_params = &schema["$defs"]["TtsQueueStatusParams"];
+        assert_eq!(
+            queue_params["additionalProperties"],
+            serde_json::json!(false)
+        );
+        assert_eq!(strings_at(queue_params, "required"), vec!["chapter"]);
+        assert_eq!(
+            queue_params["properties"]["chapter"]["$ref"],
+            serde_json::json!("#/$defs/TtsChapterRef")
+        );
+
+        let plan_params = &schema["$defs"]["TtsChapterPlanParams"];
+        assert_eq!(
+            plan_params["additionalProperties"],
+            serde_json::json!(false)
+        );
+        assert_eq!(strings_at(plan_params, "required"), vec!["chapter"]);
+        assert_eq!(
+            plan_params["properties"]["drainBehavior"]["default"],
+            serde_json::json!("stop-on-boundary")
+        );
+    }
+
+    #[test]
+    fn command_schema_defines_tts_data_model_defs() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+
+        let chapter_ref = &schema["$defs"]["TtsChapterRef"];
+        assert_eq!(
+            chapter_ref["additionalProperties"],
+            serde_json::json!(false)
+        );
+        assert_eq!(
+            strings_at(chapter_ref, "required"),
+            vec!["sourceId", "bookId", "chapterIndex"]
+        );
+        assert_eq!(
+            chapter_ref["properties"]["sourceId"]["minLength"],
+            serde_json::json!(1)
+        );
+        assert_eq!(
+            chapter_ref["properties"]["bookId"]["minLength"],
+            serde_json::json!(1)
+        );
+        assert_eq!(
+            chapter_ref["properties"]["chapterIndex"]["minimum"],
+            serde_json::json!(0)
+        );
+
+        let strategy = &schema["$defs"]["TtsSlicingStrategy"];
+        assert_eq!(
+            strings_at(strategy, "enum"),
+            vec![
+                "paragraph",
+                "sentence",
+                "paragraph-then-sentence",
+                "line-break"
+            ]
+        );
+        assert_eq!(strategy["default"], serde_json::json!("paragraph"));
+
+        let slice = &schema["$defs"]["TtsSlice"];
+        assert_eq!(slice["additionalProperties"], serde_json::json!(false));
+        assert_eq!(
+            strings_at(slice, "required"),
+            vec!["index", "text", "charStart", "charEnd", "paragraphIndex"]
+        );
+        assert_eq!(
+            slice["properties"]["text"]["minLength"],
+            serde_json::json!(1)
+        );
+        assert_eq!(
+            slice["properties"]["index"]["minimum"],
+            serde_json::json!(0)
+        );
+
+        let plan = &schema["$defs"]["TtsSlicePlan"];
+        assert_eq!(plan["additionalProperties"], serde_json::json!(false));
+        assert_eq!(
+            strings_at(plan, "required"),
+            vec!["chapter", "slices", "sourceCharCount"]
+        );
+        assert_eq!(
+            plan["properties"]["chapter"]["$ref"],
+            serde_json::json!("#/$defs/TtsChapterRef")
+        );
+        assert_eq!(
+            plan["properties"]["slices"]["items"]["$ref"],
+            serde_json::json!("#/$defs/TtsSlice")
+        );
+        assert_eq!(
+            plan["properties"]["sourceCharCount"]["minimum"],
+            serde_json::json!(0)
+        );
+
+        let queue_state = &schema["$defs"]["TtsQueueState"];
+        assert_eq!(
+            strings_at(queue_state, "enum"),
+            vec!["idle", "playing", "paused", "completed", "stopped"]
+        );
+
+        let slice_status = &schema["$defs"]["TtsSliceStatus"];
+        assert_eq!(
+            strings_at(slice_status, "enum"),
+            vec!["pending", "speaking", "done", "skipped", "failed"]
+        );
+
+        let snapshot = &schema["$defs"]["TtsQueueSnapshot"];
+        assert_eq!(snapshot["additionalProperties"], serde_json::json!(false));
+        assert_eq!(
+            strings_at(snapshot, "required"),
+            vec!["state", "totalSlices", "completedSlices", "chapter"]
+        );
+        assert_eq!(
+            snapshot["properties"]["state"]["$ref"],
+            serde_json::json!("#/$defs/TtsQueueState")
+        );
+        assert_eq!(
+            snapshot["properties"]["chapter"]["$ref"],
+            serde_json::json!("#/$defs/TtsChapterRef")
+        );
+        assert_eq!(
+            snapshot["properties"]["sliceStatuses"]["items"]["$ref"],
+            serde_json::json!("#/$defs/TtsSliceStatus")
+        );
+
+        let drain = &schema["$defs"]["TtsQueueDrainBehavior"];
+        assert_eq!(
+            strings_at(drain, "enum"),
+            vec!["stop-on-boundary", "advance-to-next"]
+        );
+        assert_eq!(drain["default"], serde_json::json!("stop-on-boundary"));
+
+        let transition = &schema["$defs"]["TtsChapterTransition"];
+        assert_eq!(transition["additionalProperties"], serde_json::json!(false));
+        assert_eq!(strings_at(transition, "required"), vec!["current"]);
+        assert_eq!(
+            transition["properties"]["current"]["$ref"],
+            serde_json::json!("#/$defs/TtsChapterRef")
+        );
+        assert_eq!(
+            transition["properties"]["next"]["anyOf"][1]["$ref"],
+            serde_json::json!("#/$defs/TtsChapterRef")
+        );
+        assert_eq!(
+            transition["properties"]["drainBehavior"]["default"],
+            serde_json::json!("stop-on-boundary")
+        );
+    }
+
+    #[test]
+    fn event_schema_defines_tts_data_contracts() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+
+        let slice_data = &schema["$defs"]["TtsSliceData"];
+        assert_eq!(slice_data["additionalProperties"], serde_json::json!(false));
+        assert_eq!(strings_at(slice_data, "required"), vec!["plan"]);
+        assert_eq!(
+            slice_data["properties"]["plan"]["$ref"],
+            serde_json::json!("#/$defs/TtsSlicePlan")
+        );
+
+        let queue_data = &schema["$defs"]["TtsQueueStatusData"];
+        assert_eq!(queue_data["additionalProperties"], serde_json::json!(false));
+        assert_eq!(strings_at(queue_data, "required"), vec!["snapshot"]);
+        assert_eq!(
+            queue_data["properties"]["snapshot"]["$ref"],
+            serde_json::json!("#/$defs/TtsQueueSnapshot")
+        );
+
+        let plan_data = &schema["$defs"]["TtsChapterPlanData"];
+        assert_eq!(plan_data["additionalProperties"], serde_json::json!(false));
+        assert_eq!(strings_at(plan_data, "required"), vec!["transition"]);
+        assert_eq!(
+            plan_data["properties"]["transition"]["$ref"],
+            serde_json::json!("#/$defs/TtsChapterTransition")
+        );
     }
 
     fn strings_at<'a>(value: &'a Value, key: &str) -> Vec<&'a str> {
