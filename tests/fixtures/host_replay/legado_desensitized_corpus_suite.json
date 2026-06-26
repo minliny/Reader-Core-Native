@@ -1,0 +1,821 @@
+{
+  "steps": [
+    {
+      "name": "legado.alpha.search.gbk.cookie",
+      "completionRequestId": 3001,
+      "command": {
+        "protocolVersion": 1,
+        "requestId": 3000,
+        "method": "book.search",
+        "params": {
+          "sourceId": "legado-alpha-desensitized",
+          "searchRequest": {
+            "url": "https://alpha.example.test/search.php?key=mirror",
+            "method": "POST",
+            "headers": {
+              "Accept": "application/json, text/html;q=0.9",
+              "Cookie": "REDACTED_BOOT=1",
+              "User-Agent": "REDACTED_LEGADO_UA",
+              "X-Reader-Step": "search"
+            },
+            "body": "searchkey=mirror&page=1",
+            "charset": "gbk",
+            "followRedirects": false,
+            "maxRedirects": 0,
+            "retry": {
+              "maxAttempts": 2,
+              "backoffMillis": 80
+            },
+            "usePlatformCookieJar": false,
+            "session": {
+              "id": "legado-alpha-session"
+            }
+          },
+          "source": {
+            "sourceId": "legado-alpha-desensitized",
+            "name": "Legado Alpha Desensitized",
+            "baseUrl": "https://alpha.example.test",
+            "rules": {
+              "search": [
+                { "kind": "jsonPath", "path": "$.books[*]" }
+              ],
+              "detail": [
+                { "kind": "jsonPath", "path": "$.detail" }
+              ],
+              "toc": [
+                { "kind": "jsonPath", "path": "$.chapters" }
+              ],
+              "chapter": "article#chapter@html"
+            },
+            "bookSource": {
+              "bookSourceName": "Legado Alpha Desensitized",
+              "bookSourceUrl": "https://alpha.example.test",
+              "bookSourceType": 0,
+              "enabledCookieJar": true,
+              "header": {
+                "User-Agent": "REDACTED_LEGADO_UA",
+                "Cookie": "REDACTED_BOOT=1"
+              },
+              "searchUrl": "https://alpha.example.test/search.php?key={{key}}",
+              "ruleSearch": "$.books[*]",
+              "ruleBookInfo": "$.detail",
+              "ruleToc": "$.chapters",
+              "ruleContent": "article#chapter@html"
+            }
+          }
+        }
+      },
+      "expectHostRequest": {
+        "capability": "http.execute",
+        "params": {
+          "url": "https://alpha.example.test/search.php?key=mirror",
+          "method": "POST",
+          "headers": {
+            "Accept": "application/json, text/html;q=0.9",
+            "Cookie": "REDACTED_BOOT=1",
+            "User-Agent": "REDACTED_LEGADO_UA",
+            "X-Reader-Step": "search"
+          },
+          "body": "searchkey=mirror&page=1",
+          "charset": "gbk",
+          "followRedirects": false,
+          "maxRedirects": 0,
+          "retry": {
+            "maxAttempts": 2,
+            "backoffMillis": 80
+          },
+          "usePlatformCookieJar": false,
+          "session": {
+            "id": "legado-alpha-session"
+          }
+        }
+      },
+      "hostResult": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json; charset=gbk",
+          "set-cookie": [
+            "REDACTED_SEARCH=1; Path=/; HttpOnly"
+          ],
+          "x-reader-step": "search"
+        },
+        "finalUrl": "https://alpha.example.test/search.php?key=mirror",
+        "charsetHint": "gbk",
+        "body": "{\"books\":[{\"bookId\":\"alpha-1001\",\"title\":\"Mirror City\",\"author\":\"Author A\",\"kind\":\"urban\",\"lastChapter\":\"Volume 1 - Awakening\"},{\"bookId\":\"alpha-1002\",\"title\":\"River Archive\",\"author\":\"Author B\",\"kind\":\"fantasy\",\"lastChapter\":\"Prologue\"}]}",
+        "session": {
+          "id": "legado-alpha-session"
+        }
+      },
+      "expectResult": {
+        "sourceId": "legado-alpha-desensitized",
+        "books": [
+          {
+            "bookId": "alpha-1001",
+            "title": "Mirror City",
+            "author": "Author A",
+            "kind": "urban",
+            "lastChapter": "Volume 1 - Awakening"
+          },
+          {
+            "bookId": "alpha-1002",
+            "title": "River Archive",
+            "author": "Author B",
+            "kind": "fantasy",
+            "lastChapter": "Prologue"
+          }
+        ],
+        "http": {
+          "status": 200,
+          "headers": {
+            "content-type": "application/json; charset=gbk",
+            "set-cookie": [
+              "REDACTED_SEARCH=1; Path=/; HttpOnly"
+            ],
+            "x-reader-step": "search"
+          },
+          "finalUrl": "https://alpha.example.test/search.php?key=mirror",
+          "charsetHint": "gbk",
+          "session": {
+            "id": "legado-alpha-session"
+          }
+        }
+      }
+    },
+    {
+      "name": "legado.alpha.detail.redirect.session",
+      "completionRequestId": 3011,
+      "command": {
+        "protocolVersion": 1,
+        "requestId": 3010,
+        "method": "book.detail",
+        "params": {
+          "sourceId": "legado-alpha-desensitized",
+          "book": {
+            "bookId": "alpha-1001",
+            "title": "Mirror City",
+            "author": "Author A"
+          },
+          "detailRequest": {
+            "url": "https://alpha.example.test/book/alpha-1001",
+            "method": "GET",
+            "headers": {
+              "Accept": "application/json",
+              "Cookie": "REDACTED_SEARCH=1",
+              "User-Agent": "REDACTED_LEGADO_UA",
+              "X-Reader-Step": "detail"
+            },
+            "body": null,
+            "charset": "utf-8",
+            "followRedirects": true,
+            "maxRedirects": 5,
+            "retry": {
+              "maxAttempts": 1,
+              "backoffMillis": null
+            },
+            "usePlatformCookieJar": true,
+            "session": {
+              "id": "legado-alpha-session"
+            }
+          },
+          "source": {
+            "sourceId": "legado-alpha-desensitized",
+            "name": "Legado Alpha Desensitized",
+            "baseUrl": "https://alpha.example.test",
+            "rules": {
+              "search": [
+                { "kind": "jsonPath", "path": "$.books[*]" }
+              ],
+              "detail": [
+                { "kind": "jsonPath", "path": "$.detail" }
+              ],
+              "toc": [
+                { "kind": "jsonPath", "path": "$.chapters" }
+              ],
+              "chapter": "article#chapter@html"
+            },
+            "bookSource": {
+              "bookSourceName": "Legado Alpha Desensitized",
+              "bookSourceUrl": "https://alpha.example.test",
+              "bookSourceType": 0,
+              "enabledCookieJar": true,
+              "header": {
+                "User-Agent": "REDACTED_LEGADO_UA",
+                "Cookie": "REDACTED_BOOT=1"
+              },
+              "searchUrl": "https://alpha.example.test/search.php?key={{key}}",
+              "ruleSearch": "$.books[*]",
+              "ruleBookInfo": "$.detail",
+              "ruleToc": "$.chapters",
+              "ruleContent": "article#chapter@html"
+            }
+          }
+        }
+      },
+      "expectHostRequest": {
+        "capability": "http.execute",
+        "params": {
+          "url": "https://alpha.example.test/book/alpha-1001",
+          "method": "GET",
+          "headers": {
+            "Accept": "application/json",
+            "Cookie": "REDACTED_SEARCH=1",
+            "User-Agent": "REDACTED_LEGADO_UA",
+            "X-Reader-Step": "detail"
+          },
+          "body": null,
+          "charset": "utf-8",
+          "followRedirects": true,
+          "maxRedirects": 5,
+          "retry": {
+            "maxAttempts": 1,
+            "backoffMillis": null
+          },
+          "usePlatformCookieJar": true,
+          "session": {
+            "id": "legado-alpha-session"
+          }
+        }
+      },
+      "hostResult": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "set-cookie": [
+            "REDACTED_DETAIL=1; Path=/; HttpOnly"
+          ],
+          "x-reader-step": "detail"
+        },
+        "finalUrl": "https://alpha.example.test/mobile/book/alpha-1001",
+        "charsetHint": "utf-8",
+        "body": "{\"detail\":{\"bookId\":\"alpha-1001\",\"title\":\"Mirror City\",\"author\":\"Author A\",\"coverUrl\":\"https://alpha.example.test/covers/alpha-1001.jpg\",\"intro\":\"Desensitized detail synopsis from a real Legado-style source.\",\"kind\":\"urban\",\"lastChapter\":\"Volume 1 - Awakening\"}}",
+        "session": {
+          "id": "legado-alpha-session"
+        }
+      },
+      "expectResult": {
+        "sourceId": "legado-alpha-desensitized",
+        "book": {
+          "bookId": "alpha-1001",
+          "title": "Mirror City",
+          "author": "Author A",
+          "coverUrl": "https://alpha.example.test/covers/alpha-1001.jpg",
+          "intro": "Desensitized detail synopsis from a real Legado-style source.",
+          "kind": "urban",
+          "lastChapter": "Volume 1 - Awakening"
+        },
+        "http": {
+          "status": 200,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "set-cookie": [
+              "REDACTED_DETAIL=1; Path=/; HttpOnly"
+            ],
+            "x-reader-step": "detail"
+          },
+          "finalUrl": "https://alpha.example.test/mobile/book/alpha-1001",
+          "charsetHint": "utf-8",
+          "session": {
+            "id": "legado-alpha-session"
+          }
+        }
+      }
+    },
+    {
+      "name": "legado.alpha.toc.gb18030.catalog",
+      "completionRequestId": 3021,
+      "command": {
+        "protocolVersion": 1,
+        "requestId": 3020,
+        "method": "book.toc",
+        "params": {
+          "sourceId": "legado-alpha-desensitized",
+          "bookId": "alpha-1001",
+          "tocRequest": {
+            "url": "https://alpha.example.test/book/alpha-1001/catalog",
+            "method": "GET",
+            "headers": {
+              "Accept": "application/json",
+              "Cookie": "REDACTED_DETAIL=1",
+              "User-Agent": "REDACTED_LEGADO_UA",
+              "X-Reader-Step": "toc"
+            },
+            "body": null,
+            "charset": "gb18030",
+            "followRedirects": true,
+            "maxRedirects": 5,
+            "retry": {
+              "maxAttempts": 2,
+              "backoffMillis": 120
+            },
+            "usePlatformCookieJar": true,
+            "session": {
+              "id": "legado-alpha-session"
+            }
+          },
+          "source": {
+            "sourceId": "legado-alpha-desensitized",
+            "name": "Legado Alpha Desensitized",
+            "baseUrl": "https://alpha.example.test",
+            "rules": {
+              "search": [
+                { "kind": "jsonPath", "path": "$.books[*]" }
+              ],
+              "detail": [
+                { "kind": "jsonPath", "path": "$.detail" }
+              ],
+              "toc": [
+                { "kind": "jsonPath", "path": "$.chapters" }
+              ],
+              "chapter": "article#chapter@html"
+            },
+            "bookSource": {
+              "bookSourceName": "Legado Alpha Desensitized",
+              "bookSourceUrl": "https://alpha.example.test",
+              "bookSourceType": 0,
+              "enabledCookieJar": true,
+              "header": {
+                "User-Agent": "REDACTED_LEGADO_UA",
+                "Cookie": "REDACTED_BOOT=1"
+              },
+              "searchUrl": "https://alpha.example.test/search.php?key={{key}}",
+              "ruleSearch": "$.books[*]",
+              "ruleBookInfo": "$.detail",
+              "ruleToc": "$.chapters",
+              "ruleContent": "article#chapter@html"
+            }
+          }
+        }
+      },
+      "expectHostRequest": {
+        "capability": "http.execute",
+        "params": {
+          "url": "https://alpha.example.test/book/alpha-1001/catalog",
+          "method": "GET",
+          "headers": {
+            "Accept": "application/json",
+            "Cookie": "REDACTED_DETAIL=1",
+            "User-Agent": "REDACTED_LEGADO_UA",
+            "X-Reader-Step": "toc"
+          },
+          "body": null,
+          "charset": "gb18030",
+          "followRedirects": true,
+          "maxRedirects": 5,
+          "retry": {
+            "maxAttempts": 2,
+            "backoffMillis": 120
+          },
+          "usePlatformCookieJar": true,
+          "session": {
+            "id": "legado-alpha-session"
+          }
+        }
+      },
+      "hostResult": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json; charset=gb18030",
+          "set-cookie": [
+            "REDACTED_TOC=1; Path=/; HttpOnly"
+          ],
+          "x-reader-step": "toc"
+        },
+        "finalUrl": "https://alpha.example.test/book/alpha-1001/catalog",
+        "charsetHint": "gb18030",
+        "body": "{\"chapters\":[{\"title\":\"Volume 1 - Awakening\",\"url\":\"https://alpha.example.test/book/alpha-1001/chapter/1\"},{\"title\":\"Volume 2 - Detour\",\"url\":\"https://alpha.example.test/book/alpha-1001/chapter/2\"},{\"title\":\"Side Story\",\"url\":\"https://alpha.example.test/book/alpha-1001/chapter/extra\"}]}",
+        "session": {
+          "id": "legado-alpha-session"
+        }
+      },
+      "expectResult": {
+        "sourceId": "legado-alpha-desensitized",
+        "bookId": "alpha-1001",
+        "toc": [
+          {
+            "index": 0,
+            "title": "Volume 1 - Awakening",
+            "url": "https://alpha.example.test/book/alpha-1001/chapter/1"
+          },
+          {
+            "index": 1,
+            "title": "Volume 2 - Detour",
+            "url": "https://alpha.example.test/book/alpha-1001/chapter/2"
+          },
+          {
+            "index": 2,
+            "title": "Side Story",
+            "url": "https://alpha.example.test/book/alpha-1001/chapter/extra"
+          }
+        ],
+        "http": {
+          "status": 200,
+          "headers": {
+            "content-type": "application/json; charset=gb18030",
+            "set-cookie": [
+              "REDACTED_TOC=1; Path=/; HttpOnly"
+            ],
+            "x-reader-step": "toc"
+          },
+          "finalUrl": "https://alpha.example.test/book/alpha-1001/catalog",
+          "charsetHint": "gb18030",
+          "session": {
+            "id": "legado-alpha-session"
+          }
+        }
+      }
+    },
+    {
+      "name": "legado.alpha.chapter.redirect.raw-css",
+      "completionRequestId": 3031,
+      "command": {
+        "protocolVersion": 1,
+        "requestId": 3030,
+        "method": "chapter.content",
+        "params": {
+          "sourceId": "legado-alpha-desensitized",
+          "bookId": "alpha-1001",
+          "chapterTitle": "Volume 1 - Awakening",
+          "chapterRequest": {
+            "url": "https://alpha.example.test/book/alpha-1001/chapter/1",
+            "method": "GET",
+            "headers": {
+              "Accept": "text/html",
+              "Cookie": "REDACTED_TOC=1",
+              "User-Agent": "REDACTED_LEGADO_UA",
+              "X-Reader-Step": "chapter"
+            },
+            "body": null,
+            "charset": "gb18030",
+            "followRedirects": true,
+            "maxRedirects": 5,
+            "retry": {
+              "maxAttempts": 3,
+              "backoffMillis": 200
+            },
+            "usePlatformCookieJar": true,
+            "session": {
+              "id": "legado-alpha-session"
+            }
+          },
+          "source": {
+            "sourceId": "legado-alpha-desensitized",
+            "name": "Legado Alpha Desensitized",
+            "baseUrl": "https://alpha.example.test",
+            "rules": {
+              "search": [
+                { "kind": "jsonPath", "path": "$.books[*]" }
+              ],
+              "detail": [
+                { "kind": "jsonPath", "path": "$.detail" }
+              ],
+              "toc": [
+                { "kind": "jsonPath", "path": "$.chapters" }
+              ],
+              "chapter": "article#chapter@html"
+            },
+            "bookSource": {
+              "bookSourceName": "Legado Alpha Desensitized",
+              "bookSourceUrl": "https://alpha.example.test",
+              "bookSourceType": 0,
+              "enabledCookieJar": true,
+              "header": {
+                "User-Agent": "REDACTED_LEGADO_UA",
+                "Cookie": "REDACTED_BOOT=1"
+              },
+              "searchUrl": "https://alpha.example.test/search.php?key={{key}}",
+              "ruleSearch": "$.books[*]",
+              "ruleBookInfo": "$.detail",
+              "ruleToc": "$.chapters",
+              "ruleContent": "article#chapter@html"
+            }
+          }
+        }
+      },
+      "expectHostRequest": {
+        "capability": "http.execute",
+        "params": {
+          "url": "https://alpha.example.test/book/alpha-1001/chapter/1",
+          "method": "GET",
+          "headers": {
+            "Accept": "text/html",
+            "Cookie": "REDACTED_TOC=1",
+            "User-Agent": "REDACTED_LEGADO_UA",
+            "X-Reader-Step": "chapter"
+          },
+          "body": null,
+          "charset": "gb18030",
+          "followRedirects": true,
+          "maxRedirects": 5,
+          "retry": {
+            "maxAttempts": 3,
+            "backoffMillis": 200
+          },
+          "usePlatformCookieJar": true,
+          "session": {
+            "id": "legado-alpha-session"
+          }
+        }
+      },
+      "hostResult": {
+        "status": 200,
+        "headers": {
+          "content-type": "text/html; charset=gb18030",
+          "set-cookie": [
+            "REDACTED_CHAPTER=1; Path=/; HttpOnly"
+          ],
+          "x-reader-step": "chapter"
+        },
+        "finalUrl": "https://alpha.example.test/amp/book/alpha-1001/chapter/1",
+        "charsetHint": "gb18030",
+        "body": "<html><body><article id=\"chapter\"><p>First line from the desensitized chapter.</p><p>Second line after a redirected mobile view.</p></article></body></html>",
+        "session": {
+          "id": "legado-alpha-session"
+        }
+      },
+      "expectResult": {
+        "sourceId": "legado-alpha-desensitized",
+        "bookId": "alpha-1001",
+        "chapterTitle": "Volume 1 - Awakening",
+        "content": "First line from the desensitized chapter.\nSecond line after a redirected mobile view.",
+        "via": "rule",
+        "http": {
+          "status": 200,
+          "headers": {
+            "content-type": "text/html; charset=gb18030",
+            "set-cookie": [
+              "REDACTED_CHAPTER=1; Path=/; HttpOnly"
+            ],
+            "x-reader-step": "chapter"
+          },
+          "finalUrl": "https://alpha.example.test/amp/book/alpha-1001/chapter/1",
+          "charsetHint": "gb18030",
+          "session": {
+            "id": "legado-alpha-session"
+          }
+        }
+      }
+    },
+    {
+      "name": "legado.beta.search.html.raw-css",
+      "completionRequestId": 3101,
+      "command": {
+        "protocolVersion": 1,
+        "requestId": 3100,
+        "method": "book.search",
+        "params": {
+          "sourceId": "legado-beta-html-desensitized",
+          "searchRequest": {
+            "url": "https://beta.example.test/modules/article/search.php?searchkey=nebula",
+            "method": "GET",
+            "headers": {
+              "Accept": "text/html",
+              "Cookie": "REDACTED_BETA_BOOT=1",
+              "User-Agent": "REDACTED_LEGADO_UA",
+              "X-Reader-Step": "search"
+            },
+            "body": null,
+            "charset": "gbk",
+            "followRedirects": true,
+            "maxRedirects": 2,
+            "retry": {
+              "maxAttempts": 2,
+              "backoffMillis": 60
+            },
+            "usePlatformCookieJar": true,
+            "session": {
+              "id": "legado-beta-session"
+            }
+          },
+          "source": {
+            "sourceId": "legado-beta-html-desensitized",
+            "name": "Legado Beta HTML Desensitized",
+            "baseUrl": "https://beta.example.test",
+            "rules": {
+              "search": "div.search-list&&div.result;h3&&a@text",
+              "detail": ".book-info span@text",
+              "toc": "script.toc@html",
+              "chapter": "article.content@html"
+            },
+            "bookSource": {
+              "bookSourceName": "Legado Beta HTML Desensitized",
+              "bookSourceUrl": "https://beta.example.test",
+              "bookSourceType": 0,
+              "enabledCookieJar": true,
+              "header": {
+                "User-Agent": "REDACTED_LEGADO_UA",
+                "Cookie": "REDACTED_BETA_BOOT=1"
+              },
+              "searchUrl": "https://beta.example.test/modules/article/search.php?searchkey={{key}}",
+              "ruleSearch": "div.search-list&&div.result;h3&&a@text",
+              "ruleBookInfo": ".book-info span@text",
+              "ruleToc": "script.toc@html",
+              "ruleContent": "article.content@html"
+            }
+          }
+        }
+      },
+      "expectHostRequest": {
+        "capability": "http.execute",
+        "params": {
+          "url": "https://beta.example.test/modules/article/search.php?searchkey=nebula",
+          "method": "GET",
+          "headers": {
+            "Accept": "text/html",
+            "Cookie": "REDACTED_BETA_BOOT=1",
+            "User-Agent": "REDACTED_LEGADO_UA",
+            "X-Reader-Step": "search"
+          },
+          "body": null,
+          "charset": "gbk",
+          "followRedirects": true,
+          "maxRedirects": 2,
+          "retry": {
+            "maxAttempts": 2,
+            "backoffMillis": 60
+          },
+          "usePlatformCookieJar": true,
+          "session": {
+            "id": "legado-beta-session"
+          }
+        }
+      },
+      "hostResult": {
+        "status": 200,
+        "headers": {
+          "content-type": "text/html; charset=gbk",
+          "set-cookie": [
+            "REDACTED_BETA_SEARCH=1; Path=/; HttpOnly"
+          ],
+          "x-reader-step": "search"
+        },
+        "finalUrl": "https://beta.example.test/search/nebula.html",
+        "charsetHint": "gbk",
+        "body": "<html><body><div class=\"search-list\"><div class=\"result\"><h3><a href=\"/book/777\">Nebula Archive</a></h3></div><div class=\"result\"><h3><a href=\"/book/778\">Silent Harbor</a></h3></div></div></body></html>",
+        "session": {
+          "id": "legado-beta-session"
+        }
+      },
+      "expectResult": {
+        "sourceId": "legado-beta-html-desensitized",
+        "books": [
+          {
+            "bookId": "",
+            "title": "Nebula Archive",
+            "author": ""
+          },
+          {
+            "bookId": "",
+            "title": "Silent Harbor",
+            "author": ""
+          }
+        ],
+        "http": {
+          "status": 200,
+          "headers": {
+            "content-type": "text/html; charset=gbk",
+            "set-cookie": [
+              "REDACTED_BETA_SEARCH=1; Path=/; HttpOnly"
+            ],
+            "x-reader-step": "search"
+          },
+          "finalUrl": "https://beta.example.test/search/nebula.html",
+          "charsetHint": "gbk",
+          "session": {
+            "id": "legado-beta-session"
+          }
+        }
+      }
+    },
+    {
+      "name": "legado.beta.detail.html.key-value",
+      "completionRequestId": 3111,
+      "command": {
+        "protocolVersion": 1,
+        "requestId": 3110,
+        "method": "book.detail",
+        "params": {
+          "sourceId": "legado-beta-html-desensitized",
+          "book": {
+            "bookId": "/book/777",
+            "title": "Nebula Archive",
+            "author": ""
+          },
+          "detailRequest": {
+            "url": "https://beta.example.test/book/777",
+            "method": "GET",
+            "headers": {
+              "Accept": "text/html",
+              "Cookie": "REDACTED_BETA_SEARCH=1",
+              "User-Agent": "REDACTED_LEGADO_UA",
+              "X-Reader-Step": "detail"
+            },
+            "body": null,
+            "charset": "utf-8",
+            "followRedirects": true,
+            "maxRedirects": 3,
+            "retry": {
+              "maxAttempts": 1,
+              "backoffMillis": null
+            },
+            "usePlatformCookieJar": true,
+            "session": {
+              "id": "legado-beta-session"
+            }
+          },
+          "source": {
+            "sourceId": "legado-beta-html-desensitized",
+            "name": "Legado Beta HTML Desensitized",
+            "baseUrl": "https://beta.example.test",
+            "rules": {
+              "search": "div.search-list&&div.result;h3&&a@text",
+              "detail": ".book-info span@text",
+              "toc": "script.toc@html",
+              "chapter": "article.content@html"
+            },
+            "bookSource": {
+              "bookSourceName": "Legado Beta HTML Desensitized",
+              "bookSourceUrl": "https://beta.example.test",
+              "bookSourceType": 0,
+              "enabledCookieJar": true,
+              "header": {
+                "User-Agent": "REDACTED_LEGADO_UA",
+                "Cookie": "REDACTED_BETA_BOOT=1"
+              },
+              "searchUrl": "https://beta.example.test/modules/article/search.php?searchkey={{key}}",
+              "ruleSearch": "div.search-list&&div.result;h3&&a@text",
+              "ruleBookInfo": ".book-info span@text",
+              "ruleToc": "script.toc@html",
+              "ruleContent": "article.content@html"
+            }
+          }
+        }
+      },
+      "expectHostRequest": {
+        "capability": "http.execute",
+        "params": {
+          "url": "https://beta.example.test/book/777",
+          "method": "GET",
+          "headers": {
+            "Accept": "text/html",
+            "Cookie": "REDACTED_BETA_SEARCH=1",
+            "User-Agent": "REDACTED_LEGADO_UA",
+            "X-Reader-Step": "detail"
+          },
+          "body": null,
+          "charset": "utf-8",
+          "followRedirects": true,
+          "maxRedirects": 3,
+          "retry": {
+            "maxAttempts": 1,
+            "backoffMillis": null
+          },
+          "usePlatformCookieJar": true,
+          "session": {
+            "id": "legado-beta-session"
+          }
+        }
+      },
+      "hostResult": {
+        "status": 200,
+        "headers": {
+          "content-type": "text/html; charset=utf-8",
+          "set-cookie": [
+            "REDACTED_BETA_DETAIL=1; Path=/; HttpOnly"
+          ],
+          "x-reader-step": "detail"
+        },
+        "finalUrl": "https://beta.example.test/book/777?mobile=1",
+        "charsetHint": "utf-8",
+        "body": "<html><body><section class=\"book-info\"><span>author</span><span>Author C</span><span>intro</span><span>Redacted synopsis from mirrored HTML.</span><span>lastChapter</span><span>Chapter 42 - Harbor</span></section></body></html>",
+        "session": {
+          "id": "legado-beta-session"
+        }
+      },
+      "expectResult": {
+        "sourceId": "legado-beta-html-desensitized",
+        "book": {
+          "bookId": "/book/777",
+          "title": "Nebula Archive",
+          "author": "Author C",
+          "intro": "Redacted synopsis from mirrored HTML.",
+          "lastChapter": "Chapter 42 - Harbor"
+        },
+        "http": {
+          "status": 200,
+          "headers": {
+            "content-type": "text/html; charset=utf-8",
+            "set-cookie": [
+              "REDACTED_BETA_DETAIL=1; Path=/; HttpOnly"
+            ],
+            "x-reader-step": "detail"
+          },
+          "finalUrl": "https://beta.example.test/book/777?mobile=1",
+          "charsetHint": "utf-8",
+          "session": {
+            "id": "legado-beta-session"
+          }
+        }
+      }
+    }
+  ]
+}
