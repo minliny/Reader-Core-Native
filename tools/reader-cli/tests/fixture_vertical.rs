@@ -15,6 +15,12 @@ fn fixture_path(name: &str) -> PathBuf {
     p.canonicalize().unwrap_or(p)
 }
 
+fn booksource_fixture_path() -> PathBuf {
+    let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    p.push("../../crates/reader-content/tests/fixtures/booksource_canonical.json");
+    p.canonicalize().unwrap_or(p)
+}
+
 #[test]
 fn fixture_vertical_runs_full_pipeline() {
     let events = run_fixture("basic_source.json");
@@ -45,6 +51,40 @@ fn fixture_vertical_runs_legado_css_dsl_pipeline() {
         .as_str()
         .unwrap()
         .contains("First & bold line."));
+}
+
+#[test]
+fn booksource_fixture_outputs_stable_json() {
+    let output = Command::new(BIN)
+        .arg("--booksource-fixture")
+        .arg(booksource_fixture_path())
+        .output()
+        .expect("reader-cli binary");
+
+    assert!(
+        output.status.success(),
+        "reader-cli failed: stderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value =
+        serde_json::from_str(stdout.trim()).expect("stdout should be one JSON object");
+
+    assert_eq!(json["sourceId"], "booksource-fixture");
+    assert_eq!(
+        json["search"]["books"][0]["bookId"],
+        "https://books.example.test/book/dune"
+    );
+    assert_eq!(json["explore"]["entries"][1]["kind"], "ranking");
+    assert_eq!(
+        json["toc"]["chapters"][0]["url"],
+        "https://books.example.test/book/dune/chapter/1"
+    );
+    assert_eq!(
+        json["content"]["content"],
+        "First line.\nbooksource-fixture\nSecond line."
+    );
 }
 
 fn run_fixture(name: &str) -> Vec<serde_json::Value> {

@@ -44,6 +44,9 @@ pub struct SourceRules {
     /// Extract a list of books from a search response.
     #[serde(default)]
     pub search: Value,
+    /// Extract a discovery/explore page.
+    #[serde(default)]
+    pub explore: Value,
     /// Extract detail metadata for a single book.
     #[serde(default)]
     pub detail: Value,
@@ -176,6 +179,201 @@ pub struct LegadoBookSource {
 }
 
 pub type BookSourceCompat = LegadoBookSource;
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookSourceSemantics {
+    pub source_id: String,
+    pub name: String,
+    #[serde(default)]
+    pub base_url: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub search_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub explore_url: Option<String>,
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub enabled_explore: bool,
+    pub rules: BookSourcePipelineRules,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookSourcePipelineRules {
+    pub search: BookSourceSearchSemantics,
+    pub explore: BookSourceExploreSemantics,
+    pub detail: BookSourceDetailSemantics,
+    pub toc: BookSourceTocSemantics,
+    pub content: BookSourceContentSemantics,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookSourceSearchSemantics {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub raw: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub list: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intro: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_chapter: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub update_time: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub word_count: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookSourceExploreSemantics {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub raw: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub list: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intro: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_chapter: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub word_count: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub screen: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookSourceDetailSemantics {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub raw: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub init: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intro: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_chapter: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub update_time: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub toc_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub word_count: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookSourceTocSemantics {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub raw: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub list: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_url: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookSourceContentSemantics {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub raw: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_regex: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replace_regex: Option<String>,
+}
+
+impl Source {
+    pub fn legado_book_source(&self) -> Option<LegadoBookSource> {
+        if self.book_source.is_null() {
+            return None;
+        }
+        serde_json::from_value(self.book_source.clone()).ok()
+    }
+
+    pub fn book_source_semantics(&self) -> Option<BookSourceSemantics> {
+        self.legado_book_source().map(|book_source| {
+            BookSourceSemantics::from_legado(
+                &self.source_id,
+                Some(&self.name),
+                Some(&self.base_url),
+                &book_source,
+            )
+        })
+    }
+}
+
+impl BookSourceSemantics {
+    pub fn from_legado(
+        source_id: &str,
+        fallback_name: Option<&str>,
+        fallback_base_url: Option<&str>,
+        source: &LegadoBookSource,
+    ) -> Self {
+        let search = normalize_search_semantics(source);
+        let explore = normalize_explore_semantics(source);
+        let detail = normalize_detail_semantics(source);
+        let toc = normalize_toc_semantics(source);
+        let content = normalize_content_semantics(source);
+        Self {
+            source_id: first_non_empty_str(&[Some(source_id)])
+                .unwrap_or_else(|| "booksource".to_string()),
+            name: first_non_empty_str(&[source.book_source_name.as_deref(), fallback_name])
+                .unwrap_or_default(),
+            base_url: first_non_empty_str(&[source.book_source_url.as_deref(), fallback_base_url])
+                .unwrap_or_default(),
+            search_url: clean_string(source.search_url.as_deref()),
+            explore_url: clean_string(source.explore_url.as_deref()),
+            enabled: source.enabled.unwrap_or(true),
+            enabled_explore: source.enabled_explore.unwrap_or(false),
+            rules: BookSourcePipelineRules {
+                search,
+                explore,
+                detail,
+                toc,
+                content,
+            },
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -393,6 +591,137 @@ pub struct ReadingProgress {
     pub chapter_progress: f64,
 }
 
+fn normalize_search_semantics(source: &LegadoBookSource) -> BookSourceSearchSemantics {
+    let structured = source.search_rule.as_ref();
+    let legacy_fields = [
+        source.rule_search_name.as_deref(),
+        source.rule_search_author.as_deref(),
+        source.rule_search_url.as_deref(),
+    ]
+    .iter()
+    .any(|value| clean_string(*value).is_some());
+    BookSourceSearchSemantics {
+        raw: clean_string(source.rule_search.as_deref()),
+        list: structured
+            .and_then(|rule| clean_string(rule.book_list.as_deref()))
+            .or_else(|| {
+                if legacy_fields {
+                    clean_string(source.rule_search.as_deref())
+                } else {
+                    None
+                }
+            }),
+        name: structured
+            .and_then(|rule| clean_string(rule.name.as_deref()))
+            .or_else(|| clean_string(source.rule_search_name.as_deref())),
+        author: structured
+            .and_then(|rule| clean_string(rule.author.as_deref()))
+            .or_else(|| clean_string(source.rule_search_author.as_deref())),
+        intro: structured.and_then(|rule| clean_string(rule.intro.as_deref())),
+        kind: structured.and_then(|rule| clean_string(rule.kind.as_deref())),
+        last_chapter: structured.and_then(|rule| clean_string(rule.last_chapter.as_deref())),
+        update_time: structured.and_then(|rule| clean_string(rule.update_time.as_deref())),
+        detail_url: structured
+            .and_then(|rule| clean_string(rule.book_url.as_deref()))
+            .or_else(|| clean_string(source.rule_search_url.as_deref())),
+        cover_url: structured.and_then(|rule| clean_string(rule.cover_url.as_deref())),
+        word_count: structured.and_then(|rule| clean_string(rule.word_count.as_deref())),
+    }
+}
+
+fn normalize_explore_semantics(source: &LegadoBookSource) -> BookSourceExploreSemantics {
+    let structured = source.explore_rule.as_ref();
+    BookSourceExploreSemantics {
+        raw: clean_string(source.rule_explore.as_deref()),
+        list: structured
+            .and_then(|rule| clean_string(rule.book_list.as_deref()))
+            .or_else(|| clean_string(source.rule_explore.as_deref())),
+        name: structured.and_then(|rule| clean_string(rule.name.as_deref())),
+        author: structured.and_then(|rule| clean_string(rule.author.as_deref())),
+        intro: structured.and_then(|rule| clean_string(rule.intro.as_deref())),
+        kind: structured.and_then(|rule| clean_string(rule.kind.as_deref())),
+        last_chapter: structured.and_then(|rule| clean_string(rule.last_chapter.as_deref())),
+        detail_url: structured.and_then(|rule| clean_string(rule.book_url.as_deref())),
+        cover_url: structured.and_then(|rule| clean_string(rule.cover_url.as_deref())),
+        word_count: structured.and_then(|rule| clean_string(rule.word_count.as_deref())),
+        screen: structured.and_then(|rule| clean_string(rule.explore_screen.as_deref())),
+    }
+}
+
+fn normalize_detail_semantics(source: &LegadoBookSource) -> BookSourceDetailSemantics {
+    let structured = source.book_info_rule.as_ref();
+    BookSourceDetailSemantics {
+        raw: clean_string(source.rule_book_info.as_deref()),
+        init: structured
+            .and_then(|rule| clean_string(rule.r#init.as_deref()))
+            .or_else(|| clean_string(source.rule_book_info.as_deref())),
+        name: structured.and_then(|rule| clean_string(rule.name.as_deref())),
+        author: structured.and_then(|rule| clean_string(rule.author.as_deref())),
+        intro: structured.and_then(|rule| clean_string(rule.intro.as_deref())),
+        kind: structured.and_then(|rule| clean_string(rule.kind.as_deref())),
+        last_chapter: structured.and_then(|rule| clean_string(rule.last_chapter.as_deref())),
+        update_time: structured.and_then(|rule| clean_string(rule.update_time.as_deref())),
+        cover_url: structured.and_then(|rule| clean_string(rule.cover_url.as_deref())),
+        toc_url: structured.and_then(|rule| clean_string(rule.toc_url.as_deref())),
+        word_count: structured.and_then(|rule| clean_string(rule.word_count.as_deref())),
+    }
+}
+
+fn normalize_toc_semantics(source: &LegadoBookSource) -> BookSourceTocSemantics {
+    let structured = source.toc_rule.as_ref();
+    let structured_fields = structured.is_some_and(|rule| {
+        [
+            rule.chapter_name.as_deref(),
+            rule.chapter_url.as_deref(),
+            rule.next_toc_url.as_deref(),
+        ]
+        .iter()
+        .any(|value| clean_string(*value).is_some())
+    });
+    BookSourceTocSemantics {
+        raw: clean_string(source.rule_toc.as_deref()),
+        list: structured
+            .and_then(|rule| clean_string(rule.chapter_list.as_deref()))
+            .or_else(|| {
+                if structured_fields {
+                    clean_string(source.rule_toc.as_deref())
+                } else {
+                    None
+                }
+            }),
+        name: structured.and_then(|rule| clean_string(rule.chapter_name.as_deref())),
+        url: structured.and_then(|rule| clean_string(rule.chapter_url.as_deref())),
+        next_url: structured.and_then(|rule| clean_string(rule.next_toc_url.as_deref())),
+    }
+}
+
+fn normalize_content_semantics(source: &LegadoBookSource) -> BookSourceContentSemantics {
+    let structured = source.content_rule.as_ref();
+    BookSourceContentSemantics {
+        raw: clean_string(source.rule_content.as_deref()),
+        content: structured
+            .and_then(|rule| clean_string(rule.content.as_deref()))
+            .or_else(|| clean_string(source.rule_content.as_deref())),
+        title: structured.and_then(|rule| clean_string(rule.title.as_deref())),
+        next_url: structured.and_then(|rule| clean_string(rule.next_content_url.as_deref())),
+        source_regex: structured.and_then(|rule| clean_string(rule.source_regex.as_deref())),
+        replace_regex: structured.and_then(|rule| clean_string(rule.replace_regex.as_deref())),
+    }
+}
+
+fn first_non_empty_str(values: &[Option<&str>]) -> Option<String> {
+    values.iter().find_map(|value| clean_string(*value))
+}
+
+fn clean_string(value: Option<&str>) -> Option<String> {
+    let value = value?.trim();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -517,6 +846,57 @@ mod tests {
         assert!(
             encoded.get("baseUrl").is_none(),
             "compat encoding must not invent V1 fields"
+        );
+    }
+
+    #[test]
+    fn legado_book_source_normalizes_structured_and_legacy_rule_aliases() {
+        let source: LegadoBookSource =
+            serde_json::from_str(LEGADO_BOOK_SOURCE).expect("fixture should decode");
+        let semantics = BookSourceSemantics::from_legado(
+            "legado-compat-source",
+            Some("Fallback Name"),
+            Some("https://fallback.example.test"),
+            &source,
+        );
+
+        assert_eq!(semantics.source_id, "legado-compat-source");
+        assert_eq!(semantics.name, "Legado Compat Source");
+        assert_eq!(semantics.base_url, "https://books.example.test");
+        assert_eq!(semantics.search_url.as_deref(), Some("/search?q={{key}}"));
+        assert_eq!(
+            semantics.rules.search.raw.as_deref(),
+            Some("div.list&&div.item;div.name&&a@text")
+        );
+        assert_eq!(
+            semantics.rules.search.list.as_deref(),
+            Some("div.list&&div.item")
+        );
+        assert_eq!(
+            semantics.rules.search.name.as_deref(),
+            Some("div.name&&a@text")
+        );
+        assert_eq!(
+            semantics.rules.search.detail_url.as_deref(),
+            Some("div.name&&a@href")
+        );
+        assert_eq!(
+            semantics.rules.detail.init.as_deref(),
+            Some("@js:java.ajax(source.bookSourceUrl)")
+        );
+        assert_eq!(
+            semantics.rules.detail.toc_url.as_deref(),
+            Some("a.toc@href")
+        );
+        assert_eq!(semantics.rules.toc.list.as_deref(), Some("div.chapter&&a"));
+        assert_eq!(semantics.rules.toc.url.as_deref(), Some("a@href"));
+        assert_eq!(
+            semantics.rules.content.content.as_deref(),
+            Some("div.content@html")
+        );
+        assert_eq!(
+            semantics.rules.content.next_url.as_deref(),
+            Some("a.next@href")
         );
     }
 }

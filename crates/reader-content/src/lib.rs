@@ -17,10 +17,13 @@
 
 pub mod normalization;
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
-use reader_domain::{Book, ReadingProgress, Source, TocEntry};
+use reader_domain::{
+    Book, BookSourceExploreSemantics, BookSourceSearchSemantics, BookSourceSemantics,
+    ReadingProgress, Source, TocEntry,
+};
 use reader_js::{JsError, JsErrorKind, JsEvaluation, JsSandbox as JsSandboxTrait, QuickJsSandbox};
 use reader_rule::{CaptureGroup, RuleEngine, RuleError, RuleOutput, RuleStep};
 use serde::{Deserialize, Serialize};
@@ -196,6 +199,96 @@ pub enum JsOutcome {
     /// The JS rule is unsupported in V1 (e.g. it called `java.get` with no host
     /// callback registered).
     Unsupported { reason: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookSourceRequestContext {
+    #[serde(default)]
+    pub base_url: String,
+    #[serde(default)]
+    pub current_url: String,
+    #[serde(default)]
+    pub book_url: String,
+    #[serde(default)]
+    pub chapter_url: String,
+    #[serde(default)]
+    pub variables: BTreeMap<String, String>,
+}
+
+impl BookSourceRequestContext {
+    pub fn for_semantics(semantics: &BookSourceSemantics) -> Self {
+        Self {
+            base_url: semantics.base_url.clone(),
+            current_url: semantics.base_url.clone(),
+            book_url: String::new(),
+            chapter_url: String::new(),
+            variables: BTreeMap::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookSourceDetail {
+    pub book: Book,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub toc_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub update_time: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub word_count: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookSourceToc {
+    #[serde(default)]
+    pub chapters: Vec<TocEntry>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_toc_url: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BookSourceExploreEntryKind {
+    Category,
+    Ranking,
+    Channel,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookSourceExploreEntry {
+    pub id: String,
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    pub kind: BookSourceExploreEntryKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookSourceExploreResult {
+    pub source_id: String,
+    #[serde(default)]
+    pub entries: Vec<BookSourceExploreEntry>,
+    #[serde(default)]
+    pub books: Vec<Book>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_page_url: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookSourceContent {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    pub content: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_content_url: Option<String>,
+    #[serde(default)]
+    pub variables: BTreeMap<String, String>,
 }
 
 /// Normalized chapter body ready for cache/storage.
@@ -521,6 +614,12 @@ impl RemoteContentPipeline {
         source: &Source,
         search_response: &str,
     ) -> Result<Vec<Book>, ContentError> {
+        if !has_rule_spec(&source.rules.search) {
+            if let Some(semantics) = source.book_source_semantics() {
+                let context = BookSourceRequestContext::for_semantics(&semantics);
+                return self.search_book_source(&semantics, search_response, &context);
+            }
+        }
         let out = self.run_chain(search_response, &source.rules.search)?;
         let mut books = Vec::new();
         for value in out.values() {
@@ -538,6 +637,15 @@ impl RemoteContentPipeline {
         base: &Book,
         detail_response: &str,
     ) -> Result<Book, ContentError> {
+        if !has_rule_spec(&source.rules.detail) {
+            if let Some(semantics) = source.book_source_semantics() {
+                let mut context = BookSourceRequestContext::for_semantics(&semantics);
+                context.book_url = base.book_id.clone();
+                let detail =
+                    self.detail_book_source(&semantics, base, detail_response, &context)?;
+                return Ok(detail.book);
+            }
+        }
         let out = self.run_chain(detail_response, &source.rules.detail)?;
         let mut merged = base.clone();
         if let Some(first) = out.first() {
@@ -569,6 +677,14 @@ impl RemoteContentPipeline {
     /// Extract the table of contents. The rule chain should yield alternating
     /// `title`, `url` values, or a JSON array of `{title, url}` objects.
     pub fn toc(&self, source: &Source, toc_response: &str) -> Result<Vec<TocEntry>, ContentError> {
+        if !has_rule_spec(&source.rules.toc) {
+            if let Some(semantics) = source.book_source_semantics() {
+                let context = BookSourceRequestContext::for_semantics(&semantics);
+                return self
+                    .toc_book_source(&semantics, toc_response, &context)
+                    .map(|toc| toc.chapters);
+            }
+        }
         let out = self.run_chain(toc_response, &source.rules.toc)?;
         let mut entries = Vec::new();
 
@@ -619,10 +735,210 @@ impl RemoteContentPipeline {
         source: &Source,
         chapter_response: &str,
     ) -> Result<String, ContentError> {
+        if !has_rule_spec(&source.rules.chapter) {
+            if let Some(semantics) = source.book_source_semantics() {
+                let context = BookSourceRequestContext::for_semantics(&semantics);
+                return self
+                    .content_book_source(&semantics, chapter_response, &context)
+                    .map(|content| content.content);
+            }
+        }
         let out = self.run_chain(chapter_response, &source.rules.chapter)?;
         Ok(normalization::normalize_extracted_content(
             &out.values().join("\n"),
         ))
+    }
+
+    pub fn search_book_source(
+        &self,
+        semantics: &BookSourceSemantics,
+        search_response: &str,
+        context: &BookSourceRequestContext,
+    ) -> Result<Vec<Book>, ContentError> {
+        let mut context = context.with_source_defaults(semantics);
+        if let Some(search_url) = semantics.search_url.as_deref() {
+            let resolved = resolve_url(&context.base_url, &context.current_url, search_url);
+            context
+                .variables
+                .entry("searchUrl".into())
+                .or_insert(resolved);
+        }
+        extract_books_from_semantic_rule(self, &semantics.rules.search, search_response, &context)
+    }
+
+    pub fn explore_book_source(
+        &self,
+        semantics: &BookSourceSemantics,
+        explore_response: &str,
+        context: &BookSourceRequestContext,
+    ) -> Result<BookSourceExploreResult, ContentError> {
+        let context = context.with_source_defaults(semantics);
+        let entries = parse_explore_entries(
+            semantics.rules.explore.screen.as_deref(),
+            semantics.explore_url.as_deref(),
+            &context,
+        );
+        let books = extract_books_from_explore_rule(
+            self,
+            &semantics.rules.explore,
+            explore_response,
+            &context,
+        )?;
+        Ok(BookSourceExploreResult {
+            source_id: semantics.source_id.clone(),
+            entries,
+            books,
+            next_page_url: None,
+        })
+    }
+
+    pub fn detail_book_source(
+        &self,
+        semantics: &BookSourceSemantics,
+        base: &Book,
+        detail_response: &str,
+        context: &BookSourceRequestContext,
+    ) -> Result<BookSourceDetail, ContentError> {
+        let context = context.with_source_defaults(semantics);
+        let rules = &semantics.rules.detail;
+        let mut book = base.clone();
+        if book.book_id.trim().is_empty() {
+            book.book_id = non_empty_string(context.book_url.as_str()).unwrap_or_default();
+        }
+        if let Some(value) =
+            extract_rule_value(self, detail_response, rules.name.as_deref(), &context)?
+        {
+            book.title = value;
+        }
+        if let Some(value) =
+            extract_rule_value(self, detail_response, rules.author.as_deref(), &context)?
+        {
+            book.author = value;
+        }
+        if let Some(value) =
+            extract_rule_value(self, detail_response, rules.cover_url.as_deref(), &context)?
+        {
+            book.cover_url = Some(resolve_url(
+                &context.base_url,
+                &context.current_url,
+                value.as_str(),
+            ));
+        }
+        if let Some(value) =
+            extract_rule_value(self, detail_response, rules.intro.as_deref(), &context)?
+        {
+            book.intro = Some(value);
+        }
+        if let Some(value) =
+            extract_rule_value(self, detail_response, rules.kind.as_deref(), &context)?
+        {
+            book.kind = Some(value);
+        }
+        if let Some(value) = extract_rule_value(
+            self,
+            detail_response,
+            rules.last_chapter.as_deref(),
+            &context,
+        )? {
+            book.last_chapter = Some(value);
+        }
+        let toc_url =
+            extract_rule_value(self, detail_response, rules.toc_url.as_deref(), &context)?
+                .map(|value| resolve_url(&context.base_url, &context.current_url, value.as_str()));
+        let update_time = extract_rule_value(
+            self,
+            detail_response,
+            rules.update_time.as_deref(),
+            &context,
+        )?;
+        let word_count =
+            extract_rule_value(self, detail_response, rules.word_count.as_deref(), &context)?;
+        Ok(BookSourceDetail {
+            book,
+            toc_url,
+            update_time,
+            word_count,
+        })
+    }
+
+    pub fn toc_book_source(
+        &self,
+        semantics: &BookSourceSemantics,
+        toc_response: &str,
+        context: &BookSourceRequestContext,
+    ) -> Result<BookSourceToc, ContentError> {
+        let context = context.with_source_defaults(semantics);
+        let rules = &semantics.rules.toc;
+        let chapters = if rules.name.is_some() || rules.url.is_some() {
+            let items = extract_rule_items(self, toc_response, rules.list.as_deref(), &context)?;
+            let mut chapters = Vec::new();
+            for (index, item) in items.iter().enumerate() {
+                let title = extract_rule_value(self, item, rules.name.as_deref(), &context)?
+                    .unwrap_or_default();
+                let url = extract_rule_value(self, item, rules.url.as_deref(), &context)?
+                    .map(|value| resolve_url(&context.base_url, &context.current_url, &value))
+                    .unwrap_or_default();
+                if !title.trim().is_empty() || !url.trim().is_empty() {
+                    chapters.push(TocEntry {
+                        index: index as u32,
+                        title,
+                        url,
+                    });
+                }
+            }
+            chapters
+        } else if let Some(raw) = rules.raw.as_deref() {
+            let out = self.engine.execute_legado_css(toc_response, raw)?;
+            parse_toc_output(out.values(), &context)
+        } else {
+            Vec::new()
+        };
+        let next_toc_url =
+            extract_rule_value(self, toc_response, rules.next_url.as_deref(), &context)?
+                .map(|value| resolve_url(&context.base_url, &context.current_url, value.as_str()));
+        Ok(BookSourceToc {
+            chapters,
+            next_toc_url,
+        })
+    }
+
+    pub fn content_book_source(
+        &self,
+        semantics: &BookSourceSemantics,
+        chapter_response: &str,
+        context: &BookSourceRequestContext,
+    ) -> Result<BookSourceContent, ContentError> {
+        let context = context.with_source_defaults(semantics);
+        let rules = &semantics.rules.content;
+        let title = extract_rule_value(self, chapter_response, rules.title.as_deref(), &context)?;
+        let raw_content =
+            extract_rule_value(self, chapter_response, rules.content.as_deref(), &context)?
+                .or_else(|| {
+                    rules.raw.as_deref().and_then(|raw| {
+                        self.engine
+                            .execute_legado_css(chapter_response, raw)
+                            .ok()
+                            .map(|out| out.values().join("\n"))
+                    })
+                })
+                .unwrap_or_default();
+        let replaced = apply_content_replacement(
+            self,
+            raw_content.as_str(),
+            rules.source_regex.as_deref(),
+            rules.replace_regex.as_deref(),
+            &context,
+        )?;
+        let content = normalization::normalize_extracted_content(&replaced);
+        let next_content_url =
+            extract_rule_value(self, chapter_response, rules.next_url.as_deref(), &context)?
+                .map(|value| resolve_url(&context.base_url, &context.current_url, value.as_str()));
+        Ok(BookSourceContent {
+            title,
+            content,
+            next_content_url,
+            variables: context.variables,
+        })
     }
 
     /// Extract and normalize one chapter body for cache/storage.
@@ -661,6 +977,542 @@ impl RemoteContentPipeline {
                 }
             }
         }
+    }
+}
+
+impl BookSourceRequestContext {
+    fn with_source_defaults(&self, semantics: &BookSourceSemantics) -> Self {
+        let mut context = self.clone();
+        if context.base_url.trim().is_empty() {
+            context.base_url = semantics.base_url.clone();
+        }
+        if context.current_url.trim().is_empty() {
+            context.current_url = context.base_url.clone();
+        }
+        let source_id = semantics.source_id.clone();
+        let base_url = context.base_url.clone();
+        let book_url = context.book_url.clone();
+        let chapter_url = context.chapter_url.clone();
+        context
+            .variables
+            .entry("sourceId".into())
+            .or_insert(source_id);
+        context
+            .variables
+            .entry("baseUrl".into())
+            .or_insert(base_url);
+        if !context.book_url.trim().is_empty() {
+            context
+                .variables
+                .entry("bookUrl".into())
+                .or_insert(book_url);
+        }
+        if !context.chapter_url.trim().is_empty() {
+            context
+                .variables
+                .entry("chapterUrl".into())
+                .or_insert(chapter_url);
+        }
+        context
+    }
+}
+
+fn has_rule_spec(value: &serde_json::Value) -> bool {
+    match value {
+        serde_json::Value::Null => false,
+        serde_json::Value::String(value) => !value.trim().is_empty(),
+        serde_json::Value::Array(values) => !values.is_empty(),
+        serde_json::Value::Object(values) => !values.is_empty(),
+        _ => true,
+    }
+}
+
+fn extract_books_from_semantic_rule(
+    pipeline: &RemoteContentPipeline,
+    rules: &BookSourceSearchSemantics,
+    input: &str,
+    context: &BookSourceRequestContext,
+) -> Result<Vec<Book>, ContentError> {
+    let has_structured_fields = [
+        rules.name.as_deref(),
+        rules.author.as_deref(),
+        rules.detail_url.as_deref(),
+        rules.cover_url.as_deref(),
+        rules.intro.as_deref(),
+    ]
+    .iter()
+    .any(|value| value.is_some());
+
+    if !has_structured_fields {
+        return extract_books_from_raw_rule(pipeline, rules.raw.as_deref(), input, context);
+    }
+
+    let items = extract_rule_items(pipeline, input, rules.list.as_deref(), context)?;
+    let mut books = Vec::new();
+    for (index, item) in items.iter().enumerate() {
+        let title =
+            extract_rule_value(pipeline, item, rules.name.as_deref(), context)?.unwrap_or_default();
+        let author = extract_rule_value(pipeline, item, rules.author.as_deref(), context)?
+            .unwrap_or_default();
+        let detail_url = extract_rule_value(pipeline, item, rules.detail_url.as_deref(), context)?
+            .map(|value| resolve_url(&context.base_url, &context.current_url, &value));
+        let cover_url = extract_rule_value(pipeline, item, rules.cover_url.as_deref(), context)?
+            .map(|value| resolve_url(&context.base_url, &context.current_url, &value));
+        let intro = extract_rule_value(pipeline, item, rules.intro.as_deref(), context)?;
+        let kind = extract_rule_value(pipeline, item, rules.kind.as_deref(), context)?;
+        let last_chapter =
+            extract_rule_value(pipeline, item, rules.last_chapter.as_deref(), context)?;
+        let book_id = detail_url
+            .clone()
+            .or_else(|| stable_fallback_book_id(&title, &author, index))
+            .unwrap_or_default();
+        if title.trim().is_empty() && book_id.trim().is_empty() {
+            continue;
+        }
+        books.push(Book {
+            book_id,
+            title,
+            author,
+            cover_url,
+            intro,
+            kind,
+            last_chapter,
+        });
+    }
+    Ok(books)
+}
+
+fn extract_books_from_explore_rule(
+    pipeline: &RemoteContentPipeline,
+    rules: &BookSourceExploreSemantics,
+    input: &str,
+    context: &BookSourceRequestContext,
+) -> Result<Vec<Book>, ContentError> {
+    let has_structured_fields = [
+        rules.name.as_deref(),
+        rules.author.as_deref(),
+        rules.detail_url.as_deref(),
+        rules.cover_url.as_deref(),
+        rules.intro.as_deref(),
+    ]
+    .iter()
+    .any(|value| value.is_some());
+
+    if !has_structured_fields {
+        return extract_books_from_raw_rule(pipeline, rules.raw.as_deref(), input, context);
+    }
+
+    let items = extract_rule_items(pipeline, input, rules.list.as_deref(), context)?;
+    let mut books = Vec::new();
+    for (index, item) in items.iter().enumerate() {
+        let title =
+            extract_rule_value(pipeline, item, rules.name.as_deref(), context)?.unwrap_or_default();
+        let author = extract_rule_value(pipeline, item, rules.author.as_deref(), context)?
+            .unwrap_or_default();
+        let detail_url = extract_rule_value(pipeline, item, rules.detail_url.as_deref(), context)?
+            .map(|value| resolve_url(&context.base_url, &context.current_url, &value));
+        let cover_url = extract_rule_value(pipeline, item, rules.cover_url.as_deref(), context)?
+            .map(|value| resolve_url(&context.base_url, &context.current_url, &value));
+        let intro = extract_rule_value(pipeline, item, rules.intro.as_deref(), context)?;
+        let kind = extract_rule_value(pipeline, item, rules.kind.as_deref(), context)?;
+        let last_chapter =
+            extract_rule_value(pipeline, item, rules.last_chapter.as_deref(), context)?;
+        let book_id = detail_url
+            .clone()
+            .or_else(|| stable_fallback_book_id(&title, &author, index))
+            .unwrap_or_default();
+        if title.trim().is_empty() && book_id.trim().is_empty() {
+            continue;
+        }
+        books.push(Book {
+            book_id,
+            title,
+            author,
+            cover_url,
+            intro,
+            kind,
+            last_chapter,
+        });
+    }
+    Ok(books)
+}
+
+fn extract_books_from_raw_rule(
+    pipeline: &RemoteContentPipeline,
+    raw_rule: Option<&str>,
+    input: &str,
+    context: &BookSourceRequestContext,
+) -> Result<Vec<Book>, ContentError> {
+    let Some(raw_rule) = raw_rule.and_then(non_empty_string) else {
+        return Ok(Vec::new());
+    };
+    let rule = expand_template(&raw_rule, context);
+    let out = pipeline.engine.execute_legado_css(input, &rule)?;
+    Ok(out
+        .values()
+        .iter()
+        .enumerate()
+        .map(|(index, value)| {
+            let title = value.trim().to_string();
+            Book {
+                book_id: stable_fallback_book_id(&title, "", index).unwrap_or_default(),
+                title,
+                author: String::new(),
+                cover_url: None,
+                intro: None,
+                kind: None,
+                last_chapter: None,
+            }
+        })
+        .collect())
+}
+
+fn extract_rule_items(
+    pipeline: &RemoteContentPipeline,
+    input: &str,
+    list_rule: Option<&str>,
+    context: &BookSourceRequestContext,
+) -> Result<Vec<String>, ContentError> {
+    let Some(rule) = list_rule.and_then(non_empty_string) else {
+        return Ok(vec![input.to_string()]);
+    };
+    let rule = expand_template(&rule, context);
+    let item_rule = if legado_rule_has_extraction(&rule) {
+        rule.clone()
+    } else {
+        format!("{rule}@html")
+    };
+    let out = pipeline.engine.execute_legado_css(input, &item_rule)?;
+    if !out.is_empty() {
+        return Ok(out.into_values());
+    }
+    Ok(pipeline
+        .engine
+        .execute_legado_css(input, &rule)?
+        .into_values())
+}
+
+fn extract_rule_value(
+    pipeline: &RemoteContentPipeline,
+    input: &str,
+    rule: Option<&str>,
+    context: &BookSourceRequestContext,
+) -> Result<Option<String>, ContentError> {
+    let Some(rule) = rule.and_then(non_empty_string) else {
+        return Ok(None);
+    };
+    if rule.starts_with("@js") {
+        return Ok(None);
+    }
+    let rule = expand_template(&rule, context);
+    let out = pipeline.engine.execute_legado_css(input, &rule)?;
+    Ok(out
+        .values()
+        .iter()
+        .find_map(|value| non_empty_string(value)))
+}
+
+fn parse_toc_output(values: &[String], context: &BookSourceRequestContext) -> Vec<TocEntry> {
+    if let Some(first) = values.first() {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(first) {
+            if let Some(array) = value.as_array() {
+                return array
+                    .iter()
+                    .enumerate()
+                    .map(|(index, item)| {
+                        let title = item
+                            .get("title")
+                            .or_else(|| item.get("name"))
+                            .and_then(|value| value.as_str())
+                            .unwrap_or_default()
+                            .to_string();
+                        let url = item
+                            .get("url")
+                            .or_else(|| item.get("chapterUrl"))
+                            .and_then(|value| value.as_str())
+                            .map(|value| {
+                                resolve_url(&context.base_url, &context.current_url, value)
+                            })
+                            .unwrap_or_default();
+                        TocEntry {
+                            index: index as u32,
+                            title,
+                            url,
+                        }
+                    })
+                    .collect();
+            }
+        }
+    }
+
+    let mut entries = Vec::new();
+    let mut iter = values.iter();
+    let mut index = 0u32;
+    while let (Some(title), Some(url)) = (iter.next(), iter.next()) {
+        entries.push(TocEntry {
+            index,
+            title: title.clone(),
+            url: resolve_url(&context.base_url, &context.current_url, url),
+        });
+        index += 1;
+    }
+    entries
+}
+
+fn parse_explore_entries(
+    screen: Option<&str>,
+    explore_url: Option<&str>,
+    context: &BookSourceRequestContext,
+) -> Vec<BookSourceExploreEntry> {
+    let mut entries = Vec::new();
+    if let Some(screen) = screen.and_then(non_empty_string) {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&screen) {
+            collect_json_explore_entries(&value, context, &mut entries);
+        } else {
+            collect_delimited_explore_entries(&screen, context, &mut entries);
+        }
+    }
+    if entries.is_empty() {
+        if let Some(url) = explore_url.and_then(non_empty_string) {
+            let title = "Explore".to_string();
+            entries.push(BookSourceExploreEntry {
+                id: stable_explore_entry_id(&title, 0),
+                title,
+                url: Some(resolve_url(&context.base_url, &context.current_url, &url)),
+                kind: BookSourceExploreEntryKind::Channel,
+            });
+        }
+    }
+    entries
+}
+
+fn collect_json_explore_entries(
+    value: &serde_json::Value,
+    context: &BookSourceRequestContext,
+    entries: &mut Vec<BookSourceExploreEntry>,
+) {
+    match value {
+        serde_json::Value::Array(values) => {
+            for value in values {
+                collect_json_explore_entries(value, context, entries);
+            }
+        }
+        serde_json::Value::Object(object) => {
+            let title = first_json_string(object, &["title", "name", "label"]).unwrap_or_default();
+            if !title.trim().is_empty() {
+                let url = first_json_string(object, &["url", "exploreUrl", "urlTemplate"])
+                    .map(|url| resolve_url(&context.base_url, &context.current_url, &url));
+                let kind = first_json_string(object, &["kind", "type"])
+                    .map(|value| classify_explore_entry_kind(&value, &title))
+                    .unwrap_or_else(|| classify_explore_entry_kind("", &title));
+                let index = entries.len();
+                entries.push(BookSourceExploreEntry {
+                    id: stable_explore_entry_id(&title, index),
+                    title,
+                    url,
+                    kind,
+                });
+            }
+            if let Some(children) = object.get("children").or_else(|| object.get("items")) {
+                collect_json_explore_entries(children, context, entries);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn collect_delimited_explore_entries(
+    screen: &str,
+    context: &BookSourceRequestContext,
+    entries: &mut Vec<BookSourceExploreEntry>,
+) {
+    for token in screen
+        .split(['\n', ';', '|'])
+        .map(str::trim)
+        .filter(|token| !token.is_empty())
+    {
+        let (title, url) = split_explore_token(token);
+        if title.trim().is_empty() {
+            continue;
+        }
+        let index = entries.len();
+        entries.push(BookSourceExploreEntry {
+            id: stable_explore_entry_id(&title, index),
+            kind: classify_explore_entry_kind("", &title),
+            title,
+            url: url.map(|url| resolve_url(&context.base_url, &context.current_url, &url)),
+        });
+    }
+}
+
+fn first_json_string(
+    object: &serde_json::Map<String, serde_json::Value>,
+    keys: &[&str],
+) -> Option<String> {
+    keys.iter()
+        .find_map(|key| object.get(*key).and_then(|value| value.as_str()))
+        .and_then(non_empty_string)
+}
+
+fn split_explore_token(token: &str) -> (String, Option<String>) {
+    for separator in ["::", "=>", "->", ","] {
+        if let Some((title, url)) = token.split_once(separator) {
+            return (title.trim().to_string(), non_empty_string(url));
+        }
+    }
+    (token.trim().to_string(), None)
+}
+
+fn classify_explore_entry_kind(kind: &str, title: &str) -> BookSourceExploreEntryKind {
+    let marker = format!("{} {}", kind, title).to_ascii_lowercase();
+    if marker.contains("rank") || marker.contains("榜") || marker.contains("排行") {
+        BookSourceExploreEntryKind::Ranking
+    } else if marker.contains("channel") || marker.contains("频道") {
+        BookSourceExploreEntryKind::Channel
+    } else {
+        BookSourceExploreEntryKind::Category
+    }
+}
+
+fn stable_explore_entry_id(title: &str, index: usize) -> String {
+    let slug = title
+        .chars()
+        .filter(|value| value.is_ascii_alphanumeric())
+        .collect::<String>()
+        .to_ascii_lowercase();
+    if slug.is_empty() {
+        format!("explore-{index}")
+    } else {
+        format!("explore-{index}-{slug}")
+    }
+}
+
+fn apply_content_replacement(
+    pipeline: &RemoteContentPipeline,
+    input: &str,
+    source_regex: Option<&str>,
+    replace_regex: Option<&str>,
+    context: &BookSourceRequestContext,
+) -> Result<String, ContentError> {
+    let Some(pattern) = source_regex.and_then(non_empty_string) else {
+        return Ok(input.to_string());
+    };
+    let replacement = replace_regex
+        .and_then(non_empty_string)
+        .map(|value| expand_template(&value, context))
+        .unwrap_or_default();
+    let step = RuleStep::regex_replace(pattern, replacement);
+    Ok(pipeline
+        .engine
+        .execute_step(input, &step)?
+        .first()
+        .unwrap_or(input)
+        .to_string())
+}
+
+fn expand_template(template: &str, context: &BookSourceRequestContext) -> String {
+    let mut output = template.to_string();
+    for (key, value) in &context.variables {
+        output = output.replace(&format!("{{{{{key}}}}}"), value);
+    }
+    output
+}
+
+fn resolve_url(base_url: &str, current_url: &str, value: &str) -> String {
+    let value = value.trim();
+    if value.is_empty() || has_url_scheme(value) {
+        return value.to_string();
+    }
+    let base = non_empty_string(current_url)
+        .or_else(|| non_empty_string(base_url))
+        .unwrap_or_default();
+    if value.starts_with("//") {
+        let scheme = base
+            .split_once("://")
+            .map(|(scheme, _)| scheme)
+            .unwrap_or("https");
+        return format!("{scheme}:{value}");
+    }
+    if value.starts_with('/') {
+        if let Some(origin) = url_origin(&base) {
+            return format!("{origin}{value}");
+        }
+        return value.to_string();
+    }
+    let directory = if base.ends_with('/') {
+        base
+    } else {
+        base.rsplit_once('/')
+            .map(|(prefix, _)| format!("{prefix}/"))
+            .unwrap_or_else(|| format!("{base}/"))
+    };
+    format!("{directory}{value}")
+}
+
+fn has_url_scheme(value: &str) -> bool {
+    let Some((scheme, _)) = value.split_once(':') else {
+        return false;
+    };
+    !scheme.is_empty()
+        && scheme
+            .chars()
+            .all(|value| value.is_ascii_alphanumeric() || matches!(value, '+' | '-' | '.'))
+}
+
+fn url_origin(value: &str) -> Option<String> {
+    let (scheme, rest) = value.split_once("://")?;
+    let host = rest.split('/').next()?;
+    if host.is_empty() {
+        None
+    } else {
+        Some(format!("{scheme}://{host}"))
+    }
+}
+
+fn stable_fallback_book_id(title: &str, author: &str, index: usize) -> Option<String> {
+    let title = title.trim();
+    if title.is_empty() {
+        return None;
+    }
+    let mut key = slug_part(title);
+    if !author.trim().is_empty() {
+        key.push('-');
+        key.push_str(&slug_part(author));
+    }
+    Some(format!("generated:{index}:{key}"))
+}
+
+fn slug_part(value: &str) -> String {
+    let mut output = String::new();
+    let mut pending_dash = false;
+    for ch in value.chars().flat_map(char::to_lowercase) {
+        if ch.is_ascii_alphanumeric() {
+            if pending_dash && !output.is_empty() {
+                output.push('-');
+            }
+            output.push(ch);
+            pending_dash = false;
+        } else if ch.is_whitespace() || ch.is_ascii_punctuation() {
+            pending_dash = true;
+        }
+    }
+    if output.is_empty() {
+        stable_fingerprint(value)
+    } else {
+        output
+    }
+}
+
+fn legado_rule_has_extraction(rule: &str) -> bool {
+    rule.contains('@')
+}
+
+fn non_empty_string(value: &str) -> Option<String> {
+    let value = value.trim();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value.to_string())
     }
 }
 
@@ -1309,8 +2161,11 @@ fn merge_book(book: &mut Book, map: &serde_json::Map<String, serde_json::Value>)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use reader_domain::SourceRules;
+    use reader_domain::{BookSourceSemantics, LegadoBookSource, SourceRules};
     use reader_js::{HostCallbackRegistry, JsRuntimeConfig};
+
+    const BOOKSOURCE_CANONICAL_FIXTURE: &str =
+        include_str!("../tests/fixtures/booksource_canonical.json");
 
     fn sample_source() -> Source {
         Source {
@@ -1319,6 +2174,35 @@ mod tests {
             base_url: "https://example.test".into(),
             rules: SourceRules::default(),
             book_source: serde_json::Value::Null,
+        }
+    }
+
+    fn canonical_fixture() -> serde_json::Value {
+        serde_json::from_str(BOOKSOURCE_CANONICAL_FIXTURE).expect("canonical fixture should parse")
+    }
+
+    fn canonical_semantics() -> (BookSourceSemantics, serde_json::Value) {
+        let fixture = canonical_fixture();
+        let book_source: LegadoBookSource =
+            serde_json::from_value(fixture["bookSource"].clone()).unwrap();
+        let semantics = BookSourceSemantics::from_legado(
+            "canonical-legado-src",
+            Some("Canonical"),
+            Some("https://books.example.test/root/index.html"),
+            &book_source,
+        );
+        (semantics, fixture)
+    }
+
+    fn canonical_context(semantics: &BookSourceSemantics) -> BookSourceRequestContext {
+        let mut variables = BTreeMap::new();
+        variables.insert("key".into(), "dune".into());
+        BookSourceRequestContext {
+            base_url: semantics.base_url.clone(),
+            current_url: "https://books.example.test/root/search.html".into(),
+            book_url: "https://books.example.test/book/dune".into(),
+            chapter_url: "https://books.example.test/book/dune/chapter/1".into(),
+            variables,
         }
     }
 
@@ -1567,6 +2451,135 @@ mod tests {
         let content = pipeline.chapter_content(&source, resp).unwrap();
 
         assert_eq!(content, "First & bold line.\nSecond\nline.");
+    }
+
+    #[test]
+    fn book_source_semantic_pipeline_runs_canonical_fixture() {
+        let (semantics, fixture) = canonical_semantics();
+        let context = canonical_context(&semantics);
+        let pipeline = RemoteContentPipeline::new();
+
+        let books = pipeline
+            .search_book_source(
+                &semantics,
+                fixture["searchResponse"].as_str().unwrap(),
+                &context,
+            )
+            .unwrap();
+        assert_eq!(books.len(), 2);
+        assert_eq!(books[0].book_id, "https://books.example.test/book/dune");
+        assert_eq!(books[0].title, "Dune");
+        assert_eq!(books[0].author, "Frank Herbert");
+        assert_eq!(
+            books[0].cover_url.as_deref(),
+            Some("https://img.example.test/dune.jpg")
+        );
+        assert_eq!(
+            books[1].book_id,
+            "https://books.example.test/root/book/foundation"
+        );
+
+        let explore = pipeline
+            .explore_book_source(
+                &semantics,
+                fixture["exploreResponse"].as_str().unwrap(),
+                &context,
+            )
+            .unwrap();
+        assert_eq!(explore.entries.len(), 3);
+        assert_eq!(explore.entries[1].kind, BookSourceExploreEntryKind::Ranking);
+        assert_eq!(explore.entries[2].kind, BookSourceExploreEntryKind::Channel);
+        assert_eq!(
+            explore.books[0].book_id,
+            "https://books.example.test/book/rank-1"
+        );
+
+        let detail = pipeline
+            .detail_book_source(
+                &semantics,
+                &books[0],
+                fixture["detailResponse"].as_str().unwrap(),
+                &context,
+            )
+            .unwrap();
+        assert_eq!(
+            detail.book.intro.as_deref(),
+            Some("Expanded desert planet.")
+        );
+        assert_eq!(detail.book.kind.as_deref(), Some("Sci-Fi Classic"));
+        assert_eq!(
+            detail.toc_url.as_deref(),
+            Some("https://books.example.test/book/dune/toc?page=1")
+        );
+        assert_eq!(detail.word_count.as_deref(), Some("188000"));
+
+        let toc = pipeline
+            .toc_book_source(
+                &semantics,
+                fixture["tocResponse"].as_str().unwrap(),
+                &context,
+            )
+            .unwrap();
+        assert_eq!(toc.chapters.len(), 2);
+        assert_eq!(
+            toc.chapters[0].url,
+            "https://books.example.test/book/dune/chapter/1"
+        );
+        assert_eq!(
+            toc.chapters[1].url,
+            "https://books.example.test/root/chapter/2"
+        );
+        assert_eq!(
+            toc.next_toc_url.as_deref(),
+            Some("https://books.example.test/book/dune/toc?page=2")
+        );
+
+        let content = pipeline
+            .content_book_source(
+                &semantics,
+                fixture["contentResponse"].as_str().unwrap(),
+                &context,
+            )
+            .unwrap();
+        assert_eq!(content.title.as_deref(), Some("Chapter 1"));
+        assert_eq!(
+            content.content,
+            "First line.\ncanonical-legado-src\nSecond line."
+        );
+        assert_eq!(
+            content.next_content_url.as_deref(),
+            Some("https://books.example.test/book/dune/chapter/2")
+        );
+        assert_eq!(content.variables["key"], "dune");
+    }
+
+    #[test]
+    fn source_with_raw_book_source_uses_semantic_rules_when_v1_rules_are_empty() {
+        let (semantics, fixture) = canonical_semantics();
+        let source = Source {
+            source_id: semantics.source_id.clone(),
+            name: semantics.name.clone(),
+            base_url: semantics.base_url.clone(),
+            rules: SourceRules::default(),
+            book_source: fixture["bookSource"].clone(),
+        };
+        let pipeline = RemoteContentPipeline::new();
+
+        let books = pipeline
+            .search(&source, fixture["searchResponse"].as_str().unwrap())
+            .unwrap();
+        assert_eq!(books[0].book_id, "https://books.example.test/book/dune");
+
+        let toc = pipeline
+            .toc(&source, fixture["tocResponse"].as_str().unwrap())
+            .unwrap();
+        assert_eq!(toc[0].title, "Chapter 1");
+        assert_eq!(toc[0].url, "https://books.example.test/book/dune/chapter/1");
+
+        let content = pipeline
+            .chapter_content(&source, fixture["contentResponse"].as_str().unwrap())
+            .unwrap();
+        assert_eq!(content, "First line.\ncanonical-legado-src\nSecond line.");
     }
 
     fn sample_book() -> Book {
