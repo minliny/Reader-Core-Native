@@ -74,15 +74,15 @@
         "book.toc",
         "chapter.content",
         "reading.progress.update",
+        "tts.slice",
+        "tts.queue.status",
+        "tts.chapter.plan",
         "rss.parse",
         "rss.refresh",
         "sync.merge",
         "sync.backup",
         "local_book.parse",
-        "local_book.catalog",
-        "tts.slice",
-        "tts.queue.status",
-        "tts.chapter.plan"
+        "local_book.catalog"
       ]
     },
     "params": {
