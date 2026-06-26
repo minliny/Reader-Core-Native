@@ -24,10 +24,10 @@
 
 | 能力 | Owner | 状态 | 证据 |
 | --- | --- | --- | --- |
-| Regex | Rust Core | 部分完成 | `crates/reader-rule` |
-| JSONPath | Rust Core | 部分完成 | `crates/reader-rule` |
+| Regex | Rust Core | 已完成 | `crates/reader-rule` Legado DSL dispatch via `execute_legado_rule` |
+| JSONPath | Rust Core | 已完成 | `crates/reader-rule` Legado DSL dispatch via `execute_legado_rule` |
 | CSS selector | Rust Core | 部分完成 | `crates/reader-rule` |
-| XPath | Rust Core | 部分完成 | `crates/reader-rule` |
+| XPath | Rust Core | 已完成 | `crates/reader-rule` Legado DSL dispatch via `execute_legado_rule` |
 | 链式规则 / fallback | Rust Core | 部分完成 | `crates/reader-rule` |
 | QuickJS sandbox | Rust Core | 部分完成 | `crates/reader-js` |
 | JS host callback | Rust Core + 平台 adapter | 部分完成 | sandbox 有基础，需接通平台能力 |
