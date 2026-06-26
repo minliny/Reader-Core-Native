@@ -722,6 +722,215 @@ fn clean_string(value: Option<&str>) -> Option<String> {
     }
 }
 
+// ===========================================================================
+// Independent configurable entities (S5 closure)
+//
+// Aligned against Legado `app/src/main/java/io/legado/app/data/entities/`
+// {ReplaceRule,DictRule,TxtTocRule,Bookmark}.kt and Swift `Reader-Core`:
+// DictRule.swift + ReplaceRuleEngine.swift (ReaderCoreManagedReplaceRule + scope).
+// Per charter red line 3: Swift Core 也缺的能力（TxtTocRule/Bookmark）对照 Legado
+// 新建；Swift 已有的（DictRule/ReplaceRule）迁移保真 + 补齐到 Legado 字段。
+// ===========================================================================
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_serial_number() -> i32 {
+    -1
+}
+
+fn default_timeout_ms() -> i64 {
+    3000
+}
+
+/// TXT 文件目录识别规则（对照 Legado `TxtTocRule.kt`）。
+///
+/// Swift Reader-Core 不存在该实体，对照 Legado 新建。`rule` 是正则字符串，
+/// 用于在本地 TXT 全文上匹配章节标题（Legado `TextFile.kt:440-461` 的择优算法
+/// 在 reader-local-book 消费侧实现）。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TxtTocRule {
+    /// 主键；Legado 默认 `System.currentTimeMillis()`，Rust 侧由调用方赋值。
+    pub id: i64,
+    #[serde(default)]
+    pub name: String,
+    /// 正则表达式字符串。
+    #[serde(default)]
+    pub rule: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub example: Option<String>,
+    /// 排序序号；Legado 默认 -1。
+    #[serde(default = "default_serial_number")]
+    pub serial_number: i32,
+    #[serde(default = "default_true")]
+    pub enable: bool,
+}
+
+/// 书签（对照 Legado `Bookmark.kt`）。
+///
+/// Swift Reader-Core 仅有轻量 draft（无同步/搜索/排序），对齐 Legado 字段。
+/// 主键 `time` 为创建时间戳；`(book_name, book_author)` 复合定位"哪本书的书签"。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Bookmark {
+    /// 主键；创建时间戳（毫秒）。
+    pub time: i64,
+    #[serde(default)]
+    pub book_name: String,
+    #[serde(default)]
+    pub book_author: String,
+    #[serde(default)]
+    pub chapter_index: i32,
+    /// 章节内字符位置（滚动/阅读进度偏移）。
+    #[serde(default)]
+    pub chapter_pos: i32,
+    #[serde(default)]
+    pub chapter_name: String,
+    /// 书签关联的原文片段（选中文本或当前页文本）。
+    #[serde(default)]
+    pub book_text: String,
+    /// 用户批注内容。
+    #[serde(default)]
+    pub content: String,
+}
+
+/// 替换规则的目标（标题或正文）。对照 Swift `ReaderCoreManagedReplaceRuleTarget`。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ReplaceRuleTarget {
+    Title,
+    Content,
+}
+
+/// 独立可配置替换规则（对照 Swift `ReaderCoreManagedReplaceRule` + Legado `ReplaceRule.kt`）。
+///
+/// 合并 Swift scope 过滤语义与 Legado 字段（`is_regex`/`order`/`group`）。
+/// 字段 `order` 在 SQLite 列名为 `sort_order`（对照 Legado `@ColumnInfo(name = "sortOrder")`）。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReplaceRule {
+    /// 主键；Legado 默认 `System.currentTimeMillis()`。
+    pub id: i64,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    /// 匹配内容（正则或纯文本，由 `is_regex` 决定）。
+    #[serde(default)]
+    pub pattern: String,
+    #[serde(default)]
+    pub replacement: String,
+    /// 包含作用域 tokens（书名/书源 URL 片段，多值分隔）；空表示匹配全部。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+    /// 是否作用于标题。Legado 默认 false。
+    #[serde(default)]
+    pub scope_title: bool,
+    /// 是否作用于正文。Legado 默认 true。
+    #[serde(default = "default_true")]
+    pub scope_content: bool,
+    /// 排除作用域 tokens；任一命中即不应用。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exclude_scope: Option<String>,
+    #[serde(default = "default_true")]
+    pub is_enabled: bool,
+    /// true=正则匹配，false=纯文本替换。Legado 默认 true。
+    #[serde(default = "default_true")]
+    pub is_regex: bool,
+    /// 正则替换超时（毫秒）。Legado 默认 3000。
+    #[serde(default = "default_timeout_ms")]
+    pub timeout_millisecond: i64,
+    /// 排序；小的先执行。SQLite 列名 `sort_order`。
+    #[serde(default)]
+    pub order: i32,
+}
+
+/// 替换规则作用域评估上下文。对照 Swift `ReaderCoreReplaceRuleEvaluationContext`。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReplaceRuleEvaluationContext {
+    pub book_title: String,
+    pub source_name: String,
+    pub source_url: String,
+}
+
+impl ReplaceRuleEvaluationContext {
+    /// 全部小写化的可搜索字段（对照 Swift `searchableFields`）。
+    fn searchable_fields(&self) -> [String; 3] {
+        [
+            self.book_title.to_lowercase(),
+            self.source_name.to_lowercase(),
+            self.source_url.to_lowercase(),
+        ]
+    }
+}
+
+/// 切分作用域 tokens：按 `,` / `;` / `|` 分割，trim + 小写，丢弃空串。
+/// 对照 Swift `scopeTokens`（ReplaceRuleEngine.swift:202-210）。
+pub fn scope_tokens(scope: Option<&str>) -> Vec<String> {
+    let Some(scope) = scope else {
+        return Vec::new();
+    };
+    scope
+        .split([',', ';', '|'])
+        .map(|s| s.trim().to_lowercase())
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+
+/// 判断规则是否作用于指定目标。对照 Swift `matchesTarget`。
+pub fn replace_rule_matches_target(rule: &ReplaceRule, target: ReplaceRuleTarget) -> bool {
+    match target {
+        ReplaceRuleTarget::Title => rule.scope_title,
+        ReplaceRuleTarget::Content => rule.scope_content,
+    }
+}
+
+/// 判断规则的作用域是否命中上下文。对照 Swift `matchesIncludeScope && !matchesExcludeScope`。
+/// - include tokens 为空 → 匹配全部；
+/// - 否则 ANY 语义：任一 token 是任一 searchable field 的子串即命中。
+/// - exclude tokens 为空 → 不排除；
+/// - 否则 ANY 语义：任一 token 命中即排除（排除优先于包含）。
+pub fn replace_rule_matches_scope(rule: &ReplaceRule, ctx: &ReplaceRuleEvaluationContext) -> bool {
+    let fields = ctx.searchable_fields();
+    let include = scope_tokens(rule.scope.as_deref());
+    let include_hit = include.is_empty()
+        || include
+            .iter()
+            .any(|tok| fields.iter().any(|f| f.contains(tok)));
+    if !include_hit {
+        return false;
+    }
+    let exclude = scope_tokens(rule.exclude_scope.as_deref());
+    if exclude.is_empty() {
+        return true;
+    }
+    !exclude
+        .iter()
+        .any(|tok| fields.iter().any(|f| f.contains(tok)))
+}
+
+/// 字典搜索规则（对照 Swift `DictRule.swift` + Legado `DictRule.kt`）。
+///
+/// 主键为 `name`（字符串）。`url_rule` 含 `{{key}}` 占位的搜索 URL，
+/// `show_rule` 为结果展示规则（空则直接返回原始响应体）。
+/// 执行（网络请求 + 解析）由 Host 层完成，Core 只存取与校验。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DictRule {
+    /// 主键；规则名。
+    pub name: String,
+    #[serde(default)]
+    pub url_rule: String,
+    #[serde(default)]
+    pub show_rule: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub sort_number: i32,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
