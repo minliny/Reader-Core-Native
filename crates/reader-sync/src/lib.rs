@@ -5,6 +5,7 @@
 //! local books, chapter cache, RSS subscriptions, and future settings can share
 //! the same merge and backup/restore rules.
 
+pub mod webdav_backup;
 pub mod webdav_client;
 pub mod webdav_protocol;
 
