@@ -26,8 +26,8 @@ use reader_domain::{
 };
 use reader_js::{JsError, JsErrorKind, JsEvaluation, JsSandbox as JsSandboxTrait, QuickJsSandbox};
 use reader_rule::{
-    CaptureGroup, NoopVariableScope, RuleEngine, RuleError, RuleJsEvaluator, RuleOutput,
-    RuleStep, RuleVariableScope,
+    CaptureGroup, NoopVariableScope, RuleEngine, RuleError, RuleJsEvaluator, RuleOutput, RuleStep,
+    RuleVariableScope,
 };
 use serde::{Deserialize, Serialize};
 
@@ -1238,9 +1238,7 @@ fn extract_rule_items(
     if !out.is_empty() {
         return Ok(out.into_values());
     }
-    Ok(pipeline
-        .run_raw_legado_rule(input, &rule)?
-        .into_values())
+    Ok(pipeline.run_raw_legado_rule(input, &rule)?.into_values())
 }
 
 fn extract_rule_value(
@@ -2328,6 +2326,66 @@ mod tests {
         assert_eq!(books.len(), 2);
         assert_eq!(books[0].title, "Dune");
         assert_eq!(books[1].title, "Foundation");
+    }
+
+    #[test]
+    fn search_book_source_scopes_per_item_with_json_booklist() {
+        // Closes DSL migration gap 7: bookList @json: scoping.
+        //
+        // Legado `searchRule.bookList` selects a list of elements (HTML nodes
+        // or JSON array items) and each subsequent rule (`name`/`author`/...)
+        // is evaluated independently against that item — not the whole
+        // document. Before Task 1 (prefix dispatch), a `@Json:$.books[*]`
+        // bookList would have been mis-parsed as CSS and silently returned
+        // empty, breaking the per-item scoping for any JSON book source.
+        //
+        // This test builds a BookSourceSearchSemantics whose bookList is a
+        // `@Json:` rule and asserts each per-item rule resolves fields from
+        // its own JSON object, proving the dispatch + scoping chain.
+        let mut search = reader_domain::BookSourceSearchSemantics::default();
+        search.list = Some("@Json:$.books[*]".into());
+        search.name = Some("$.title".into());
+        search.author = Some("$.author".into());
+        search.detail_url = Some("$.url".into());
+
+        let semantics = BookSourceSemantics {
+            source_id: "json-src".into(),
+            name: "JSON Scoping Source".into(),
+            base_url: "https://json.example.test".into(),
+            search_url: None,
+            explore_url: None,
+            enabled: true,
+            enabled_explore: false,
+            rules: reader_domain::BookSourcePipelineRules {
+                search,
+                explore: reader_domain::BookSourceExploreSemantics::default(),
+                detail: reader_domain::BookSourceDetailSemantics::default(),
+                toc: reader_domain::BookSourceTocSemantics::default(),
+                content: reader_domain::BookSourceContentSemantics::default(),
+            },
+        };
+        let context = BookSourceRequestContext::for_semantics(&semantics);
+        let pipeline = RemoteContentPipeline::new();
+
+        let resp = r#"{"books":[
+            {"title":"Dune","author":"Herbert","url":"/book/dune"},
+            {"title":"Foundation","author":"Asimov","url":"/book/foundation"}
+        ]}"#;
+
+        let books = pipeline
+            .search_book_source(&semantics, resp, &context)
+            .unwrap();
+
+        assert_eq!(books.len(), 2);
+        assert_eq!(books[0].title, "Dune");
+        assert_eq!(books[0].author, "Herbert");
+        assert_eq!(books[0].book_id, "https://json.example.test/book/dune");
+        assert_eq!(books[1].title, "Foundation");
+        assert_eq!(books[1].author, "Asimov");
+        assert_eq!(
+            books[1].book_id,
+            "https://json.example.test/book/foundation"
+        );
     }
 
     #[test]
