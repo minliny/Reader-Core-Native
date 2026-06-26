@@ -1,0 +1,35 @@
+{
+  "id": "ja-003",
+  "source_type": "json-api",
+  "format": "json",
+  "source_description": "Sanitized JSON group-key consistency rule samples migrated from legacy Reader-Core samples/fixtures/group_consistency/ (6 files; 3 representative cases retained). Each case pairs a single_key_unique rule with a small record set and an expected classification (pass/fail/reject). Exercises the rule engine's validation DSL: distinctness checking, duplicate detection, and unknown-rule-type rejection.",
+  "sanitization": "All record values are synthetic Greek letters (alpha/beta/gamma/delta). No real device names, no real record IDs. Migrated from clean synthetic samples.",
+  "capability_tags": [
+    "rule-engine",
+    "json-parsing",
+    "group-consistency",
+    "single-key-unique",
+    "duplicate-detection",
+    "rule-rejection",
+    "pass-fail-reject"
+  ],
+  "privacy_check": {
+    "passed": true,
+    "checked_for": [
+      "real-tokens",
+      "cookies",
+      "account-credentials",
+      "private-content",
+      "real-device-names",
+      "real-record-ids"
+    ],
+    "notes": "Pure synthetic placeholder data; no real identifiers."
+  },
+  "consumer_branch": {
+    "primary": "codex/rule-engine-parity",
+    "secondary": []
+  },
+  "fixture_file": "ja-003-fixture.json",
+  "added_in_round": 2,
+  "migrated_from": "Documents/Reader-Core/samples/fixtures/group_consistency/gc_single_key_{unique_pass,duplicate_hit,invalid_rule_reject}.json"
+}

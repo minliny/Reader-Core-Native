@@ -1,0 +1,26 @@
+{
+  "fixture_id": "ja-002",
+  "source_type": "json-api",
+  "description": "Sanitized HTTP 404 policy/error marker payloads. Captures two distinct 404 failure modes: (1) policy-driven content failure where a higher layer rejected the response, (2) transport-level 404 with empty body. Both carry only a marker field for assertion; no real response bodies.",
+  "cases": [
+    {
+      "case_id": "policy_content_failed",
+      "scenario": "Upstream policy layer rejected content despite a non-404 transport; modeled here as a 404 marker for parity with the legacy Reader-Core sample.",
+      "payload": {
+        "httpStatus": 404,
+        "marker": "POLICY_CONTENT_FAILED"
+      },
+      "expected_behavior": "Rule engine should surface POLICY_CONTENT_FAILED marker to the host; no content extraction attempted."
+    },
+    {
+      "case_id": "http_404_content_failed",
+      "scenario": "Transport returned a literal 404 with an empty body; the marker is the only signal available for the rule engine to branch on.",
+      "payload": {
+        "httpStatus": 404,
+        "body": "",
+        "marker": "HTTP_404_CONTENT_FAILED"
+      },
+      "expected_behavior": "Rule engine should short-circuit content extraction and emit HTTP_404_CONTENT_FAILED marker."
+    }
+  ]
+}

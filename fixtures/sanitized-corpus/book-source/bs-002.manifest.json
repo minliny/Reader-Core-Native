@@ -1,0 +1,35 @@
+{
+  "id": "bs-002",
+  "source_type": "book-source",
+  "format": "json",
+  "source_description": "Sanitized HTML search/toc/content trio migrated from legacy Reader-Core samples/fixtures/html/sample_001_*.html. Exercises CSS list-item text splitting on a pipe delimiter (name|url pattern), CSS class selectors (#results, .item, #chapters, .chapter, .content), and a content rule targeting a single .content div. The chapter content uses public-domain-style phrasing (三国演义 opening) with a synthetic tail sentence.",
+  "sanitization": "All URLs neutralized from http://fixture.local to https://books.example.test. Book titles (书剑恩仇录, 天龙八部) are kept as recognizable public-domain work titles for parity testing; chapter text is a public-domain opening + synthetic addition. No real domain, no credentials, no copyrighted long text, no scripts.",
+  "capability_tags": [
+    "rule-engine",
+    "book-source-parsing",
+    "css-selector",
+    "search-rule",
+    "toc-rule",
+    "content-rule",
+    "text-split-delimiter"
+  ],
+  "privacy_check": {
+    "passed": true,
+    "checked_for": [
+      "real-tokens",
+      "cookies",
+      "account-credentials",
+      "private-content",
+      "copyrighted-long-text",
+      "real-domains"
+    ],
+    "notes": "Migrated from clean synthetic sample; URLs neutralized to example.test. No credentials or private data."
+  },
+  "consumer_branch": {
+    "primary": "codex/rule-engine-parity",
+    "secondary": ["codex/remote-reading-vertical"]
+  },
+  "fixture_file": "bs-002-fixture.json",
+  "added_in_round": 2,
+  "migrated_from": "Documents/Reader-Core/samples/fixtures/html/sample_001_{search,toc,content}.html"
+}

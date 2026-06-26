@@ -1,0 +1,50 @@
+{
+  "source": {
+    "bookSourceName": "Sanitized Scraped Site Skeleton",
+    "bookSourceUrl": "https://books.example.test",
+    "bookSourceType": 0,
+    "bookSourceGroup": "sanitized-corpus",
+    "enabled": true,
+    "ruleBookInfo": {
+      "name": "css:.itemtxt h1 a@text",
+      "author": "css:.itemtxt p a@text##作者：",
+      "coverUrl": "css:.item img|attr:src",
+      "intro": "css:.des p@text",
+      "tocUrl": "css:.itemtxt h1 a|attr:href",
+      "kind": "css:.itemtxt p span@text",
+      "lastChapter": "css:.itemtxt ul li:last-child a@text",
+      "wordCount": "css:.itemtxt h1 i@text"
+    },
+    "ruleToc": {
+      "chapterList": "css:#list ul li a",
+      "chapterName": "css:#list ul li a@text",
+      "chapterUrl": "css:#list ul li a|attr:href"
+    },
+    "ruleContent": {
+      "content": "css:.con@html",
+      "nextContentUrl": "css:.prenext a:last-child|attr:href"
+    }
+  },
+  "samples": {
+    "detailResponse": "<!DOCTYPE html><html><head><title>示例小说-示例站点-示例作者-最新章节免费阅读</title><meta name=\"keywords\" content=\"示例小说,最新章节,示例作者,示例站点\"/><meta name=\"description\" content=\"示例站点提供示例作者创作的示例小说最新章节在线阅读。\"/><meta http-equiv=\"Content-type\" name=\"viewport\" content=\"initial-scale=1.0, maximum-scale=1.0, user-scalable=no, width=device-width\"/></head><body><div class=\"header\"><span class=\"home\"><a href=\"/\">首页</a></span><p><a href=\"/\">示例站点</a></p></div><div class=\"menu\"><ul class=\"clear\"><li><a href=\"/xuanhuan/\">玄幻小说</a></li><li><a href=\"/dushi/\">都市小说</a></li></ul></div><div class=\"container\"><div class=\"item\"><a href=\"/51/#dir\"><img alt=\"示例小说\" src=\"https://img.example.test/cover/sample.png\" /></a><div class=\"itemtxt\"><h1><i>100.0万字</i><a href=\"/51/#dir\">示例小说</a></h1><p><span>连载中</span><span>都市小说</span></p><p><a href=\"/zuozhe/?tag=示例作者\">作者：示例作者</a></p><p><i>更新时间</i>最新三章节</p><ul><li><i>04-24</i><a href=\"/51/3612068.html\">第608章</a></li><li><i>04-21</i><a href=\"/51/3602369.html\">第607章</a></li><li><i>04-19</i><a href=\"/51/3576736.html\">第606章</a></li></ul></div></div><h2 class=\"op bb\"><a href=\"/51/3194.html\">开始阅读</a></h2><div class=\"des bb\"><p>示例简介占位文本。</p></div><h2 id=\"dir\"><span>更新时间：2026-04-24 12:25:49</span><a href=\"/51/#dir\">全文目录</a></h2><div id=\"list\" class=\"dir clear\"><ul><li><a href=\"/51/3194.html\">第一章</a></li><li><a href=\"/51/3195.html\">第二章</a></li><li><a href=\"/51/3196.html\">第三章</a></li><li><a href=\"/51/3781.html\">第五章</a></li><li><a href=\"/51/4724.html\">上架感言</a></li><li><a href=\"/51/4725.html\">第31章</a></li><li><a href=\"/51/5037.html\">第37章</a></li><li><a href=\"/51/3612068.html\">第608章</a></li></ul></div><div class=\"des bb\">示例站点免费提供示例小说在线阅读。本简介为占位文本。</div></div><div class=\"footer\">&copy 2026 <a href=\"/\">示例站点</a></div></body></html>",
+    "tocResponse": "<!DOCTYPE html><html><head><title>示例小说-示例站点-示例作者-最新章节免费阅读</title></head><body><div class=\"container\"><div class=\"item\"><a href=\"/51/#dir\"><img alt=\"示例小说\" src=\"https://img.example.test/cover/sample.png\" /></a><div class=\"itemtxt\"><h1><i>100.0万字</i><a href=\"/51/#dir\">示例小说</a></h1><p><span>连载中</span><span>都市小说</span></p><p><a href=\"/zuozhe/?tag=示例作者\">作者：示例作者</a></p></div></div><h2 id=\"dir\"><span>更新时间：2026-04-24 12:25:49</span><a href=\"/51/#dir\">全文目录</a></h2><div id=\"list\" class=\"dir clear\"><ul><li><a href=\"/51/3194.html\">第一章</a></li><li><a href=\"/51/3195.html\">第二章</a></li><li><a href=\"/51/3196.html\">第三章</a></li><li><a href=\"/51/3781.html\">第五章</a></li><li><a href=\"/51/3782.html\">第六章</a></li><li><a href=\"/51/4724.html\">上架感言</a></li><li><a href=\"/51/4725.html\">第31章</a></li><li><a href=\"/51/5036.html\">第37章</a></li><li><a href=\"/51/5037.html\">第37章</a></li><li><a href=\"/51/3612068.html\">第608章</a></li></ul></div></div><div class=\"footer\">&copy 2026 <a href=\"/\">示例站点</a></div></body></html>",
+    "chapterResponse": "<!DOCTYPE html><html><head><title>示例小说 第608章-示例作者-示例站点</title></head><body><div class=\"header\"><span class=\"home\"><a href=\"/\">首页</a></span><p><a href=\"/\">示例站点</a></p></div><div class=\"container\"><div class=\"submenu\"><span><a href=\"/i/pifu.aspx\" rel=\"nofollow\">设置</a></span><h1><a href=\"/51/\">示例小说</a> &gt; 第608章</h1></div><div class=\"con\"><p>此处为示例章节内容占位文本第一段。</p><p>此处为示例章节内容占位文本第二段。</p><p>此处为示例章节内容占位文本第三段。</p><p>此处为示例章节内容占位文本第四段。</p></div><div class=\"prenext\"><span><a href=\"/51/3602369.html\">上一章</a></span><a href=\"/51/#dir\">目录</a><span><a href=\"/51/3612068-2.html\">下一页</a></span></div></div><div class=\"footer\">&copy 2026 <a href=\"/\">示例站点</a></div></body></html>"
+  },
+  "sanitization_notes": {
+    "original_source": "Documents/Reader-Core/case_022/{toc,detail,content}.html",
+    "original_site": "sudugu.org (速读谷)",
+    "original_work": "《捞尸人》by 纯洁滴小龙 (real copyrighted novel, 562.4万字)",
+    "redactions": [
+      "Replaced real domain sudugu.org → books.example.test / img.example.test",
+      "Replaced real novel title 捞尸人 → 示例小说",
+      "Replaced real author 纯洁滴小龙 → 示例作者",
+      "Replaced real site name 速读谷 → 示例站点",
+      "Replaced all copyrighted novel text (~5600 chars in content.html) with 4 synthetic CJK placeholder paragraphs",
+      "Replaced real cover image URLs (sudugu.org/files/cover/...) with img.example.test/cover/sample.png",
+      "Truncated chapter list from 608 entries to 10 representative entries (preserving duplicate-chapter pattern at 第37章 for parity testing)",
+      "Stripped all <script> tags, external CSS, tracking pixels (tj.js, v7.js)",
+      "Stripped related-novel sidebar (6 real book covers + titles)",
+      "Preserved DOM structure (classes: item, itemtxt, des, dir, list, con, prenext, submenu, header, menu, footer) for CSS rule validation"
+    ]
+  }
+}

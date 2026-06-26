@@ -1,0 +1,35 @@
+{
+  "id": "wp-002",
+  "source_type": "web-page",
+  "format": "html",
+  "source_description": "Sanitized static HTML page migrated from legacy Reader-Core samples/fixtures/html/sample_js_runtime_001_input.html. Captures the JS-runtime timeout fallback contract: a minimal <article> element with a data-sample attribute, intended for testing the rule engine's behavior when a JS-dependent rule times out and must fall back to static HTML extraction.",
+  "sanitization": "Pure synthetic placeholder content ('timeout fallback contract'). No real domain, no scripts, no external resources, no credentials.",
+  "capability_tags": [
+    "rule-engine",
+    "css-selector",
+    "html-parsing",
+    "js-runtime-timeout",
+    "fallback-contract",
+    "attribute-selector"
+  ],
+  "privacy_check": {
+    "passed": true,
+    "checked_for": [
+      "real-tokens",
+      "cookies",
+      "account-credentials",
+      "private-content",
+      "copyrighted-long-text",
+      "tracking-scripts",
+      "real-domains"
+    ],
+    "notes": "Minimal synthetic HTML; no real data or external resources."
+  },
+  "consumer_branch": {
+    "primary": "codex/rule-engine-parity",
+    "secondary": ["codex/local-content-runtime"]
+  },
+  "fixture_file": "wp-002-fixture.html",
+  "added_in_round": 2,
+  "migrated_from": "Documents/Reader-Core/samples/fixtures/html/sample_js_runtime_001_input.html"
+}

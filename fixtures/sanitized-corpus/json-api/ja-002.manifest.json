@@ -1,0 +1,34 @@
+{
+  "id": "ja-002",
+  "source_type": "json-api",
+  "format": "json",
+  "source_description": "Sanitized HTTP 404 policy/error marker payloads migrated from legacy Reader-Core samples/fixtures/json/{policy_http_404,error_http_404}.json. Captures two distinct 404 failure modes: (1) POLICY_CONTENT_FAILED — upstream policy rejection marker, (2) HTTP_404_CONTENT_FAILED — transport 404 with empty body. Both payloads are marker-only (no real response bodies) and document the expected rule-engine branching behavior for each.",
+  "sanitization": "Marker-only payloads with no real response bodies. No real API endpoints, no credentials, no user data. Synthetic marker strings (POLICY_CONTENT_FAILED, HTTP_404_CONTENT_FAILED) are test-only constants.",
+  "capability_tags": [
+    "rule-engine",
+    "json-parsing",
+    "error-path",
+    "http-404",
+    "policy-marker",
+    "short-circuit-extraction"
+  ],
+  "privacy_check": {
+    "passed": true,
+    "checked_for": [
+      "real-tokens",
+      "cookies",
+      "account-credentials",
+      "private-content",
+      "real-endpoints",
+      "real-response-bodies"
+    ],
+    "notes": "Pure marker payloads; no real data. Migrated from clean synthetic sample."
+  },
+  "consumer_branch": {
+    "primary": "codex/rule-engine-parity",
+    "secondary": ["codex/remote-reading-vertical"]
+  },
+  "fixture_file": "ja-002-fixture.json",
+  "added_in_round": 2,
+  "migrated_from": "Documents/Reader-Core/samples/fixtures/json/{policy_http_404,error_http_404}.json"
+}

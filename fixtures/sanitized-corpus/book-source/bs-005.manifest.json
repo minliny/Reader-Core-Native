@@ -1,0 +1,36 @@
+{
+  "id": "bs-005",
+  "source_type": "book-source",
+  "format": "json",
+  "source_description": "Sanitized ToC rule fixture with golden expected output, migrated from legacy Reader-Core samples/fixtures/toc/basic.{html,rule.json,expected.json}. Exercises CSS descendant selectors (#chapter-list .chapter-item), attribute extraction (css:.chapter-link|attr:href), next-page pagination (css:.next-page|attr:href), VIP chapter detection (.vip-tag), and chapter indexing. The golden expected array enables differential testing against the rule engine.",
+  "sanitization": "All URLs neutralized from relative /chapter-N.html (resolved against example.com) to https://books.example.test/chapter-N.html. Synthetic placeholder content only (测试小说, 测试作者, 测试标题). No real domain, no credentials, no copyrighted text.",
+  "capability_tags": [
+    "rule-engine",
+    "book-source-parsing",
+    "css-selector",
+    "attribute-extraction",
+    "toc-rule",
+    "pagination",
+    "vip-detection",
+    "golden-expected"
+  ],
+  "privacy_check": {
+    "passed": true,
+    "checked_for": [
+      "real-tokens",
+      "cookies",
+      "account-credentials",
+      "private-content",
+      "copyrighted-long-text",
+      "real-domains"
+    ],
+    "notes": "Migrated from clean synthetic sample; URLs neutralized. Includes golden expected output for differential testing."
+  },
+  "consumer_branch": {
+    "primary": "codex/rule-engine-parity",
+    "secondary": ["codex/remote-reading-vertical"]
+  },
+  "fixture_file": "bs-005-fixture.json",
+  "added_in_round": 2,
+  "migrated_from": "Documents/Reader-Core/samples/fixtures/toc/basic.{html,rule.json,expected.json}"
+}

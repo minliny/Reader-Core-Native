@@ -1,0 +1,148 @@
+{
+  "fixture_id": "bs-010",
+  "source_type": "book-source",
+  "description": "Sanitized subset of real legado-style book-source definitions (migrated from Documents/Reader-Core/docs/design/书源示例.json). Retains the structurally valuable rule patterns — POST-body templating, @put/@js post-processing, md5 sign flow, JSONPath + CSS hybrid rules — while redacting all credentials and neutralizing all real endpoints.",
+  "sources": [
+    {
+      "bookSourceComment": "sanitized-corpus: API source A (credentials redacted, endpoint neutralized)",
+      "bookSourceGroup": "⭐️ API",
+      "bookSourceName": "⭐️ Sanitized API Source A",
+      "bookSourceType": 0,
+      "bookSourceUrl": "https://api.example.test",
+      "bookUrlPattern": "",
+      "customOrder": 4,
+      "enabled": true,
+      "enabledCookieJar": true,
+      "enabledExplore": true,
+      "exploreUrl": "[{\"title\":\"男频分类\",\"url\":\"/v1/resource/query_cate_content_list_by_filter,{'method':'POST','body':'{\\\"columns_id\\\":\\\"138\\\",\\\"page_index\\\":{{page}},\\\"page_size\\\":20,\\\"api_key\\\":\\\"REDACTED\\\",\\\"api_secret\\\":\\\"REDACTED\\\",\\\"device_id\\\":\\\"00000000-0000-0000-0000-000000000000\\\",\\\"from_system\\\":\\\"hk-reader\\\",\\\"uid\\\":\\\"00000000\\\",\\\"version\\\":\\\"3.00.31.000\\\"}'}\",\"style\":{\"layout_flexBasisPercent\":1,\"layout_flexGrow\":1}}]",
+      "header": "",
+      "loginUrl": "",
+      "respondTime": 2777,
+      "ruleBookInfo": {
+        "author": "$.author",
+        "coverUrl": "$.image_url",
+        "init": "$.data",
+        "intro": "🔖   简介：{{$.desc_info}}##(^|[。！？]+[”」）】]?)##$1<br>",
+        "kind": "{{java.timeFormat(java.getString('$.last_version_v2')*1000)}}##/##-",
+        "lastChapter": "$.newest_chapter_name",
+        "name": "$.name",
+        "tocUrl": "https://api.example.test/v1/book_v2/chapter_list/@get:{id}?sign={{java.md5Encode(java.get('id')+'REDACTED_SALT')}},{\\n'method': 'POST',\\n'body': '{\\\"api_key\\\":\\\"REDACTED\\\",\\\"api_secret\\\":\\\"REDACTED\\\",\\\"device_id\\\":\\\"00000000-0000-0000-0000-000000000000\\\",\\\"uid\\\":\\\"00000000\\\"}'\\n}",
+        "wordCount": "$.word_count"
+      },
+      "ruleContent": {
+        "content": "data[0].content"
+      },
+      "ruleExplore": {
+        "author": "$.author",
+        "bookList": "$.data",
+        "bookUrl": "https://api.example.test/v1/resource/query_novel_info_with_rec,{'method':'POST','body':'{\\\"id\\\":\\\"{{$.id}}\\\",\\\"api_key\\\":\\\"REDACTED\\\",\\\"api_secret\\\":\\\"REDACTED\\\",\\\"device_id\\\":\\\"00000000-0000-0000-0000-000000000000\\\",\\\"uid\\\":\\\"00000000\\\"}'}",
+        "coverUrl": "$.image_url",
+        "intro": "$.desc_info",
+        "kind": "{{$.category_name}}\\n{{$.tag}}",
+        "lastChapter": "$.newest_chapter_name@put:{newest_chapter_name:newest_chapter_name}",
+        "name": "$.name@put:{id:id,name:name,author:author}",
+        "wordCount": "$.word_count@put:{image_url:image_url,short_copyright:short_copyright,desc_info:desc_info,category_name:category_name,tag:tag}"
+      },
+      "ruleSearch": {
+        "author": "$.author",
+        "bookList": "$.data.novel_list||$.data",
+        "bookUrl": "https://api.example.test/v1/resource/query_novel_info_with_rec,{'method':'POST','body':'{\\\"id\\\":\\\"{{$.id}}\\\",\\\"api_key\\\":\\\"REDACTED\\\",\\\"api_secret\\\":\\\"REDACTED\\\",\\\"device_id\\\":\\\"00000000-0000-0000-0000-000000000000\\\",\\\"uid\\\":\\\"00000000\\\"}'}",
+        "coverUrl": "$.image_url",
+        "intro": "$.desc_info",
+        "kind": "{{$.category_name}}\\n{{$.tag}}",
+        "lastChapter": "$.newest_chapter_name",
+        "name": "$.name@put:{id:id,name:name,author:author}",
+        "wordCount": "$.word_count"
+      },
+      "ruleToc": {
+        "chapterList": "$.data",
+        "chapterName": "$.name@put:{cid:chapter_id}",
+        "chapterUrl": "https://api.example.test/v1/book_v2/chapter_content/@get:{id}/{{$.chapter_id}}?sign={{java.md5Encode(java.get('id')+'$'+java.get('cid')+'REDACTED_SALT')}},{\\n'method': 'POST',\\n'body': '{\\\"api_key\\\":\\\"REDACTED\\\",\\\"api_secret\\\":\\\"REDACTED\\\",\\\"device_id\\\":\\\"00000000-0000-0000-0000-000000000000\\\",\\\"uid\\\":\\\"00000000\\\"}'\\n}",
+        "isVolume": "",
+        "updateTime": "{{java.timeFormat(java.getString('$.version')*1000)}}"
+      },
+      "searchUrl": "https://api.example.test/v1/resource/search/do_search,{\\n'method': 'POST',\\n'body': '{\\\"keyword\\\":\\\"{{key}}\\\",\\\"search_id\\\":0,\\\"search_type\\\":0,\\\"page_index\\\":{{page}},\\\"page_size\\\":10,\\\"api_key\\\":\\\"REDACTED\\\",\\\"api_secret\\\":\\\"REDACTED\\\",\\\"device_id\\\":\\\"00000000-0000-0000-0000-000000000000\\\",\\\"uid\\\":\\\"00000000\\\"}'\\n}",
+      "weight": 0
+    },
+    {
+      "bookSourceComment": "sanitized-corpus: API source B (endpoint neutralized)",
+      "bookSourceGroup": "⭐️ API",
+      "bookSourceName": "⭐️ Sanitized API Source B",
+      "bookSourceType": 0,
+      "bookSourceUrl": "https://api-b.example.test",
+      "customOrder": 5,
+      "enabled": true,
+      "enabledCookieJar": true,
+      "enabledExplore": true,
+      "exploreUrl": "",
+      "header": "{\\n\\t\\\"Accept\\\": \\\"*/*\\\",\\n\\t\\\"Connection\\\": \\\"Close\\\",\\n\\t\\\"User-Agent\\\": \\\"Dalvik/2.1.0 (Linux; U; Android 8.0.0; Sample Build)\\\"\\n}",
+      "respondTime": 2231,
+      "ruleBookInfo": {
+        "author": "$.author_name",
+        "coverUrl": "$.cover_url",
+        "init": "$.data",
+        "intro": "$.intro##(^|[。！？]+[”」）】]?)##$1<br>",
+        "kind": "{{$.category_name}},{{$.status}},{{$.update_time}}@js:result.replace(/30/,\\\"连载\\\").replace(/50/,\\\"完结\\\").replace(/\\\\s..:.*/,\\\"\\\")",
+        "lastChapter": "$.new_chapter_name##正文卷.|正文.|VIP卷.|默认卷.|卷_|VIP章节.|免费章节.|章节目录.|最新章节.|[\\\\(（【].*?[求更票谢乐发订合补加架字修Kk].*?[】）\\\\)]",
+        "name": "$.title",
+        "tocUrl": "/novels/api/book/{{$.book_id}}/chapters?paging=0",
+        "wordCount": "$.all_words"
+      },
+      "ruleContent": {
+        "content": "$.data.content"
+      },
+      "ruleExplore": {
+        "author": ""
+      },
+      "ruleSearch": {
+        "author": "$.author_name",
+        "bookList": "$.data",
+        "bookUrl": "/novels/api/book/{{$.book_id}}",
+        "checkKeyWord": "",
+        "coverUrl": "$.cover_url",
+        "intro": "$.intro",
+        "kind": "{{$.category_name}},{{$.status}}@js:result.replace(/30/,\\\"连载\\\").replace(/50/,\\\"完结\\\")",
+        "name": "$.title",
+        "wordCount": "$.all_words"
+      },
+      "ruleToc": {
+        "chapterList": "$.data",
+        "chapterName": "$.chapter_title##正文卷.|正文.|VIP卷.|默认卷.|卷_|VIP章节.|免费章节.|章节目录.|最新章节.|[\\\\(（【].*?[求更票谢乐发订合补加架字修Kk].*?[】）\\\\)]",
+        "chapterUrl": "/novels/api/book/{{$.book_id}}/chapters/{{$.chapter_id}}",
+        "formatJs": "",
+        "updateTime": "{{$.volume_name}}•{{$.original_words}}字"
+      },
+      "searchUrl": "/novels/api/book/search?keyword={{key}}&pi={{page}}&ps=30",
+      "weight": 0
+    }
+  ],
+  "sanitization_notes": {
+    "original_source": "Documents/Reader-Core/docs/design/书源示例.json (393KB, 3 real book sources)",
+    "original_sites": ["g21.manmeng168.com (番薯小说)", "appi.kuwo.cn (酷我小说)", "猫眼看书"],
+    "sources_retained": 2,
+    "sources_dropped": 1,
+    "sources_dropped_reason": "猫眼看书 source was largely redundant with Source A; dropped to keep fixture focused.",
+    "redactions": [
+      "All api_key values → 'REDACTED' (was '20002007')",
+      "All api_secret values → 'REDACTED' (was '974685bdc9957e8c')",
+      "All device_id values → '00000000-0000-0000-0000-000000000000' (was a real UUID)",
+      "All uid values → '00000000' (was '60562717')",
+      "All md5 sign salts → 'REDACTED_SALT' (was '$%@*!^#!@(@')",
+      "All operate_time / lastUpdateTime timestamps → removed or zeroed",
+      "g21.manmeng168.com → api.example.test",
+      "appi.kuwo.cn → api-b.example.test",
+      "Source names → 'Sanitized API Source A/B' (was 番薯小说 / 酷我小说)",
+      "User-Agent in header → 'Sample Build' (was a real device fingerprint 'LND-AL40 Build/HONORLND-AL40')"
+    ],
+    "preserved_for_rule_engine_parity": [
+      "POST-body JSON templating with {{page}} / {{key}} / {{$.id}} substitution",
+      "@put:{key:value} post-processing chain (ruleExplore.name → ruleSearch.bookUrl)",
+      "@js:result.replace(...) post-processing on kind field",
+      "java.md5Encode(...) sign flow for chapter content URL",
+      "java.timeFormat(...) timestamp formatting",
+      "JSONPath || fallback ($.data.novel_list||$.data)",
+      "## regex replacement on intro / lastChapter / chapterName",
+      "css:|attr: pattern is NOT present in these sources (pure JSONPath) — see bs-001/bs-002 for CSS examples"
+    ]
+  }
+}

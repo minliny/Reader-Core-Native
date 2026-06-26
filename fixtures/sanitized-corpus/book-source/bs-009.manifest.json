@@ -1,0 +1,38 @@
+{
+  "id": "bs-009",
+  "source_type": "book-source",
+  "format": "json",
+  "source_description": "Heavily sanitized skeleton of a real scraped novel site (速读谷/sudugu.org), migrated from legacy Reader-Core case_022/{toc,detail,content}.html. Preserves the full DOM structure (header/menu/container/item/itemtxt/des/dir/list/con/prenext/submenu classes) for CSS rule validation while replacing all copyrighted novel text, real cover images, and real domains. Tests detail/toc/content rule extraction against a realistic site skeleton with duplicate-chapter entries (第37章 appears twice) for parity testing.",
+  "sanitization": "Heavy sanitization applied. Real domain sudugu.org → books.example.test / img.example.test. Real novel 《捞尸人》by 纯洁滴小龙 (562.4万字, copyrighted) → 示例小说 by 示例作者. All ~5600 chars of copyrighted chapter text → 4 synthetic CJK placeholder paragraphs. Real cover image URLs (sudugu.org/files/cover/...) → img.example.test/cover/sample.png. Chapter list truncated from 608 to 10 entries (preserving the duplicate 第37章 pattern). Stripped all <script> tags, external CSS, tracking pixels (tj.js, v7.js), and related-novel sidebar.",
+  "capability_tags": [
+    "rule-engine",
+    "book-source-parsing",
+    "css-selector",
+    "detail-rule",
+    "toc-rule",
+    "content-rule",
+    "scraped-site-skeleton",
+    "duplicate-chapter-parity"
+  ],
+  "privacy_check": {
+    "passed": true,
+    "checked_for": [
+      "real-tokens",
+      "cookies",
+      "account-credentials",
+      "private-content",
+      "copyrighted-long-text",
+      "real-domains",
+      "tracking-scripts",
+      "real-cover-images"
+    ],
+    "notes": "All copyrighted novel text replaced with synthetic placeholders. All real domains and image URLs neutralized. DOM structure preserved for rule validation only."
+  },
+  "consumer_branch": {
+    "primary": "codex/rule-engine-parity",
+    "secondary": ["codex/remote-reading-vertical"]
+  },
+  "fixture_file": "bs-009-fixture.json",
+  "added_in_round": 2,
+  "migrated_from": "Documents/Reader-Core/case_022/{toc,detail,content}.html"
+}

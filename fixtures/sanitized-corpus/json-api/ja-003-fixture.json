@@ -1,0 +1,54 @@
+{
+  "fixture_id": "ja-003",
+  "source_type": "json-api",
+  "description": "Sanitized JSON group-key consistency rule samples. Each case pairs a rule (type + key) with a small record set; the engine must classify the case as pass/fail/reject. Migrated from the legacy Reader-Core group_consistency suite (6 files); 3 representative cases retained (pass / duplicate-hit / invalid-rule-reject).",
+  "rule_schema": {
+    "type": "single_key_unique",
+    "description": "Asserts that the value of `key` is unique across all records in the group.",
+    "pass_when": "all record values for `key` are distinct",
+    "fail_when": "a duplicate value for `key` is detected",
+    "reject_when": "rule.type is not a recognized rule name"
+  },
+  "cases": [
+    {
+      "case_id": "gc_single_key_unique_pass",
+      "expect": "pass",
+      "rule": {
+        "type": "single_key_unique",
+        "key": "device_name"
+      },
+      "records": [
+        { "record_id": "r-001", "device_name": "alpha" },
+        { "record_id": "r-002", "device_name": "beta" },
+        { "record_id": "r-003", "device_name": "gamma" },
+        { "record_id": "r-004", "device_name": "delta" }
+      ]
+    },
+    {
+      "case_id": "gc_single_key_duplicate_hit",
+      "expect": "fail",
+      "rule": {
+        "type": "single_key_unique",
+        "key": "device_name"
+      },
+      "records": [
+        { "record_id": "r-001", "device_name": "alpha" },
+        { "record_id": "r-002", "device_name": "beta" },
+        { "record_id": "r-003", "device_name": "alpha" },
+        { "record_id": "r-004", "device_name": "gamma" }
+      ]
+    },
+    {
+      "case_id": "gc_single_key_invalid_rule_reject",
+      "expect": "reject",
+      "rule": {
+        "type": "single_key_unique_v2",
+        "key": "device_name"
+      },
+      "records": [
+        { "record_id": "r-001", "device_name": "alpha" },
+        { "record_id": "r-002", "device_name": "alpha" }
+      ]
+    }
+  ]
+}

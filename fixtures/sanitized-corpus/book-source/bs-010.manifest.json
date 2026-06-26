@@ -1,0 +1,41 @@
+{
+  "id": "bs-010",
+  "source_type": "book-source",
+  "format": "json",
+  "source_description": "Sanitized real legado-style book-source definitions migrated from Documents/Reader-Core/docs/design/书源示例.json (393KB, 3 sources). Retains 2 structurally valuable sources (POST-body templating, @put/@js post-processing, md5 sign flow, JSONPath || fallback, ## regex replacement) with all credentials redacted and all real endpoints neutralized. Exercises the full legado rule DSL surface that the rule-engine-parity branch must support.",
+  "sanitization": "All api_key/api_secret values → 'REDACTED'. All device_id → '00000000-0000-0000-0000-000000000000'. All uid → '00000000'. All md5 sign salts → 'REDACTED_SALT'. g21.manmeng168.com → api.example.test; appi.kuwo.cn → api-b.example.test. Source names → 'Sanitized API Source A/B'. Real device fingerprint in User-Agent → 'Sample Build'. Timestamps removed/zeroed. 3rd source (猫眼看书) dropped as redundant.",
+  "capability_tags": [
+    "rule-engine",
+    "book-source-parsing",
+    "jsonpath",
+    "post-body-templating",
+    "at-put-postprocessing",
+    "at-js-postprocessing",
+    "java-md5-sign",
+    "java-timeformat",
+    "regex-replacement",
+    "jsonpath-fallback"
+  ],
+  "privacy_check": {
+    "passed": true,
+    "checked_for": [
+      "real-tokens",
+      "api-keys",
+      "api-secrets",
+      "device-ids",
+      "user-ids",
+      "sign-salts",
+      "device-fingerprints",
+      "real-domains",
+      "real-endpoints"
+    ],
+    "notes": "All credentials redacted to 'REDACTED' / zero-UUIDs. All real endpoints neutralized to example.test. Rule DSL structure preserved verbatim for parity testing."
+  },
+  "consumer_branch": {
+    "primary": "codex/rule-engine-parity",
+    "secondary": ["codex/remote-reading-vertical"]
+  },
+  "fixture_file": "bs-010-fixture.json",
+  "added_in_round": 2,
+  "migrated_from": "Documents/Reader-Core/docs/design/书源示例.json"
+}
