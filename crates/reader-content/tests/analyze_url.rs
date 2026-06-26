@@ -3,7 +3,9 @@
 //! These exercise the URL DSL parser ported from Swift `URLDSLParser.swift`
 //! and the AnalyzeUrl builder ported from `BookSourceRequestBuilder.swift`.
 
-use reader_content::analyze_url::{JsExpressionClassification, UrlDslParser};
+use reader_content::analyze_url::{
+    expand_static_templates, AnalyzeUrlContext, JsExpressionClassification, UrlDslParser,
+};
 
 #[test]
 fn parse_plain_url_yields_no_options() {
@@ -75,4 +77,40 @@ fn parse_malformed_json_returns_error() {
     let raw = "https://example.test/search, {not valid json";
     let result = UrlDslParser::parse(raw);
     assert!(result.is_err());
+}
+
+// ===== Task 2: Static template expander + page list =====
+
+#[test]
+fn expand_static_templates_replaces_key_and_page() {
+    let ctx = AnalyzeUrlContext::for_search("mirror", 2);
+    let out = expand_static_templates(
+        "https://example.test/search?q={{key}}&p={{page}}&pm={{pageMinus}}&pp={{pagePlus}}",
+        &ctx,
+    );
+    assert_eq!(
+        out,
+        "https://example.test/search?q=mirror&p=2&pm=1&pp=3"
+    );
+}
+
+#[test]
+fn expand_static_templates_replaces_keyword_alias() {
+    let ctx = AnalyzeUrlContext::for_search("中文测试", 1);
+    let out = expand_static_templates("q={{keyword}}", &ctx);
+    assert_eq!(out, "q=中文测试");
+}
+
+#[test]
+fn expand_page_list_takes_first_value_for_single_request() {
+    let ctx = AnalyzeUrlContext::for_search("k", 1);
+    let out = expand_static_templates("https://example.test/list?p=<1,3,5>", &ctx);
+    assert_eq!(out, "https://example.test/list?p=1");
+}
+
+#[test]
+fn expand_page_list_range_takes_first_value() {
+    let ctx = AnalyzeUrlContext::for_search("k", 1);
+    let out = expand_static_templates("https://example.test/list?p=<1-3>", &ctx);
+    assert_eq!(out, "https://example.test/list?p=1");
 }

@@ -302,3 +302,100 @@ fn classify_js_expression(url: &str) -> (Option<String>, JsExpressionClassificat
 }
 
 // HostHttpRequest assembly + AnalyzeUrl builder are added in later tasks.
+
+// ============================================================================
+// Task 2: Static template expander + page list
+// ============================================================================
+
+/// Context for AnalyzeUrl template expansion. Mirrors Swift
+/// `SearchRequestContext`: raw keyword, percent-encoded keyword, page, and
+/// page-derived values (`pageMinus`/`pagePlus`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnalyzeUrlContext {
+    pub raw_keyword: String,
+    pub encoded_keyword: String,
+    pub page: u32,
+    pub page_string: String,
+    pub page_minus_string: String,
+    pub page_plus_string: String,
+}
+
+impl AnalyzeUrlContext {
+    /// Build a context for a search query. `keyword` is URL-percent-encoded
+    /// for `encoded_keyword` (Legado `{{key}}` substitutes the encoded form,
+    /// matching Swift `SearchRequestContext.encodedKeyword`).
+    pub fn for_search(keyword: &str, page: u32) -> Self {
+        Self {
+            raw_keyword: keyword.to_string(),
+            encoded_keyword: percent_encode_query_component(keyword),
+            page,
+            page_string: page.to_string(),
+            page_minus_string: page.saturating_sub(1).max(1).to_string(),
+            page_plus_string: (page + 1).to_string(),
+        }
+    }
+
+    /// Build a context for a non-search URL (TOC/detail/chapter). `page`
+    /// defaults to 1; `keyword` is empty.
+    pub fn for_url() -> Self {
+        Self::for_search("", 1)
+    }
+}
+
+impl Default for AnalyzeUrlContext {
+    fn default() -> Self {
+        Self::for_url()
+    }
+}
+
+fn percent_encode_query_component(value: &str) -> String {
+    use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+    utf8_percent_encode(value, NON_ALPHANUMERIC).to_string()
+}
+
+/// Expand Legado static templates `{{key}}`/`{{keyword}}`/`{{page}}`/
+/// `{{pageMinus}}`/`{{pagePlus}}` and Legado page-list `<1,3,5>`/`<1-3>`
+/// (takes the first value for a single-request build — Legado `pagePattern`).
+///
+/// Mirrors Swift `replacingStaticTemplates(in:context:)` +
+/// `PageListExpander.expandURLs` first-value behavior.
+pub fn expand_static_templates(raw: &str, ctx: &AnalyzeUrlContext) -> String {
+    let with_page_list = expand_page_list(raw);
+    let mut out = with_page_list;
+    out = out.replace("{{key}}", &ctx.encoded_keyword);
+    out = out.replace("{{keyword}}", &ctx.raw_keyword);
+    out = out.replace("{{page}}", &ctx.page_string);
+    out = out.replace("{{pageMinus}}", &ctx.page_minus_string);
+    out = out.replace("{{pagePlus}}", &ctx.page_plus_string);
+    out
+}
+
+/// Expand Legado `<a,b,c>` / `<a-b>` page-list pattern. For a single-request
+/// build (AnalyzeUrl constructs one descriptor), use the first value. Ports
+/// Swift `PageListExpander.expandURLs` first-value behavior.
+///
+/// Only the first `<...>` pattern in the string is expanded. Multiple
+/// page-list patterns in one URL are a deferred V2 concern.
+fn expand_page_list(input: &str) -> String {
+    let Some(start) = input.find('<') else {
+        return input.to_string();
+    };
+    let Some(end_rel) = input[start + 1..].find('>') else {
+        return input.to_string();
+    };
+    let end = start + 1 + end_rel;
+    let body = &input[start + 1..end];
+    let first = body.split(',').next().unwrap_or(body).trim();
+    let first_value: i64 = if let Some((lo, hi)) = first.split_once('-') {
+        let lo: i64 = lo.trim().parse().unwrap_or(1);
+        let _hi: i64 = hi.trim().parse().unwrap_or(lo);
+        lo
+    } else {
+        first.parse::<i64>().unwrap_or(1)
+    };
+    let mut out = String::with_capacity(input.len());
+    out.push_str(&input[..start]);
+    out.push_str(&first_value.to_string());
+    out.push_str(&input[end + 1..]);
+    out
+}

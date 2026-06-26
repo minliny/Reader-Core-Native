@@ -12,3 +12,4 @@ reader-rule = { path = "../reader-rule" }
 reader-js = { path = "../reader-js" }
 serde.workspace = true
 serde_json.workspace = true
+percent-encoding = "2"
