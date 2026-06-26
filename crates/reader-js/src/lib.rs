@@ -439,6 +439,7 @@ impl QuickJsSandbox {
             "call",
             make_host_dispatch_callback(ctx.clone(), self.host_callbacks.clone())?,
         )?;
+        install_residual_host_routing(ctx.clone(), &java, self.host_callbacks.clone())?;
         ctx.globals().set("java", java)?;
         ctx.globals()
             .set("Buffer", make_buffer_object(ctx.clone())?)?;
@@ -7079,4 +7080,223 @@ AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1
             .unwrap();
         assert_eq!(result.value, json!([1, 1, 2]));
     }
+}
+
+// ============================================================================
+// P3 residual host routing: java.downloadFile / cacheFile / importScript /
+// setContent / put / reGetBook.
+//
+// These host-routed methods are deliberately NOT added to the `HostMethod`
+// enum, to keep this change merge-safe with concurrent edits to that enum on
+// `codex/reader-js-compat-runtime` (Head/WebView/StartBrowser/getCookie are
+// being added there by another work stream). They reuse the existing
+// `HostCall` descriptor + `HostCallbackRegistry` boundary, so the host
+// receives the same `{name, args}` descriptor shape as `java.ajax` etc. and
+// executes the real network/file/state operation; reader-js only routes.
+// ============================================================================
+
+#[derive(Clone, Copy, Debug)]
+enum ResidualArgShape {
+    /// No required args (extras ignored, matching legado leniency). e.g. reGetBook.
+    NoArgs,
+    /// First arg must be a URL string. e.g. downloadFile, importScript.
+    UrlString,
+    /// First arg URL string; optional second arg passes through. e.g. cacheFile(url[, saveTime]).
+    UrlStringOptExtra,
+    /// First arg content string (or null); optional second base-url string. e.g. setContent.
+    ContentOptBase,
+    /// Exactly two string args (key, value). e.g. put.
+    KeyValueStrings,
+}
+
+fn require_url_string_arg<'js>(
+    ctx: &Ctx<'js>,
+    name: &str,
+    args: &[JsonValue],
+) -> Result<(), QuickJsError> {
+    let Some(url) = args.first() else {
+        return Err(Exception::throw_type(
+            ctx,
+            format!("{name} requires a URL string argument").as_str(),
+        ));
+    };
+    if !url.is_string() {
+        return Err(Exception::throw_type(
+            ctx,
+            format!("{name} URL argument must be a string").as_str(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_residual_args<'js>(
+    ctx: &Ctx<'js>,
+    name: &str,
+    shape: ResidualArgShape,
+    args: &[JsonValue],
+) -> Result<(), QuickJsError> {
+    match shape {
+        ResidualArgShape::NoArgs => Ok(()),
+        ResidualArgShape::UrlString | ResidualArgShape::UrlStringOptExtra => {
+            require_url_string_arg(ctx, name, args)
+        }
+        ResidualArgShape::ContentOptBase => {
+            let Some(content) = args.first() else {
+                return Err(Exception::throw_type(
+                    ctx,
+                    format!("{name} requires a content argument").as_str(),
+                ));
+            };
+            if !content.is_string() && !content.is_null() {
+                return Err(Exception::throw_type(
+                    ctx,
+                    format!("{name} content argument must be a string or null").as_str(),
+                ));
+            }
+            Ok(())
+        }
+        ResidualArgShape::KeyValueStrings => {
+            if args.len() < 2 {
+                return Err(Exception::throw_type(
+                    ctx,
+                    format!("{name} requires key and value string arguments").as_str(),
+                ));
+            }
+            if !args[0].is_string() || !args[1].is_string() {
+                return Err(Exception::throw_type(
+                    ctx,
+                    format!("{name} key and value arguments must be strings").as_str(),
+                ));
+            }
+            Ok(())
+        }
+    }
+}
+
+fn make_residual_host_callback<'js>(
+    ctx: Ctx<'js>,
+    name: &'static str,
+    shape: ResidualArgShape,
+    registry: HostCallbackRegistry,
+) -> Result<rquickjs::Function<'js>, QuickJsError> {
+    rquickjs::Function::new(
+        ctx,
+        move |ctx: Ctx<'js>,
+              args: Rest<QuickJsValue<'js>>|
+              -> Result<QuickJsValue<'js>, QuickJsError> {
+            let json_args = host_args_to_json(&ctx, &args.0)?;
+            validate_residual_args(&ctx, name, shape, &json_args)?;
+
+            let result = registry
+                .call(HostCall {
+                    name: name.to_string(),
+                    args: json_args,
+                })
+                .map_err(|error| {
+                    Exception::throw_internal(
+                        &ctx,
+                        format!("host callback {name} failed: {error}").as_str(),
+                    )
+                })?;
+
+            json_to_quickjs(&ctx, &result).map_err(|_| {
+                Exception::throw_internal(
+                    &ctx,
+                    format!("host callback {name} returned invalid JSON").as_str(),
+                )
+            })
+        },
+    )
+}
+
+/// Wire the residual `java.*` host-routed methods (downloadFile, cacheFile,
+/// importScript, setContent, put, reGetBook) plus top-level global aliases for
+/// the network/file helpers (mirroring how `ajax`/`getSource` are exposed both
+/// as `java.ajax` and global `ajax`). The state helpers (setContent/put/
+/// reGetBook) stay java-namespaced.
+///
+/// Called from `install_host_api` right before the `java` object is published
+/// to the global scope. Uses a dedicated routing path so the `HostMethod` enum
+/// stays untouched (concurrent-agent safety).
+fn install_residual_host_routing<'js>(
+    ctx: Ctx<'js>,
+    java: &rquickjs::Object<'js>,
+    registry: HostCallbackRegistry,
+) -> Result<(), QuickJsError> {
+    use ResidualArgShape::*;
+
+    java.set(
+        "downloadFile",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.downloadFile",
+            UrlString,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "cacheFile",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.cacheFile",
+            UrlStringOptExtra,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "importScript",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.importScript",
+            UrlString,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "setContent",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.setContent",
+            ContentOptBase,
+            registry.clone(),
+        )?,
+    )?;
+    java.set(
+        "put",
+        make_residual_host_callback(ctx.clone(), "java.put", KeyValueStrings, registry.clone())?,
+    )?;
+    java.set(
+        "reGetBook",
+        make_residual_host_callback(ctx.clone(), "java.reGetBook", NoArgs, registry.clone())?,
+    )?;
+
+    let globals = ctx.globals();
+    globals.set(
+        "downloadFile",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.downloadFile",
+            UrlString,
+            registry.clone(),
+        )?,
+    )?;
+    globals.set(
+        "cacheFile",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.cacheFile",
+            UrlStringOptExtra,
+            registry.clone(),
+        )?,
+    )?;
+    globals.set(
+        "importScript",
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.importScript",
+            UrlString,
+            registry.clone(),
+        )?,
+    )?;
+    Ok(())
 }
