@@ -314,6 +314,8 @@ pub enum AnalyzeUrlError {
     Dsl(UrlDslParseError),
     InvalidUrl(String),
     JsUnsupported(String),
+    /// JS expression evaluation failed (e.g. sandbox runtime error).
+    JsExecution(String),
 }
 
 impl std::fmt::Display for AnalyzeUrlError {
@@ -324,6 +326,7 @@ impl std::fmt::Display for AnalyzeUrlError {
             AnalyzeUrlError::JsUnsupported(msg) => {
                 write!(f, "URL JS execution unsupported in this build: {msg}")
             }
+            AnalyzeUrlError::JsExecution(msg) => write!(f, "URL JS execution failed: {msg}"),
         }
     }
 }
@@ -372,6 +375,68 @@ impl AnalyzeUrl {
             ));
         }
         Self::assemble(dsl, ctx, base_url, source_headers)
+    }
+
+    /// Build a [`HostHttpRequest`] from a raw URL DSL string that may contain
+    /// `@js:` / `<js>...</js>` expressions or a DSL `js` option.
+    ///
+    /// Mirrors Legado `AnalyzeUrl` JS path: the embedded JS expression is
+    /// evaluated with `key`/`page`/`baseUrl` variables in scope, and the
+    /// returned string is parsed as a URL DSL. Non-JS URLs delegate to
+    /// [`AnalyzeUrl::build_request`].
+    ///
+    /// The `js_eval` closure receives `(expression, context_json)` and returns
+    /// the evaluated string result. Callers wire this to a JS sandbox (e.g.
+    /// `RemoteContentPipeline::evaluate_url_js`).
+    pub fn build_request_with_js<F>(
+        raw_url: &str,
+        ctx: &AnalyzeUrlContext,
+        base_url: &str,
+        source_headers: &Map<String, Value>,
+        js_eval: F,
+    ) -> Result<HostHttpRequest, AnalyzeUrlError>
+    where
+        F: FnOnce(&str, &Value) -> Result<String, String>,
+    {
+        let expanded = expand_static_templates(raw_url, ctx);
+        let (js_expr, classification) = classify_js_expression(&expanded);
+        let dsl = UrlDslParser::parse(&expanded)?;
+
+        // Determine the JS expression source: `@js:`/`<js>` in URL, or DSL `js` option.
+        let active_js = js_expr
+            .clone()
+            .or_else(|| dsl.options.js.clone());
+
+        let has_js = classification == JsExpressionClassification::RequiresJsSandbox
+            || dsl.options.js.is_some()
+            || dsl.has_js_expression;
+
+        if !has_js {
+            // No JS — fall through to the non-JS path.
+            return Self::assemble(dsl, ctx, base_url, source_headers);
+        }
+
+        let Some(expr) = active_js else {
+            return Err(AnalyzeUrlError::JsUnsupported(
+                "URL classified as JS but no expression extracted".into(),
+            ));
+        };
+
+        // Build the JS context: variables exposed to the script. Mirrors Legado
+        // AnalyzeUrl.kt's `evalJS` variable scope.
+        let js_context = serde_json::json!({
+            "key": ctx.raw_keyword,
+            "page": ctx.page,
+            "baseUrl": base_url,
+        });
+
+        let result = js_eval(&expr, &js_context)
+            .map_err(AnalyzeUrlError::JsExecution)?;
+
+        // The JS result is a URL string (or a Legado DSL form
+        // `url,{"method":"POST",...}`). Re-parse it.
+        let result_dsl = UrlDslParser::parse(&result)?;
+        Self::assemble(result_dsl, ctx, base_url, source_headers)
     }
 
     fn assemble(
@@ -605,28 +670,51 @@ pub fn expand_static_templates(raw: &str, ctx: &AnalyzeUrlContext) -> String {
 /// build (AnalyzeUrl constructs one descriptor), use the first value. Ports
 /// Swift `PageListExpander.expandURLs` first-value behavior.
 ///
-/// Only the first `<...>` pattern in the string is expanded. Multiple
-/// page-list patterns in one URL are a deferred V2 concern.
+/// Only the first numeric `<...>` pattern is expanded. Non-numeric angle-bracket
+/// content (e.g. `<js>...</js>`) is left intact. Multiple page-list patterns in
+/// one URL are a deferred V2 concern.
 fn expand_page_list(input: &str) -> String {
-    let Some(start) = input.find('<') else {
-        return input.to_string();
-    };
-    let Some(end_rel) = input[start + 1..].find('>') else {
-        return input.to_string();
-    };
-    let end = start + 1 + end_rel;
-    let body = &input[start + 1..end];
-    let first = body.split(',').next().unwrap_or(body).trim();
-    let first_value: i64 = if let Some((lo, hi)) = first.split_once('-') {
-        let lo: i64 = lo.trim().parse().unwrap_or(1);
-        let _hi: i64 = hi.trim().parse().unwrap_or(lo);
-        lo
-    } else {
-        first.parse::<i64>().unwrap_or(1)
-    };
-    let mut out = String::with_capacity(input.len());
-    out.push_str(&input[..start]);
-    out.push_str(&first_value.to_string());
-    out.push_str(&input[end + 1..]);
-    out
+    // Scan for `<` followed by numeric content (digits, comma, dash, space).
+    // This avoids false positives on `<js>`/`<html>`/etc.
+    let bytes = input.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'<' {
+            // Find the matching `>`.
+            if let Some(end_rel) = input[i + 1..].find('>') {
+                let end = i + 1 + end_rel;
+                let body = &input[i + 1..end];
+                let first = body.split(',').next().unwrap_or(body).trim();
+                // Only treat as page-list if the first item parses as integer
+                // or a `lo-hi` range. Otherwise skip this `<...>` (e.g. `<js>`).
+                let is_numeric = if let Some((lo, _hi)) = first.split_once('-') {
+                    !lo.trim().is_empty() && lo.trim().parse::<i64>().is_ok()
+                } else {
+                    first.parse::<i64>().is_ok()
+                };
+                if is_numeric {
+                    let first_value: i64 = if let Some((lo, hi)) = first.split_once('-') {
+                        let lo: i64 = lo.trim().parse().unwrap_or(1);
+                        let _hi: i64 = hi.trim().parse().unwrap_or(lo);
+                        lo
+                    } else {
+                        first.parse::<i64>().unwrap_or(1)
+                    };
+                    let mut out = String::with_capacity(input.len());
+                    out.push_str(&input[..i]);
+                    out.push_str(&first_value.to_string());
+                    out.push_str(&input[end + 1..]);
+                    return out;
+                }
+                // Not numeric — skip past this `>` and keep scanning.
+                i = end + 1;
+                continue;
+            } else {
+                // No matching `>` — stop.
+                break;
+            }
+        }
+        i += 1;
+    }
+    input.to_string()
 }

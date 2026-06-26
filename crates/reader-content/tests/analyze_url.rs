@@ -205,3 +205,123 @@ fn build_request_rejects_js_url_in_non_js_build() {
     let result = AnalyzeUrl::build_request(raw, &ctx, "https://example.test", &Default::default());
     assert!(result.is_err());
 }
+
+// ===========================================================================
+// Task 6: build_request_with_js — URL-embedded JS execution
+// ===========================================================================
+
+#[test]
+fn build_request_with_js_evaluates_at_js_expression() {
+    let ctx = AnalyzeUrlContext::for_search("斗破苍穹", 1);
+    let raw = "@js:\"https://example.test/search?q=\" + key";
+    let request = AnalyzeUrl::build_request_with_js(
+        raw,
+        &ctx,
+        "https://example.test",
+        &Default::default(),
+        |expr, context| {
+            // Toy evaluator: concatenate the variable bindings + return the
+            // expression result. The real implementation uses a JS sandbox.
+            assert_eq!(expr, "\"https://example.test/search?q=\" + key");
+            assert_eq!(context["key"], "斗破苍穹");
+            assert_eq!(context["page"], 1);
+            assert_eq!(context["baseUrl"], "https://example.test");
+            Ok(format!("https://example.test/search?q=斗破苍穹"))
+        },
+    )
+    .expect("JS URL builds");
+    assert_eq!(request.url, "https://example.test/search?q=斗破苍穹");
+    assert_eq!(request.method, "GET");
+}
+
+#[test]
+fn build_request_with_js_evaluates_js_tag_expression() {
+    let ctx = AnalyzeUrlContext::for_search("test", 2);
+    let raw = "<js>\"https://js.example.test/p=\" + page</js>";
+    let request = AnalyzeUrl::build_request_with_js(
+        raw,
+        &ctx,
+        "https://example.test",
+        &Default::default(),
+        |expr, _context| {
+            assert_eq!(expr, "\"https://js.example.test/p=\" + page");
+            Ok("https://js.example.test/p=2".to_string())
+        },
+    )
+    .expect("<js> URL builds");
+    assert_eq!(request.url, "https://js.example.test/p=2");
+}
+
+#[test]
+fn build_request_with_js_evaluates_dsl_js_option() {
+    let ctx = AnalyzeUrlContext::for_search("test", 1);
+    let raw = r#"https://placeholder.test,{"js":"\"https://real.example.test/k=\" + key"}"#;
+    let request = AnalyzeUrl::build_request_with_js(
+        raw,
+        &ctx,
+        "https://example.test",
+        &Default::default(),
+        |expr, _context| {
+            assert_eq!(expr, "\"https://real.example.test/k=\" + key");
+            Ok("https://real.example.test/k=test".to_string())
+        },
+    )
+    .expect("DSL js option builds");
+    assert_eq!(request.url, "https://real.example.test/k=test");
+}
+
+#[test]
+fn build_request_with_js_returns_js_result_as_dsl_with_post_options() {
+    let ctx = AnalyzeUrlContext::for_search("test", 1);
+    let raw = "@js:buildUrl(key)";
+    let request = AnalyzeUrl::build_request_with_js(
+        raw,
+        &ctx,
+        "https://example.test",
+        &Default::default(),
+        |_expr, _context| {
+            // The JS sandbox can return a full DSL string with POST options.
+            Ok(r#"https://built.example.test/api,{"method":"POST","body":"q=test"}"#.to_string())
+        },
+    )
+    .expect("JS DSL result builds");
+    assert_eq!(request.url, "https://built.example.test/api");
+    assert_eq!(request.method, "POST");
+    assert_eq!(request.body.as_deref(), Some("q=test"));
+}
+
+#[test]
+fn build_request_with_js_without_js_falls_through_to_non_js_path() {
+    let ctx = AnalyzeUrlContext::for_search("test", 1);
+    let raw = "https://example.test/search?q={{key}}";
+    let request = AnalyzeUrl::build_request_with_js(
+        raw,
+        &ctx,
+        "https://example.test",
+        &Default::default(),
+        |_expr, _context| panic!("js_eval should not be called for non-JS URL"),
+    )
+    .expect("non-JS URL builds via fall-through");
+    assert_eq!(request.url, "https://example.test/search?q=test");
+}
+
+#[test]
+fn build_request_with_js_surfaces_evaluator_error() {
+    let ctx = AnalyzeUrlContext::for_search("test", 1);
+    let raw = "@js:throw new Error('boom')";
+    let result = AnalyzeUrl::build_request_with_js(
+        raw,
+        &ctx,
+        "https://example.test",
+        &Default::default(),
+        |_expr, _context| Err("boom".to_string()),
+    );
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    match err {
+        reader_content::analyze_url::AnalyzeUrlError::JsExecution(msg) => {
+            assert_eq!(msg, "boom");
+        }
+        other => panic!("expected JsExecution, got {other:?}"),
+    }
+}

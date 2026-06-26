@@ -306,3 +306,90 @@ fn book_search_auto_build_errors_when_source_has_no_search_url() {
         other => panic!("expected Finished (error from missing searchUrl), got {other:?}"),
     }
 }
+
+/// URL-embedded `@js:` expression in `searchUrl` is evaluated by the JS
+/// sandbox, and the result is parsed as the request URL.
+#[test]
+fn book_search_auto_builds_from_at_js_expression_via_sandbox() {
+    let state = RemoteState::new();
+    // The JS expression builds a URL string using the `key` variable.
+    let source = inline_search_source(
+        "@js:\"https://api.example.test/search?q=\" + key",
+        "https://api.example.test",
+    );
+    let params = serde_json::json!({
+        "sourceId": "src-1",
+        "source": source,
+        "keyword": "斗破",
+        "page": 1,
+    });
+
+    let dispatch = dispatch_book_search(&state, params);
+    let (url, method) = pending_url_method(dispatch);
+    assert_eq!(method, "GET");
+    assert_eq!(url, "https://api.example.test/search?q=斗破");
+}
+
+/// URL-embedded `<js>...</js>` expression in `searchUrl`.
+#[test]
+fn book_search_auto_builds_from_js_tag_expression_via_sandbox() {
+    let state = RemoteState::new();
+    let source = inline_search_source(
+        r#"<js>"https://js.example.test/p=" + page</js>"#,
+        "https://api.example.test",
+    );
+    let params = serde_json::json!({
+        "sourceId": "src-1",
+        "source": source,
+        "keyword": "test",
+        "page": 5,
+    });
+
+    let dispatch = dispatch_book_search(&state, params);
+    let (url, _) = pending_url_method(dispatch);
+    assert_eq!(url, "https://js.example.test/p=5");
+}
+
+/// DSL `js` option is evaluated and the result is re-parsed as URL DSL.
+#[test]
+fn book_search_auto_builds_from_dsl_js_option_via_sandbox() {
+    let state = RemoteState::new();
+    // The DSL `js` option returns a plain URL string built from `key`.
+    let source = inline_search_source(
+        r#"https://placeholder.test,{"js":"\"https://built.example.test/k=\" + key"}"#,
+        "https://api.example.test",
+    );
+    let params = serde_json::json!({
+        "sourceId": "src-1",
+        "source": source,
+        "keyword": "test",
+        "page": 1,
+    });
+
+    let dispatch = dispatch_book_search(&state, params);
+    let (url, method) = pending_url_method(dispatch);
+    assert_eq!(method, "GET");
+    assert_eq!(url, "https://built.example.test/k=test");
+}
+
+/// A JS expression that throws surfaces as a Finished (error) dispatch.
+#[test]
+fn book_search_auto_build_js_error_surfaces_as_finished() {
+    let state = RemoteState::new();
+    let source = inline_search_source(
+        "@js:(function() { throw new Error('boom'); })()",
+        "https://api.example.test",
+    );
+    let params = serde_json::json!({
+        "sourceId": "src-1",
+        "source": source,
+        "keyword": "test",
+        "page": 1,
+    });
+
+    let dispatch = dispatch_book_search(&state, params);
+    match dispatch {
+        RemoteDispatch::Finished => {}
+        other => panic!("expected Finished (JS error), got {other:?}"),
+    }
+}

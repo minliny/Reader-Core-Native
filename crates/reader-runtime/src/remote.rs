@@ -10,7 +10,9 @@
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use reader_content::analyze_url::{AnalyzeUrl, AnalyzeUrlContext, AnalyzeUrlError};
+use reader_content::analyze_url::{
+    AnalyzeUrl, AnalyzeUrlContext, AnalyzeUrlError, JsExpressionClassification, UrlDslParser,
+};
 use reader_content::{JsOutcome, RemoteContentPipeline};
 use reader_contract::{
     self as contract,
@@ -476,8 +478,13 @@ fn build_search_request_from_source(
         .and_then(|h| h.as_object())
         .cloned()
         .unwrap_or_default();
-    AnalyzeUrl::build_request(search_url, &ctx, &source.base_url, &source_headers)
-        .map_err(analyze_url_internal)
+    build_analyze_url_request(
+        state,
+        search_url,
+        &ctx,
+        &source.base_url,
+        &source_headers,
+    )
 }
 
 /// Build a `HostHttpRequest` from an explicit URL field (`bookUrl` /
@@ -505,8 +512,41 @@ fn build_request_from_url_field(
         .cloned()
         .unwrap_or_default();
     let ctx = AnalyzeUrlContext::for_url();
-    AnalyzeUrl::build_request(raw_url, &ctx, &source.base_url, &source_headers)
-        .map_err(analyze_url_internal)
+    build_analyze_url_request(state, raw_url, &ctx, &source.base_url, &source_headers)
+}
+
+/// Dispatch to `AnalyzeUrl::build_request_with_js` when the URL contains
+/// `@js:`/`<js>` or a DSL `js` option; otherwise fall back to the non-JS
+/// `AnalyzeUrl::build_request`. The JS sandbox lives on the
+/// [`RemoteContentPipeline`], so this is where the Core/Host boundary is
+/// honoured: JS evaluation is a pure compute (no sockets), but any
+/// `java.get`/`java.post` calls inside the JS surface as structured
+/// `unsupported` errors unless a host callback is registered.
+fn build_analyze_url_request(
+    state: &RemoteState,
+    raw_url: &str,
+    ctx: &AnalyzeUrlContext,
+    base_url: &str,
+    source_headers: &serde_json::Map<String, serde_json::Value>,
+) -> Result<HostHttpRequest, CoreError> {
+    // Quick pre-check: classify the URL (after static template expansion) for
+    // embedded JS. If no JS, use the cheaper non-JS path.
+    let expanded = reader_content::analyze_url::expand_static_templates(raw_url, ctx);
+    let (_, classification) = UrlDslParser::classify_js_expression(&expanded);
+    let dsl_pre = UrlDslParser::parse(&expanded)
+        .map_err(|e| analyze_url_internal(AnalyzeUrlError::from(e)))?;
+    let has_js = classification == JsExpressionClassification::RequiresJsSandbox
+        || dsl_pre.options.js.is_some()
+        || dsl_pre.has_js_expression;
+    if !has_js {
+        return AnalyzeUrl::build_request(raw_url, ctx, base_url, source_headers)
+            .map_err(analyze_url_internal);
+    }
+    let pipeline = state.pipeline();
+    AnalyzeUrl::build_request_with_js(raw_url, ctx, base_url, source_headers, |expr, context| {
+        pipeline.evaluate_url_js(expr, context)
+    })
+    .map_err(analyze_url_internal)
 }
 
 fn analyze_url_internal(err: AnalyzeUrlError) -> CoreError {
