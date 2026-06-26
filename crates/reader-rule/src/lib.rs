@@ -99,13 +99,22 @@ impl RuleEngine {
     /// Mirrors `AnalyzeRule.SourceRule.init` (lines 545-578): the rule mode is
     /// detected from the string prefix and the body is routed to the matching
     /// engine (CSS / XPath / JSONPath). `@put`/`@get`, `##regex##replacement`,
-    /// `{{...}}` and `<js>`/`@js:` handling are layered on top of this in later
-    /// tasks; for now this closes issue 1 (prefix dispatch) so XPath/JSONPath
-    /// engines become reachable from raw DSL strings.
+    /// `{{...}}` and `<js>`/`@js:` handling are layered on top of this.
     ///
-    /// `scope` receives `@put:{...}` pairs and resolves `@get:{key}`. `js`
-    /// evaluates `{{...}}` / `<js>` segments. Both are optional so callers
-    /// without JS / variable support still get prefix routing.
+    /// Pipeline order mirrors Legado:
+    /// 1. Mode detection on the raw rule text (SourceRule.init 546-578).
+    /// 2. `@put:{...}` extraction → `scope` (splitPutRule 408-431).
+    /// 3. `@get:{key}` substitution from `scope` (makeUpRule getRuleType 698).
+    /// 4. `{{expr}}` JS template substitution (makeUpRule jsRuleType 606-609,
+    ///    AppPattern.EXP_PATTERN). If `js` is None and templates are present,
+    ///    returns empty output (graceful degradation — Legado catches the JS
+    ///    eval failure at a higher level).
+    /// 5. `##regex##replacement` suffix parsing (splitRegex 627-654).
+    /// 6. `<js>...</js>` / `@js:...` segment splitting (splitSourceRule
+    ///    498-518, AppPattern.JS_PATTERN). Non-JS segments execute on the
+    ///    previous output; JS segments transform each value with `result`
+    ///    bound to the current value.
+    /// 7. `##` regex applied to each final output value (replaceRegex 436-460).
     pub fn execute_legado_rule(
         &self,
         input: &str,
@@ -113,7 +122,6 @@ impl RuleEngine {
         scope: &mut dyn RuleVariableScope,
         js: Option<&dyn RuleJsEvaluator>,
     ) -> RuleResult<RuleOutput> {
-        let _ = js; // wired in Task 5
         let rule = rule.trim();
         if rule.is_empty() {
             return Ok(RuleOutput::new(Vec::new()));
@@ -124,27 +132,98 @@ impl RuleEngine {
         // stored by an earlier @put:{...} in the same rule.
         let body = extract_put_rules(body, scope);
         let body = substitute_get_rules(&body, scope);
+        // {{expr}} templates: if present but no evaluator, degrade gracefully
+        // to empty output (mirrors Legado catching JS eval failures).
+        if body.contains("{{") && js.is_none() {
+            return Ok(RuleOutput::new(Vec::new()));
+        }
+        let body = substitute_js_templates(&body, js);
         let suffix = LegadoRegexSuffix::parse(&body);
-        let out = match mode {
-            LegadoRuleMode::Default => self.execute_legado_css(input, suffix.selector)?,
+        let segments = split_js_segments(suffix.selector);
+        let has_js_segment = segments.iter().any(|(_, is_js)| *is_js);
+        if has_js_segment && js.is_none() {
+            // <js>/@js: present but no evaluator → cannot transform → empty.
+            return Ok(RuleOutput::new(Vec::new()));
+        }
+        let values = if has_js_segment {
+            execute_js_pipeline(self, input, mode, &segments, js.unwrap())?
+        } else {
+            self.execute_mode(input, mode, suffix.selector)?
+                .into_values()
+        };
+        let values = if suffix.has_regex() {
+            values.iter().map(|v| suffix.apply(v)).collect()
+        } else {
+            values
+        };
+        Ok(RuleOutput::new(values))
+    }
+
+    /// Dispatch a selector to the engine matching `mode`. Mirrors the `when`
+    /// block in Legado `getStringList` (lines 206-212) / `getString` (293-304).
+    fn execute_mode(
+        &self,
+        input: &str,
+        mode: LegadoRuleMode,
+        selector: &str,
+    ) -> RuleResult<RuleOutput> {
+        match mode {
+            LegadoRuleMode::Default => self.execute_legado_css(input, selector),
             LegadoRuleMode::Xpath => {
-                let step = RuleStep::XPath(XPathRule::new(suffix.selector));
-                self.execute_step(input, &step)?
+                let step = RuleStep::XPath(XPathRule::new(selector));
+                self.execute_step(input, &step)
             }
             LegadoRuleMode::Json => {
-                let step = RuleStep::JsonPath(JsonPathRule::new(suffix.selector));
-                self.execute_step(input, &step)?
+                let step = RuleStep::JsonPath(JsonPathRule::new(selector));
+                self.execute_step(input, &step)
             }
-            LegadoRuleMode::Regex => self.execute_legado_css(input, suffix.selector)?,
-            LegadoRuleMode::Js => RuleOutput::new(Vec::new()),
-        };
-        if suffix.has_regex() {
-            let replaced = out.values().iter().map(|v| suffix.apply(v)).collect();
-            Ok(RuleOutput::new(replaced))
-        } else {
-            Ok(out)
+            LegadoRuleMode::Regex => self.execute_legado_css(input, selector),
+            LegadoRuleMode::Js => Ok(RuleOutput::new(Vec::new())),
         }
     }
+}
+
+/// Run a multi-segment Legado rule pipeline that contains JS segments.
+///
+/// Mirrors Legado `getStringList` (lines 200-223): `result` starts as the
+/// input content; each non-JS segment extracts from the previous result, and
+/// each JS segment transforms every value with `result` bound to that value
+/// (Legado `evalJS`, AnalyzeRule.kt:603-606).
+fn execute_js_pipeline(
+    engine: &RuleEngine,
+    input: &str,
+    mode: LegadoRuleMode,
+    segments: &[(String, bool)],
+    js: &dyn RuleJsEvaluator,
+) -> RuleResult<Vec<String>> {
+    let mut values: Vec<String> = vec![input.to_string()];
+    for (text, is_js) in segments {
+        if *is_js {
+            let mut next = Vec::new();
+            for v in &values {
+                // Mirrors Legado: eval failure for one value doesn't abort
+                // the whole pipeline; the value is dropped.
+                if let Ok(result) = js.eval(text, Some(v)) {
+                    next.push(result);
+                }
+            }
+            values = next;
+        } else if !text.is_empty() {
+            let mut next = Vec::new();
+            for v in &values {
+                // CSS/XPath parse failures on a sub-segment are non-fatal:
+                // drop the value, keep going.
+                if let Ok(out) = engine.execute_mode(v, mode, text) {
+                    next.extend(out.into_values());
+                }
+            }
+            values = next;
+        }
+        // Empty non-JS segment: pass through (values unchanged). This lets
+        // `<js>expr</js>` with no preceding selector evaluate against the
+        // raw input, matching Legado's initial `result = content`.
+    }
+    Ok(values)
 }
 
 /// Legado rule mode detected from the rule-string prefix.
@@ -361,6 +440,79 @@ fn substitute_get_rules(body: &str, scope: &dyn RuleVariableScope) -> String {
             scope.get(key).unwrap_or_default()
         })
         .into_owned()
+}
+
+/// Substitute `{{expr}}` JS templates in the rule body.
+///
+/// Mirrors Legado `makeUpRule` jsRuleType (AnalyzeRule.kt:606-609) +
+/// `AppPattern.EXP_PATTERN` (`{{([\w\W]*?)}}`). Each template is evaluated
+/// with no `result` context (the expression runs against the scope, not the
+/// extracted value) and its string result replaces the template in the body.
+///
+/// If `js` is None the body is returned unchanged — callers should check for
+/// remaining `{{` and degrade gracefully (see `execute_legado_rule`).
+fn substitute_js_templates(body: &str, js: Option<&dyn RuleJsEvaluator>) -> String {
+    let Some(js) = js else {
+        return body.to_string();
+    };
+    let regex = match Regex::new(r"(?i)\{\{([\w\W]*?)\}\}") {
+        Ok(r) => r,
+        Err(_) => return body.to_string(),
+    };
+    regex
+        .replace_all(body, |caps: &regex::Captures| {
+            let expr = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+            js.eval(expr, None).unwrap_or_default()
+        })
+        .into_owned()
+}
+
+/// Split a rule body into alternating non-JS / JS segments.
+///
+/// Mirrors Legado `splitSourceRule` (AnalyzeRule.kt:498-518) +
+/// `AppPattern.JS_PATTERN` (`<js>([\w\W]*?)</js>|@js:([\w\W]*)`).
+/// - `<js>expr</js>` captures `expr` as a JS segment (non-greedy).
+/// - `@js:expr` captures `expr` as a JS segment (greedy to end of body —
+///   matching Legado's `([\\w\\W]*)` semantics; anything after `@js:` is JS).
+///
+/// Returns a vec of `(text, is_js)` tuples in source order. Non-JS segments
+/// may be empty (e.g. when the body starts with `<js>`).
+fn split_js_segments(body: &str) -> Vec<(String, bool)> {
+    let regex = match Regex::new(r"(?i)<js>([\w\W]*?)</js>|@js:([\w\W]*)") {
+        Ok(r) => r,
+        Err(_) => return vec![(body.to_string(), false)],
+    };
+    let mut segments = Vec::new();
+    let mut last_end = 0;
+    for caps in regex.captures_iter(body) {
+        let m = match caps.get(0) {
+            Some(m) => m,
+            None => continue,
+        };
+        // Leading non-JS text before this match.
+        if m.start() > last_end {
+            segments.push((body[last_end..m.start()].to_string(), false));
+        } else if m.start() == last_end && last_end == 0 {
+            // Body starts with a JS segment — emit an empty non-JS prefix so
+            // the pipeline knows there's no preceding selector. This empty
+            // segment is a pass-through (values stay as the input).
+            segments.push((String::new(), false));
+        }
+        let js_expr = caps
+            .get(1)
+            .or_else(|| caps.get(2))
+            .map(|m| m.as_str())
+            .unwrap_or("");
+        segments.push((js_expr.to_string(), true));
+        last_end = m.end();
+    }
+    if last_end < body.len() {
+        segments.push((body[last_end..].to_string(), false));
+    }
+    if segments.is_empty() {
+        segments.push((body.to_string(), false));
+    }
+    segments
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
