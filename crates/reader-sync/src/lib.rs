@@ -7,6 +7,7 @@
 
 pub mod webdav_backup;
 pub mod webdav_client;
+pub mod webdav_conflict;
 pub mod webdav_protocol;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -2934,7 +2935,7 @@ fn compare_progress_retention_order(
         .then_with(|| right.device_id.cmp(&left.device_id))
 }
 
-fn sort_progress_cloud_records(records: &mut [ProgressCloudSyncRecord]) {
+pub(crate) fn sort_progress_cloud_records(records: &mut [ProgressCloudSyncRecord]) {
     records.sort_by(|left, right| {
         left.book_id
             .cmp(&right.book_id)
@@ -2945,7 +2946,7 @@ fn sort_progress_cloud_records(records: &mut [ProgressCloudSyncRecord]) {
     });
 }
 
-fn compare_progress_webdav_last_write_wins_order(
+pub(crate) fn compare_progress_webdav_last_write_wins_order(
     left: &ProgressCloudSyncRecord,
     right: &ProgressCloudSyncRecord,
 ) -> std::cmp::Ordering {
@@ -2955,7 +2956,7 @@ fn compare_progress_webdav_last_write_wins_order(
         .then_with(|| compare_progress_runtime_order(left, right))
 }
 
-fn compare_progress_runtime_order(
+pub(crate) fn compare_progress_runtime_order(
     left: &ProgressCloudSyncRecord,
     right: &ProgressCloudSyncRecord,
 ) -> std::cmp::Ordering {
