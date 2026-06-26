@@ -12,6 +12,12 @@ use std::sync::Mutex;
 use reader_domain::{Book, ReadingProgress, Source};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "sqlite")]
+pub mod sqlite_backend;
+
+#[cfg(feature = "sqlite")]
+pub use sqlite_backend::{SqliteStorage, SQLITE_SCHEMA_VERSION};
+
 /// Current storage snapshot schema version.
 pub const STORAGE_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
 
@@ -2749,7 +2755,7 @@ impl StorageSnapshotStore for InMemoryStorage {
     }
 }
 
-fn sort_storage_snapshot(snapshot: &mut StorageSnapshot) {
+pub(crate) fn sort_storage_snapshot(snapshot: &mut StorageSnapshot) {
     snapshot
         .sources
         .sort_by(|a, b| a.source_id.cmp(&b.source_id));
@@ -2899,7 +2905,7 @@ fn compare_download_key(a: &ChapterDownloadTask, b: &ChapterDownloadTask) -> std
         .then_with(|| a.chapter_index.cmp(&b.chapter_index))
 }
 
-fn validate_book_key(source_id: &str, book_id: &str) -> Result<(), StorageError> {
+pub(crate) fn validate_book_key(source_id: &str, book_id: &str) -> Result<(), StorageError> {
     if source_id.trim().is_empty() {
         return Err(StorageError::InvalidKey {
             field: "source_id".into(),
@@ -2913,7 +2919,7 @@ fn validate_book_key(source_id: &str, book_id: &str) -> Result<(), StorageError>
     Ok(())
 }
 
-fn validate_source_id(source_id: &str) -> Result<(), StorageError> {
+pub(crate) fn validate_source_id(source_id: &str) -> Result<(), StorageError> {
     if source_id.trim().is_empty() {
         return Err(StorageError::InvalidKey {
             field: "source_id".into(),
@@ -2969,7 +2975,7 @@ fn count_offline_status(
     })
 }
 
-fn validate_reading_progress(entry: &ReadingProgressEntry) -> Result<(), StorageError> {
+pub(crate) fn validate_reading_progress(entry: &ReadingProgressEntry) -> Result<(), StorageError> {
     validate_book_key(&entry.source_id, &entry.book_id)?;
     if !entry.chapter_progress.is_finite()
         || entry.chapter_progress < 0.0
@@ -3274,7 +3280,9 @@ fn default_max_attempts() -> u32 {
     3
 }
 
-fn validate_chapter_download_task(task: &ChapterDownloadTask) -> Result<(), StorageError> {
+pub(crate) fn validate_chapter_download_task(
+    task: &ChapterDownloadTask,
+) -> Result<(), StorageError> {
     validate_book_key(&task.source_id, &task.book_id)?;
     if task.max_attempts == 0 {
         return Err(StorageError::InvalidDownloadTask {
@@ -3408,11 +3416,11 @@ fn chapter_download_key(
     })
 }
 
-fn validate_shelf_key(source_id: &str, book_id: &str) -> Result<(), StorageError> {
+pub(crate) fn validate_shelf_key(source_id: &str, book_id: &str) -> Result<(), StorageError> {
     validate_book_key(source_id, book_id)
 }
 
-fn sort_shelf(entries: &mut Vec<BookshelfEntry>) {
+pub(crate) fn sort_shelf(entries: &mut Vec<BookshelfEntry>) {
     // sort_index ascending; ties broken by added_at descending (newer first).
     entries.sort_by(|a, b| {
         a.sort_index
@@ -3423,7 +3431,7 @@ fn sort_shelf(entries: &mut Vec<BookshelfEntry>) {
     });
 }
 
-fn normalize_required_filter(
+pub(crate) fn normalize_required_filter(
     value: Option<String>,
     field: &str,
 ) -> Result<Option<String>, StorageError> {
@@ -3441,13 +3449,13 @@ fn normalize_required_filter(
         .transpose()
 }
 
-fn normalize_keyword(value: Option<String>) -> Option<String> {
+pub(crate) fn normalize_keyword(value: Option<String>) -> Option<String> {
     value
         .map(|value| value.trim().to_ascii_lowercase())
         .filter(|value| !value.is_empty())
 }
 
-fn normalize_group(value: Option<String>) -> Result<Option<String>, StorageError> {
+pub(crate) fn normalize_group(value: Option<String>) -> Result<Option<String>, StorageError> {
     normalize_required_filter(value, "group")
 }
 
@@ -3464,7 +3472,7 @@ fn entry_has_reading_progress(inner: &StorageInner, entry: &BookshelfEntry) -> b
     })
 }
 
-fn sort_shelf_query(
+pub(crate) fn sort_shelf_query(
     entries: &mut Vec<BookshelfEntry>,
     sort_by: BookshelfSortBy,
     direction: BookshelfSortDirection,
@@ -3496,7 +3504,7 @@ fn sort_shelf_query(
     });
 }
 
-fn paginate_shelf(
+pub(crate) fn paginate_shelf(
     entries: Vec<BookshelfEntry>,
     offset: usize,
     limit: Option<usize>,
@@ -3508,11 +3516,11 @@ fn paginate_shelf(
     }
 }
 
-fn chapter_cache_content_bytes(entry: &ChapterCacheEntry) -> usize {
+pub(crate) fn chapter_cache_content_bytes(entry: &ChapterCacheEntry) -> usize {
     entry.content.as_bytes().len()
 }
 
-fn validate_chapter_count(chapter_count: u32) -> Result<(), StorageError> {
+pub(crate) fn validate_chapter_count(chapter_count: u32) -> Result<(), StorageError> {
     if chapter_count == 0 {
         return Err(StorageError::InvalidChapterCache {
             field: "chapter_count".into(),
@@ -3521,7 +3529,10 @@ fn validate_chapter_count(chapter_count: u32) -> Result<(), StorageError> {
     Ok(())
 }
 
-fn validate_chapter_anchor(chapter_count: u32, anchor_index: u32) -> Result<(), StorageError> {
+pub(crate) fn validate_chapter_anchor(
+    chapter_count: u32,
+    anchor_index: u32,
+) -> Result<(), StorageError> {
     validate_chapter_count(chapter_count)?;
     if anchor_index >= chapter_count {
         return Err(StorageError::InvalidChapterCache {
@@ -3531,7 +3542,7 @@ fn validate_chapter_anchor(chapter_count: u32, anchor_index: u32) -> Result<(), 
     Ok(())
 }
 
-fn validate_prefetch_limit(max_count: usize) -> Result<(), StorageError> {
+pub(crate) fn validate_prefetch_limit(max_count: usize) -> Result<(), StorageError> {
     if max_count == 0 {
         return Err(StorageError::InvalidChapterCache {
             field: "max_count".into(),
@@ -3540,7 +3551,7 @@ fn validate_prefetch_limit(max_count: usize) -> Result<(), StorageError> {
     Ok(())
 }
 
-fn chapter_cache_stats_from_entries<'a>(
+pub(crate) fn chapter_cache_stats_from_entries<'a>(
     entries: impl Iterator<Item = &'a ChapterCacheEntry>,
 ) -> ChapterCacheStats {
     let mut entry_count = 0usize;
@@ -3571,7 +3582,7 @@ fn chapter_cache_stats_from_entries<'a>(
     }
 }
 
-fn chapter_cache_coverage_from_entries(
+pub(crate) fn chapter_cache_coverage_from_entries(
     source_id: &str,
     book_id: &str,
     chapter_count: u32,

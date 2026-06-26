@@ -6,7 +6,21 @@ license.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 
+[features]
+default = []
+# Enables the rusqlite-backed `SqliteStorage` persistent backend (schema v1 +
+# `user_version` migrations). When disabled, only `InMemoryStorage` is built,
+# preserving the zero-native-dep build for consumers that do not need disk
+# persistence.
+sqlite = ["dep:rusqlite", "dep:sha2"]
+
 [dependencies]
 reader-domain = { path = "../reader-domain" }
 serde.workspace = true
 serde_json.workspace = true
+rusqlite = { workspace = true, optional = true }
+sha2 = { workspace = true, optional = true }
+
+[dev-dependencies]
+reader-domain = { path = "../reader-domain" }
+sha2 = { workspace = true }
