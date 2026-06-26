@@ -1,8 +1,8 @@
 use serde::{de, Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
-use crate::command::is_valid_token_path;
 use crate::error::CoreError;
+use crate::host::HostCapability;
 use crate::PROTOCOL_VERSION;
 
 fn assert_object_payload(field: &str, value: &Value) {
@@ -11,13 +11,6 @@ fn assert_object_payload(field: &str, value: &Value) {
 
 fn assert_positive_id(field: &str, value: u64) {
     assert!(value > 0, "{field} must be greater than 0");
-}
-
-fn assert_token_path(field: &str, value: &str) {
-    assert!(
-        is_valid_token_path(value),
-        "{field} must be dot-separated non-empty tokens without whitespace"
-    );
 }
 
 fn deserialize_event_protocol_version<'de, D>(deserializer: D) -> Result<u32, D::Error>
@@ -93,7 +86,7 @@ pub enum Event {
         request_id: u64,
         #[serde(rename = "operationId")]
         operation_id: u64,
-        capability: String,
+        capability: HostCapability,
         params: Value,
     },
 }
@@ -123,13 +116,11 @@ impl Event {
     pub fn host_request(
         request_id: u64,
         operation_id: u64,
-        capability: impl Into<String>,
+        capability: HostCapability,
         params: Value,
     ) -> Self {
-        let capability = capability.into();
         assert_positive_id("host.request requestId", request_id);
         assert_positive_id("host.request operationId", operation_id);
-        assert_token_path("host.request capability", &capability);
         assert_object_payload("host.request params", &params);
         Event::HostRequest {
             protocol_version: PROTOCOL_VERSION,
@@ -169,7 +160,12 @@ mod tests {
 
     #[test]
     fn host_request_event_accepts_object_params() {
-        let event = Event::host_request(1, 2, "host.smoke.echo", serde_json::json!({ "ok": true }));
+        let event = Event::host_request(
+            1,
+            2,
+            HostCapability::HostSmokeEcho,
+            serde_json::json!({ "ok": true }),
+        );
         let json = serde_json::to_value(event).expect("event must serialize");
 
         assert_eq!(json["type"], "host.request");
@@ -182,30 +178,32 @@ mod tests {
     #[test]
     #[should_panic(expected = "host.request requestId must be greater than 0")]
     fn host_request_event_rejects_zero_request_id() {
-        let _event = Event::host_request(0, 2, "host.smoke.echo", serde_json::json!({}));
+        let _event =
+            Event::host_request(0, 2, HostCapability::HostSmokeEcho, serde_json::json!({}));
     }
 
     #[test]
     #[should_panic(expected = "host.request operationId must be greater than 0")]
     fn host_request_event_rejects_zero_operation_id() {
-        let _event = Event::host_request(1, 0, "host.smoke.echo", serde_json::json!({}));
+        let _event =
+            Event::host_request(1, 0, HostCapability::HostSmokeEcho, serde_json::json!({}));
     }
 
     #[test]
-    fn host_request_event_rejects_malformed_capability() {
-        for capability in ["", "host. smoke.echo", "host..echo", "host"] {
-            let panic = std::panic::catch_unwind(|| {
-                Event::host_request(1, 2, capability, serde_json::json!({}))
-            })
-            .expect_err("malformed capability should panic");
-            let message = panic
-                .downcast_ref::<String>()
-                .map(String::as_str)
-                .or_else(|| panic.downcast_ref::<&str>().copied())
-                .unwrap_or("");
+    fn host_request_event_deserialize_rejects_unsupported_capability() {
+        for capability in ["", "host. smoke.echo", "host..echo", "host", "custom.valid"] {
+            let err = serde_json::from_value::<Event>(serde_json::json!({
+                "protocolVersion": 1,
+                "requestId": 1,
+                "type": "host.request",
+                "operationId": 1,
+                "capability": capability,
+                "params": {}
+            }))
+            .unwrap_err();
             assert!(
-                message.contains("host.request capability"),
-                "unexpected panic for {capability:?}: {message}"
+                err.to_string().contains("host capability"),
+                "unexpected capability parse error for {capability:?}: {err}"
             );
         }
     }
@@ -216,7 +214,7 @@ mod tests {
         let _event = Event::host_request(
             1,
             2,
-            "host.smoke.echo",
+            HostCapability::HostSmokeEcho,
             serde_json::json!(["not", "an", "object"]),
         );
     }

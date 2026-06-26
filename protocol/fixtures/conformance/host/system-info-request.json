@@ -1,0 +1,15 @@
+{
+  "protocolVersion": 1,
+  "requestId": 456,
+  "method": "runtime.hostSmoke",
+  "params": {
+    "capability": "system.info",
+    "params": {
+      "keys": [
+        "os",
+        "locale",
+        "network"
+      ]
+    }
+  }
+}

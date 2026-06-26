@@ -123,6 +123,38 @@ ABI v1 没有单独的 `rc_host_complete`。host completion 仍然通过
 
 Core 不在当前架构内直接打开 socket。
 
+## File/cache capability
+
+`file.read` / `file.write` 和 `cache.get` / `cache.put` 是 host-owned
+capability：
+
+- Core 负责给出 opaque path、namespace、key、byte bounds、TTL 和文本/base64
+  payload。
+- Host 负责平台文件系统、沙盒路径解析、缓存后端、权限和实际 I/O。
+- Host 不能从 path、namespace、key 或 payload 推断 Legado 规则语义，也不能把缓存命中
+  转换成业务结果；只能通过 `host.complete` 返回协议 payload 或通过 `host.error`
+  返回能力执行失败。
+
+文本和二进制 payload 使用二选一字段表达：`content` / `contentBase64` 或
+`value` / `valueBase64`。具体编码解释属于 Core 后续处理或上层 contract，平台只负责
+忠实搬运。
+
+### Cookie/log/time/system/persistence capability
+
+`cookie.get`、`cookie.set`、`log.emit`、`time.now`、`system.info`、
+`persistence.get` 和 `persistence.put` 是 Core 向 host 索取平台事实或执行副作用的
+协议能力。
+
+- Cookie 能力只按 Core 给出的 URL、domain、name、sessionId 和 cookie record 读写
+  平台 cookie jar。
+- Log 能力只发出 Core 提供的 level、message、target 和结构化 fields。
+- Time 能力只返回平台时钟事实，包含 `unixMillis` 和 `iso8601`。
+- System 能力只返回 Core 请求的系统信息 key/value 对象。
+- Persistence 能力只按 Core 给出的 opaque namespace/key/value/revision 读取或写入。
+
+Host 不得把这些参数解释为 Legado 规则、书源语义、阅读状态或章节业务结果；所有业务
+解释都保留在 Core 内。Host completion 只能返回 schema 中定义的能力 payload。
+
 ## Runtime config
 
 Runtime config JSON schema 位于 `protocol/reader-runtime-config.schema.json`。
@@ -145,6 +177,19 @@ cargo run -p reader-cli -- --conformance
 ```
 
 执行这些用例。退出码非零表示协议不兼容或用例失败。
+
+Host replay fixture 使用同一份 command/hostResult 形状支持录制、回放和比对：
+
+```bash
+cargo run -p reader-cli -- --host-record tests/fixtures/host_replay/request_session_search.json
+cargo run -p reader-cli -- --host-replay tests/fixtures/host_replay/request_session_search.json
+cargo run -p reader-cli -- --host-record-suite tests/fixtures/host_replay/remote_reading_e2e_suite.json
+cargo run -p reader-cli -- --host-replay-suite tests/fixtures/host_replay/remote_reading_e2e_suite.json
+```
+
+`--host-record*` 执行 Core command，捕获 Core 发出的 `host.request`，用 fixture 内
+`hostResult` 完成该 host operation，并输出带 `expectHostRequest` / `expectResult`
+的可回放 fixture。`--host-replay*` 使用这些 expectation 对 Core 输出做精确比较。
 
 新增或修改协议语义时，必须同步：
 

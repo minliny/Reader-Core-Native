@@ -1,0 +1,13 @@
+{
+  "protocolVersion": 1,
+  "requestId": 455,
+  "method": "host.complete",
+  "params": {
+    "operationId": 1,
+    "result": {
+      "unixMillis": 1782432000000,
+      "iso8601": "2026-06-26T00:00:00Z",
+      "timezone": "UTC"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "protocolVersion": 1,
+  "requestId": 445,
+  "method": "host.complete",
+  "params": {
+    "operationId": 1,
+    "result": {
+      "hit": true,
+      "value": "{\"books\":[]}",
+      "expiresAt": "2026-06-26T00:00:00Z"
+    }
+  }
+}

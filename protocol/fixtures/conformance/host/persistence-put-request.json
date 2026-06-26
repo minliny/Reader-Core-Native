@@ -1,0 +1,14 @@
+{
+  "protocolVersion": 1,
+  "requestId": 460,
+  "method": "runtime.hostSmoke",
+  "params": {
+    "capability": "persistence.put",
+    "params": {
+      "namespace": "reader.session",
+      "key": "last-source",
+      "value": "basic-src",
+      "expectedRevision": "rev-1"
+    }
+  }
+}

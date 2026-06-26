@@ -1,0 +1,18 @@
+{
+  "protocolVersion": 1,
+  "requestId": 427,
+  "method": "host.error",
+  "params": {
+    "operationId": 1,
+    "error": {
+      "code": "INTERNAL",
+      "message": "host transport failed",
+      "retryable": true
+    },
+    "diagnostics": {
+      "code": "NETWORK_ERROR",
+      "phase": "transport",
+      "extra": true
+    }
+  }
+}

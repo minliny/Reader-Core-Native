@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "requestId": 461,
+  "method": "host.complete",
+  "params": {
+    "operationId": 1,
+    "result": {
+      "stored": true,
+      "revision": "rev-2"
+    }
+  }
+}

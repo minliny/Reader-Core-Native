@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "requestId": 454,
+  "method": "runtime.hostSmoke",
+  "params": {
+    "capability": "time.now",
+    "params": {
+      "clock": "system",
+      "timezone": "UTC"
+    }
+  }
+}

@@ -17,7 +17,7 @@ use reader_contract::{
         parse_params, BookDetailParams, BookSearchParams, BookTocParams, ChapterContentParams,
         HostHttpRequest, HostHttpResponse, ReadingProgressUpdateParams, SourceImportParams,
     },
-    CoreError, Event,
+    CoreError, Event, HostCapability,
 };
 use reader_domain::{Book, ReadingProgress, Source, SourceRules};
 use reader_storage::InMemoryStorage;
@@ -73,7 +73,7 @@ enum RemoteCommandResult {
 /// A host capability request that must complete before the original remote
 /// command can finish.
 pub struct PendingHostRequest {
-    pub capability: String,
+    pub capability: HostCapability,
     pub params: serde_json::Value,
     pub continuation: RemoteHostContinuation,
 }
@@ -255,7 +255,7 @@ fn pending_http_request(
         }
     }
     Ok(PendingHostRequest {
-        capability: contract::capabilities::HTTP_EXECUTE.to_string(),
+        capability: HostCapability::HttpExecute,
         params,
         continuation,
     })
@@ -303,6 +303,18 @@ fn http_response_diagnostics(response: &HostHttpResponse) -> Option<serde_json::
         diagnostics.insert(
             "session".to_string(),
             serde_json::to_value(session).unwrap(),
+        );
+    }
+    if let Some(redirects) = &response.redirects {
+        diagnostics.insert(
+            "redirects".to_string(),
+            serde_json::to_value(redirects).unwrap(),
+        );
+    }
+    if let Some(cookies) = &response.cookies {
+        diagnostics.insert(
+            "cookies".to_string(),
+            serde_json::to_value(cookies).unwrap(),
         );
     }
     if diagnostics.is_empty() {

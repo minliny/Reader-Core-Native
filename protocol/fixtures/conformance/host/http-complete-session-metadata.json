@@ -18,6 +18,27 @@
       "session": {
         "id": "core-session-main"
       },
+      "redirects": [
+        {
+          "status": 302,
+          "fromUrl": "https://books.example.test/search",
+          "toUrl": "https://books.example.test/search?q=empty",
+          "headers": {
+            "location": "/search?q=empty"
+          }
+        }
+      ],
+      "cookies": [
+        {
+          "name": "sid",
+          "value": "new",
+          "domain": "books.example.test",
+          "path": "/",
+          "httpOnly": true,
+          "secure": true,
+          "sameSite": "Lax"
+        }
+      ],
       "body": "{\"books\":[]}"
     }
   }

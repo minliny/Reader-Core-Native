@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "requestId": 447,
+  "method": "host.complete",
+  "params": {
+    "operationId": 1,
+    "result": {
+      "stored": true,
+      "expiresAt": "2026-06-26T00:00:00Z"
+    }
+  }
+}

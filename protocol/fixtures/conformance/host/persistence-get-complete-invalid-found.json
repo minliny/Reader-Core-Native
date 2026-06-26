@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "requestId": 464,
+  "method": "host.complete",
+  "params": {
+    "operationId": 1,
+    "result": {
+      "found": true
+    }
+  }
+}

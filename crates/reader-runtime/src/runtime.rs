@@ -4,8 +4,12 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
 use reader_contract::{
-    core_info, methods, Command, CoreError, EmptyParams, Event, HostCompleteParams,
-    HostErrorParams, HostSmokeParams, PendingHostOperationStatus, RuntimeCancelParams,
+    core_info, methods, Command, CoreError, EmptyParams, Event, HostCacheGetResponse,
+    HostCachePutResponse, HostCapability, HostCompleteParams, HostCookieGetResponse,
+    HostCookieSetResponse, HostErrorDiagnostics, HostErrorParams, HostFileReadResponse,
+    HostFileWriteResponse, HostLogEmitResponse, HostPersistenceGetResponse,
+    HostPersistencePutResponse, HostSmokeParams, HostSystemInfoResponse, HostTimeNowResponse,
+    HostWebViewEvaluateJavaScriptResponse, PendingHostOperationStatus, RuntimeCancelParams,
     RuntimeConfig, RuntimeShutdownParams, RuntimeStatus, RuntimeStatusParams,
 };
 
@@ -51,7 +55,7 @@ enum HostOperationContinuation {
 #[derive(Debug, Clone, PartialEq)]
 struct HostOperation {
     request_id: u64,
-    capability: String,
+    capability: HostCapability,
     state: HostOperationState,
     continuation: HostOperationContinuation,
 }
@@ -791,7 +795,12 @@ fn dispatch_host_complete(
     };
 
     let event = match operation.continuation {
-        HostOperationContinuation::Echo => Event::result(operation.request_id, params.result),
+        HostOperationContinuation::Echo => {
+            match complete_echo_host_operation(&operation, params.result) {
+                Ok(data) => Event::result(operation.request_id, data),
+                Err(error) => Event::error(operation.request_id, error),
+            }
+        }
         HostOperationContinuation::Remote(continuation) => {
             match complete_remote_host(continuation, params.result, remote_state) {
                 Ok(data) => Event::result(operation.request_id, data),
@@ -807,6 +816,173 @@ fn dispatch_host_complete(
         operation.request_id,
         event,
     );
+}
+
+fn complete_echo_host_operation(
+    operation: &HostOperation,
+    result: serde_json::Value,
+) -> Result<serde_json::Value, CoreError> {
+    match operation.capability {
+        HostCapability::WebViewEvaluateJavaScript => {
+            let response =
+                serde_json::from_value::<HostWebViewEvaluateJavaScriptResponse>(result.clone())
+                    .map_err(|err| {
+                        CoreError::invalid_params("invalid result for webview.evaluateJavaScript")
+                            .with_details(serde_json::json!({
+                                "source": err.to_string(),
+                                "capability": operation.capability,
+                            }))
+                    })?;
+            response.validate()?;
+            Ok(result)
+        }
+        HostCapability::FileRead => validate_echo_host_result::<HostFileReadResponse>(
+            operation.capability,
+            result,
+            "file.read",
+        ),
+        HostCapability::FileWrite => validate_echo_host_result::<HostFileWriteResponse>(
+            operation.capability,
+            result,
+            "file.write",
+        ),
+        HostCapability::CacheGet => validate_echo_host_result::<HostCacheGetResponse>(
+            operation.capability,
+            result,
+            "cache.get",
+        ),
+        HostCapability::CachePut => validate_echo_host_result::<HostCachePutResponse>(
+            operation.capability,
+            result,
+            "cache.put",
+        ),
+        HostCapability::CookieGet => validate_echo_host_result::<HostCookieGetResponse>(
+            operation.capability,
+            result,
+            "cookie.get",
+        ),
+        HostCapability::CookieSet => validate_echo_host_result::<HostCookieSetResponse>(
+            operation.capability,
+            result,
+            "cookie.set",
+        ),
+        HostCapability::LogEmit => validate_echo_host_result::<HostLogEmitResponse>(
+            operation.capability,
+            result,
+            "log.emit",
+        ),
+        HostCapability::TimeNow => validate_echo_host_result::<HostTimeNowResponse>(
+            operation.capability,
+            result,
+            "time.now",
+        ),
+        HostCapability::SystemInfo => validate_echo_host_result::<HostSystemInfoResponse>(
+            operation.capability,
+            result,
+            "system.info",
+        ),
+        HostCapability::PersistenceGet => validate_echo_host_result::<HostPersistenceGetResponse>(
+            operation.capability,
+            result,
+            "persistence.get",
+        ),
+        HostCapability::PersistencePut => validate_echo_host_result::<HostPersistencePutResponse>(
+            operation.capability,
+            result,
+            "persistence.put",
+        ),
+        _ => Ok(result),
+    }
+}
+
+fn validate_echo_host_result<T>(
+    capability: HostCapability,
+    result: serde_json::Value,
+    label: &'static str,
+) -> Result<serde_json::Value, CoreError>
+where
+    T: for<'de> serde::Deserialize<'de> + HostResultValidation,
+{
+    let response = serde_json::from_value::<T>(result.clone()).map_err(|err| {
+        CoreError::invalid_params(format!("invalid result for {label}")).with_details(
+            serde_json::json!({
+                "source": err.to_string(),
+                "capability": capability,
+            }),
+        )
+    })?;
+    response.validate()?;
+    Ok(result)
+}
+
+trait HostResultValidation {
+    fn validate(&self) -> Result<(), CoreError>;
+}
+
+impl HostResultValidation for HostFileReadResponse {
+    fn validate(&self) -> Result<(), CoreError> {
+        HostFileReadResponse::validate(self)
+    }
+}
+
+impl HostResultValidation for HostFileWriteResponse {
+    fn validate(&self) -> Result<(), CoreError> {
+        HostFileWriteResponse::validate(self)
+    }
+}
+
+impl HostResultValidation for HostCacheGetResponse {
+    fn validate(&self) -> Result<(), CoreError> {
+        HostCacheGetResponse::validate(self)
+    }
+}
+
+impl HostResultValidation for HostCachePutResponse {
+    fn validate(&self) -> Result<(), CoreError> {
+        HostCachePutResponse::validate(self)
+    }
+}
+
+impl HostResultValidation for HostCookieGetResponse {
+    fn validate(&self) -> Result<(), CoreError> {
+        HostCookieGetResponse::validate(self)
+    }
+}
+
+impl HostResultValidation for HostCookieSetResponse {
+    fn validate(&self) -> Result<(), CoreError> {
+        HostCookieSetResponse::validate(self)
+    }
+}
+
+impl HostResultValidation for HostLogEmitResponse {
+    fn validate(&self) -> Result<(), CoreError> {
+        HostLogEmitResponse::validate(self)
+    }
+}
+
+impl HostResultValidation for HostTimeNowResponse {
+    fn validate(&self) -> Result<(), CoreError> {
+        HostTimeNowResponse::validate(self)
+    }
+}
+
+impl HostResultValidation for HostSystemInfoResponse {
+    fn validate(&self) -> Result<(), CoreError> {
+        HostSystemInfoResponse::validate(self)
+    }
+}
+
+impl HostResultValidation for HostPersistenceGetResponse {
+    fn validate(&self) -> Result<(), CoreError> {
+        HostPersistenceGetResponse::validate(self)
+    }
+}
+
+impl HostResultValidation for HostPersistencePutResponse {
+    fn validate(&self) -> Result<(), CoreError> {
+        HostPersistencePutResponse::validate(self)
+    }
 }
 
 fn dispatch_host_error(
@@ -844,8 +1020,59 @@ fn dispatch_host_error(
         active_requests,
         cancelled,
         operation.request_id,
-        Event::error(operation.request_id, params.error),
+        Event::error(
+            operation.request_id,
+            host_error_with_details(
+                params.error,
+                params.operation_id,
+                &operation,
+                params.diagnostics,
+            ),
+        ),
     );
+}
+
+fn host_error_with_details(
+    mut error: CoreError,
+    operation_id: u64,
+    operation: &HostOperation,
+    diagnostics: Option<HostErrorDiagnostics>,
+) -> CoreError {
+    let mut details = serde_json::Map::new();
+    if let Some(existing) = error.details.as_object() {
+        if !existing.is_empty() {
+            details.insert(
+                "cause".to_string(),
+                serde_json::Value::Object(existing.clone()),
+            );
+        }
+    }
+
+    let mut host = serde_json::Map::new();
+    host.insert("operationId".to_string(), serde_json::json!(operation_id));
+    host.insert(
+        "requestId".to_string(),
+        serde_json::json!(operation.request_id),
+    );
+    host.insert(
+        "capability".to_string(),
+        serde_json::json!(operation.capability),
+    );
+    if let Some(diagnostics) = diagnostics {
+        host.insert(
+            "diagnostics".to_string(),
+            serde_json::to_value(diagnostics).unwrap_or_else(|err| {
+                serde_json::json!({
+                    "code": "INTERNAL",
+                    "phase": "runtime",
+                    "message": format!("failed to encode host diagnostics: {err}")
+                })
+            }),
+        );
+    }
+    details.insert("host".to_string(), serde_json::Value::Object(host));
+    error.details = serde_json::Value::Object(details);
+    error
 }
 
 fn parse_empty_params(cmd: &Command) -> Result<EmptyParams, CoreError> {
@@ -861,12 +1088,16 @@ fn parse_empty_params(cmd: &Command) -> Result<EmptyParams, CoreError> {
 
 fn parse_host_smoke_params(cmd: &Command) -> Result<HostSmokeParams, CoreError> {
     let params = serde_json::from_value::<HostSmokeParams>(cmd.params.clone()).map_err(|err| {
-        CoreError::invalid_params(format!("invalid params for {}", cmd.method)).with_details(
-            serde_json::json!({
-                "source": err.to_string(),
-                "method": cmd.method,
-            }),
-        )
+        let message = if err.to_string().contains("host capability") {
+            format!("invalid capability for {}", cmd.method)
+        } else {
+            format!("invalid params for {}", cmd.method)
+        };
+        CoreError::invalid_params(message).with_details(serde_json::json!({
+            "source": err.to_string(),
+            "method": cmd.method,
+            "capability": cmd.params.get("capability").cloned().unwrap_or(serde_json::Value::Null),
+        }))
     })?;
     params.validate()?;
     Ok(params)
@@ -962,7 +1193,7 @@ fn runtime_status_snapshot(
         .map(|(operation_id, operation)| PendingHostOperationStatus {
             operation_id: *operation_id,
             request_id: operation.request_id,
-            capability: operation.capability.clone(),
+            capability: operation.capability,
             state: operation.state.as_protocol_str().to_string(),
         })
         .collect::<Vec<_>>();
@@ -1651,7 +1882,7 @@ mod tests {
             } => {
                 assert_eq!(*request_id, 10);
                 assert_eq!(*operation_id, 1);
-                assert_eq!(capability, "host.smoke.echo");
+                assert_eq!(*capability, HostCapability::HostSmokeEcho);
                 assert_eq!(params["url"], "https://example.invalid");
                 *operation_id
             }
@@ -1681,8 +1912,95 @@ mod tests {
     }
 
     #[test]
+    fn webview_host_request_shape_and_completion_are_typed() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send_json(
+            include_str!("../../../protocol/fixtures/conformance/host/webview-request.json")
+                .as_bytes(),
+        )
+        .unwrap();
+
+        let events = sink.wait_len(1);
+        match &events[0] {
+            Event::HostRequest {
+                request_id,
+                operation_id,
+                capability,
+                params,
+                ..
+            } => {
+                assert_eq!(*request_id, 431);
+                assert_eq!(*operation_id, 1);
+                assert_eq!(*capability, HostCapability::WebViewEvaluateJavaScript);
+                assert_eq!(params["document"]["kind"], "html");
+                assert_eq!(
+                    params["javaScript"],
+                    "document.querySelector('#book')?.textContent"
+                );
+            }
+            other => panic!("expected webview host.request, got {other:?}"),
+        }
+
+        rt.send_json(
+            include_str!("../../../protocol/fixtures/conformance/host/webview-complete.json")
+                .as_bytes(),
+        )
+        .unwrap();
+
+        let events = sink.wait_len(2);
+        match &events[1] {
+            Event::Result {
+                request_id, data, ..
+            } => {
+                assert_eq!(*request_id, 431);
+                assert_eq!(data["value"], "Dune");
+                assert_eq!(data["finalUrl"], "https://books.example.test/detail");
+            }
+            other => panic!("expected webview completion result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn webview_host_completion_rejects_invalid_result_shape() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send_json(
+            include_str!("../../../protocol/fixtures/conformance/host/webview-request.json")
+                .as_bytes(),
+        )
+        .unwrap();
+        let events = sink.wait_len(1);
+        assert!(matches!(events[0], Event::HostRequest { .. }));
+
+        rt.send_json(
+            include_str!(
+                "../../../protocol/fixtures/conformance/host/webview-complete-blank-final-url.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+
+        let events = sink.wait_len(2);
+        match &events[1] {
+            Event::Error {
+                request_id, error, ..
+            } => {
+                assert_eq!(*request_id, 431);
+                assert_eq!(error.code, ErrorCode::InvalidParams);
+                assert!(error.message.contains("finalUrl"));
+            }
+            other => panic!("expected webview completion error, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn host_smoke_rejects_malformed_capability_names() {
-        for (request_id, capability) in [(37, "host. smoke.echo"), (38, "host..echo")] {
+        for (request_id, capability) in [
+            (37, "host. smoke.echo"),
+            (38, "host..echo"),
+            (39, "custom.valid"),
+        ] {
             let sink = Arc::new(CollectSink::new());
             let rt = Runtime::new(sink.clone());
             rt.send(Command::new(
@@ -1851,8 +2169,49 @@ mod tests {
                 assert_eq!(*request_id, 301);
                 assert_eq!(error.code, ErrorCode::Internal);
                 assert!(error.retryable);
+                assert_eq!(error.details["host"]["operationId"], 1);
+                assert_eq!(error.details["host"]["requestId"], 301);
+                assert_eq!(error.details["host"]["capability"], "host.smoke.echo");
             }
             other => panic!("expected original request error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn host_error_attaches_typed_diagnostics_to_original_request() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        rt.send_json(
+            include_str!("../../../protocol/fixtures/conformance/host/request.json").as_bytes(),
+        )
+        .unwrap();
+
+        let events = sink.wait_len(1);
+        assert!(matches!(events[0], Event::HostRequest { .. }));
+
+        rt.send_json(
+            include_str!("../../../protocol/fixtures/conformance/host/error-diagnostics.json")
+                .as_bytes(),
+        )
+        .unwrap();
+
+        let events = sink.wait_len(2);
+        match &events[1] {
+            Event::Error {
+                request_id, error, ..
+            } => {
+                assert_eq!(*request_id, 301);
+                assert_eq!(error.code, ErrorCode::Internal);
+                assert_eq!(error.details["host"]["operationId"], 1);
+                assert_eq!(error.details["host"]["capability"], "host.smoke.echo");
+                assert_eq!(error.details["host"]["diagnostics"]["code"], "TIMEOUT");
+                assert_eq!(error.details["host"]["diagnostics"]["phase"], "transport");
+                assert_eq!(
+                    error.details["host"]["diagnostics"]["details"]["timeoutMillis"],
+                    30000
+                );
+            }
+            other => panic!("expected original request diagnostic error, got {other:?}"),
         }
     }
 
@@ -2193,7 +2552,7 @@ mod tests {
                 ..
             } => {
                 assert_eq!(*request_id, 21);
-                assert_eq!(capability, "http.execute");
+                assert_eq!(*capability, HostCapability::HttpExecute);
                 assert_eq!(params["method"], "GET");
                 assert_eq!(params["url"], "https://books.example.test/search?q=dune");
                 assert_eq!(params["headers"]["Accept"], "application/json");

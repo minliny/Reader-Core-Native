@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "requestId": 421,
+  "method": "runtime.hostSmoke",
+  "params": {
+    "capability": "custom.valid",
+    "params": {
+      "message": "unsupported capability"
+    }
+  }
+}

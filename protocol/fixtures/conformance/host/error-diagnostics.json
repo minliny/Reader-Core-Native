@@ -1,0 +1,21 @@
+{
+  "protocolVersion": 1,
+  "requestId": 425,
+  "method": "host.error",
+  "params": {
+    "operationId": 1,
+    "error": {
+      "code": "INTERNAL",
+      "message": "host transport timed out",
+      "retryable": true
+    },
+    "diagnostics": {
+      "code": "TIMEOUT",
+      "phase": "transport",
+      "message": "deadline exceeded while executing host capability",
+      "details": {
+        "timeoutMillis": 30000
+      }
+    }
+  }
+}
