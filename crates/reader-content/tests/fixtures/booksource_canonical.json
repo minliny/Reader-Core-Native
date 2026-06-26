@@ -1,0 +1,60 @@
+{
+  "bookSource": {
+    "bookSourceName": "Canonical Legado Source",
+    "bookSourceUrl": "https://books.example.test/root/index.html",
+    "searchUrl": "/search?keyword={{key}}",
+    "exploreUrl": "/explore",
+    "enabled": true,
+    "enabledExplore": true,
+    "searchRule": {
+      "bookList": "div.result",
+      "name": "a.title@text",
+      "author": "span.author@text",
+      "bookUrl": "a.title@href",
+      "coverUrl": "img.cover@src",
+      "intro": "p.intro@text",
+      "kind": "span.kind@text",
+      "lastChapter": "span.last@text"
+    },
+    "exploreRule": {
+      "bookList": "li.book",
+      "name": "a.title@text",
+      "author": "span.author@text",
+      "bookUrl": "a.title@href",
+      "coverUrl": "img.cover@src",
+      "intro": "p.intro@text",
+      "kind": "span.kind@text",
+      "lastChapter": "span.last@text",
+      "exploreScreen": "[{\"title\":\"Fantasy\",\"url\":\"/explore/fantasy\",\"kind\":\"category\"},{\"title\":\"Top Rank\",\"url\":\"/rank/top\",\"kind\":\"ranking\"},{\"title\":\"Editor Channel\",\"url\":\"/channel/editor\",\"kind\":\"channel\"}]"
+    },
+    "bookInfoRule": {
+      "name": "h1.title@text",
+      "author": "span.author@text",
+      "intro": "p.intro@text",
+      "kind": "span.kind@text",
+      "lastChapter": "a.last@text",
+      "coverUrl": "img.cover@src",
+      "tocUrl": "a.toc@href",
+      "wordCount": "span.words@text",
+      "updateTime": "time.updated@text"
+    },
+    "tocRule": {
+      "chapterList": "ol.toc li",
+      "chapterName": "a@text",
+      "chapterUrl": "a@href",
+      "nextTocUrl": "a.next@href"
+    },
+    "contentRule": {
+      "title": "h1.chapter@text",
+      "content": "article.content@html",
+      "nextContentUrl": "a.next-content@href",
+      "sourceRegex": "AD:[^<]+",
+      "replaceRegex": "{{sourceId}}"
+    }
+  },
+  "searchResponse": "<main><div class=\"result\"><a class=\"title\" href=\"/book/dune\">Dune</a><span class=\"author\">Frank Herbert</span><img class=\"cover\" src=\"//img.example.test/dune.jpg\"><p class=\"intro\">A desert planet.</p><span class=\"kind\">Sci-Fi</span><span class=\"last\">Arrakis</span></div><div class=\"result\"><a class=\"title\" href=\"book/foundation\">Foundation</a><span class=\"author\">Isaac Asimov</span><img class=\"cover\" src=\"/covers/foundation.jpg\"><p class=\"intro\">A psychohistory epic.</p><span class=\"kind\">Sci-Fi</span><span class=\"last\">Terminus</span></div></main>",
+  "exploreResponse": "<ul class=\"books\"><li class=\"book\"><a class=\"title\" href=\"/book/rank-1\">Rank One</a><span class=\"author\">Writer A</span><img class=\"cover\" src=\"/covers/rank-1.jpg\"><p class=\"intro\">Ranked intro.</p><span class=\"kind\">Ranking</span><span class=\"last\">Hot Chapter</span></li></ul>",
+  "detailResponse": "<section class=\"detail\"><h1 class=\"title\">Dune</h1><span class=\"author\">Frank Herbert</span><img class=\"cover\" src=\"/covers/dune-detail.jpg\"><p class=\"intro\">Expanded desert planet.</p><span class=\"kind\">Sci-Fi Classic</span><a class=\"last\" href=\"/book/dune/chapter/2\">Chapter 2</a><a class=\"toc\" href=\"/book/dune/toc?page=1\">Catalog</a><span class=\"words\">188000</span><time class=\"updated\">2026-06-26</time></section>",
+  "tocResponse": "<nav><a class=\"next\" href=\"/book/dune/toc?page=2\">Next</a></nav><ol class=\"toc\"><li><a href=\"/book/dune/chapter/1\">Chapter 1</a></li><li><a href=\"chapter/2\">Chapter 2</a></li></ol>",
+  "contentResponse": "<main><h1 class=\"chapter\">Chapter 1</h1><article class=\"content\"><p>First&nbsp;line.</p><p>AD: remove me</p><p>Second line.</p></article><a class=\"next-content\" href=\"/book/dune/chapter/2\">Next</a></main>"
+}

@@ -6,6 +6,7 @@
 
 mod conformance;
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::{self, Read};
 use std::path::PathBuf;
@@ -13,7 +14,9 @@ use std::sync::mpsc::{self, Receiver};
 use std::sync::Arc;
 use std::time::Duration;
 
+use reader_content::{BookSourceRequestContext, RemoteContentPipeline};
 use reader_contract::{methods, Command, CoreError, Event, HostCapability};
+use reader_domain::{Book, BookSourceSemantics, LegadoBookSource};
 use reader_runtime::{EventSink, Runtime};
 use serde_json::Value;
 
@@ -40,6 +43,8 @@ enum Mode {
     /// Run the full remote-reading vertical pipeline against a fixture file.
     /// See `tests/fixtures/remote_source/basic_source.json` for the shape.
     FixtureVertical(PathBuf),
+    /// Run the BookSource semantic pipeline directly and print stable JSON.
+    BookSourceFixture(PathBuf),
     /// Replay a host HTTP request/complete pair against Core without opening a
     /// real socket.
     HostReplay(PathBuf),
@@ -113,6 +118,7 @@ fn run() -> Result<(), CoreError> {
             }
         }
         Mode::FixtureVertical(path) => run_fixture_vertical(&runtime, &rx, &path),
+        Mode::BookSourceFixture(path) => run_booksource_fixture(&path),
         Mode::HostReplay(path) => run_host_replay(&runtime, &rx, &path),
         Mode::HostReplaySuite(path) => run_host_replay_suite(&runtime, &rx, &path),
         Mode::HostRecord(path) => run_host_record(&runtime, &rx, &path),
@@ -143,6 +149,14 @@ where
                     ));
                 };
                 set_mode(&mut mode, Mode::FixtureVertical(PathBuf::from(path)))?;
+            }
+            "--booksource-fixture" => {
+                let Some(path) = iter.next() else {
+                    return Err(CoreError::invalid_message(
+                        "--booksource-fixture requires a path to a fixture JSON file",
+                    ));
+                };
+                set_mode(&mut mode, Mode::BookSourceFixture(PathBuf::from(path)))?;
             }
             "--host-replay" => {
                 let Some(path) = iter.next() else {
@@ -210,7 +224,7 @@ where
 fn set_mode(slot: &mut Option<Mode>, mode: Mode) -> Result<(), CoreError> {
     if slot.is_some() {
         return Err(CoreError::invalid_message(
-            "only one of --info, --ping, --status, --host-smoke, --conformance, --json, --stdin, --fixture-vertical, --host-replay, --host-replay-suite, --host-record, or --host-record-suite may be used",
+            "only one of --info, --ping, --status, --host-smoke, --conformance, --json, --stdin, --fixture-vertical, --booksource-fixture, --host-replay, --host-replay-suite, --host-record, or --host-record-suite may be used",
         ));
     }
     *slot = Some(mode);
@@ -446,6 +460,167 @@ fn run_fixture_vertical(
     }
 
     Ok(())
+}
+
+fn run_booksource_fixture(path: &PathBuf) -> Result<(), CoreError> {
+    let fixture = read_json_fixture(path, "BookSource fixture")?;
+    let book_source_value = fixture
+        .get("bookSource")
+        .cloned()
+        .ok_or_else(|| CoreError::invalid_message("BookSource fixture missing `bookSource`"))?;
+    let book_source: LegadoBookSource =
+        serde_json::from_value(book_source_value).map_err(|err| {
+            CoreError::invalid_message("BookSource fixture `bookSource` is invalid")
+                .with_details(serde_json::json!({ "source": err.to_string() }))
+        })?;
+
+    let source_id =
+        fixture_string(&fixture, "sourceId").unwrap_or_else(|| "booksource-fixture".to_string());
+    let semantics = BookSourceSemantics::from_legado(
+        &source_id,
+        fixture.get("name").and_then(Value::as_str),
+        fixture.get("baseUrl").and_then(Value::as_str),
+        &book_source,
+    );
+    let pipeline = RemoteContentPipeline::new();
+    let mut context = fixture_context(&fixture, &semantics);
+
+    let search = pipeline
+        .search_book_source(
+            &semantics,
+            fixture_string(&fixture, "searchResponse")
+                .as_deref()
+                .unwrap_or_default(),
+            &context,
+        )
+        .map_err(content_error)?;
+    if let Some(book) = search.first() {
+        context.book_url = book.book_id.clone();
+    }
+
+    let explore = pipeline
+        .explore_book_source(
+            &semantics,
+            fixture_string(&fixture, "exploreResponse")
+                .as_deref()
+                .unwrap_or_default(),
+            &context,
+        )
+        .map_err(content_error)?;
+
+    let base_book = fixture
+        .get("book")
+        .cloned()
+        .map(serde_json::from_value::<Book>)
+        .transpose()
+        .map_err(|err| {
+            CoreError::invalid_message("BookSource fixture `book` is invalid")
+                .with_details(serde_json::json!({ "source": err.to_string() }))
+        })?
+        .or_else(|| search.first().cloned())
+        .unwrap_or_else(|| Book {
+            book_id: context.book_url.clone(),
+            title: String::new(),
+            author: String::new(),
+            cover_url: None,
+            intro: None,
+            kind: None,
+            last_chapter: None,
+        });
+
+    let detail = pipeline
+        .detail_book_source(
+            &semantics,
+            &base_book,
+            fixture_string(&fixture, "detailResponse")
+                .as_deref()
+                .unwrap_or_default(),
+            &context,
+        )
+        .map_err(content_error)?;
+    if let Some(toc_url) = detail.toc_url.as_ref() {
+        context.current_url = toc_url.clone();
+    }
+
+    let toc = pipeline
+        .toc_book_source(
+            &semantics,
+            fixture_string(&fixture, "tocResponse")
+                .as_deref()
+                .unwrap_or_default(),
+            &context,
+        )
+        .map_err(content_error)?;
+    if let Some(chapter) = toc.chapters.first() {
+        context.chapter_url = chapter.url.clone();
+        context.current_url = chapter.url.clone();
+    }
+
+    let content = pipeline
+        .content_book_source(
+            &semantics,
+            fixture_string(&fixture, "contentResponse")
+                .as_deref()
+                .unwrap_or_default(),
+            &context,
+        )
+        .map_err(content_error)?;
+
+    println!(
+        "{}",
+        serde_json::to_string(&serde_json::json!({
+            "sourceId": semantics.source_id.clone(),
+            "source": semantics,
+            "search": { "books": search },
+            "explore": explore,
+            "detail": detail,
+            "toc": toc,
+            "content": content,
+        }))
+        .unwrap_or_default()
+    );
+    Ok(())
+}
+
+fn fixture_context(fixture: &Value, semantics: &BookSourceSemantics) -> BookSourceRequestContext {
+    let mut variables = fixture_variables(fixture);
+    variables
+        .entry("sourceId".into())
+        .or_insert_with(|| semantics.source_id.clone());
+    BookSourceRequestContext {
+        base_url: fixture_string(fixture, "baseUrl").unwrap_or_else(|| semantics.base_url.clone()),
+        current_url: fixture_string(fixture, "currentUrl")
+            .unwrap_or_else(|| semantics.base_url.clone()),
+        book_url: fixture_string(fixture, "bookUrl").unwrap_or_default(),
+        chapter_url: fixture_string(fixture, "chapterUrl").unwrap_or_default(),
+        variables,
+    }
+}
+
+fn fixture_variables(fixture: &Value) -> BTreeMap<String, String> {
+    fixture
+        .get("variables")
+        .and_then(Value::as_object)
+        .map(|object| {
+            object
+                .iter()
+                .filter_map(|(key, value)| value.as_str().map(|value| (key.clone(), value.into())))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn fixture_string(fixture: &Value, key: &str) -> Option<String> {
+    fixture
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+}
+
+fn content_error(err: reader_content::ContentError) -> CoreError {
+    CoreError::internal(err.to_string())
 }
 
 fn run_host_replay(
@@ -757,6 +932,6 @@ fn print_json_value(value: &Value) {
 
 fn print_usage() {
     eprintln!(
-        "usage: reader-cli [--info|--ping|--status|--host-smoke|--conformance|--json '<command>'|--stdin|--fixture-vertical <path>|--host-replay <path>|--host-replay-suite <path>|--host-record <path>|--host-record-suite <path>] [--config-json '<config>']"
+        "usage: reader-cli [--info|--ping|--status|--host-smoke|--conformance|--json '<command>'|--stdin|--fixture-vertical <path>|--booksource-fixture <path>|--host-replay <path>|--host-replay-suite <path>|--host-record <path>|--host-record-suite <path>] [--config-json '<config>']"
     );
 }
