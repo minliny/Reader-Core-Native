@@ -1606,6 +1606,328 @@ impl SqliteStorage {
     }
 }
 
+// ===== v2 independent-entity CRUD (TxtTocRule / Bookmark / ReplaceRule / DictRule) =====
+//
+// Inherent methods mirroring the v1 put_source/get_source pattern. Each entity
+// has put/get/list/delete plus targeted queries where Legado's UI uses them
+// (TxtTocRule enable filter + serial_number order; Bookmark by-book + text
+// search; ReplaceRule enabled list for the rule chain). PK validation: empty
+// dict_rules.name is rejected (matches StorageSnapshot::validate); the other
+// three use integer PKs assigned by the caller (Legado uses currentTimeMillis).
+
+impl SqliteStorage {
+    // ----- TxtTocRule -----
+    pub fn put_txt_toc_rule(&self, rule: TxtTocRule) -> Result<TxtTocRule, StorageError> {
+        let conn = self.lock()?;
+        conn.execute(
+            "INSERT OR REPLACE INTO txt_toc_rules \
+             (id, name, rule, example, serial_number, enable) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                rule.id,
+                rule.name,
+                rule.rule,
+                rule.example,
+                rule.serial_number,
+                rule.enable as i64,
+            ],
+        )
+        .map_err(rusqlite_error)?;
+        Ok(rule)
+    }
+
+    pub fn get_txt_toc_rule(&self, id: i64) -> Result<Option<TxtTocRule>, StorageError> {
+        let conn = self.lock()?;
+        conn.query_row(
+            "SELECT id, name, rule, example, serial_number, enable \
+             FROM txt_toc_rules WHERE id = ?1",
+            params![id],
+            row_to_txt_toc_rule,
+        )
+        .optional()
+        .map_err(rusqlite_error)
+    }
+
+    pub fn list_txt_toc_rules(&self) -> Result<Vec<TxtTocRule>, StorageError> {
+        let conn = self.lock()?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, name, rule, example, serial_number, enable \
+                 FROM txt_toc_rules ORDER BY serial_number, id",
+            )
+            .map_err(rusqlite_error)?;
+        let rows = stmt
+            .query_map([], row_to_txt_toc_rule)
+            .map_err(rusqlite_error)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.map_err(rusqlite_error)?);
+        }
+        Ok(out)
+    }
+
+    pub fn list_enabled_txt_toc_rules(&self) -> Result<Vec<TxtTocRule>, StorageError> {
+        let conn = self.lock()?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, name, rule, example, serial_number, enable \
+                 FROM txt_toc_rules WHERE enable = 1 ORDER BY serial_number, id",
+            )
+            .map_err(rusqlite_error)?;
+        let rows = stmt
+            .query_map([], row_to_txt_toc_rule)
+            .map_err(rusqlite_error)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.map_err(rusqlite_error)?);
+        }
+        Ok(out)
+    }
+
+    pub fn delete_txt_toc_rule(&self, id: i64) -> Result<(), StorageError> {
+        let conn = self.lock()?;
+        conn.execute("DELETE FROM txt_toc_rules WHERE id = ?1", params![id])
+            .map_err(rusqlite_error)?;
+        Ok(())
+    }
+
+    // ----- Bookmark -----
+    pub fn put_bookmark(&self, bookmark: Bookmark) -> Result<Bookmark, StorageError> {
+        let conn = self.lock()?;
+        conn.execute(
+            "INSERT OR REPLACE INTO bookmarks \
+             (time, book_name, book_author, chapter_index, chapter_pos, \
+             chapter_name, book_text, content) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                bookmark.time,
+                bookmark.book_name,
+                bookmark.book_author,
+                bookmark.chapter_index,
+                bookmark.chapter_pos,
+                bookmark.chapter_name,
+                bookmark.book_text,
+                bookmark.content,
+            ],
+        )
+        .map_err(rusqlite_error)?;
+        Ok(bookmark)
+    }
+
+    pub fn get_bookmark(&self, time: i64) -> Result<Option<Bookmark>, StorageError> {
+        let conn = self.lock()?;
+        conn.query_row(
+            "SELECT time, book_name, book_author, chapter_index, chapter_pos, \
+             chapter_name, book_text, content FROM bookmarks WHERE time = ?1",
+            params![time],
+            row_to_bookmark,
+        )
+        .optional()
+        .map_err(rusqlite_error)
+    }
+
+    pub fn list_bookmarks(&self) -> Result<Vec<Bookmark>, StorageError> {
+        let conn = self.lock()?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT time, book_name, book_author, chapter_index, chapter_pos, \
+                 chapter_name, book_text, content FROM bookmarks ORDER BY time",
+            )
+            .map_err(rusqlite_error)?;
+        let rows = stmt
+            .query_map([], row_to_bookmark)
+            .map_err(rusqlite_error)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.map_err(rusqlite_error)?);
+        }
+        Ok(out)
+    }
+
+    pub fn list_bookmarks_by_book(
+        &self,
+        book_name: &str,
+        book_author: &str,
+    ) -> Result<Vec<Bookmark>, StorageError> {
+        let conn = self.lock()?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT time, book_name, book_author, chapter_index, chapter_pos, \
+                 chapter_name, book_text, content FROM bookmarks \
+                 WHERE book_name = ?1 AND book_author = ?2 ORDER BY time",
+            )
+            .map_err(rusqlite_error)?;
+        let rows = stmt
+            .query_map(params![book_name, book_author], row_to_bookmark)
+            .map_err(rusqlite_error)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.map_err(rusqlite_error)?);
+        }
+        Ok(out)
+    }
+
+    /// Search bookmarks whose book_name / chapter_name / content / book_text
+    /// contains `key` (case-insensitive LIKE). Mirrors Legado's bookmark search.
+    pub fn search_bookmarks(&self, key: &str) -> Result<Vec<Bookmark>, StorageError> {
+        let conn = self.lock()?;
+        let pattern = format!("%{key}%");
+        let mut stmt = conn
+            .prepare(
+                "SELECT time, book_name, book_author, chapter_index, chapter_pos, \
+                 chapter_name, book_text, content FROM bookmarks \
+                 WHERE book_name LIKE ?1 OR chapter_name LIKE ?1 \
+                 OR content LIKE ?1 OR book_text LIKE ?1 ORDER BY time",
+            )
+            .map_err(rusqlite_error)?;
+        let rows = stmt
+            .query_map(params![pattern], row_to_bookmark)
+            .map_err(rusqlite_error)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.map_err(rusqlite_error)?);
+        }
+        Ok(out)
+    }
+
+    pub fn delete_bookmark(&self, time: i64) -> Result<(), StorageError> {
+        let conn = self.lock()?;
+        conn.execute("DELETE FROM bookmarks WHERE time = ?1", params![time])
+            .map_err(rusqlite_error)?;
+        Ok(())
+    }
+
+    // ----- ReplaceRule -----
+    pub fn put_replace_rule(&self, rule: ReplaceRule) -> Result<ReplaceRule, StorageError> {
+        let conn = self.lock()?;
+        conn.execute(
+            "INSERT OR REPLACE INTO replace_rules \
+             (id, name, \"group\", pattern, replacement, scope, scope_title, \
+             scope_content, exclude_scope, is_enabled, is_regex, \
+             timeout_millisecond, sort_order) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+            params![
+                rule.id,
+                rule.name,
+                rule.group,
+                rule.pattern,
+                rule.replacement,
+                rule.scope,
+                rule.scope_title as i64,
+                rule.scope_content as i64,
+                rule.exclude_scope,
+                rule.is_enabled as i64,
+                rule.is_regex as i64,
+                rule.timeout_millisecond,
+                rule.order,
+            ],
+        )
+        .map_err(rusqlite_error)?;
+        Ok(rule)
+    }
+
+    pub fn get_replace_rule(&self, id: i64) -> Result<Option<ReplaceRule>, StorageError> {
+        let conn = self.lock()?;
+        conn.query_row(
+            "SELECT id, name, \"group\", pattern, replacement, scope, scope_title, \
+             scope_content, exclude_scope, is_enabled, is_regex, \
+             timeout_millisecond, sort_order FROM replace_rules WHERE id = ?1",
+            params![id],
+            row_to_replace_rule,
+        )
+        .optional()
+        .map_err(rusqlite_error)
+    }
+
+    pub fn list_replace_rules(&self) -> Result<Vec<ReplaceRule>, StorageError> {
+        let conn = self.lock()?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, name, \"group\", pattern, replacement, scope, scope_title, \
+                 scope_content, exclude_scope, is_enabled, is_regex, \
+                 timeout_millisecond, sort_order FROM replace_rules \
+                 ORDER BY sort_order, id",
+            )
+            .map_err(rusqlite_error)?;
+        let rows = stmt
+            .query_map([], row_to_replace_rule)
+            .map_err(rusqlite_error)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.map_err(rusqlite_error)?);
+        }
+        Ok(out)
+    }
+
+    pub fn delete_replace_rule(&self, id: i64) -> Result<(), StorageError> {
+        let conn = self.lock()?;
+        conn.execute("DELETE FROM replace_rules WHERE id = ?1", params![id])
+            .map_err(rusqlite_error)?;
+        Ok(())
+    }
+
+    // ----- DictRule -----
+    pub fn put_dict_rule(&self, rule: DictRule) -> Result<DictRule, StorageError> {
+        if rule.name.trim().is_empty() {
+            return Err(StorageError::InvalidKey {
+                field: "dict_rules.name".into(),
+            });
+        }
+        let conn = self.lock()?;
+        conn.execute(
+            "INSERT OR REPLACE INTO dict_rules \
+             (name, url_rule, show_rule, enabled, sort_number) \
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                rule.name,
+                rule.url_rule,
+                rule.show_rule,
+                rule.enabled as i64,
+                rule.sort_number,
+            ],
+        )
+        .map_err(rusqlite_error)?;
+        Ok(rule)
+    }
+
+    pub fn get_dict_rule(&self, name: &str) -> Result<Option<DictRule>, StorageError> {
+        let conn = self.lock()?;
+        conn.query_row(
+            "SELECT name, url_rule, show_rule, enabled, sort_number \
+             FROM dict_rules WHERE name = ?1",
+            params![name],
+            row_to_dict_rule,
+        )
+        .optional()
+        .map_err(rusqlite_error)
+    }
+
+    pub fn list_dict_rules(&self) -> Result<Vec<DictRule>, StorageError> {
+        let conn = self.lock()?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT name, url_rule, show_rule, enabled, sort_number \
+                 FROM dict_rules ORDER BY name",
+            )
+            .map_err(rusqlite_error)?;
+        let rows = stmt
+            .query_map([], row_to_dict_rule)
+            .map_err(rusqlite_error)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.map_err(rusqlite_error)?);
+        }
+        Ok(out)
+    }
+
+    pub fn delete_dict_rule(&self, name: &str) -> Result<(), StorageError> {
+        let conn = self.lock()?;
+        conn.execute("DELETE FROM dict_rules WHERE name = ?1", params![name])
+            .map_err(rusqlite_error)?;
+        Ok(())
+    }
+}
+
 // ===== StorageSnapshotStore =====
 
 impl StorageSnapshotStore for SqliteStorage {

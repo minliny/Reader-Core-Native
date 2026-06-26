@@ -41,6 +41,11 @@ struct StorageInner {
     reading_progress: HashMap<ReadingProgressKey, ReadingProgressEntry>,
     reading_progress_history: HashMap<ReadingProgressKey, Vec<ReadingProgressEntry>>,
     chapter_download_queue: HashMap<ChapterDownloadKey, ChapterDownloadTask>,
+    // v2 independent entities (Legado data/entities). Keyed by PK.
+    txt_toc_rules: HashMap<i64, TxtTocRule>,
+    bookmarks: HashMap<i64, Bookmark>,
+    replace_rules: HashMap<i64, ReplaceRule>,
+    dict_rules: HashMap<String, DictRule>,
 }
 
 /// A minimal cached entry: an opaque JSON payload keyed by a string cache key.
@@ -2794,15 +2799,10 @@ impl StorageSnapshotStore for InMemoryStorage {
                 .flat_map(|entries| entries.iter().cloned())
                 .collect(),
             chapter_download_queue: inner.chapter_download_queue.values().cloned().collect(),
-            // InMemoryStorage does not yet own the four v2 independent-entity
-            // collections (SqliteStorage does, via the v2 schema). Snapshot
-            // round-trips through InMemoryStorage therefore emit empty arrays
-            // for these fields. SqliteStorage ↔ SqliteStorage round-trips
-            // preserve them. B7 will add InMemoryStorage ownership.
-            txt_toc_rules: Vec::new(),
-            bookmarks: Vec::new(),
-            replace_rules: Vec::new(),
-            dict_rules: Vec::new(),
+            txt_toc_rules: inner.txt_toc_rules.values().cloned().collect(),
+            bookmarks: inner.bookmarks.values().cloned().collect(),
+            replace_rules: inner.replace_rules.values().cloned().collect(),
+            dict_rules: inner.dict_rules.values().cloned().collect(),
         };
         sort_storage_snapshot(&mut snapshot);
         snapshot.validate()?;
@@ -2814,9 +2814,6 @@ impl StorageSnapshotStore for InMemoryStorage {
         let replacement = storage_inner_from_snapshot(snapshot)?;
         let mut inner = self.lock()?;
         *inner = replacement;
-        // The four v2 entity collections are dropped on InMemoryStorage import:
-        // StorageInner has no fields for them yet (B7). SqliteStorage is the
-        // authoritative backend for v2 entities until B7 lands.
         Ok(())
     }
 }
@@ -2894,6 +2891,18 @@ fn storage_inner_from_snapshot(snapshot: StorageSnapshot) -> Result<StorageInner
         inner
             .chapter_download_queue
             .insert(task.download_key(), task);
+    }
+    for rule in snapshot.txt_toc_rules {
+        inner.txt_toc_rules.insert(rule.id, rule);
+    }
+    for bookmark in snapshot.bookmarks {
+        inner.bookmarks.insert(bookmark.time, bookmark);
+    }
+    for rule in snapshot.replace_rules {
+        inner.replace_rules.insert(rule.id, rule);
+    }
+    for rule in snapshot.dict_rules {
+        inner.dict_rules.insert(rule.name.clone(), rule);
     }
 
     Ok(inner)
@@ -4368,6 +4377,164 @@ impl InMemoryStorage {
         update(task);
         validate_chapter_download_task(task)?;
         Ok(task.clone())
+    }
+}
+
+// ===== v2 independent-entity CRUD on InMemoryStorage =====
+//
+// Mirrors the SqliteStorage CRUD surface so the two backends are
+// interchangeable for the four Legado independent entities. List operations
+// sort to match the SqliteStorage ORDER BY clauses (see sort_storage_snapshot)
+// so backend↔backend snapshot hashes stay stable.
+
+impl InMemoryStorage {
+    // ----- TxtTocRule -----
+    pub fn put_txt_toc_rule(&self, rule: TxtTocRule) -> Result<TxtTocRule, StorageError> {
+        let mut inner = self.lock()?;
+        inner.txt_toc_rules.insert(rule.id, rule.clone());
+        Ok(rule)
+    }
+
+    pub fn get_txt_toc_rule(&self, id: i64) -> Result<Option<TxtTocRule>, StorageError> {
+        Ok(self.lock()?.txt_toc_rules.get(&id).cloned())
+    }
+
+    pub fn list_txt_toc_rules(&self) -> Result<Vec<TxtTocRule>, StorageError> {
+        let mut rules: Vec<TxtTocRule> = self.lock()?.txt_toc_rules.values().cloned().collect();
+        rules.sort_by(|a, b| {
+            a.serial_number
+                .cmp(&b.serial_number)
+                .then_with(|| a.id.cmp(&b.id))
+        });
+        Ok(rules)
+    }
+
+    pub fn list_enabled_txt_toc_rules(&self) -> Result<Vec<TxtTocRule>, StorageError> {
+        let mut rules: Vec<TxtTocRule> = self
+            .lock()?
+            .txt_toc_rules
+            .values()
+            .filter(|r| r.enable)
+            .cloned()
+            .collect();
+        rules.sort_by(|a, b| {
+            a.serial_number
+                .cmp(&b.serial_number)
+                .then_with(|| a.id.cmp(&b.id))
+        });
+        Ok(rules)
+    }
+
+    pub fn delete_txt_toc_rule(&self, id: i64) -> Result<(), StorageError> {
+        self.lock()?.txt_toc_rules.remove(&id);
+        Ok(())
+    }
+
+    // ----- Bookmark -----
+    pub fn put_bookmark(&self, bookmark: Bookmark) -> Result<Bookmark, StorageError> {
+        let mut inner = self.lock()?;
+        inner.bookmarks.insert(bookmark.time, bookmark.clone());
+        Ok(bookmark)
+    }
+
+    pub fn get_bookmark(&self, time: i64) -> Result<Option<Bookmark>, StorageError> {
+        Ok(self.lock()?.bookmarks.get(&time).cloned())
+    }
+
+    pub fn list_bookmarks(&self) -> Result<Vec<Bookmark>, StorageError> {
+        let mut bookmarks: Vec<Bookmark> = self.lock()?.bookmarks.values().cloned().collect();
+        bookmarks.sort_by(|a, b| a.time.cmp(&b.time));
+        Ok(bookmarks)
+    }
+
+    pub fn list_bookmarks_by_book(
+        &self,
+        book_name: &str,
+        book_author: &str,
+    ) -> Result<Vec<Bookmark>, StorageError> {
+        let mut bookmarks: Vec<Bookmark> = self
+            .lock()?
+            .bookmarks
+            .values()
+            .filter(|b| b.book_name == book_name && b.book_author == book_author)
+            .cloned()
+            .collect();
+        bookmarks.sort_by(|a, b| a.time.cmp(&b.time));
+        Ok(bookmarks)
+    }
+
+    /// Case-insensitive substring search across book_name / chapter_name /
+    /// content / book_text, mirroring SqliteStorage::search_bookmarks.
+    pub fn search_bookmarks(&self, key: &str) -> Result<Vec<Bookmark>, StorageError> {
+        let needle = key.to_lowercase();
+        let mut bookmarks: Vec<Bookmark> = self
+            .lock()?
+            .bookmarks
+            .values()
+            .filter(|b| {
+                b.book_name.to_lowercase().contains(&needle)
+                    || b.chapter_name.to_lowercase().contains(&needle)
+                    || b.content.to_lowercase().contains(&needle)
+                    || b.book_text.to_lowercase().contains(&needle)
+            })
+            .cloned()
+            .collect();
+        bookmarks.sort_by(|a, b| a.time.cmp(&b.time));
+        Ok(bookmarks)
+    }
+
+    pub fn delete_bookmark(&self, time: i64) -> Result<(), StorageError> {
+        self.lock()?.bookmarks.remove(&time);
+        Ok(())
+    }
+
+    // ----- ReplaceRule -----
+    pub fn put_replace_rule(&self, rule: ReplaceRule) -> Result<ReplaceRule, StorageError> {
+        let mut inner = self.lock()?;
+        inner.replace_rules.insert(rule.id, rule.clone());
+        Ok(rule)
+    }
+
+    pub fn get_replace_rule(&self, id: i64) -> Result<Option<ReplaceRule>, StorageError> {
+        Ok(self.lock()?.replace_rules.get(&id).cloned())
+    }
+
+    pub fn list_replace_rules(&self) -> Result<Vec<ReplaceRule>, StorageError> {
+        let mut rules: Vec<ReplaceRule> = self.lock()?.replace_rules.values().cloned().collect();
+        rules.sort_by(|a, b| a.order.cmp(&b.order).then_with(|| a.id.cmp(&b.id)));
+        Ok(rules)
+    }
+
+    pub fn delete_replace_rule(&self, id: i64) -> Result<(), StorageError> {
+        self.lock()?.replace_rules.remove(&id);
+        Ok(())
+    }
+
+    // ----- DictRule -----
+    pub fn put_dict_rule(&self, rule: DictRule) -> Result<DictRule, StorageError> {
+        if rule.name.trim().is_empty() {
+            return Err(StorageError::InvalidKey {
+                field: "dict_rules.name".into(),
+            });
+        }
+        let mut inner = self.lock()?;
+        inner.dict_rules.insert(rule.name.clone(), rule.clone());
+        Ok(rule)
+    }
+
+    pub fn get_dict_rule(&self, name: &str) -> Result<Option<DictRule>, StorageError> {
+        Ok(self.lock()?.dict_rules.get(name).cloned())
+    }
+
+    pub fn list_dict_rules(&self) -> Result<Vec<DictRule>, StorageError> {
+        let mut rules: Vec<DictRule> = self.lock()?.dict_rules.values().cloned().collect();
+        rules.sort_by(|a, b| a.name.cmp(&b.name));
+        Ok(rules)
+    }
+
+    pub fn delete_dict_rule(&self, name: &str) -> Result<(), StorageError> {
+        self.lock()?.dict_rules.remove(name);
+        Ok(())
     }
 }
 
