@@ -4,7 +4,7 @@
 //! `codex/reader-js-compat-runtime` work does NOT yet bind:
 //! `downloadFile`, `cacheFile`, `importScript`, `setContent`, `put`,
 //! `reGetBook`. They route through the same `HostCallbackRegistry` /
-//! `HostCall` descriptor boundary as `java.ajax` etc., but are wired via a
+//! `HostDescriptor` boundary as `java.ajax` etc., but are wired via a
 //! dedicated installer so the existing `HostMethod` enum is untouched
 //! (concurrent-agent safety).
 //!
@@ -16,58 +16,49 @@
 //!   put(key, value)          -> the value (legado returns the stored value)
 //!   reGetBook()              -> null (triggers host re-search; no JS return)
 
-use reader_js::{HostCallbackRegistry, JsErrorKind, JsRuntimeConfig, JsSandbox, QuickJsSandbox};
+use reader_js::{
+    HostCallbackRegistry, HostDescriptor, JsErrorKind, JsRuntimeConfig, JsSandbox, QuickJsSandbox,
+};
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 
-/// Capture every `HostCall` descriptor the host receives, plus a per-name
-/// canned response so tests can assert both the descriptor contract and the
-/// realistic fixture shape.
-fn observing_registry(
-    sink: Arc<Mutex<Vec<(String, Vec<serde_json::Value>)>>>,
-) -> HostCallbackRegistry {
+/// Capture every `HostDescriptor` the host receives, plus a per-method canned
+/// response so tests can assert both the descriptor contract and the realistic
+/// fixture shape.
+fn observing_registry(sink: Arc<Mutex<Vec<HostDescriptor>>>) -> HostCallbackRegistry {
     let mut registry = HostCallbackRegistry::new();
     let s = Arc::clone(&sink);
-    registry.register("java.downloadFile", move |call| {
-        s.lock()
-            .unwrap()
-            .push((call.name.clone(), call.args.clone()));
+    registry.register("java.downloadFile", move |descriptor| {
+        s.lock().unwrap().push(descriptor.clone());
         Ok(json!("cache/a1b2c3d4e5f6a1b2.html"))
     });
     let s = Arc::clone(&sink);
-    registry.register("java.cacheFile", move |call| {
-        s.lock()
-            .unwrap()
-            .push((call.name.clone(), call.args.clone()));
+    registry.register("java.cacheFile", move |descriptor| {
+        s.lock().unwrap().push(descriptor.clone());
         Ok(json!("cached script body\n"))
     });
     let s = Arc::clone(&sink);
-    registry.register("java.importScript", move |call| {
-        s.lock()
-            .unwrap()
-            .push((call.name.clone(), call.args.clone()));
+    registry.register("java.importScript", move |descriptor| {
+        s.lock().unwrap().push(descriptor.clone());
         Ok(json!("function calc(){return 1+1;}\n"))
     });
     let s = Arc::clone(&sink);
-    registry.register("java.setContent", move |call| {
-        s.lock()
-            .unwrap()
-            .push((call.name.clone(), call.args.clone()));
+    registry.register("java.setContent", move |descriptor| {
+        s.lock().unwrap().push(descriptor.clone());
         Ok(json!(null))
     });
     let s = Arc::clone(&sink);
-    registry.register("java.put", move |call| {
-        s.lock()
-            .unwrap()
-            .push((call.name.clone(), call.args.clone()));
+    registry.register("java.put", move |descriptor| {
+        s.lock().unwrap().push(descriptor.clone());
         // legado: java.put returns the stored value.
-        Ok(call.args.get(1).cloned().unwrap_or(json!(null)))
+        match &descriptor {
+            HostDescriptor::Put { value, .. } => Ok(json!(value.clone())),
+            _ => Ok(json!(null)),
+        }
     });
     let s = Arc::clone(&sink);
-    registry.register("java.reGetBook", move |call| {
-        s.lock()
-            .unwrap()
-            .push((call.name.clone(), call.args.clone()));
+    registry.register("java.reGetBook", move |descriptor| {
+        s.lock().unwrap().push(descriptor.clone());
         Ok(json!(null))
     });
     registry
@@ -88,10 +79,12 @@ fn download_file_routes_url_descriptor_to_host() {
 
     let calls = calls.lock().unwrap();
     assert_eq!(calls.len(), 1);
-    assert_eq!(calls[0].0, "java.downloadFile");
-    assert_eq!(calls[0].1[0], json!("https://example.test/book/1.html"));
-    // request-config object (legado inline `,{type=...}`) passes through as 2nd arg.
-    assert_eq!(calls[0].1[1], json!({"type": "html"}));
+    match &calls[0] {
+        HostDescriptor::DownloadFile { url } => {
+            assert_eq!(url, "https://example.test/book/1.html");
+        }
+        other => panic!("expected DownloadFile, got {other:?}"),
+    }
 }
 
 #[test]
@@ -106,7 +99,8 @@ fn download_file_global_alias_routes_identically() {
 
     assert_eq!(result.value, json!("cache/a1b2c3d4e5f6a1b2.html"));
     let calls = calls.lock().unwrap();
-    assert_eq!(calls[0].0, "java.downloadFile");
+    assert_eq!(calls.len(), 1);
+    assert!(matches!(calls[0], HostDescriptor::DownloadFile { .. }));
 }
 
 #[test]
@@ -121,8 +115,14 @@ fn cache_file_single_arg_routes_descriptor() {
 
     assert_eq!(result.value, json!("cached script body\n"));
     let calls = calls.lock().unwrap();
-    assert_eq!(calls[0].0, "java.cacheFile");
-    assert_eq!(calls[0].1, vec![json!("https://example.test/lib.js")]);
+    assert_eq!(calls.len(), 1);
+    match &calls[0] {
+        HostDescriptor::CacheFile { url, save_time } => {
+            assert_eq!(url, "https://example.test/lib.js");
+            assert_eq!(*save_time, None);
+        }
+        other => panic!("expected CacheFile, got {other:?}"),
+    }
 }
 
 #[test]
@@ -137,8 +137,14 @@ fn cache_file_optional_save_time_passes_through() {
 
     assert_eq!(result.value, json!("cached script body\n"));
     let calls = calls.lock().unwrap();
-    assert_eq!(calls[0].1[0], json!("https://example.test/lib.js"));
-    assert_eq!(calls[0].1[1], json!(3600));
+    assert_eq!(calls.len(), 1);
+    match &calls[0] {
+        HostDescriptor::CacheFile { url, save_time } => {
+            assert_eq!(url, "https://example.test/lib.js");
+            assert_eq!(*save_time, Some(3600));
+        }
+        other => panic!("expected CacheFile, got {other:?}"),
+    }
 }
 
 #[test]
@@ -153,8 +159,13 @@ fn import_script_returns_script_text_from_host() {
 
     assert_eq!(result.value, json!("function calc(){return 1+1;}\n"));
     let calls = calls.lock().unwrap();
-    assert_eq!(calls[0].0, "java.importScript");
-    assert_eq!(calls[0].1, vec![json!("https://example.test/helpers.js")]);
+    assert_eq!(calls.len(), 1);
+    match &calls[0] {
+        HostDescriptor::ImportScript { path } => {
+            assert_eq!(path, "https://example.test/helpers.js");
+        }
+        other => panic!("expected ImportScript, got {other:?}"),
+    }
 }
 
 #[test]
@@ -175,11 +186,20 @@ fn set_content_routes_content_and_optional_base_url() {
 
     let calls = calls.lock().unwrap();
     assert_eq!(calls.len(), 2);
-    assert_eq!(calls[0].0, "java.setContent");
-    assert_eq!(calls[0].1, vec![json!("<p>chapter</p>")]);
-    assert_eq!(calls[1].0, "java.setContent");
-    assert_eq!(calls[1].1[0], json!("<p>chapter</p>"));
-    assert_eq!(calls[1].1[1], json!("https://example.test/book/1"));
+    match &calls[0] {
+        HostDescriptor::SetContent { content, base_url } => {
+            assert_eq!(*content, Some("<p>chapter</p>".to_string()));
+            assert_eq!(*base_url, None);
+        }
+        other => panic!("expected SetContent, got {other:?}"),
+    }
+    match &calls[1] {
+        HostDescriptor::SetContent { content, base_url } => {
+            assert_eq!(*content, Some("<p>chapter</p>".to_string()));
+            assert_eq!(*base_url, Some("https://example.test/book/1".to_string()));
+        }
+        other => panic!("expected SetContent, got {other:?}"),
+    }
 }
 
 #[test]
@@ -195,8 +215,14 @@ fn put_variable_routes_and_returns_value() {
     // legado: java.put returns the stored value.
     assert_eq!(result.value, json!("ch-42"));
     let calls = calls.lock().unwrap();
-    assert_eq!(calls[0].0, "java.put");
-    assert_eq!(calls[0].1, vec![json!("lastChapter"), json!("ch-42")]);
+    assert_eq!(calls.len(), 1);
+    match &calls[0] {
+        HostDescriptor::Put { key, value } => {
+            assert_eq!(key, "lastChapter");
+            assert_eq!(value, "ch-42");
+        }
+        other => panic!("expected Put, got {other:?}"),
+    }
 }
 
 #[test]
@@ -209,11 +235,8 @@ fn re_get_book_routes_with_no_args() {
     assert!(result.value.is_null());
 
     let calls = calls.lock().unwrap();
-    assert_eq!(calls[0].0, "java.reGetBook");
-    assert!(
-        calls[0].1.is_empty(),
-        "reGetBook must carry no descriptor args"
-    );
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0], HostDescriptor::ReGetBook);
 }
 
 #[test]
@@ -280,9 +303,9 @@ fn set_content_rejects_non_string_content() {
 
 #[test]
 fn residual_descriptor_carries_realistic_response_shapes() {
-    // R6 contract: the host receives a well-typed HostCall (name + args) and
-    // returns realistic fixture shapes that mirror legado's return semantics,
-    // not a generic {"body":"<p>stubbed</p>"} blob.
+    // R6 contract: the host receives a well-typed HostDescriptor and returns
+    // realistic fixture shapes that mirror legado's return semantics, not a
+    // generic {"body":"<p>stubbed</p>"} blob.
     let calls = Arc::new(Mutex::new(Vec::new()));
 
     let cases: &[(&str, serde_json::Value)] = &[
@@ -318,7 +341,7 @@ fn residual_descriptor_carries_realistic_response_shapes() {
     let calls = calls.lock().unwrap();
     assert_eq!(calls.len(), cases.len());
     // All descriptors carry their canonical java.* routing name.
-    let names: Vec<&str> = calls.iter().map(|(n, _)| n.as_str()).collect();
+    let names: Vec<&str> = calls.iter().map(|d| d.callback_name()).collect();
     assert_eq!(
         names,
         &[
