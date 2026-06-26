@@ -723,7 +723,10 @@ dependencies = [
  "reader-content",
  "reader-contract",
  "reader-domain",
+ "reader-local-book",
+ "reader-rss",
  "reader-storage",
+ "reader-sync",
  "serde",
  "serde_json",
 ]

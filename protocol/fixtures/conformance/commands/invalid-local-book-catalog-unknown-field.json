@@ -1,0 +1,10 @@
+{
+  "protocolVersion": 1,
+  "requestId": 617,
+  "method": "local_book.catalog",
+  "params": {
+    "catalog": { "schemaVersion": 1, "books": [], "chapters": [], "resources": [] },
+    "entry": { "stableBookId": "x" },
+    "extra": true
+  }
+}

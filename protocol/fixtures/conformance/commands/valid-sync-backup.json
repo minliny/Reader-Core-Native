@@ -1,0 +1,20 @@
+{
+  "protocolVersion": 1,
+  "requestId": 604,
+  "method": "sync.backup",
+  "params": {
+    "package": {
+      "manifest": {
+        "backupID": "conformance-backup-1",
+        "createdAt": 1000,
+        "entries": [],
+        "totalBytes": 0,
+        "bookCount": 0
+      }
+    },
+    "policy": {
+      "mode": "full",
+      "overwriteExisting": false
+    }
+  }
+}

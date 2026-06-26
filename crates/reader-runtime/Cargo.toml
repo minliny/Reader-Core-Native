@@ -12,5 +12,8 @@ reader-contract = { path = "../reader-contract" }
 reader-domain = { path = "../reader-domain" }
 reader-content = { path = "../reader-content" }
 reader-storage = { path = "../reader-storage" }
+reader-rss = { path = "../reader-rss" }
+reader-sync = { path = "../reader-sync" }
+reader-local-book = { path = "../reader-local-book" }
 serde_json.workspace = true
 serde.workspace = true

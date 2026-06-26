@@ -1,0 +1,9 @@
+{
+  "protocolVersion": 1,
+  "requestId": 607,
+  "method": "rss.parse",
+  "params": {
+    "xml": "<rss version=\"2.0\"><channel><title>x</title></channel></rss>",
+    "extra": true
+  }
+}

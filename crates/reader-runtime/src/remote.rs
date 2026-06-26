@@ -15,7 +15,10 @@ use reader_contract::{
     self as contract,
     remote::{
         parse_params, BookDetailParams, BookSearchParams, BookTocParams, ChapterContentParams,
-        HostHttpRequest, HostHttpResponse, ReadingProgressUpdateParams, SourceImportParams,
+        HostHttpRequest, HostHttpResponse, LocalBookCatalogData, LocalBookCatalogParams,
+        LocalBookParseData, LocalBookParseParams, ReadingProgressUpdateParams, RssParseData,
+        RssParseEntryData, RssParseParams, RssRefreshData, RssRefreshParams, SourceImportParams,
+        SyncBackupData, SyncBackupParams, SyncMergeData, SyncMergeParams,
     },
     CoreError, Event, HostCapability,
 };
@@ -162,6 +165,20 @@ pub fn dispatch_remote(
         contract::methods::CHAPTER_CONTENT => chapter_content(cmd, state),
         contract::methods::READING_PROGRESS_UPDATE => {
             reading_progress_update(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::RSS_PARSE => rss_parse(cmd, state).map(RemoteCommandResult::Complete),
+        contract::methods::RSS_REFRESH => {
+            rss_refresh(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::SYNC_MERGE => sync_merge(cmd, state).map(RemoteCommandResult::Complete),
+        contract::methods::SYNC_BACKUP => {
+            sync_backup(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::LOCAL_BOOK_PARSE => {
+            local_book_parse(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::LOCAL_BOOK_CATALOG => {
+            local_book_catalog(cmd, state).map(RemoteCommandResult::Complete)
         }
         _ => return RemoteDispatch::NotHandled,
     };
@@ -607,4 +624,224 @@ fn reading_progress_update(
         "chapterProgress": stored.chapter_progress,
         "stored": true,
     }))
+}
+
+// ===========================================================================
+// RSS vertical (V1 minimal) — pure, no host bus
+// ===========================================================================
+
+fn rss_parse(
+    cmd: &reader_contract::Command,
+    _state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: RssParseParams = parse_params(contract::methods::RSS_PARSE, &cmd.params)?;
+    let feed = if params.feed_url.is_empty() {
+        reader_rss::parse_feed(&params.xml)
+    } else {
+        reader_rss::parse_feed_with_url(&params.feed_url, &params.xml)
+    }
+    .map_err(rss_internal)?;
+    let entries = feed
+        .entries
+        .into_iter()
+        .map(|entry| RssParseEntryData {
+            id: entry.id,
+            title: entry.title,
+            link: entry.link,
+            summary: entry.summary,
+            published_at: entry.published_at,
+        })
+        .collect::<Vec<_>>();
+    let data = RssParseData {
+        title: feed.title,
+        feed_url: feed.feed_url,
+        site_url: feed.site_url,
+        description: feed.description,
+        entries,
+    };
+    serde_json::to_value(&data).map_err(serde_internal)
+}
+
+fn rss_refresh(
+    cmd: &reader_contract::Command,
+    _state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: RssRefreshParams = parse_params(contract::methods::RSS_REFRESH, &cmd.params)?;
+    let policy = reader_rss::RssRefreshPolicy {
+        enabled: params.enabled,
+        update_interval_minutes: params.update_interval_minutes,
+        last_fetched_at: params.last_fetched_at,
+        force_refresh: params.force_refresh,
+    };
+    let decision = reader_rss::decide_rss_refresh(&policy, params.evaluated_at);
+    let reason_value = serde_json::to_value(&decision.reason).map_err(serde_internal)?;
+    let reason = reason_value
+        .as_str()
+        .map(String::from)
+        .unwrap_or_else(|| format!("{:?}", decision.reason));
+    let data = RssRefreshData {
+        subscription_id: params.subscription_id,
+        should_fetch: decision.should_fetch,
+        reason,
+        evaluated_at: decision.evaluated_at,
+        next_eligible_fetch_at: decision.next_eligible_fetch_at,
+    };
+    serde_json::to_value(&data).map_err(serde_internal)
+}
+
+fn rss_internal(err: reader_rss::RssError) -> CoreError {
+    CoreError::internal(format!("rss command failed: {err}"))
+}
+
+// ===========================================================================
+// Sync vertical (V1 minimal) — pure, no host bus
+// ===========================================================================
+
+fn sync_merge(
+    cmd: &reader_contract::Command,
+    _state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: SyncMergeParams = parse_params(contract::methods::SYNC_MERGE, &cmd.params)?;
+    let local: reader_sync::SyncSnapshot =
+        serde_json::from_value(params.local).map_err(|err| sync_invalid("local snapshot", err))?;
+    let remote: reader_sync::SyncSnapshot = serde_json::from_value(params.remote)
+        .map_err(|err| sync_invalid("remote snapshot", err))?;
+    let result = reader_sync::merge_snapshots(
+        &local,
+        &remote,
+        params.merged_snapshot_id,
+        params.merged_device_id,
+        params.merged_created_at,
+    )
+    .map_err(sync_internal)?;
+    let snapshot = serde_json::to_value(&result.snapshot).map_err(serde_internal)?;
+    let conflicts = result
+        .conflicts
+        .into_iter()
+        .map(|conflict| serde_json::to_value(&conflict).unwrap_or(serde_json::Value::Null))
+        .collect::<Vec<_>>();
+    let data = SyncMergeData {
+        snapshot,
+        conflicts,
+    };
+    serde_json::to_value(&data).map_err(serde_internal)
+}
+
+fn sync_backup(
+    cmd: &reader_contract::Command,
+    _state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: SyncBackupParams = parse_params(contract::methods::SYNC_BACKUP, &cmd.params)?;
+    let package: reader_sync::BackupPackage = serde_json::from_value(params.package)
+        .map_err(|err| sync_invalid("backup package", err))?;
+    let policy: reader_sync::RestorePolicy =
+        serde_json::from_value(params.policy).map_err(|err| sync_invalid("restore policy", err))?;
+    let plan = reader_sync::plan_backup_restore(&package, &policy).map_err(sync_internal)?;
+    let plan_value = serde_json::to_value(&plan).map_err(serde_internal)?;
+    let data = SyncBackupData { plan: plan_value };
+    serde_json::to_value(&data).map_err(serde_internal)
+}
+
+fn sync_internal(err: reader_sync::SyncError) -> CoreError {
+    CoreError::internal(format!("sync command failed: {err}"))
+}
+
+fn sync_invalid(field: &str, err: serde_json::Error) -> CoreError {
+    CoreError::invalid_params(format!("sync command invalid {field}"))
+        .with_details(serde_json::json!({ "source": err.to_string() }))
+}
+
+// ===========================================================================
+// Local-book vertical (V1 minimal) — pure, no host bus
+// ===========================================================================
+
+fn local_book_parse(
+    cmd: &reader_contract::Command,
+    _state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: LocalBookParseParams =
+        parse_params(contract::methods::LOCAL_BOOK_PARSE, &cmd.params)?;
+    let book = reader_local_book::parse_txt_text(
+        &params.book_id,
+        params.title.as_deref(),
+        params.author.as_deref(),
+        params.file_name.as_deref(),
+        &params.text,
+    )
+    .map_err(local_book_internal)?;
+    let chapter_count = book.chapters.len() as u32;
+    let full = serde_json::to_value(&book).map_err(serde_internal)?;
+    let book_obj = full.get("book").cloned().unwrap_or(serde_json::Value::Null);
+    let format = full
+        .get("format")
+        .and_then(|value| value.as_str())
+        .unwrap_or("txt")
+        .to_string();
+    let encoding = full
+        .get("encoding")
+        .and_then(|value| value.as_str())
+        .unwrap_or("utf8")
+        .to_string();
+    let byte_len = full
+        .get("byteLen")
+        .and_then(|value| value.as_u64())
+        .unwrap_or(0);
+    let char_len = full
+        .get("charLen")
+        .and_then(|value| value.as_u64())
+        .unwrap_or(0);
+    let data = LocalBookParseData {
+        book: book_obj,
+        format,
+        encoding,
+        byte_len,
+        char_len,
+        chapter_count,
+    };
+    serde_json::to_value(&data).map_err(serde_internal)
+}
+
+fn local_book_catalog(
+    cmd: &reader_contract::Command,
+    _state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: LocalBookCatalogParams =
+        parse_params(contract::methods::LOCAL_BOOK_CATALOG, &cmd.params)?;
+    let catalog: reader_local_book::LocalBookCatalogSnapshot =
+        serde_json::from_value(params.catalog).map_err(|err| local_book_invalid("catalog", err))?;
+    let entry: reader_local_book::LocalBookFingerprintCatalogEntry =
+        serde_json::from_value(params.entry).map_err(|err| local_book_invalid("entry", err))?;
+    let chapters: Vec<reader_local_book::LocalBookChapterIndexEntry> = params
+        .chapters
+        .into_iter()
+        .map(serde_json::from_value)
+        .collect::<Result<_, _>>()
+        .map_err(|err| local_book_invalid("chapters", err))?;
+    let resources: Vec<reader_local_book::LocalBookResourceIndexEntry> = params
+        .resources
+        .into_iter()
+        .map(serde_json::from_value)
+        .collect::<Result<_, _>>()
+        .map_err(|err| local_book_invalid("resources", err))?;
+    let updated =
+        reader_local_book::upsert_local_book_catalog_entry(&catalog, entry, chapters, resources)
+            .map_err(local_book_internal)?;
+    let catalog_value = serde_json::to_value(&updated).map_err(serde_internal)?;
+    let data = LocalBookCatalogData {
+        catalog: catalog_value,
+    };
+    serde_json::to_value(&data).map_err(serde_internal)
+}
+
+fn local_book_internal(err: reader_local_book::LocalBookError) -> CoreError {
+    CoreError::internal(format!("local_book command failed: {err}"))
+}
+
+fn local_book_invalid(field: &str, err: serde_json::Error) -> CoreError {
+    CoreError::invalid_params(format!("local_book command invalid {field}"))
+        .with_details(serde_json::json!({ "source": err.to_string() }))
+}
+
+fn serde_internal(err: serde_json::Error) -> CoreError {
+    CoreError::internal(format!("serialization failed: {err}"))
 }

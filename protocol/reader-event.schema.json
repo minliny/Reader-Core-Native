@@ -517,8 +517,8 @@
         },
         "capabilities": {
           "type": "array",
-          "minItems": 12,
-          "maxItems": 12,
+          "minItems": 15,
+          "maxItems": 15,
           "prefixItems": [
             { "type": "string", "const": "core.info" },
             { "type": "string", "const": "runtime.ping" },
@@ -531,7 +531,10 @@
             { "type": "string", "const": "host.bus.v1" },
             { "type": "string", "const": "http.execute" },
             { "type": "string", "const": "runtime.config.v1" },
-            { "type": "string", "const": "remote.reading.v1" }
+            { "type": "string", "const": "remote.reading.v1" },
+            { "type": "string", "const": "rss.v1" },
+            { "type": "string", "const": "sync.v1" },
+            { "type": "string", "const": "local_book.v1" }
           ],
           "description": "Ordered V1 capability list advertised to hosts."
         }
@@ -958,6 +961,172 @@
           "type": "boolean",
           "const": true,
           "description": "Successful result marker. A failed store is reported as an error event."
+        }
+      }
+    },
+    "RssParseEntryData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title"],
+      "description": "One entry in the rss.parse result. Stable wire shape; unknown feed fields are dropped.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Stable entry identity derived from guid/id/link/title."
+        },
+        "title": {
+          "type": "string",
+          "description": "Entry title."
+        },
+        "link": {
+          "type": "string",
+          "description": "Optional entry link."
+        },
+        "summary": {
+          "type": "string",
+          "description": "Optional entry summary/description."
+        },
+        "publishedAt": {
+          "type": "string",
+          "description": "Optional raw date string from pubDate/updated/published."
+        }
+      }
+    },
+    "RssParseData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "entries"],
+      "description": "Result data for rss.parse. Pure feed parse output.",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Feed title."
+        },
+        "feedUrl": {
+          "type": "string",
+          "description": "Optional feed URL."
+        },
+        "siteUrl": {
+          "type": "string",
+          "description": "Optional site URL."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional feed description."
+        },
+        "entries": {
+          "type": "array",
+          "description": "Parsed feed entries.",
+          "items": { "$ref": "#/$defs/RssParseEntryData" }
+        }
+      }
+    },
+    "RssRefreshData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subscriptionId", "shouldFetch", "reason", "evaluatedAt"],
+      "description": "Result data for rss.refresh. Pure refresh-policy decision.",
+      "properties": {
+        "subscriptionId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Subscription identifier evaluated."
+        },
+        "shouldFetch": {
+          "type": "boolean",
+          "description": "Whether the subscription should be fetched now."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Stable reason code (disabled/forced/missingLastFetchedAt/missingUpdateInterval/intervalElapsed/intervalNotElapsed)."
+        },
+        "evaluatedAt": {
+          "type": "integer",
+          "description": "Unix-millis timestamp at which the decision was evaluated."
+        },
+        "nextEligibleFetchAt": {
+          "type": "integer",
+          "description": "Optional next eligible fetch timestamp."
+        }
+      }
+    },
+    "SyncMergeData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["snapshot", "conflicts"],
+      "description": "Result data for sync.merge. Pure merge output.",
+      "properties": {
+        "snapshot": {
+          "type": "object",
+          "description": "Merged snapshot (shape owned by reader_sync::SyncSnapshot)."
+        },
+        "conflicts": {
+          "type": "array",
+          "default": [],
+          "description": "Merge conflicts (shape owned by reader_sync::SyncConflict).",
+          "items": { "type": "object" }
+        }
+      }
+    },
+    "SyncBackupData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan"],
+      "description": "Result data for sync.backup. Pure restore-plan output.",
+      "properties": {
+        "plan": {
+          "type": "object",
+          "description": "Restore plan (shape owned by reader_sync::BackupRestorePlan)."
+        }
+      }
+    },
+    "LocalBookParseData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["book", "format", "encoding", "byteLen", "charLen", "chapterCount"],
+      "description": "Result data for local_book.parse. Pure TXT parse output.",
+      "properties": {
+        "book": {
+          "type": "object",
+          "description": "Parsed book object (shape owned by reader_domain::Book)."
+        },
+        "format": {
+          "type": "string",
+          "description": "Detected book format (e.g. txt)."
+        },
+        "encoding": {
+          "type": "string",
+          "description": "Detected encoding (e.g. utf8)."
+        },
+        "byteLen": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Byte length of the parsed text."
+        },
+        "charLen": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Character length of the parsed text."
+        },
+        "chapterCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of chapters split from the text."
+        }
+      }
+    },
+    "LocalBookCatalogData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["catalog"],
+      "description": "Result data for local_book.catalog. Updated catalog snapshot.",
+      "properties": {
+        "catalog": {
+          "type": "object",
+          "description": "Updated catalog snapshot (shape owned by reader_local_book::LocalBookCatalogSnapshot)."
         }
       }
     },

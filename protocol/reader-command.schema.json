@@ -15,7 +15,10 @@
     "host.bus.v1",
     "http.execute",
     "runtime.config.v1",
-    "remote.reading.v1"
+    "remote.reading.v1",
+    "rss.v1",
+    "sync.v1",
+    "local_book.v1"
   ],
   "x-reader-core-v1-host-capabilities": [
     "host.smoke.echo",
@@ -66,7 +69,13 @@
         "book.detail",
         "book.toc",
         "chapter.content",
-        "reading.progress.update"
+        "reading.progress.update",
+        "rss.parse",
+        "rss.refresh",
+        "sync.merge",
+        "sync.backup",
+        "local_book.parse",
+        "local_book.catalog"
       ]
     },
     "params": {
@@ -227,6 +236,72 @@
       "then": {
         "properties": {
           "params": { "$ref": "#/$defs/ReadingProgressUpdateParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "rss.parse" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/RssParseParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "rss.refresh" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/RssRefreshParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "sync.merge" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/SyncMergeParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "sync.backup" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/SyncBackupParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "local_book.parse" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/LocalBookParseParams" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "local_book.catalog" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "params": { "$ref": "#/$defs/LocalBookCatalogParams" }
         }
       }
     }
@@ -1333,6 +1408,169 @@
           "maximum": 1,
           "default": 0,
           "description": "Fractional progress reported by the host reader for the current chapter."
+        }
+      }
+    },
+    "RssParseParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["xml"],
+      "description": "Parameters for rss.parse. Parses an RSS/Atom XML feed into entries. Pure: no network.",
+      "properties": {
+        "feedUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Optional feed URL used to resolve relative links and self-reference guards."
+        },
+        "xml": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "RSS/Atom XML feed text. Must be non-empty."
+        }
+      }
+    },
+    "RssRefreshParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subscriptionId", "evaluatedAt"],
+      "description": "Parameters for rss.refresh. Pure policy decision: should the subscription be polled now?",
+      "properties": {
+        "subscriptionId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Stable subscription identifier. Must be non-empty."
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether the subscription is enabled for refresh."
+        },
+        "updateIntervalMinutes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Minimum minutes between refreshes. Omitted means no interval bound."
+        },
+        "lastFetchedAt": {
+          "type": "integer",
+          "description": "Unix-millis timestamp of the last successful fetch."
+        },
+        "forceRefresh": {
+          "type": "boolean",
+          "default": false,
+          "description": "Force a refresh decision regardless of interval."
+        },
+        "evaluatedAt": {
+          "type": "integer",
+          "description": "Unix-millis timestamp at which the decision is evaluated."
+        }
+      }
+    },
+    "SyncMergeParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["local", "remote"],
+      "description": "Parameters for sync.merge. Merges two snapshots with deterministic last-write-wins. Pure.",
+      "properties": {
+        "local": {
+          "type": "object",
+          "description": "Local snapshot object (shape owned by reader_sync::SyncSnapshot)."
+        },
+        "remote": {
+          "type": "object",
+          "description": "Remote snapshot object (shape owned by reader_sync::SyncSnapshot)."
+        },
+        "mergedSnapshotId": {
+          "type": "string",
+          "default": "",
+          "description": "Optional stable id for the merged snapshot. Blank lets Core assign one."
+        },
+        "mergedDeviceId": {
+          "type": "string",
+          "default": "",
+          "description": "Optional device id for the merged snapshot."
+        },
+        "mergedCreatedAt": {
+          "type": "integer",
+          "default": 0,
+          "description": "Optional created-at timestamp for the merged snapshot."
+        }
+      }
+    },
+    "SyncBackupParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package", "policy"],
+      "description": "Parameters for sync.backup. Plans backup restore from a manifest. Pure planner.",
+      "properties": {
+        "package": {
+          "type": "object",
+          "description": "Backup package object (shape owned by reader_sync::BackupPackage)."
+        },
+        "policy": {
+          "type": "object",
+          "description": "Restore policy object (shape owned by reader_sync::RestorePolicy)."
+        }
+      }
+    },
+    "LocalBookParseParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bookId", "text"],
+      "description": "Parameters for local_book.parse. Parses a local TXT book into book + toc + chapters. Pure: no network.",
+      "properties": {
+        "bookId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Stable book identifier. Must be non-empty."
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional book title."
+        },
+        "author": {
+          "type": "string",
+          "description": "Optional book author."
+        },
+        "fileName": {
+          "type": "string",
+          "description": "Optional originating file name."
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Already-decoded TXT content. Must be non-empty."
+        }
+      }
+    },
+    "LocalBookCatalogParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["catalog", "entry"],
+      "description": "Parameters for local_book.catalog. Upserts a fingerprint catalog entry. Pure.",
+      "properties": {
+        "catalog": {
+          "type": "object",
+          "description": "Existing catalog snapshot (shape owned by reader_local_book::LocalBookCatalogSnapshot)."
+        },
+        "entry": {
+          "type": "object",
+          "description": "Fingerprint catalog entry to upsert (shape owned by reader_local_book::LocalBookFingerprintCatalogEntry)."
+        },
+        "chapters": {
+          "type": "array",
+          "default": [],
+          "description": "Chapter index entries to add (shape owned by reader_local_book::LocalBookChapterIndexEntry).",
+          "items": { "type": "object" }
+        },
+        "resources": {
+          "type": "array",
+          "default": [],
+          "description": "Resource index entries to add (shape owned by reader_local_book::LocalBookResourceIndexEntry).",
+          "items": { "type": "object" }
         }
       }
     }

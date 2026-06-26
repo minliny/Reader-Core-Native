@@ -1,0 +1,9 @@
+{
+  "protocolVersion": 1,
+  "requestId": 608,
+  "method": "rss.parse",
+  "params": {
+    "feedUrl": "https://books.example.test/feed",
+    "xml": "   "
+  }
+}

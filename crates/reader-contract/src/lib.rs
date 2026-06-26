@@ -38,8 +38,11 @@ pub use remote::{
     BookDetailBookData, BookDetailData, BookDetailParams, BookSearchBookData, BookSearchData,
     BookSearchParams, BookTocData, BookTocEntryData, BookTocParams, ChapterContentData,
     ChapterContentParams, ChapterContentVia, HostHttpCookie, HostHttpRedirect, HostHttpRequest,
-    HostHttpResponse, ReadingProgressUpdateData, ReadingProgressUpdateParams,
-    RemoteHttpDiagnosticsData, SourceImportData, SourceImportParams,
+    HostHttpResponse, LocalBookCatalogData, LocalBookCatalogParams, LocalBookParseData,
+    LocalBookParseParams, ReadingProgressUpdateData, ReadingProgressUpdateParams,
+    RemoteHttpDiagnosticsData, RssParseData, RssParseEntryData, RssParseParams, RssRefreshData,
+    RssRefreshParams, SourceImportData, SourceImportParams, SyncBackupData, SyncBackupParams,
+    SyncMergeData, SyncMergeParams,
 };
 
 /// JSON protocol version. Bumped on non-backward-compatible schema changes.
@@ -74,6 +77,24 @@ pub mod methods {
     pub const CHAPTER_CONTENT: &str = "chapter.content";
     /// Update reading progress/state for a book.
     pub const READING_PROGRESS_UPDATE: &str = "reading.progress.update";
+
+    // --- RSS vertical (V1 minimal) -----------------------------------------
+    /// Parse an RSS/Atom XML feed into entries + diagnostics (pure, no network).
+    pub const RSS_PARSE: &str = "rss.parse";
+    /// Decide whether an RSS subscription should be refreshed (pure policy).
+    pub const RSS_REFRESH: &str = "rss.refresh";
+
+    // --- Sync vertical (V1 minimal) ----------------------------------------
+    /// Merge two sync snapshots with deterministic last-write-wins (pure).
+    pub const SYNC_MERGE: &str = "sync.merge";
+    /// Plan backup restore operations from a manifest (pure planner).
+    pub const SYNC_BACKUP: &str = "sync.backup";
+
+    // --- Local-book vertical (V1 minimal) ----------------------------------
+    /// Parse a local TXT book into book + toc + chapters (pure, no network).
+    pub const LOCAL_BOOK_PARSE: &str = "local_book.parse";
+    /// Upsert a local-book catalog entry (fingerprint + chapters, pure).
+    pub const LOCAL_BOOK_CATALOG: &str = "local_book.catalog";
 }
 
 /// Non-method capability names advertised by `core.info` in v1.
@@ -84,6 +105,12 @@ pub mod capabilities {
     pub const RUNTIME_CONFIG_V1: &str = "runtime.config.v1";
     /// Remote-reading vertical (V1 minimal).
     pub const REMOTE_READING_V1: &str = "remote.reading.v1";
+    /// RSS vertical (V1 minimal): feed parsing + refresh decisions.
+    pub const RSS_V1: &str = "rss.v1";
+    /// Sync vertical (V1 minimal): snapshot merge + backup planning.
+    pub const SYNC_V1: &str = "sync.v1";
+    /// Local-book vertical (V1 minimal): TXT parsing + catalog bookkeeping.
+    pub const LOCAL_BOOK_V1: &str = "local_book.v1";
 }
 
 /// Capabilities advertised by `core.info` in v1.
@@ -100,6 +127,9 @@ pub const V1_CAPABILITIES: &[&str] = &[
     capabilities::HTTP_EXECUTE,
     capabilities::RUNTIME_CONFIG_V1,
     capabilities::REMOTE_READING_V1,
+    capabilities::RSS_V1,
+    capabilities::SYNC_V1,
+    capabilities::LOCAL_BOOK_V1,
 ];
 
 /// Host-owned capabilities Core may request in v1.
@@ -186,6 +216,12 @@ mod tests {
                 methods::BOOK_TOC,
                 methods::CHAPTER_CONTENT,
                 methods::READING_PROGRESS_UPDATE,
+                methods::RSS_PARSE,
+                methods::RSS_REFRESH,
+                methods::SYNC_MERGE,
+                methods::SYNC_BACKUP,
+                methods::LOCAL_BOOK_PARSE,
+                methods::LOCAL_BOOK_CATALOG,
             ]
         );
         assert!(!schema_examples.contains(&methods::LEGACY_CORE_PING));
