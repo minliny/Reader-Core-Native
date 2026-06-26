@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "requestId": 440,
+  "method": "runtime.hostSmoke",
+  "params": {
+    "capability": "cache.put",
+    "params": {
+      "namespace": "remote.response",
+      "key": "search/basic"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "protocolVersion": 1,
+  "requestId": 457,
+  "method": "host.complete",
+  "params": {
+    "operationId": 1,
+    "result": {
+      "info": {
+        "os": "test",
+        "locale": "en-US",
+        "network": "fixture"
+      }
+    }
+  }
+}

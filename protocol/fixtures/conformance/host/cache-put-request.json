@@ -1,0 +1,14 @@
+{
+  "protocolVersion": 1,
+  "requestId": 438,
+  "method": "runtime.hostSmoke",
+  "params": {
+    "capability": "cache.put",
+    "params": {
+      "namespace": "remote.response",
+      "key": "search/basic",
+      "value": "{\"books\":[]}",
+      "ttlMillis": 60000
+    }
+  }
+}

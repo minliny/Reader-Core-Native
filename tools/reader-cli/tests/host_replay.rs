@@ -3,8 +3,10 @@
 //! emits the exact `http.execute` descriptor from the fixture, then resumes with
 //! host-provided response diagnostics.
 
+use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
 
@@ -220,10 +222,84 @@ fn host_replay_suite_runs_remote_reading_e2e() {
     );
 }
 
+#[test]
+fn host_record_outputs_replayable_single_step_fixture() {
+    let recorded = run_host_record_fixture("--host-record", "request_session_search.json");
+
+    assert_eq!(recorded["completionRequestId"], 802);
+    assert_eq!(recorded["command"]["requestId"], 801);
+    assert_eq!(recorded["expectHostRequest"]["capability"], "http.execute");
+    assert_eq!(
+        recorded["expectHostRequest"]["params"]["session"]["id"],
+        "core-session-main"
+    );
+    assert_eq!(recorded["expectResult"]["sourceId"], "host-contract-src");
+    assert_eq!(recorded["expectResult"]["http"]["status"], 200);
+    assert_eq!(
+        recorded["expectResult"]["http"]["finalUrl"],
+        "https://books.example.test/search?q=dune"
+    );
+
+    let path = write_temp_json("host-record-single", &recorded);
+    let events = run_host_replay_path("--host-replay", &path);
+    let _ = fs::remove_file(&path);
+
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0]["type"], "host.request");
+    assert_eq!(events[1]["type"], "result");
+    assert_eq!(events[1]["data"], recorded["expectResult"]);
+}
+
+#[test]
+fn host_record_suite_outputs_replayable_comparison_fixture() {
+    let recorded = run_host_record_fixture("--host-record-suite", "remote_reading_e2e_suite.json");
+    let steps = recorded["steps"].as_array().expect("recorded steps");
+
+    assert_eq!(steps.len(), 4);
+    assert_eq!(steps[0]["name"], "book.search");
+    assert_eq!(steps[0]["completionRequestId"], 1901);
+    assert_eq!(steps[0]["expectHostRequest"]["capability"], "http.execute");
+    assert_eq!(
+        steps[0]["expectHostRequest"]["params"]["headers"]["Cookie"],
+        "sid=old"
+    );
+    assert_eq!(steps[3]["expectResult"]["via"], "rule");
+    assert_eq!(
+        steps[3]["expectResult"]["http"]["headers"]["set-cookie"][0],
+        "sid=chapter; Path=/; HttpOnly"
+    );
+
+    let path = write_temp_json("host-record-suite", &recorded);
+    let events = run_host_replay_path("--host-replay-suite", &path);
+    let _ = fs::remove_file(&path);
+
+    assert_eq!(events.len(), 8);
+    assert_eq!(events[0]["type"], "host.request");
+    assert_eq!(events[7]["type"], "result");
+    assert_eq!(events[7]["data"], steps[3]["expectResult"]);
+}
+
 fn run_host_replay_fixture(mode: &str, name: &str) -> Vec<Value> {
+    run_host_replay_path(mode, &fixture_path(name))
+}
+
+fn run_host_replay_path(mode: &str, path: &PathBuf) -> Vec<Value> {
+    let stdout = run_cli_output(mode, path);
+    stdout
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("each line is a JSON event"))
+        .collect()
+}
+
+fn run_host_record_fixture(mode: &str, name: &str) -> Value {
+    let stdout = run_cli_output(mode, &fixture_path(name));
+    serde_json::from_str(&stdout).expect("record output is a JSON fixture")
+}
+
+fn run_cli_output(mode: &str, path: &PathBuf) -> String {
     let output = Command::new(BIN)
         .arg(mode)
-        .arg(fixture_path(name))
+        .arg(path)
         .output()
         .expect("reader-cli binary");
 
@@ -234,11 +310,21 @@ fn run_host_replay_fixture(mode: &str, name: &str) -> Vec<Value> {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    stdout
-        .lines()
-        .map(|line| serde_json::from_str(line).expect("each line is a JSON event"))
-        .collect()
+    String::from_utf8_lossy(&output.stdout).into_owned()
+}
+
+fn write_temp_json(prefix: &str, value: &Value) -> PathBuf {
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time")
+        .as_nanos();
+    let mut path = std::env::temp_dir();
+    path.push(format!(
+        "reader-cli-{prefix}-{}-{stamp}.json",
+        std::process::id()
+    ));
+    fs::write(&path, serde_json::to_string_pretty(value).unwrap()).unwrap();
+    path
 }
 
 fn assert_host_request(event: &Value, request_id: u64, operation_id: u64, expected_params: Value) {

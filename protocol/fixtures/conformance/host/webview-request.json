@@ -1,0 +1,18 @@
+{
+  "protocolVersion": 1,
+  "requestId": 431,
+  "method": "runtime.hostSmoke",
+  "params": {
+    "capability": "webview.evaluateJavaScript",
+    "params": {
+      "document": {
+        "kind": "html",
+        "body": "<!doctype html><title>Fixture</title><main id=\"book\">Dune</main>",
+        "baseUrl": "https://books.example.test/detail"
+      },
+      "javaScript": "document.querySelector('#book')?.textContent",
+      "timeoutMillis": 3000,
+      "profileId": "core-webview-fixture"
+    }
+  }
+}

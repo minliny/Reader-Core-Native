@@ -1,0 +1,19 @@
+{
+  "protocolVersion": 1,
+  "requestId": 507,
+  "method": "host.complete",
+  "params": {
+    "operationId": 1,
+    "result": {
+      "status": 200,
+      "body": "{\"books\":[]}",
+      "redirects": [
+        {
+          "status": 200,
+          "fromUrl": "https://books.example.test/search",
+          "toUrl": "https://books.example.test/search?q=empty"
+        }
+      ]
+    }
+  }
+}

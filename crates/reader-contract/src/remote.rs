@@ -84,6 +84,14 @@ fn validate_optional_non_blank(value: Option<&str>, field: &'static str) -> Resu
     }
 }
 
+fn validate_required_non_blank(value: &str, field: &'static str) -> Result<(), String> {
+    if value.trim().is_empty() {
+        Err(format!("http.execute {field} must not be blank"))
+    } else {
+        Ok(())
+    }
+}
+
 fn deserialize_non_blank_source_name<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: Deserializer<'de>,
@@ -205,6 +213,55 @@ where
             "remote http diagnostics headers must be an object",
         ))
     }
+}
+
+fn deserialize_remote_http_session<'de, D>(
+    deserializer: D,
+) -> Result<Option<HostHttpSession>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<HostHttpSession>::deserialize(deserializer)?;
+    if let Some(session) = &value {
+        session
+            .validate()
+            .map_err(|err| de::Error::custom(err.message))?;
+    }
+    Ok(value)
+}
+
+fn deserialize_remote_http_redirects<'de, D>(
+    deserializer: D,
+) -> Result<Option<Vec<HostHttpRedirect>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<Vec<HostHttpRedirect>>::deserialize(deserializer)?;
+    if let Some(redirects) = &value {
+        for redirect in redirects {
+            redirect
+                .validate()
+                .map_err(|err| de::Error::custom(err.message))?;
+        }
+    }
+    Ok(value)
+}
+
+fn deserialize_remote_http_cookies<'de, D>(
+    deserializer: D,
+) -> Result<Option<Vec<HostHttpCookie>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<Vec<HostHttpCookie>>::deserialize(deserializer)?;
+    if let Some(cookies) = &value {
+        for cookie in cookies {
+            cookie
+                .validate()
+                .map_err(|err| de::Error::custom(err.message))?;
+        }
+    }
+    Ok(value)
 }
 
 fn deserialize_remote_http_diagnostics<'de, D>(
@@ -406,6 +463,80 @@ impl HostHttpSession {
     }
 }
 
+/// One redirect hop observed by the host HTTP stack.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HostHttpRedirect {
+    pub status: u16,
+    pub from_url: String,
+    pub to_url: String,
+    #[serde(default)]
+    pub headers: Option<Value>,
+}
+
+impl HostHttpRedirect {
+    pub fn validate(&self) -> Result<(), CoreError> {
+        if !(300..=399).contains(&self.status) {
+            return Err(CoreError::invalid_params(
+                "http.execute redirect.status must be between 300 and 399",
+            )
+            .with_details(serde_json::json!({ "redirect": self })));
+        }
+        validate_required_non_blank(&self.from_url, "redirect.fromUrl")
+            .and_then(|_| validate_required_non_blank(&self.to_url, "redirect.toUrl"))
+            .map_err(|message| {
+                CoreError::invalid_params(message)
+                    .with_details(serde_json::json!({ "redirect": self }))
+            })?;
+        if let Some(headers) = &self.headers {
+            if !headers.is_object() {
+                return Err(CoreError::invalid_params(
+                    "http.execute redirect.headers must be an object",
+                )
+                .with_details(serde_json::json!({ "redirect": self })));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Cookie metadata observed or applied by the host HTTP stack.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HostHttpCookie {
+    pub name: String,
+    #[serde(default)]
+    pub value: Option<String>,
+    #[serde(default)]
+    pub domain: Option<String>,
+    #[serde(default)]
+    pub path: Option<String>,
+    #[serde(default)]
+    pub expires_at: Option<String>,
+    #[serde(default)]
+    pub http_only: Option<bool>,
+    #[serde(default)]
+    pub secure: Option<bool>,
+    #[serde(default)]
+    pub same_site: Option<String>,
+}
+
+impl HostHttpCookie {
+    pub fn validate(&self) -> Result<(), CoreError> {
+        validate_required_non_blank(&self.name, "cookie.name")
+            .and_then(|_| validate_optional_non_blank(self.domain.as_deref(), "cookie.domain"))
+            .and_then(|_| validate_optional_non_blank(self.path.as_deref(), "cookie.path"))
+            .and_then(|_| {
+                validate_optional_non_blank(self.expires_at.as_deref(), "cookie.expiresAt")
+            })
+            .and_then(|_| validate_optional_non_blank(self.same_site.as_deref(), "cookie.sameSite"))
+            .map_err(|message| {
+                CoreError::invalid_params(message)
+                    .with_details(serde_json::json!({ "cookie": self }))
+            })
+    }
+}
+
 impl HostHttpRequest {
     pub fn validate(&self) -> Result<(), CoreError> {
         if let Err(message) = validate_http_url_scalar(&self.url) {
@@ -475,6 +606,10 @@ pub struct HostHttpResponse {
     pub body_base64: Option<String>,
     #[serde(default)]
     pub session: Option<HostHttpSession>,
+    #[serde(default)]
+    pub redirects: Option<Vec<HostHttpRedirect>>,
+    #[serde(default)]
+    pub cookies: Option<Vec<HostHttpCookie>>,
 }
 
 impl HostHttpResponse {
@@ -523,6 +658,18 @@ impl HostHttpResponse {
 
         if let Some(session) = &self.session {
             session.validate()?;
+        }
+
+        if let Some(redirects) = &self.redirects {
+            for redirect in redirects {
+                redirect.validate()?;
+            }
+        }
+
+        if let Some(cookies) = &self.cookies {
+            for cookie in cookies {
+                cookie.validate()?;
+            }
         }
 
         Ok(())
@@ -598,8 +745,12 @@ pub struct RemoteHttpDiagnosticsData {
     pub final_url: Option<String>,
     #[serde(default)]
     pub charset_hint: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_remote_http_session")]
     pub session: Option<HostHttpSession>,
+    #[serde(default, deserialize_with = "deserialize_remote_http_redirects")]
+    pub redirects: Option<Vec<HostHttpRedirect>>,
+    #[serde(default, deserialize_with = "deserialize_remote_http_cookies")]
+    pub cookies: Option<Vec<HostHttpCookie>>,
 }
 
 /// Minimal stable book shape returned by `book.search`.
@@ -825,7 +976,26 @@ mod tests {
             "finalUrl": "https://books.example.test/search",
             "charsetHint": "gbk",
             "bodyBase64": "eyJib29rcyI6W119",
-            "session": { "id": "core-session-main" }
+            "session": { "id": "core-session-main" },
+            "redirects": [
+                {
+                    "status": 302,
+                    "fromUrl": "https://books.example.test/search",
+                    "toUrl": "https://books.example.test/search?q=empty",
+                    "headers": { "location": "/search?q=empty" }
+                }
+            ],
+            "cookies": [
+                {
+                    "name": "sid",
+                    "value": "new",
+                    "domain": "books.example.test",
+                    "path": "/",
+                    "httpOnly": true,
+                    "secure": true,
+                    "sameSite": "Lax"
+                }
+            ]
         }))
         .unwrap();
 
@@ -845,6 +1015,11 @@ mod tests {
             response.session.as_ref().map(|session| session.id.as_str()),
             Some("core-session-main")
         );
+        assert_eq!(
+            response.redirects.as_ref().unwrap()[0].to_url,
+            "https://books.example.test/search?q=empty"
+        );
+        assert_eq!(response.cookies.as_ref().unwrap()[0].name, "sid");
     }
 
     #[test]
@@ -966,6 +1141,38 @@ mod tests {
         let err = response.validate().unwrap_err();
         assert_eq!(err.code, ErrorCode::InvalidParams);
         assert!(err.message.contains("headers"));
+    }
+
+    #[test]
+    fn host_http_response_rejects_invalid_redirect_and_cookie_metadata() {
+        let response: HostHttpResponse = serde_json::from_value(serde_json::json!({
+            "body": "{\"books\":[]}",
+            "redirects": [
+                {
+                    "status": 200,
+                    "fromUrl": "https://books.example.test/search",
+                    "toUrl": "https://books.example.test/search?q=empty"
+                }
+            ]
+        }))
+        .unwrap();
+        let err = response.validate().unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert!(err.message.contains("redirect.status"));
+
+        let response: HostHttpResponse = serde_json::from_value(serde_json::json!({
+            "body": "{\"books\":[]}",
+            "cookies": [
+                {
+                    "name": "   ",
+                    "value": "new"
+                }
+            ]
+        }))
+        .unwrap();
+        let err = response.validate().unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidParams);
+        assert!(err.message.contains("cookie.name"));
     }
 
     #[test]

@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "requestId": 463,
+  "method": "runtime.hostSmoke",
+  "params": {
+    "capability": "log.emit",
+    "params": {
+      "level": "info",
+      "message": "   "
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "requestId": 434,
+  "method": "host.complete",
+  "params": {
+    "operationId": 1,
+    "result": {
+      "value": "Dune",
+      "finalUrl": "   "
+    }
+  }
+}

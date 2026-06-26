@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "requestId": 442,
+  "method": "host.complete",
+  "params": {
+    "operationId": 1,
+    "result": {
+      "encoding": "utf-8"
+    }
+  }
+}

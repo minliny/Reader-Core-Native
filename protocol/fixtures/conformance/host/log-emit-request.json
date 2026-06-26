@@ -1,0 +1,16 @@
+{
+  "protocolVersion": 1,
+  "requestId": 452,
+  "method": "runtime.hostSmoke",
+  "params": {
+    "capability": "log.emit",
+    "params": {
+      "level": "info",
+      "message": "host capability smoke",
+      "target": "reader-core",
+      "fields": {
+        "operation": "log.emit"
+      }
+    }
+  }
+}

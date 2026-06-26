@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "requestId": 439,
+  "method": "runtime.hostSmoke",
+  "params": {
+    "capability": "file.read",
+    "params": {
+      "path": "   "
+    }
+  }
+}

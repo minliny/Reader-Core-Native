@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "requestId": 462,
+  "method": "runtime.hostSmoke",
+  "params": {
+    "capability": "cookie.get",
+    "params": {
+      "name": "sid"
+    }
+  }
+}

@@ -13,7 +13,7 @@ use std::sync::mpsc::{self, Receiver};
 use std::sync::Arc;
 use std::time::Duration;
 
-use reader_contract::{methods, Command, CoreError, Event};
+use reader_contract::{methods, Command, CoreError, Event, HostCapability};
 use reader_runtime::{EventSink, Runtime};
 use serde_json::Value;
 
@@ -46,6 +46,12 @@ enum Mode {
     /// Replay a sequence of host HTTP request/complete pairs against one
     /// runtime instance.
     HostReplaySuite(PathBuf),
+    /// Execute a host replay input and print a normalized fixture with
+    /// recorded host request/result expectations.
+    HostRecord(PathBuf),
+    /// Execute a host replay suite input and print a normalized suite fixture
+    /// with recorded expectations.
+    HostRecordSuite(PathBuf),
 }
 
 fn main() {
@@ -109,6 +115,8 @@ fn run() -> Result<(), CoreError> {
         Mode::FixtureVertical(path) => run_fixture_vertical(&runtime, &rx, &path),
         Mode::HostReplay(path) => run_host_replay(&runtime, &rx, &path),
         Mode::HostReplaySuite(path) => run_host_replay_suite(&runtime, &rx, &path),
+        Mode::HostRecord(path) => run_host_record(&runtime, &rx, &path),
+        Mode::HostRecordSuite(path) => run_host_record_suite(&runtime, &rx, &path),
     }
 }
 
@@ -152,6 +160,22 @@ where
                 };
                 set_mode(&mut mode, Mode::HostReplaySuite(PathBuf::from(path)))?;
             }
+            "--host-record" => {
+                let Some(path) = iter.next() else {
+                    return Err(CoreError::invalid_message(
+                        "--host-record requires a path to a fixture JSON file",
+                    ));
+                };
+                set_mode(&mut mode, Mode::HostRecord(PathBuf::from(path)))?;
+            }
+            "--host-record-suite" => {
+                let Some(path) = iter.next() else {
+                    return Err(CoreError::invalid_message(
+                        "--host-record-suite requires a path to a fixture JSON file",
+                    ));
+                };
+                set_mode(&mut mode, Mode::HostRecordSuite(PathBuf::from(path)))?;
+            }
             "--json" => {
                 let Some(json) = iter.next() else {
                     return Err(CoreError::invalid_message(
@@ -186,7 +210,7 @@ where
 fn set_mode(slot: &mut Option<Mode>, mode: Mode) -> Result<(), CoreError> {
     if slot.is_some() {
         return Err(CoreError::invalid_message(
-            "only one of --info, --ping, --status, --host-smoke, --conformance, --json, --stdin, --fixture-vertical, --host-replay, or --host-replay-suite may be used",
+            "only one of --info, --ping, --status, --host-smoke, --conformance, --json, --stdin, --fixture-vertical, --host-replay, --host-replay-suite, --host-record, or --host-record-suite may be used",
         ));
     }
     *slot = Some(mode);
@@ -327,7 +351,7 @@ fn run_fixture_vertical(
             operation_id,
             capability,
             ..
-        } if capability == "http.execute" => operation_id,
+        } if capability == HostCapability::HttpExecute => operation_id,
         other => {
             return Err(CoreError::internal(format!(
                 "expected http.execute host.request event, got {other:?}"
@@ -454,6 +478,40 @@ fn run_host_replay_suite(
     Ok(())
 }
 
+fn run_host_record(
+    runtime: &Runtime,
+    rx: &Receiver<Event>,
+    path: &PathBuf,
+) -> Result<(), CoreError> {
+    let fixture = read_json_fixture(path, "host record fixture")?;
+    let recording = record_host_replay_step(runtime, rx, &fixture)?;
+    print_json_value(&recording);
+    Ok(())
+}
+
+fn run_host_record_suite(
+    runtime: &Runtime,
+    rx: &Receiver<Event>,
+    path: &PathBuf,
+) -> Result<(), CoreError> {
+    let fixture = read_json_fixture(path, "host record suite fixture")?;
+    let steps = fixture
+        .get("steps")
+        .and_then(Value::as_array)
+        .ok_or_else(|| CoreError::invalid_message("host record suite fixture missing `steps`"))?;
+    if steps.is_empty() {
+        return Err(CoreError::invalid_message(
+            "host record suite fixture `steps` must not be empty",
+        ));
+    }
+    let recorded_steps = steps
+        .iter()
+        .map(|step| record_host_replay_step(runtime, rx, step))
+        .collect::<Result<Vec<_>, _>>()?;
+    print_json_value(&serde_json::json!({ "steps": recorded_steps }));
+    Ok(())
+}
+
 fn read_json_fixture(path: &PathBuf, label: &str) -> Result<Value, CoreError> {
     let raw = fs::read_to_string(path).map_err(|err| {
         CoreError::invalid_message(format!("failed to read {label} {}", path.display()))
@@ -465,11 +523,7 @@ fn read_json_fixture(path: &PathBuf, label: &str) -> Result<Value, CoreError> {
     })
 }
 
-fn run_host_replay_step(
-    runtime: &Runtime,
-    rx: &Receiver<Event>,
-    fixture: &Value,
-) -> Result<(), CoreError> {
+fn parse_replay_command(fixture: &Value) -> Result<(Command, Value), CoreError> {
     let command_value = fixture
         .get("command")
         .cloned()
@@ -479,14 +533,34 @@ fn run_host_replay_step(
             .with_details(serde_json::json!({ "source": err.to_string() }))
     })?;
     let command = Command::from_json_bytes(&command_json)?;
-    let completion_request_id = match fixture.get("completionRequestId") {
+    Ok((command, command_value))
+}
+
+fn replay_completion_request_id(command: &Command, fixture: &Value) -> Result<u64, CoreError> {
+    match fixture.get("completionRequestId") {
         Some(value) => value.as_u64().filter(|id| *id > 0).ok_or_else(|| {
             CoreError::invalid_message("host replay completionRequestId must be a positive integer")
-        })?,
+        }),
         None => command.request_id.checked_add(1).ok_or_else(|| {
             CoreError::invalid_message("host replay command requestId is too large")
-        })?,
-    };
+        }),
+    }
+}
+
+fn host_result_for_replay(fixture: &Value) -> Result<Value, CoreError> {
+    fixture
+        .get("hostResult")
+        .cloned()
+        .ok_or_else(|| CoreError::invalid_message("host replay fixture missing `hostResult`"))
+}
+
+fn run_host_replay_step(
+    runtime: &Runtime,
+    rx: &Receiver<Event>,
+    fixture: &Value,
+) -> Result<(), CoreError> {
+    let (command, _) = parse_replay_command(fixture)?;
+    let completion_request_id = replay_completion_request_id(&command, fixture)?;
 
     runtime.send(command)?;
 
@@ -502,11 +576,12 @@ fn run_host_replay_step(
                 ..
             } => {
                 if let Some(expected) = fixture.get("expectHostRequest") {
-                    if expected.get("capability") != Some(&Value::String(capability.clone())) {
+                    let actual_capability = Value::String(capability.as_str().to_string());
+                    if expected.get("capability") != Some(&actual_capability) {
                         return Err(CoreError::internal("host replay capability mismatch")
                             .with_details(serde_json::json!({
                                 "expected": expected.get("capability"),
-                                "actual": capability,
+                                "actual": capability.as_str(),
                             })));
                     }
                     if expected.get("params") != Some(params) {
@@ -526,10 +601,7 @@ fn run_host_replay_step(
             }
         };
 
-    let host_result = fixture
-        .get("hostResult")
-        .cloned()
-        .ok_or_else(|| CoreError::invalid_message("host replay fixture missing `hostResult`"))?;
+    let host_result = host_result_for_replay(fixture)?;
     runtime.send(Command::new(
         completion_request_id,
         methods::HOST_COMPLETE,
@@ -587,6 +659,80 @@ fn run_host_replay_step(
     Ok(())
 }
 
+fn record_host_replay_step(
+    runtime: &Runtime,
+    rx: &Receiver<Event>,
+    fixture: &Value,
+) -> Result<Value, CoreError> {
+    let (command, command_value) = parse_replay_command(fixture)?;
+    let completion_request_id = replay_completion_request_id(&command, fixture)?;
+
+    runtime.send(command)?;
+    let host_request = recv_event(rx)?;
+    let (operation_id, expect_host_request) = match host_request {
+        Event::HostRequest {
+            operation_id,
+            capability,
+            params,
+            ..
+        } => (
+            operation_id,
+            serde_json::json!({
+                "capability": capability.as_str(),
+                "params": params,
+            }),
+        ),
+        other => {
+            return Err(CoreError::internal(format!(
+                "expected host.request event, got {other:?}"
+            )));
+        }
+    };
+
+    let host_result = host_result_for_replay(fixture)?;
+    runtime.send(Command::new(
+        completion_request_id,
+        methods::HOST_COMPLETE,
+        serde_json::json!({
+            "operationId": operation_id,
+            "result": host_result,
+        }),
+    ))?;
+
+    let result = recv_event(rx)?;
+    let expect_result = match result {
+        Event::Result { data, .. } => data,
+        Event::Error { error, .. } => {
+            return Err(
+                CoreError::internal("host record expected result event").with_details(
+                    serde_json::json!({
+                        "error": error,
+                    }),
+                ),
+            );
+        }
+        other => {
+            return Err(CoreError::internal(format!(
+                "expected result event after host.complete, got {other:?}"
+            )));
+        }
+    };
+
+    let mut output = serde_json::Map::new();
+    if let Some(name) = fixture.get("name").cloned() {
+        output.insert("name".to_string(), name);
+    }
+    output.insert(
+        "completionRequestId".to_string(),
+        serde_json::json!(completion_request_id),
+    );
+    output.insert("command".to_string(), command_value);
+    output.insert("expectHostRequest".to_string(), expect_host_request);
+    output.insert("hostResult".to_string(), host_result);
+    output.insert("expectResult".to_string(), expect_result);
+    Ok(Value::Object(output))
+}
+
 fn print_next_event(rx: &Receiver<Event>) -> Result<(), CoreError> {
     let event = recv_event(rx)?;
     print_event(&event);
@@ -602,8 +748,15 @@ fn print_event(event: &Event) {
     println!("{}", serde_json::to_string(event).unwrap_or_default());
 }
 
+fn print_json_value(value: &Value) {
+    println!(
+        "{}",
+        serde_json::to_string_pretty(value).unwrap_or_default()
+    );
+}
+
 fn print_usage() {
     eprintln!(
-        "usage: reader-cli [--info|--ping|--status|--host-smoke|--conformance|--json '<command>'|--stdin|--fixture-vertical <path>|--host-replay <path>|--host-replay-suite <path>] [--config-json '<config>']"
+        "usage: reader-cli [--info|--ping|--status|--host-smoke|--conformance|--json '<command>'|--stdin|--fixture-vertical <path>|--host-replay <path>|--host-replay-suite <path>|--host-record <path>|--host-record-suite <path>] [--config-json '<config>']"
     );
 }

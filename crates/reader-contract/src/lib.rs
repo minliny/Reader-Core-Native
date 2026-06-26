@@ -21,16 +21,25 @@ pub use core_info::{core_info, CoreInfoData};
 pub use error::{CoreError, ErrorCode};
 pub use event::Event;
 pub use host::{
-    HostCompleteParams, HostErrorParams, HostSmokeParams, PendingHostOperationStatus,
-    RuntimeCancelData, RuntimeCancelParams, RuntimePingData, RuntimeShutdownData,
-    RuntimeShutdownParams, RuntimeStatus, RuntimeStatusParams,
+    HostCacheGetRequest, HostCacheGetResponse, HostCachePutRequest, HostCachePutResponse,
+    HostCapability, HostCompleteParams, HostCookieGetRequest, HostCookieGetResponse,
+    HostCookieRecord, HostCookieSetRequest, HostCookieSetResponse, HostErrorCode,
+    HostErrorDiagnostics, HostErrorParams, HostErrorPhase, HostFileReadRequest,
+    HostFileReadResponse, HostFileWriteRequest, HostFileWriteResponse, HostLogEmitRequest,
+    HostLogEmitResponse, HostLogLevel, HostPersistenceGetRequest, HostPersistenceGetResponse,
+    HostPersistencePutRequest, HostPersistencePutResponse, HostSmokeParams, HostSystemInfoRequest,
+    HostSystemInfoResponse, HostTimeNowRequest, HostTimeNowResponse, HostWebViewDocument,
+    HostWebViewDocumentKind, HostWebViewEvaluateJavaScriptRequest,
+    HostWebViewEvaluateJavaScriptResponse, PendingHostOperationStatus, RuntimeCancelData,
+    RuntimeCancelParams, RuntimePingData, RuntimeShutdownData, RuntimeShutdownParams,
+    RuntimeStatus, RuntimeStatusParams,
 };
 pub use remote::{
     BookDetailBookData, BookDetailData, BookDetailParams, BookSearchBookData, BookSearchData,
     BookSearchParams, BookTocData, BookTocEntryData, BookTocParams, ChapterContentData,
-    ChapterContentParams, ChapterContentVia, HostHttpRequest, HostHttpResponse,
-    ReadingProgressUpdateData, ReadingProgressUpdateParams, RemoteHttpDiagnosticsData,
-    SourceImportData, SourceImportParams,
+    ChapterContentParams, ChapterContentVia, HostHttpCookie, HostHttpRedirect, HostHttpRequest,
+    HostHttpResponse, ReadingProgressUpdateData, ReadingProgressUpdateParams,
+    RemoteHttpDiagnosticsData, SourceImportData, SourceImportParams,
 };
 
 /// JSON protocol version. Bumped on non-backward-compatible schema changes.
@@ -93,9 +102,13 @@ pub const V1_CAPABILITIES: &[&str] = &[
     capabilities::REMOTE_READING_V1,
 ];
 
+/// Host-owned capabilities Core may request in v1.
+pub const V1_HOST_CAPABILITIES: &[HostCapability] = HostCapability::ALL;
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::Serialize;
     use serde_json::Value;
 
     #[test]
@@ -114,6 +127,34 @@ mod tests {
             .map(|value| value.as_str().expect("capability must be a string"))
             .collect::<Vec<_>>();
         assert_eq!(info_capabilities, schema_capabilities);
+    }
+
+    #[test]
+    fn schema_host_capability_extensions_match_contract_enum() {
+        let command_schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+        let event_schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+        let expected = host_capability_strings();
+
+        assert_eq!(
+            strings_at(&command_schema, "x-reader-core-v1-host-capabilities"),
+            expected
+        );
+        assert_eq!(
+            strings_at(&event_schema, "x-reader-core-v1-host-capabilities"),
+            expected
+        );
+        assert_eq!(
+            strings_at(&command_schema["$defs"]["HostCapability"], "enum"),
+            expected
+        );
+        assert_eq!(
+            strings_at(&event_schema["$defs"]["HostCapability"], "enum"),
+            expected
+        );
     }
 
     #[test]
@@ -209,9 +250,302 @@ mod tests {
             serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
                 .expect("command schema must be valid JSON");
         let params = &schema["$defs"]["HostSmokeParams"]["properties"]["params"];
+        let capability = &schema["$defs"]["HostSmokeParams"]["properties"]["capability"];
 
         assert_eq!(params["type"], serde_json::json!("object"));
         assert_eq!(params["default"], serde_json::json!({}));
+        assert_eq!(
+            capability["$ref"],
+            serde_json::json!("#/$defs/HostCapability")
+        );
+        assert_eq!(
+            capability["default"],
+            serde_json::json!(HostCapability::HostSmokeEcho.as_str())
+        );
+    }
+
+    #[test]
+    fn command_schema_defines_host_error_diagnostics_contract() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+        let diagnostics = &schema["$defs"]["HostErrorParams"]["properties"]["diagnostics"];
+        let diagnostics_def = &schema["$defs"]["HostErrorDiagnostics"];
+
+        assert_eq!(
+            diagnostics["$ref"],
+            serde_json::json!("#/$defs/HostErrorDiagnostics")
+        );
+        assert_eq!(
+            strings_at(diagnostics_def, "required"),
+            vec!["code", "phase"]
+        );
+        assert_eq!(
+            diagnostics_def["additionalProperties"],
+            serde_json::json!(false)
+        );
+        assert_eq!(
+            diagnostics_def["properties"]["code"]["$ref"],
+            serde_json::json!("#/$defs/HostErrorCode")
+        );
+        assert_eq!(
+            diagnostics_def["properties"]["phase"]["$ref"],
+            serde_json::json!("#/$defs/HostErrorPhase")
+        );
+        assert_eq!(
+            diagnostics_def["properties"]["details"]["type"],
+            serde_json::json!("object")
+        );
+        assert_eq!(
+            owned_strings_at(&schema["$defs"]["HostErrorCode"], "enum"),
+            serialize_enum_strings(&[
+                HostErrorCode::CapabilityUnavailable,
+                HostErrorCode::PermissionDenied,
+                HostErrorCode::Timeout,
+                HostErrorCode::NetworkError,
+                HostErrorCode::TlsError,
+                HostErrorCode::HttpError,
+                HostErrorCode::InvalidResponse,
+                HostErrorCode::Cancelled,
+                HostErrorCode::Internal,
+            ])
+        );
+        assert_eq!(
+            owned_strings_at(&schema["$defs"]["HostErrorPhase"], "enum"),
+            serialize_enum_strings(&[
+                HostErrorPhase::Request,
+                HostErrorPhase::Transport,
+                HostErrorPhase::Response,
+                HostErrorPhase::Decode,
+                HostErrorPhase::Storage,
+                HostErrorPhase::Runtime,
+            ])
+        );
+    }
+
+    #[test]
+    fn schemas_define_webview_evaluate_javascript_contract() {
+        let command_schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+        let event_schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+        let request = &command_schema["$defs"]["HostWebViewEvaluateJavaScriptRequest"];
+        let response = &command_schema["$defs"]["HostWebViewEvaluateJavaScriptResponse"];
+        let document = &command_schema["$defs"]["HostWebViewDocument"];
+
+        assert_eq!(
+            strings_at(request, "required"),
+            vec!["document", "javaScript"]
+        );
+        assert_eq!(request["additionalProperties"], serde_json::json!(false));
+        assert_eq!(
+            request["properties"]["document"]["$ref"],
+            serde_json::json!("#/$defs/HostWebViewDocument")
+        );
+        assert_eq!(
+            request["properties"]["javaScript"]["pattern"],
+            serde_json::json!("\\S")
+        );
+        assert_eq!(
+            request["properties"]["timeoutMillis"]["minimum"],
+            serde_json::json!(1)
+        );
+        assert_eq!(strings_at(response, "required"), vec!["value"]);
+        assert_eq!(response["additionalProperties"], serde_json::json!(false));
+        assert_eq!(document["additionalProperties"], serde_json::json!(false));
+        assert_eq!(
+            document["properties"]["kind"]["enum"],
+            serde_json::json!(["html", "url"])
+        );
+        assert_eq!(
+            command_schema["$defs"]["HostSmokeParams"]["allOf"][0]["then"]["properties"]["params"]
+                ["$ref"],
+            serde_json::json!("#/$defs/HostWebViewEvaluateJavaScriptRequest")
+        );
+        assert_eq!(
+            event_schema["$defs"]["HostRequestEvent"]["allOf"][0]["then"]["properties"]["params"]
+                ["$ref"],
+            serde_json::json!("#/$defs/HostWebViewEvaluateJavaScriptRequest")
+        );
+        assert_eq!(
+            event_schema["$defs"]["HostWebViewEvaluateJavaScriptRequest"]["properties"]
+                ["javaScript"]["pattern"],
+            serde_json::json!("\\S")
+        );
+    }
+
+    #[test]
+    fn schemas_define_remaining_host_capability_contracts() {
+        let command_schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+        let event_schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
+                .expect("event schema must be valid JSON");
+
+        for (capability, request_ref) in [
+            ("file.read", "#/$defs/HostFileReadRequest"),
+            ("file.write", "#/$defs/HostFileWriteRequest"),
+            ("cache.get", "#/$defs/HostCacheGetRequest"),
+            ("cache.put", "#/$defs/HostCachePutRequest"),
+            ("cookie.get", "#/$defs/HostCookieGetRequest"),
+            ("cookie.set", "#/$defs/HostCookieSetRequest"),
+            ("log.emit", "#/$defs/HostLogEmitRequest"),
+            ("time.now", "#/$defs/HostTimeNowRequest"),
+            ("system.info", "#/$defs/HostSystemInfoRequest"),
+            ("persistence.get", "#/$defs/HostPersistenceGetRequest"),
+            ("persistence.put", "#/$defs/HostPersistencePutRequest"),
+        ] {
+            assert_eq!(
+                capability_params_ref(&command_schema["$defs"]["HostSmokeParams"], capability),
+                Some(request_ref),
+                "HostSmokeParams must bind {capability} request params"
+            );
+            assert_eq!(
+                capability_params_ref(&event_schema["$defs"]["HostRequestEvent"], capability),
+                Some(request_ref),
+                "HostRequestEvent must bind {capability} request params"
+            );
+        }
+
+        let file_read_request = &command_schema["$defs"]["HostFileReadRequest"];
+        assert_eq!(strings_at(file_read_request, "required"), vec!["path"]);
+        assert_eq!(
+            file_read_request["properties"]["path"]["pattern"],
+            serde_json::json!("\\S")
+        );
+        assert_eq!(
+            file_read_request["properties"]["maxBytes"]["minimum"],
+            serde_json::json!(1)
+        );
+
+        let file_read_response = &command_schema["$defs"]["HostFileReadResponse"];
+        assert_eq!(
+            file_read_response["additionalProperties"],
+            serde_json::json!(false)
+        );
+        assert_eq!(
+            file_read_response["oneOf"].as_array().map(Vec::len),
+            Some(2)
+        );
+
+        let file_write_response = &command_schema["$defs"]["HostFileWriteResponse"];
+        assert_eq!(
+            file_write_response["properties"]["written"]["const"],
+            serde_json::json!(true)
+        );
+
+        let cache_get_request = &command_schema["$defs"]["HostCacheGetRequest"];
+        assert_eq!(
+            strings_at(cache_get_request, "required"),
+            vec!["namespace", "key"]
+        );
+        assert_eq!(
+            cache_get_request["properties"]["namespace"]["pattern"],
+            serde_json::json!("\\S")
+        );
+
+        let cache_get_response = &command_schema["$defs"]["HostCacheGetResponse"];
+        assert_eq!(strings_at(cache_get_response, "required"), vec!["hit"]);
+        assert_eq!(
+            cache_get_response["allOf"][0]["then"]["oneOf"]
+                .as_array()
+                .map(Vec::len),
+            Some(2)
+        );
+
+        let cache_put_request = &command_schema["$defs"]["HostCachePutRequest"];
+        assert_eq!(
+            strings_at(cache_put_request, "required"),
+            vec!["namespace", "key"]
+        );
+        assert_eq!(
+            cache_put_request["properties"]["ttlMillis"]["minimum"],
+            serde_json::json!(1)
+        );
+
+        let cache_put_response = &command_schema["$defs"]["HostCachePutResponse"];
+        assert_eq!(
+            cache_put_response["properties"]["stored"]["const"],
+            serde_json::json!(true)
+        );
+
+        let cookie_record = &command_schema["$defs"]["HostCookieRecord"];
+        assert_eq!(strings_at(cookie_record, "required"), vec!["name"]);
+        assert_eq!(
+            cookie_record["properties"]["name"]["pattern"],
+            serde_json::json!("\\S")
+        );
+        let cookie_get_request = &command_schema["$defs"]["HostCookieGetRequest"];
+        assert_eq!(
+            cookie_get_request["anyOf"].as_array().map(Vec::len),
+            Some(3)
+        );
+        let cookie_get_response = &command_schema["$defs"]["HostCookieGetResponse"];
+        assert_eq!(strings_at(cookie_get_response, "required"), vec!["cookies"]);
+        assert_eq!(
+            cookie_get_response["properties"]["cookies"]["items"]["$ref"],
+            serde_json::json!("#/$defs/HostCookieRecord")
+        );
+        let cookie_set_response = &command_schema["$defs"]["HostCookieSetResponse"];
+        assert_eq!(
+            cookie_set_response["properties"]["stored"]["const"],
+            serde_json::json!(true)
+        );
+
+        let log_request = &command_schema["$defs"]["HostLogEmitRequest"];
+        assert_eq!(
+            strings_at(log_request, "required"),
+            vec!["level", "message"]
+        );
+        assert_eq!(
+            command_schema["$defs"]["HostLogLevel"]["enum"],
+            serde_json::json!(["trace", "debug", "info", "warn", "error"])
+        );
+        assert_eq!(
+            command_schema["$defs"]["HostLogEmitResponse"]["properties"]["emitted"]["const"],
+            serde_json::json!(true)
+        );
+
+        let time_response = &command_schema["$defs"]["HostTimeNowResponse"];
+        assert_eq!(
+            strings_at(time_response, "required"),
+            vec!["unixMillis", "iso8601"]
+        );
+        assert_eq!(
+            time_response["properties"]["iso8601"]["pattern"],
+            serde_json::json!("\\S")
+        );
+
+        let system_info_response = &command_schema["$defs"]["HostSystemInfoResponse"];
+        assert_eq!(
+            system_info_response["properties"]["info"]["type"],
+            serde_json::json!("object")
+        );
+
+        let persistence_get_request = &command_schema["$defs"]["HostPersistenceGetRequest"];
+        assert_eq!(
+            strings_at(persistence_get_request, "required"),
+            vec!["namespace", "key"]
+        );
+        let persistence_get_response = &command_schema["$defs"]["HostPersistenceGetResponse"];
+        assert_eq!(
+            strings_at(persistence_get_response, "required"),
+            vec!["found"]
+        );
+        assert_eq!(
+            persistence_get_response["allOf"][0]["then"]["oneOf"]
+                .as_array()
+                .map(Vec::len),
+            Some(2)
+        );
+        let persistence_put_response = &command_schema["$defs"]["HostPersistencePutResponse"];
+        assert_eq!(
+            persistence_put_response["properties"]["stored"]["const"],
+            serde_json::json!(true)
+        );
     }
 
     #[test]
@@ -355,6 +689,60 @@ mod tests {
 
         assert_eq!(url["minLength"], serde_json::json!(1));
         assert_eq!(url["pattern"], serde_json::json!("\\S"));
+    }
+
+    #[test]
+    fn command_schema_defines_host_http_response_redirect_cookie_metadata() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+        let response = &schema["$defs"]["HostHttpResponse"];
+        let redirect = &schema["$defs"]["HostHttpRedirect"];
+        let cookie = &schema["$defs"]["HostHttpCookie"];
+
+        assert_eq!(
+            response["properties"]["redirects"]["items"]["$ref"],
+            serde_json::json!("#/$defs/HostHttpRedirect")
+        );
+        assert_eq!(
+            response["properties"]["cookies"]["items"]["$ref"],
+            serde_json::json!("#/$defs/HostHttpCookie")
+        );
+        assert_eq!(redirect["additionalProperties"], serde_json::json!(false));
+        assert_eq!(
+            strings_at(redirect, "required"),
+            vec!["status", "fromUrl", "toUrl"]
+        );
+        assert_eq!(
+            redirect["properties"]["status"]["minimum"],
+            serde_json::json!(300)
+        );
+        assert_eq!(
+            redirect["properties"]["status"]["maximum"],
+            serde_json::json!(399)
+        );
+        assert_eq!(
+            redirect["properties"]["headers"]["type"],
+            serde_json::json!("object")
+        );
+        assert_eq!(cookie["additionalProperties"], serde_json::json!(false));
+        assert_eq!(strings_at(cookie, "required"), vec!["name"]);
+        assert_eq!(
+            cookie["properties"]["name"]["pattern"],
+            serde_json::json!("\\S")
+        );
+        assert_eq!(
+            cookie["properties"]["domain"]["pattern"],
+            serde_json::json!("\\S")
+        );
+        assert_eq!(
+            cookie["properties"]["httpOnly"]["type"],
+            serde_json::json!("boolean")
+        );
+        assert_eq!(
+            cookie["properties"]["secure"]["type"],
+            serde_json::json!("boolean")
+        );
     }
 
     #[test]
@@ -528,15 +916,19 @@ mod tests {
     }
 
     #[test]
-    fn event_schema_requires_host_request_capability_token_path() {
+    fn event_schema_defines_host_capability_enum() {
         let schema: Value =
             serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
                 .expect("event schema must be valid JSON");
-        let capability = &schema["$defs"]["HostRequestEvent"]["properties"]["capability"];
+        let capability = &schema["$defs"]["HostCapability"];
+        let values = strings_at(capability, "enum");
+        let expected = host_capability_strings();
 
+        assert_eq!(capability["type"], serde_json::json!("string"));
+        assert_eq!(values, expected);
         assert_eq!(
-            capability["pattern"],
-            serde_json::json!("^[^\\s.]+(\\.[^\\s.]+)+$")
+            schema["$defs"]["HostRequestEvent"]["properties"]["capability"]["$ref"],
+            serde_json::json!("#/$defs/HostCapability")
         );
     }
 
@@ -588,15 +980,15 @@ mod tests {
     }
 
     #[test]
-    fn event_schema_requires_pending_host_operation_capability_token_path() {
+    fn event_schema_uses_host_capability_for_pending_host_operations() {
         let schema: Value =
             serde_json::from_str(include_str!("../../../protocol/reader-event.schema.json"))
                 .expect("event schema must be valid JSON");
         let capability = &schema["$defs"]["PendingHostOperationStatus"]["properties"]["capability"];
 
         assert_eq!(
-            capability["pattern"],
-            serde_json::json!("^[^\\s.]+(\\.[^\\s.]+)+$")
+            capability["$ref"],
+            serde_json::json!("#/$defs/HostCapability")
         );
     }
 
@@ -729,6 +1121,14 @@ mod tests {
         assert_eq!(
             http["properties"]["headers"]["type"],
             serde_json::json!("object")
+        );
+        assert_eq!(
+            http["properties"]["redirects"]["items"]["$ref"],
+            serde_json::json!("#/$defs/HostHttpRedirect")
+        );
+        assert_eq!(
+            http["properties"]["cookies"]["items"]["$ref"],
+            serde_json::json!("#/$defs/HostHttpCookie")
         );
     }
 
@@ -939,6 +1339,47 @@ mod tests {
                     .unwrap_or_else(|| panic!("{key} item must be a string"))
             })
             .collect()
+    }
+
+    fn owned_strings_at(value: &Value, key: &str) -> Vec<String> {
+        strings_at(value, key)
+            .into_iter()
+            .map(str::to_string)
+            .collect()
+    }
+
+    fn host_capability_strings() -> Vec<&'static str> {
+        V1_HOST_CAPABILITIES
+            .iter()
+            .copied()
+            .map(HostCapability::as_str)
+            .collect()
+    }
+
+    fn serialize_enum_strings<T: Serialize + Copy>(values: &[T]) -> Vec<String> {
+        values
+            .iter()
+            .copied()
+            .map(|value| {
+                serde_json::to_value(value)
+                    .expect("enum must serialize")
+                    .as_str()
+                    .expect("enum must serialize as string")
+                    .to_string()
+            })
+            .collect()
+    }
+
+    fn capability_params_ref<'a>(schema_def: &'a Value, capability: &str) -> Option<&'a str> {
+        schema_def["allOf"].as_array()?.iter().find_map(|rule| {
+            let matches_capability =
+                rule["if"]["properties"]["capability"]["const"].as_str() == Some(capability);
+            if matches_capability {
+                rule["then"]["properties"]["params"]["$ref"].as_str()
+            } else {
+                None
+            }
+        })
     }
 
     fn params_ref_for_method<'a>(schema: &'a Value, method: &str) -> Option<&'a str> {

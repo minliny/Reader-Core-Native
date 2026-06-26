@@ -1,0 +1,21 @@
+{
+  "protocolVersion": 1,
+  "requestId": 449,
+  "method": "host.complete",
+  "params": {
+    "operationId": 1,
+    "result": {
+      "cookies": [
+        {
+          "name": "sid",
+          "value": "new",
+          "domain": "books.example.test",
+          "path": "/",
+          "httpOnly": true,
+          "secure": true,
+          "sameSite": "Lax"
+        }
+      ]
+    }
+  }
+}

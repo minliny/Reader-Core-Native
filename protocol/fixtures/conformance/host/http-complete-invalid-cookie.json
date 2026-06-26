@@ -1,0 +1,18 @@
+{
+  "protocolVersion": 1,
+  "requestId": 508,
+  "method": "host.complete",
+  "params": {
+    "operationId": 1,
+    "result": {
+      "status": 200,
+      "body": "{\"books\":[]}",
+      "cookies": [
+        {
+          "name": "   ",
+          "value": "new"
+        }
+      ]
+    }
+  }
+}

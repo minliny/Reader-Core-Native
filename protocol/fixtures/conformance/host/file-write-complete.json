@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "requestId": 443,
+  "method": "host.complete",
+  "params": {
+    "operationId": 1,
+    "result": {
+      "written": true,
+      "byteLength": 11
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "protocolVersion": 1,
+  "requestId": 450,
+  "method": "runtime.hostSmoke",
+  "params": {
+    "capability": "cookie.set",
+    "params": {
+      "url": "https://books.example.test/search",
+      "sessionId": "core-session-main",
+      "cookie": {
+        "name": "sid",
+        "value": "new",
+        "domain": "books.example.test",
+        "path": "/",
+        "httpOnly": true,
+        "secure": true,
+        "sameSite": "Lax"
+      }
+    }
+  }
+}

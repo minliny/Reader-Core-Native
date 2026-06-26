@@ -4,9 +4,11 @@ use std::time::Duration;
 
 use reader_contract::{
     methods, BookDetailData, BookSearchData, BookTocData, ChapterContentData, ChapterContentVia,
-    Command, CoreError, CoreInfoData, ErrorCode, Event, PendingHostOperationStatus,
-    ReadingProgressUpdateData, RuntimeCancelData, RuntimeConfig, RuntimePingData,
-    RuntimeShutdownData, RuntimeStatus, SourceImportData, PROTOCOL_VERSION, V1_CAPABILITIES,
+    Command, CoreError, CoreInfoData, ErrorCode, Event, HostCapability,
+    HostWebViewEvaluateJavaScriptRequest, HostWebViewEvaluateJavaScriptResponse,
+    PendingHostOperationStatus, ReadingProgressUpdateData, RuntimeCancelData, RuntimeConfig,
+    RuntimePingData, RuntimeShutdownData, RuntimeStatus, SourceImportData, PROTOCOL_VERSION,
+    V1_CAPABILITIES,
 };
 use reader_runtime::{EventSink, Runtime};
 use serde_json::{json, Value};
@@ -131,6 +133,8 @@ const HOST_REQUEST_INVALID_CAPABILITY_WHITESPACE: &str = include_str!(
 const HOST_REQUEST_INVALID_CAPABILITY_EMPTY_SEGMENT: &str = include_str!(
     "../../../protocol/fixtures/conformance/host/request-invalid-capability-empty-segment.json"
 );
+const HOST_REQUEST_UNSUPPORTED_CAPABILITY: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/request-unsupported-capability.json");
 const HOST_REQUEST_PARAMS_NOT_OBJECT: &str =
     include_str!("../../../protocol/fixtures/conformance/host/request-params-not-object.json");
 const HOST_COMPLETE: &str =
@@ -152,12 +156,99 @@ const HOST_ERROR_DETAILS_NOT_OBJECT: &str =
     include_str!("../../../protocol/fixtures/conformance/host/error-details-not-object.json");
 const HOST_ERROR_CORE_ERROR_UNKNOWN_FIELD: &str =
     include_str!("../../../protocol/fixtures/conformance/host/error-core-error-unknown-field.json");
+const HOST_ERROR_DIAGNOSTICS: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/error-diagnostics.json");
+const HOST_ERROR_DIAGNOSTICS_DETAILS_NOT_OBJECT: &str = include_str!(
+    "../../../protocol/fixtures/conformance/host/error-diagnostics-details-not-object.json"
+);
+const HOST_ERROR_DIAGNOSTICS_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/host/error-diagnostics-unknown-field.json"
+);
 const HOST_HTTP_COMPLETE_SESSION_METADATA: &str =
     include_str!("../../../protocol/fixtures/conformance/host/http-complete-session-metadata.json");
 const HOST_HTTP_COMPLETE_INVALID_STATUS: &str =
     include_str!("../../../protocol/fixtures/conformance/host/http-complete-invalid-status.json");
 const HOST_HTTP_COMPLETE_INVALID_HEADERS: &str =
     include_str!("../../../protocol/fixtures/conformance/host/http-complete-invalid-headers.json");
+const HOST_HTTP_COMPLETE_INVALID_REDIRECT: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/http-complete-invalid-redirect.json");
+const HOST_HTTP_COMPLETE_INVALID_COOKIE: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/http-complete-invalid-cookie.json");
+const HOST_WEBVIEW_REQUEST: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/webview-request.json");
+const HOST_WEBVIEW_REQUEST_BLANK_JAVASCRIPT: &str = include_str!(
+    "../../../protocol/fixtures/conformance/host/webview-request-blank-javascript.json"
+);
+const HOST_WEBVIEW_COMPLETE: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/webview-complete.json");
+const HOST_WEBVIEW_COMPLETE_BLANK_FINAL_URL: &str = include_str!(
+    "../../../protocol/fixtures/conformance/host/webview-complete-blank-final-url.json"
+);
+const HOST_FILE_READ_REQUEST: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/file-read-request.json");
+const HOST_FILE_WRITE_REQUEST: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/file-write-request.json");
+const HOST_CACHE_GET_REQUEST: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/cache-get-request.json");
+const HOST_CACHE_PUT_REQUEST: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/cache-put-request.json");
+const HOST_FILE_READ_REQUEST_BLANK_PATH: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/file-read-request-blank-path.json");
+const HOST_CACHE_PUT_REQUEST_MISSING_VALUE: &str = include_str!(
+    "../../../protocol/fixtures/conformance/host/cache-put-request-missing-value.json"
+);
+const HOST_FILE_READ_COMPLETE: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/file-read-complete.json");
+const HOST_FILE_READ_COMPLETE_MISSING_CONTENT: &str = include_str!(
+    "../../../protocol/fixtures/conformance/host/file-read-complete-missing-content.json"
+);
+const HOST_FILE_WRITE_COMPLETE: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/file-write-complete.json");
+const HOST_FILE_WRITE_COMPLETE_NOT_WRITTEN: &str = include_str!(
+    "../../../protocol/fixtures/conformance/host/file-write-complete-not-written.json"
+);
+const HOST_CACHE_GET_COMPLETE_HIT: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/cache-get-complete-hit.json");
+const HOST_CACHE_GET_COMPLETE_INVALID_HIT: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/cache-get-complete-invalid-hit.json");
+const HOST_CACHE_PUT_COMPLETE: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/cache-put-complete.json");
+const HOST_COOKIE_GET_REQUEST: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/cookie-get-request.json");
+const HOST_COOKIE_GET_COMPLETE: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/cookie-get-complete.json");
+const HOST_COOKIE_SET_REQUEST: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/cookie-set-request.json");
+const HOST_COOKIE_SET_COMPLETE: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/cookie-set-complete.json");
+const HOST_LOG_EMIT_REQUEST: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/log-emit-request.json");
+const HOST_LOG_EMIT_COMPLETE: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/log-emit-complete.json");
+const HOST_TIME_NOW_REQUEST: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/time-now-request.json");
+const HOST_TIME_NOW_COMPLETE: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/time-now-complete.json");
+const HOST_SYSTEM_INFO_REQUEST: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/system-info-request.json");
+const HOST_SYSTEM_INFO_COMPLETE: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/system-info-complete.json");
+const HOST_PERSISTENCE_GET_REQUEST: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/persistence-get-request.json");
+const HOST_PERSISTENCE_GET_COMPLETE: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/persistence-get-complete.json");
+const HOST_PERSISTENCE_PUT_REQUEST: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/persistence-put-request.json");
+const HOST_PERSISTENCE_PUT_COMPLETE: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/persistence-put-complete.json");
+const HOST_COOKIE_GET_REQUEST_MISSING_SCOPE: &str = include_str!(
+    "../../../protocol/fixtures/conformance/host/cookie-get-request-missing-scope.json"
+);
+const HOST_LOG_EMIT_REQUEST_BLANK_MESSAGE: &str =
+    include_str!("../../../protocol/fixtures/conformance/host/log-emit-request-blank-message.json");
+const HOST_PERSISTENCE_GET_COMPLETE_INVALID_FOUND: &str = include_str!(
+    "../../../protocol/fixtures/conformance/host/persistence-get-complete-invalid-found.json"
+);
 
 const VALID_RUNTIME_CANCEL: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-runtime-cancel.json");
@@ -629,6 +720,48 @@ pub(crate) fn run_conformance() -> ConformanceReport {
                         "http": { "headers": ["content-type", "application/json"] }
                     }),
                     "headers",
+                ),
+                (
+                    "http.session",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "books": [],
+                        "http": { "session": { "id": " " } }
+                    }),
+                    "session.id",
+                ),
+                (
+                    "http.redirects",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "books": [],
+                        "http": {
+                            "redirects": [
+                                {
+                                    "status": 200,
+                                    "fromUrl": "https://books.example.test/search",
+                                    "toUrl": "https://books.example.test/search?q=empty"
+                                }
+                            ]
+                        }
+                    }),
+                    "redirect.status",
+                ),
+                (
+                    "http.cookies",
+                    json!({
+                        "sourceId": "conformance-source",
+                        "books": [],
+                        "http": {
+                            "cookies": [
+                                {
+                                    "name": " ",
+                                    "value": "new"
+                                }
+                            ]
+                        }
+                    }),
+                    "cookie.name",
                 ),
                 (
                     "unknown field",
@@ -1341,10 +1474,8 @@ pub(crate) fn run_conformance() -> ConformanceReport {
                 && event_json["operationId"]
                     .as_u64()
                     .is_some_and(|operation_id| operation_id > 0)
-                && capability == "host.smoke.echo"
-                && event_json["capability"]
-                    .as_str()
-                    .is_some_and(is_valid_token_path)
+                && *capability == HostCapability::HostSmokeEcho
+                && event_json["capability"] == HostCapability::HostSmokeEcho.as_str()
                 && params["message"] == "conformance host request"
                 && event_json["params"].is_object() =>
             {
@@ -1508,6 +1639,11 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         },
     );
 
+    record(&mut report, "host-request-unsupported-capability", || {
+        let (_runtime, rx) = send_to_fresh_runtime(HOST_REQUEST_UNSUPPORTED_CAPABILITY)?;
+        expect_event_error(&rx, 421, ErrorCode::InvalidParams)
+    });
+
     record(&mut report, "host-request-rejects-unknown-params", || {
         let (_runtime, rx) = send_to_fresh_runtime(HOST_REQUEST_UNKNOWN_FIELD)?;
         expect_event_error(&rx, 309, ErrorCode::InvalidParams)
@@ -1519,6 +1655,567 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         || {
             let (_runtime, rx) = send_to_fresh_runtime(HOST_REQUEST_PARAMS_NOT_OBJECT)?;
             expect_event_error(&rx, 420, ErrorCode::InvalidParams)
+        },
+    );
+
+    record(&mut report, "host-webview-request-event-shape", || {
+        let (_runtime, rx) = send_to_fresh_runtime(HOST_WEBVIEW_REQUEST)?;
+        match recv_event(&rx)? {
+            Event::HostRequest {
+                request_id,
+                operation_id,
+                capability,
+                params,
+                ..
+            } if request_id == 431
+                && operation_id == 1
+                && capability == HostCapability::WebViewEvaluateJavaScript =>
+            {
+                let request =
+                    serde_json::from_value::<HostWebViewEvaluateJavaScriptRequest>(params)
+                        .map_err(|err| format!("webview request DTO parse failed: {err}"))?;
+                request
+                    .validate()
+                    .map_err(|err| format!("webview request validation failed: {err:?}"))?;
+                if request
+                    .document
+                    .body
+                    .as_deref()
+                    .is_some_and(|body| body.contains("Dune"))
+                    && request.java_script.contains("querySelector")
+                    && request.timeout_millis == Some(3000)
+                {
+                    Ok(())
+                } else {
+                    Err(format!("unexpected webview request {request:?}"))
+                }
+            }
+            other => Err(format!("unexpected webview host.request event {other:?}")),
+        }
+    });
+
+    record(
+        &mut report,
+        "host-webview-request-rejects-blank-javascript",
+        || {
+            let (_runtime, rx) = send_to_fresh_runtime(HOST_WEBVIEW_REQUEST_BLANK_JAVASCRIPT)?;
+            expect_event_error(&rx, 432, ErrorCode::InvalidParams)
+        },
+    );
+
+    record(&mut report, "host-webview-complete-routes-result", || {
+        let (runtime, rx) = send_to_fresh_runtime(HOST_WEBVIEW_REQUEST)?;
+        match recv_event(&rx)? {
+            Event::HostRequest {
+                capability, params, ..
+            } if capability == HostCapability::WebViewEvaluateJavaScript
+                && params["document"]["kind"] == "html" => {}
+            other => return Err(format!("expected webview host.request, got {other:?}")),
+        }
+        runtime
+            .send_json(HOST_WEBVIEW_COMPLETE.as_bytes())
+            .map_err(|err| format!("webview host.complete send failed: {err:?}"))?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 431 => {
+                let response =
+                    serde_json::from_value::<HostWebViewEvaluateJavaScriptResponse>(data.clone())
+                        .map_err(|err| format!("webview response DTO parse failed: {err}"))?;
+                response
+                    .validate()
+                    .map_err(|err| format!("webview response validation failed: {err:?}"))?;
+                if response.value == json!("Dune")
+                    && response.final_url.as_deref() == Some("https://books.example.test/detail")
+                {
+                    Ok(())
+                } else {
+                    Err(format!("unexpected webview response {response:?}"))
+                }
+            }
+            other => Err(format!("unexpected webview completion result {other:?}")),
+        }
+    });
+
+    record(
+        &mut report,
+        "host-webview-complete-rejects-invalid-result",
+        || {
+            let (runtime, rx) = send_to_fresh_runtime(HOST_WEBVIEW_REQUEST)?;
+            match recv_event(&rx)? {
+                Event::HostRequest {
+                    capability, params, ..
+                } if capability == HostCapability::WebViewEvaluateJavaScript
+                    && params["document"]["kind"] == "html" => {}
+                other => return Err(format!("expected webview host.request, got {other:?}")),
+            }
+            runtime
+                .send_json(HOST_WEBVIEW_COMPLETE_BLANK_FINAL_URL.as_bytes())
+                .map_err(|err| format!("webview invalid host.complete send failed: {err:?}"))?;
+            match recv_event(&rx)? {
+                Event::Error {
+                    request_id, error, ..
+                } if request_id == 431
+                    && error.code == ErrorCode::InvalidParams
+                    && error.message.contains("finalUrl") =>
+                {
+                    Ok(())
+                }
+                other => Err(format!("unexpected webview completion error {other:?}")),
+            }
+        },
+    );
+
+    record(&mut report, "host-file-read-routes-result", || {
+        let (runtime, rx) = send_to_fresh_runtime(HOST_FILE_READ_REQUEST)?;
+        expect_capability_host_request(
+            &rx,
+            435,
+            HostCapability::FileRead,
+            json!({
+                "path": "core-cache/books/basic.json",
+                "encoding": "utf-8",
+                "byteOffset": 0,
+                "maxBytes": 4096
+            }),
+        )?;
+        runtime
+            .send_json(HOST_FILE_READ_COMPLETE.as_bytes())
+            .map_err(|err| format!("file.read host.complete send failed: {err:?}"))?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 435
+                && data["content"] == "cached body"
+                && data["encoding"] == "utf-8"
+                && data["byteLength"] == 11 =>
+            {
+                Ok(())
+            }
+            other => Err(format!("unexpected file.read completion result {other:?}")),
+        }
+    });
+
+    record(&mut report, "host-file-write-routes-result", || {
+        let (runtime, rx) = send_to_fresh_runtime(HOST_FILE_WRITE_REQUEST)?;
+        expect_capability_host_request(
+            &rx,
+            436,
+            HostCapability::FileWrite,
+            json!({
+                "path": "core-cache/books/basic.json",
+                "content": "{\"books\":[]}",
+                "encoding": "utf-8",
+                "createDirectories": true,
+                "append": false
+            }),
+        )?;
+        runtime
+            .send_json(HOST_FILE_WRITE_COMPLETE.as_bytes())
+            .map_err(|err| format!("file.write host.complete send failed: {err:?}"))?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 436 && data["written"] == true && data["byteLength"] == 11 => Ok(()),
+            other => Err(format!("unexpected file.write completion result {other:?}")),
+        }
+    });
+
+    record(&mut report, "host-cache-get-routes-result", || {
+        let (runtime, rx) = send_to_fresh_runtime(HOST_CACHE_GET_REQUEST)?;
+        expect_capability_host_request(
+            &rx,
+            437,
+            HostCapability::CacheGet,
+            json!({
+                "namespace": "remote.response",
+                "key": "search/basic"
+            }),
+        )?;
+        runtime
+            .send_json(HOST_CACHE_GET_COMPLETE_HIT.as_bytes())
+            .map_err(|err| format!("cache.get host.complete send failed: {err:?}"))?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 437
+                && data["hit"] == true
+                && data["value"] == "{\"books\":[]}"
+                && data["expiresAt"] == "2026-06-26T00:00:00Z" =>
+            {
+                Ok(())
+            }
+            other => Err(format!("unexpected cache.get completion result {other:?}")),
+        }
+    });
+
+    record(&mut report, "host-cache-put-routes-result", || {
+        let (runtime, rx) = send_to_fresh_runtime(HOST_CACHE_PUT_REQUEST)?;
+        expect_capability_host_request(
+            &rx,
+            438,
+            HostCapability::CachePut,
+            json!({
+                "namespace": "remote.response",
+                "key": "search/basic",
+                "value": "{\"books\":[]}",
+                "ttlMillis": 60000
+            }),
+        )?;
+        runtime
+            .send_json(HOST_CACHE_PUT_COMPLETE.as_bytes())
+            .map_err(|err| format!("cache.put host.complete send failed: {err:?}"))?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 438
+                && data["stored"] == true
+                && data["expiresAt"] == "2026-06-26T00:00:00Z" =>
+            {
+                Ok(())
+            }
+            other => Err(format!("unexpected cache.put completion result {other:?}")),
+        }
+    });
+
+    record(&mut report, "host-file-read-rejects-blank-path", || {
+        let (_runtime, rx) = send_to_fresh_runtime(HOST_FILE_READ_REQUEST_BLANK_PATH)?;
+        match recv_event(&rx)? {
+            Event::Error {
+                request_id, error, ..
+            } if request_id == 439
+                && error.code == ErrorCode::InvalidParams
+                && error.message.contains("file.read path") =>
+            {
+                Ok(())
+            }
+            other => Err(format!("expected file.read path rejection, got {other:?}")),
+        }
+    });
+
+    record(&mut report, "host-cache-put-rejects-missing-value", || {
+        let (_runtime, rx) = send_to_fresh_runtime(HOST_CACHE_PUT_REQUEST_MISSING_VALUE)?;
+        match recv_event(&rx)? {
+            Event::Error {
+                request_id, error, ..
+            } if request_id == 440
+                && error.code == ErrorCode::InvalidParams
+                && error.message.contains("value") =>
+            {
+                Ok(())
+            }
+            other => Err(format!(
+                "expected cache.put missing value rejection, got {other:?}"
+            )),
+        }
+    });
+
+    record(&mut report, "host-file-read-rejects-invalid-result", || {
+        let (runtime, rx) = send_to_fresh_runtime(HOST_FILE_READ_REQUEST)?;
+        expect_capability_host_request(
+            &rx,
+            435,
+            HostCapability::FileRead,
+            json!({
+                "path": "core-cache/books/basic.json",
+                "encoding": "utf-8",
+                "byteOffset": 0,
+                "maxBytes": 4096
+            }),
+        )?;
+        runtime
+            .send_json(HOST_FILE_READ_COMPLETE_MISSING_CONTENT.as_bytes())
+            .map_err(|err| format!("file.read invalid host.complete send failed: {err:?}"))?;
+        match recv_event(&rx)? {
+            Event::Error {
+                request_id, error, ..
+            } if request_id == 435
+                && error.code == ErrorCode::InvalidParams
+                && error.message.contains("content") =>
+            {
+                Ok(())
+            }
+            other => Err(format!(
+                "expected file.read result rejection, got {other:?}"
+            )),
+        }
+    });
+
+    record(
+        &mut report,
+        "host-file-write-rejects-invalid-result",
+        || {
+            let (runtime, rx) = send_to_fresh_runtime(HOST_FILE_WRITE_REQUEST)?;
+            expect_capability_host_request(
+                &rx,
+                436,
+                HostCapability::FileWrite,
+                json!({
+                    "path": "core-cache/books/basic.json",
+                    "content": "{\"books\":[]}",
+                    "encoding": "utf-8",
+                    "createDirectories": true,
+                    "append": false
+                }),
+            )?;
+            runtime
+                .send_json(HOST_FILE_WRITE_COMPLETE_NOT_WRITTEN.as_bytes())
+                .map_err(|err| format!("file.write invalid host.complete send failed: {err:?}"))?;
+            match recv_event(&rx)? {
+                Event::Error {
+                    request_id, error, ..
+                } if request_id == 436
+                    && error.code == ErrorCode::InvalidParams
+                    && error.message.contains("written") =>
+                {
+                    Ok(())
+                }
+                other => Err(format!(
+                    "expected file.write result rejection, got {other:?}"
+                )),
+            }
+        },
+    );
+
+    record(
+        &mut report,
+        "host-cache-get-rejects-invalid-hit-result",
+        || {
+            let (runtime, rx) = send_to_fresh_runtime(HOST_CACHE_GET_REQUEST)?;
+            expect_capability_host_request(
+                &rx,
+                437,
+                HostCapability::CacheGet,
+                json!({
+                    "namespace": "remote.response",
+                    "key": "search/basic"
+                }),
+            )?;
+            runtime
+                .send_json(HOST_CACHE_GET_COMPLETE_INVALID_HIT.as_bytes())
+                .map_err(|err| format!("cache.get invalid host.complete send failed: {err:?}"))?;
+            match recv_event(&rx)? {
+                Event::Error {
+                    request_id, error, ..
+                } if request_id == 437
+                    && error.code == ErrorCode::InvalidParams
+                    && error.message.contains("value") =>
+                {
+                    Ok(())
+                }
+                other => Err(format!(
+                    "expected cache.get hit result rejection, got {other:?}"
+                )),
+            }
+        },
+    );
+
+    record(&mut report, "host-cookie-get-routes-result", || {
+        expect_capability_roundtrip(
+            HOST_COOKIE_GET_REQUEST,
+            HOST_COOKIE_GET_COMPLETE,
+            448,
+            HostCapability::CookieGet,
+            json!({
+                "url": "https://books.example.test/search",
+                "name": "sid",
+                "sessionId": "core-session-main"
+            }),
+            json!({
+                "cookies": [
+                    {
+                        "name": "sid",
+                        "value": "new",
+                        "domain": "books.example.test",
+                        "path": "/",
+                        "httpOnly": true,
+                        "secure": true,
+                        "sameSite": "Lax"
+                    }
+                ]
+            }),
+        )
+    });
+
+    record(&mut report, "host-cookie-set-routes-result", || {
+        expect_capability_roundtrip(
+            HOST_COOKIE_SET_REQUEST,
+            HOST_COOKIE_SET_COMPLETE,
+            450,
+            HostCapability::CookieSet,
+            json!({
+                "url": "https://books.example.test/search",
+                "sessionId": "core-session-main",
+                "cookie": {
+                    "name": "sid",
+                    "value": "new",
+                    "domain": "books.example.test",
+                    "path": "/",
+                    "httpOnly": true,
+                    "secure": true,
+                    "sameSite": "Lax"
+                }
+            }),
+            json!({ "stored": true }),
+        )
+    });
+
+    record(&mut report, "host-log-emit-routes-result", || {
+        expect_capability_roundtrip(
+            HOST_LOG_EMIT_REQUEST,
+            HOST_LOG_EMIT_COMPLETE,
+            452,
+            HostCapability::LogEmit,
+            json!({
+                "level": "info",
+                "message": "host capability smoke",
+                "target": "reader-core",
+                "fields": { "operation": "log.emit" }
+            }),
+            json!({ "emitted": true }),
+        )
+    });
+
+    record(&mut report, "host-time-now-routes-result", || {
+        expect_capability_roundtrip(
+            HOST_TIME_NOW_REQUEST,
+            HOST_TIME_NOW_COMPLETE,
+            454,
+            HostCapability::TimeNow,
+            json!({
+                "clock": "system",
+                "timezone": "UTC"
+            }),
+            json!({
+                "unixMillis": 1782432000000_u64,
+                "iso8601": "2026-06-26T00:00:00Z",
+                "timezone": "UTC"
+            }),
+        )
+    });
+
+    record(&mut report, "host-system-info-routes-result", || {
+        expect_capability_roundtrip(
+            HOST_SYSTEM_INFO_REQUEST,
+            HOST_SYSTEM_INFO_COMPLETE,
+            456,
+            HostCapability::SystemInfo,
+            json!({
+                "keys": ["os", "locale", "network"]
+            }),
+            json!({
+                "info": {
+                    "os": "test",
+                    "locale": "en-US",
+                    "network": "fixture"
+                }
+            }),
+        )
+    });
+
+    record(&mut report, "host-persistence-get-routes-result", || {
+        expect_capability_roundtrip(
+            HOST_PERSISTENCE_GET_REQUEST,
+            HOST_PERSISTENCE_GET_COMPLETE,
+            458,
+            HostCapability::PersistenceGet,
+            json!({
+                "namespace": "reader.session",
+                "key": "last-source"
+            }),
+            json!({
+                "found": true,
+                "value": "basic-src",
+                "revision": "rev-1"
+            }),
+        )
+    });
+
+    record(&mut report, "host-persistence-put-routes-result", || {
+        expect_capability_roundtrip(
+            HOST_PERSISTENCE_PUT_REQUEST,
+            HOST_PERSISTENCE_PUT_COMPLETE,
+            460,
+            HostCapability::PersistencePut,
+            json!({
+                "namespace": "reader.session",
+                "key": "last-source",
+                "value": "basic-src",
+                "expectedRevision": "rev-1"
+            }),
+            json!({
+                "stored": true,
+                "revision": "rev-2"
+            }),
+        )
+    });
+
+    record(&mut report, "host-cookie-get-rejects-missing-scope", || {
+        let (_runtime, rx) = send_to_fresh_runtime(HOST_COOKIE_GET_REQUEST_MISSING_SCOPE)?;
+        match recv_event(&rx)? {
+            Event::Error {
+                request_id, error, ..
+            } if request_id == 462
+                && error.code == ErrorCode::InvalidParams
+                && error.message.contains("cookie.get requires") =>
+            {
+                Ok(())
+            }
+            other => Err(format!(
+                "expected cookie.get missing scope rejection, got {other:?}"
+            )),
+        }
+    });
+
+    record(&mut report, "host-log-emit-rejects-blank-message", || {
+        let (_runtime, rx) = send_to_fresh_runtime(HOST_LOG_EMIT_REQUEST_BLANK_MESSAGE)?;
+        match recv_event(&rx)? {
+            Event::Error {
+                request_id, error, ..
+            } if request_id == 463
+                && error.code == ErrorCode::InvalidParams
+                && error.message.contains("log.emit message") =>
+            {
+                Ok(())
+            }
+            other => Err(format!(
+                "expected log.emit blank message rejection, got {other:?}"
+            )),
+        }
+    });
+
+    record(
+        &mut report,
+        "host-persistence-get-rejects-invalid-found-result",
+        || {
+            let (runtime, rx) = send_to_fresh_runtime(HOST_PERSISTENCE_GET_REQUEST)?;
+            expect_capability_host_request(
+                &rx,
+                458,
+                HostCapability::PersistenceGet,
+                json!({
+                    "namespace": "reader.session",
+                    "key": "last-source"
+                }),
+            )?;
+            runtime
+                .send_json(HOST_PERSISTENCE_GET_COMPLETE_INVALID_FOUND.as_bytes())
+                .map_err(|err| {
+                    format!("persistence.get invalid host.complete send failed: {err:?}")
+                })?;
+            match recv_event(&rx)? {
+                Event::Error {
+                    request_id, error, ..
+                } if request_id == 458
+                    && error.code == ErrorCode::InvalidParams
+                    && error.message.contains("value") =>
+                {
+                    Ok(())
+                }
+                other => Err(format!(
+                    "expected persistence.get found result rejection, got {other:?}"
+                )),
+            }
         },
     );
 
@@ -1545,10 +2242,39 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         match recv_event(&rx)? {
             Event::Error {
                 request_id, error, ..
-            } if request_id == 301 && error.code == ErrorCode::Internal && error.retryable => {
+            } if request_id == 301
+                && error.code == ErrorCode::Internal
+                && error.retryable
+                && error.details["host"]["operationId"] == 1
+                && error.details["host"]["requestId"] == 301
+                && error.details["host"]["capability"] == "host.smoke.echo" =>
+            {
                 Ok(())
             }
             other => Err(format!("unexpected host.error event {other:?}")),
+        }
+    });
+
+    record(&mut report, "host-error-routes-diagnostics", || {
+        let (runtime, rx) = send_to_fresh_runtime(HOST_REQUEST)?;
+        expect_host_request(&rx)?;
+        runtime
+            .send_json(HOST_ERROR_DIAGNOSTICS.as_bytes())
+            .map_err(|err| format!("host.error diagnostics send failed: {err:?}"))?;
+        match recv_event(&rx)? {
+            Event::Error {
+                request_id, error, ..
+            } if request_id == 301
+                && error.code == ErrorCode::Internal
+                && error.details["host"]["operationId"] == 1
+                && error.details["host"]["capability"] == "host.smoke.echo"
+                && error.details["host"]["diagnostics"]["code"] == "TIMEOUT"
+                && error.details["host"]["diagnostics"]["phase"] == "transport"
+                && error.details["host"]["diagnostics"]["details"]["timeoutMillis"] == 30000 =>
+            {
+                Ok(())
+            }
+            other => Err(format!("unexpected host.error diagnostics event {other:?}")),
         }
     });
 
@@ -1628,6 +2354,52 @@ pub(crate) fn run_conformance() -> ConformanceReport {
 
     record(
         &mut report,
+        "host-error-rejects-non-object-diagnostic-details",
+        || {
+            let (_runtime, rx) = send_to_fresh_runtime(HOST_ERROR_DIAGNOSTICS_DETAILS_NOT_OBJECT)?;
+            match recv_event(&rx)? {
+                Event::Error {
+                    request_id, error, ..
+                } if request_id == 426
+                    && error.code == ErrorCode::InvalidParams
+                    && error.details["source"]
+                        .as_str()
+                        .is_some_and(|source| source.contains("diagnostics.details")) =>
+                {
+                    Ok(())
+                }
+                other => Err(format!(
+                    "unexpected host.error diagnostics details rejection {other:?}"
+                )),
+            }
+        },
+    );
+
+    record(
+        &mut report,
+        "host-error-rejects-unknown-diagnostics-fields",
+        || {
+            let (_runtime, rx) = send_to_fresh_runtime(HOST_ERROR_DIAGNOSTICS_UNKNOWN_FIELD)?;
+            match recv_event(&rx)? {
+                Event::Error {
+                    request_id, error, ..
+                } if request_id == 427
+                    && error.code == ErrorCode::InvalidParams
+                    && error.details["source"]
+                        .as_str()
+                        .is_some_and(|source| source.contains("unknown field")) =>
+                {
+                    Ok(())
+                }
+                other => Err(format!(
+                    "unexpected host.error diagnostics unknown field rejection {other:?}"
+                )),
+            }
+        },
+    );
+
+    record(
+        &mut report,
         "host-complete-after-completed-operation",
         || {
             let (runtime, rx) = send_to_fresh_runtime(HOST_REQUEST)?;
@@ -1681,6 +2453,20 @@ pub(crate) fn run_conformance() -> ConformanceReport {
                             .session
                             .as_ref()
                             .is_some_and(|session| session.id == "core-session-main")
+                        && http.redirects.as_ref().is_some_and(|redirects| {
+                            redirects[0].status == 302
+                                && redirects[0].from_url == "https://books.example.test/search"
+                                && redirects[0].to_url
+                                    == "https://books.example.test/search?q=empty"
+                        })
+                        && http.cookies.as_ref().is_some_and(|cookies| {
+                            cookies[0].name == "sid"
+                                && cookies[0].domain.as_deref() == Some("books.example.test")
+                                && cookies[0].path.as_deref() == Some("/")
+                                && cookies[0].http_only == Some(true)
+                                && cookies[0].secure == Some(true)
+                                && cookies[0].same_site.as_deref() == Some("Lax")
+                        })
                     {
                         Ok(())
                     } else {
@@ -1718,6 +2504,62 @@ pub(crate) fn run_conformance() -> ConformanceReport {
                     Ok(())
                 }
                 other => Err(format!("expected invalid http status error, got {other:?}")),
+            }
+        },
+    );
+
+    record(
+        &mut report,
+        "remote-http-complete-rejects-invalid-redirect",
+        || {
+            let (runtime, rx) = fresh_runtime();
+            runtime
+                .send(remote_http_search_command(509))
+                .map_err(|err| format!("remote http command send failed: {err:?}"))?;
+            expect_http_host_request(&rx, 509)?;
+            runtime
+                .send_json(HOST_HTTP_COMPLETE_INVALID_REDIRECT.as_bytes())
+                .map_err(|err| format!("http host.complete send failed: {err:?}"))?;
+
+            match recv_event(&rx)? {
+                Event::Error {
+                    request_id, error, ..
+                } if request_id == 509
+                    && error.code == ErrorCode::InvalidParams
+                    && error.message.contains("redirect.status") =>
+                {
+                    Ok(())
+                }
+                other => Err(format!(
+                    "expected invalid http redirect error, got {other:?}"
+                )),
+            }
+        },
+    );
+
+    record(
+        &mut report,
+        "remote-http-complete-rejects-invalid-cookie",
+        || {
+            let (runtime, rx) = fresh_runtime();
+            runtime
+                .send(remote_http_search_command(510))
+                .map_err(|err| format!("remote http command send failed: {err:?}"))?;
+            expect_http_host_request(&rx, 510)?;
+            runtime
+                .send_json(HOST_HTTP_COMPLETE_INVALID_COOKIE.as_bytes())
+                .map_err(|err| format!("http host.complete send failed: {err:?}"))?;
+
+            match recv_event(&rx)? {
+                Event::Error {
+                    request_id, error, ..
+                } if request_id == 510
+                    && error.code == ErrorCode::InvalidParams
+                    && error.message.contains("cookie.name") =>
+                {
+                    Ok(())
+                }
+                other => Err(format!("expected invalid http cookie error, got {other:?}")),
             }
         },
     );
@@ -1937,7 +2779,7 @@ pub(crate) fn run_conformance() -> ConformanceReport {
                     };
                     if operation.operation_id != 1
                         || operation.request_id != 301
-                        || operation.capability != "host.smoke.echo"
+                        || operation.capability != HostCapability::HostSmokeEcho
                         || operation.state != "pending"
                     {
                         return Err(format!("unexpected pending operation {operation:?}"));
@@ -2027,7 +2869,7 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         &mut report,
         "pending-host-operation-rejects-invalid-capability",
         || {
-            for capability in ["", "host. smoke.echo", "host..echo", "host"] {
+            for capability in ["", "host. smoke.echo", "host..echo", "host", "custom.valid"] {
                 let err = serde_json::from_value::<PendingHostOperationStatus>(json!({
                     "operationId": 1,
                     "requestId": 301,
@@ -2255,8 +3097,67 @@ fn expect_host_request(rx: &Receiver<Event>) -> Result<(), String> {
             capability,
             params,
             ..
-        } if operation_id > 0 && is_valid_token_path(&capability) && params.is_object() => Ok(()),
+        } if operation_id > 0
+            && params.is_object()
+            && matches!(capability, HostCapability::HostSmokeEcho) =>
+        {
+            Ok(())
+        }
         other => Err(format!("expected host.request, got {other:?}")),
+    }
+}
+
+fn expect_capability_host_request(
+    rx: &Receiver<Event>,
+    expected_request_id: u64,
+    expected_capability: HostCapability,
+    expected_params: Value,
+) -> Result<(), String> {
+    match recv_event(rx)? {
+        Event::HostRequest {
+            request_id,
+            operation_id,
+            capability,
+            params,
+            ..
+        } if request_id == expected_request_id
+            && operation_id == 1
+            && capability == expected_capability
+            && params == expected_params =>
+        {
+            Ok(())
+        }
+        other => Err(format!(
+            "expected {expected_capability} host.request requestId={expected_request_id}, got {other:?}"
+        )),
+    }
+}
+
+fn expect_capability_roundtrip(
+    request_json: &str,
+    complete_json: &str,
+    expected_request_id: u64,
+    expected_capability: HostCapability,
+    expected_params: Value,
+    expected_result: Value,
+) -> Result<(), String> {
+    let (runtime, rx) = send_to_fresh_runtime(request_json)?;
+    expect_capability_host_request(
+        &rx,
+        expected_request_id,
+        expected_capability,
+        expected_params,
+    )?;
+    runtime
+        .send_json(complete_json.as_bytes())
+        .map_err(|err| format!("{expected_capability} host.complete send failed: {err:?}"))?;
+    match recv_event(&rx)? {
+        Event::Result {
+            request_id, data, ..
+        } if request_id == expected_request_id && data == expected_result => Ok(()),
+        other => Err(format!(
+            "unexpected {expected_capability} completion result {other:?}"
+        )),
     }
 }
 
@@ -2306,8 +3207,7 @@ fn expect_http_host_request(rx: &Receiver<Event>, expected_request_id: u64) -> R
             ..
         } if request_id == expected_request_id
             && operation_id == 1
-            && capability == "http.execute"
-            && is_valid_token_path(&capability)
+            && capability == HostCapability::HttpExecute
             && params.is_object()
             && params["url"] == "https://books.example.test/search?q=empty"
             && params["method"] == "GET"
@@ -2325,12 +3225,6 @@ fn expect_http_host_request(rx: &Receiver<Event>, expected_request_id: u64) -> R
         }
         other => Err(format!("unexpected http host.request event {other:?}")),
     }
-}
-
-fn is_valid_token_path(value: &str) -> bool {
-    value.contains('.')
-        && !value.chars().any(char::is_whitespace)
-        && value.split('.').all(|segment| !segment.is_empty())
 }
 
 fn expect_event_error(

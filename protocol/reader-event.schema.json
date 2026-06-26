@@ -3,6 +3,22 @@
   "$id": "https://reader-core-native/reader-event.schema.json",
   "title": "Reader Core Event Protocol",
   "description": "JSON message protocol for Core → platform events.",
+  "x-reader-core-v1-host-capabilities": [
+    "host.smoke.echo",
+    "http.execute",
+    "cookie.get",
+    "cookie.set",
+    "webview.evaluateJavaScript",
+    "file.read",
+    "file.write",
+    "cache.get",
+    "cache.put",
+    "log.emit",
+    "time.now",
+    "system.info",
+    "persistence.get",
+    "persistence.put"
+  ],
   "oneOf": [
     { "$ref": "#/$defs/ResultEvent" },
     { "$ref": "#/$defs/ErrorEvent" },
@@ -42,6 +58,164 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["protocolVersion", "requestId", "type", "operationId", "capability", "params"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "capability": { "const": "webview.evaluateJavaScript" }
+            },
+            "required": ["capability"]
+          },
+          "then": {
+            "properties": {
+              "params": { "$ref": "#/$defs/HostWebViewEvaluateJavaScriptRequest" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability": { "const": "file.read" }
+            },
+            "required": ["capability"]
+          },
+          "then": {
+            "properties": {
+              "params": { "$ref": "#/$defs/HostFileReadRequest" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability": { "const": "file.write" }
+            },
+            "required": ["capability"]
+          },
+          "then": {
+            "properties": {
+              "params": { "$ref": "#/$defs/HostFileWriteRequest" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability": { "const": "cache.get" }
+            },
+            "required": ["capability"]
+          },
+          "then": {
+            "properties": {
+              "params": { "$ref": "#/$defs/HostCacheGetRequest" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability": { "const": "cache.put" }
+            },
+            "required": ["capability"]
+          },
+          "then": {
+            "properties": {
+              "params": { "$ref": "#/$defs/HostCachePutRequest" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability": { "const": "cookie.get" }
+            },
+            "required": ["capability"]
+          },
+          "then": {
+            "properties": {
+              "params": { "$ref": "#/$defs/HostCookieGetRequest" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability": { "const": "cookie.set" }
+            },
+            "required": ["capability"]
+          },
+          "then": {
+            "properties": {
+              "params": { "$ref": "#/$defs/HostCookieSetRequest" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability": { "const": "log.emit" }
+            },
+            "required": ["capability"]
+          },
+          "then": {
+            "properties": {
+              "params": { "$ref": "#/$defs/HostLogEmitRequest" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability": { "const": "time.now" }
+            },
+            "required": ["capability"]
+          },
+          "then": {
+            "properties": {
+              "params": { "$ref": "#/$defs/HostTimeNowRequest" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability": { "const": "system.info" }
+            },
+            "required": ["capability"]
+          },
+          "then": {
+            "properties": {
+              "params": { "$ref": "#/$defs/HostSystemInfoRequest" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability": { "const": "persistence.get" }
+            },
+            "required": ["capability"]
+          },
+          "then": {
+            "properties": {
+              "params": { "$ref": "#/$defs/HostPersistenceGetRequest" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability": { "const": "persistence.put" }
+            },
+            "required": ["capability"]
+          },
+          "then": {
+            "properties": {
+              "params": { "$ref": "#/$defs/HostPersistencePutRequest" }
+            }
+          }
+        }
+      ],
       "properties": {
         "protocolVersion": { "type": "integer", "const": 1 },
         "requestId": {
@@ -51,11 +225,252 @@
         },
         "type": { "type": "string", "const": "host.request" },
         "operationId": { "type": "integer", "minimum": 1 },
-        "capability": {
-          "type": "string",
-          "pattern": "^[^\\s.]+(\\.[^\\s.]+)+$"
-        },
+        "capability": { "$ref": "#/$defs/HostCapability" },
         "params": { "type": "object" }
+      }
+    },
+    "HostCapability": {
+      "type": "string",
+      "enum": [
+        "host.smoke.echo",
+        "http.execute",
+        "cookie.get",
+        "cookie.set",
+        "webview.evaluateJavaScript",
+        "file.read",
+        "file.write",
+        "cache.get",
+        "cache.put",
+        "log.emit",
+        "time.now",
+        "system.info",
+        "persistence.get",
+        "persistence.put"
+      ],
+      "description": "Closed set of host-owned capabilities Core may request. Platforms only execute these capabilities and must not interpret Legado business rules."
+    },
+    "HostWebViewEvaluateJavaScriptRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document", "javaScript"],
+      "description": "Request params for webview.evaluateJavaScript. Core supplies document input and JavaScript; the host only evaluates the script in a platform WebView.",
+      "properties": {
+        "document": { "$ref": "#/$defs/HostWebViewDocument" },
+        "javaScript": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "JavaScript source supplied by Core."
+        },
+        "timeoutMillis": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional execution timeout requested by Core."
+        },
+        "profileId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Optional opaque WebView profile/session handle."
+        }
+      }
+    },
+    "HostWebViewDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "oneOf": [
+        {
+          "required": ["body"],
+          "properties": {
+            "kind": { "const": "html" },
+            "body": { "type": "string", "minLength": 1, "pattern": "\\S" },
+            "baseUrl": { "type": "string", "minLength": 1, "pattern": "\\S" }
+          },
+          "not": { "required": ["url"] }
+        },
+        {
+          "required": ["url"],
+          "properties": {
+            "kind": { "const": "url" },
+            "url": { "type": "string", "minLength": 1, "pattern": "\\S" }
+          },
+          "not": {
+            "anyOf": [
+              { "required": ["body"] },
+              { "required": ["baseUrl"] }
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "kind": { "type": "string", "enum": ["html", "url"] },
+        "body": { "type": "string" },
+        "url": { "type": "string" },
+        "baseUrl": { "type": "string" }
+      }
+    },
+    "HostFileReadRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "description": "Request params for file.read. Core supplies an opaque path and byte bounds; hosts only read bytes/content.",
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "encoding": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "byteOffset": { "type": "integer", "minimum": 0 },
+        "maxBytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "HostFileWriteRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "oneOf": [
+        { "required": ["content"], "not": { "required": ["contentBase64"] } },
+        { "required": ["contentBase64"], "not": { "required": ["content"] } }
+      ],
+      "description": "Request params for file.write. Core supplies the destination path and bytes/content.",
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "content": { "type": "string" },
+        "contentBase64": { "type": "string" },
+        "encoding": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "createDirectories": { "type": "boolean" },
+        "append": { "type": "boolean" }
+      }
+    },
+    "HostCacheGetRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "key"],
+      "description": "Request params for cache.get. Namespace and key are Core-owned opaque identifiers.",
+      "properties": {
+        "namespace": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "key": { "type": "string", "minLength": 1, "pattern": "\\S" }
+      }
+    },
+    "HostCachePutRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "key"],
+      "oneOf": [
+        { "required": ["value"], "not": { "required": ["valueBase64"] } },
+        { "required": ["valueBase64"], "not": { "required": ["value"] } }
+      ],
+      "description": "Request params for cache.put. Core supplies opaque namespace/key and bytes/content to store.",
+      "properties": {
+        "namespace": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "key": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "value": { "type": "string" },
+        "valueBase64": { "type": "string" },
+        "ttlMillis": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "HostCookieRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "value": { "type": "string" },
+        "domain": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "path": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "expiresAt": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "httpOnly": { "type": "boolean" },
+        "secure": { "type": "boolean" },
+        "sameSite": { "type": "string", "minLength": 1, "pattern": "\\S" }
+      }
+    },
+    "HostCookieGetRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [
+        { "required": ["url"] },
+        { "required": ["domain"] },
+        { "required": ["sessionId"] }
+      ],
+      "description": "Request params for cookie.get. Core supplies lookup scope; host only returns cookie records.",
+      "properties": {
+        "url": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "domain": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "name": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "sessionId": { "type": "string", "minLength": 1, "pattern": "\\S" }
+      }
+    },
+    "HostCookieSetRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cookie"],
+      "description": "Request params for cookie.set. Core supplies a cookie record; host only stores it for the scoped jar.",
+      "properties": {
+        "cookie": { "$ref": "#/$defs/HostCookieRecord" },
+        "url": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "sessionId": { "type": "string", "minLength": 1, "pattern": "\\S" }
+      }
+    },
+    "HostLogLevel": {
+      "type": "string",
+      "enum": ["trace", "debug", "info", "warn", "error"]
+    },
+    "HostLogEmitRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "message"],
+      "description": "Request params for log.emit. Core supplies structured log facts; host only emits them.",
+      "properties": {
+        "level": { "$ref": "#/$defs/HostLogLevel" },
+        "message": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "target": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "fields": { "type": "object", "default": {} }
+      }
+    },
+    "HostTimeNowRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Request params for time.now. Core may request an optional clock/timezone fact.",
+      "properties": {
+        "clock": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "timezone": { "type": "string", "minLength": 1, "pattern": "\\S" }
+      }
+    },
+    "HostSystemInfoRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Request params for system.info. Keys are Core-owned opaque fact names.",
+      "properties": {
+        "keys": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "pattern": "\\S" },
+          "default": []
+        }
+      }
+    },
+    "HostPersistenceGetRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "key"],
+      "description": "Request params for persistence.get. Namespace/key are Core-owned opaque identifiers.",
+      "properties": {
+        "namespace": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "key": { "type": "string", "minLength": 1, "pattern": "\\S" }
+      }
+    },
+    "HostPersistencePutRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "key"],
+      "oneOf": [
+        { "required": ["value"], "not": { "required": ["valueBase64"] } },
+        { "required": ["valueBase64"], "not": { "required": ["value"] } }
+      ],
+      "description": "Request params for persistence.put. Core supplies opaque namespace/key and bytes/content to store.",
+      "properties": {
+        "namespace": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "key": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "value": { "type": "string" },
+        "valueBase64": { "type": "string" },
+        "expectedRevision": { "type": "string", "minLength": 1, "pattern": "\\S" }
       }
     },
     "CoreError": {
@@ -246,6 +661,16 @@
         "session": {
           "$ref": "#/$defs/HostHttpSession",
           "description": "Opaque Core-owned session/cookie-jar handle associated with this response."
+        },
+        "redirects": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/HostHttpRedirect" },
+          "description": "Redirect hops observed by the host HTTP stack."
+        },
+        "cookies": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/HostHttpCookie" },
+          "description": "Cookie metadata observed or applied by the host HTTP stack."
         }
       }
     },
@@ -259,6 +684,67 @@
           "minLength": 1,
           "pattern": "\\S",
           "description": "Opaque session/cookie-jar identifier owned by Core."
+        }
+      }
+    },
+    "HostHttpRedirect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "fromUrl", "toUrl"],
+      "properties": {
+        "status": {
+          "type": "integer",
+          "minimum": 300,
+          "maximum": 399
+        },
+        "fromUrl": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "toUrl": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "headers": {
+          "type": "object",
+          "description": "Optional redirect response headers."
+        }
+      }
+    },
+    "HostHttpCookie": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "value": { "type": "string" },
+        "domain": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "expiresAt": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "httpOnly": { "type": "boolean" },
+        "secure": { "type": "boolean" },
+        "sameSite": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
         }
       }
     },
@@ -482,10 +968,7 @@
       "properties": {
         "operationId": { "type": "integer", "minimum": 1 },
         "requestId": { "type": "integer", "minimum": 1 },
-        "capability": {
-          "type": "string",
-          "pattern": "^[^\\s.]+(\\.[^\\s.]+)+$"
-        },
+        "capability": { "$ref": "#/$defs/HostCapability" },
         "state": { "type": "string", "const": "pending" }
       }
     }

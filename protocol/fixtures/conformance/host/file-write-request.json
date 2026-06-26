@@ -1,0 +1,15 @@
+{
+  "protocolVersion": 1,
+  "requestId": 436,
+  "method": "runtime.hostSmoke",
+  "params": {
+    "capability": "file.write",
+    "params": {
+      "path": "core-cache/books/basic.json",
+      "content": "{\"books\":[]}",
+      "encoding": "utf-8",
+      "createDirectories": true,
+      "append": false
+    }
+  }
+}
