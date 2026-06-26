@@ -1,0 +1,11 @@
+{
+  "version": "build-env-doctor/1",
+  "generated_at": "2026-06-25T06:30:00Z",
+  "tool": "build-environment-doctor",
+  "platform": {"os": "Darwin", "arch": "arm64", "kernel": "23.4.0"},
+  "tools": [
+    {"name": "swift", "kind": "language", "found": true, "path": "/usr/bin/swift", "version": "5.9.2", "status": "ok", "notes": ""},
+    {"name": "cargo", "kind": "build", "found": true, "path": "/usr/bin/cargo", "version": "1.75.0", "status": "ok", "notes": ""}
+  ],
+  "summary": {"total": 2, "found": 2, "missing": 0, "unknown": 0}
+}

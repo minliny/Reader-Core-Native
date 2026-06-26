@@ -1,0 +1,14 @@
+{
+  "version": "platform-evidence/1",
+  "platform": "windows",
+  "kind": "build",
+  "capability": "reader.runtime",
+  "status": "pass",
+  "timestamp": "2026-06-25T11:00:00Z",
+  "environment": {
+    "os": "Windows",
+    "arch": "x86_64",
+    "toolchain": "msvc-2022"
+  },
+  "notes": "Deliberately invalid sample: platform 'windows' is not in ios/android/harmony."
+}

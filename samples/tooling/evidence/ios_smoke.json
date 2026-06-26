@@ -1,0 +1,15 @@
+{
+  "version": "platform-evidence/1",
+  "platform": "ios",
+  "kind": "smoke",
+  "capability": "reader.search",
+  "status": "pass",
+  "timestamp": "2026-06-25T08:00:00Z",
+  "environment": {
+    "os": "Darwin",
+    "arch": "arm64",
+    "toolchain": "xcode-15.4"
+  },
+  "artifact": "logs/ios/smoke-search.log",
+  "notes": "Synthetic smoke sample. Host api.example.test is a placeholder."
+}

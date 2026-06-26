@@ -1,0 +1,1116 @@
+{
+  "capabilities": [
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "book-chapter-source-\u6570\u636e\u6a21\u578b",
+      "name": "Book-Chapter-Source-\u6570\u636e\u6a21\u578b",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "protocol/reader-command.schema.json",
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "book.detail",
+      "name": "Book Detail",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "protocol/reader-command.schema.json",
+      "status": "implemented"
+    },
+    {
+      "evidence": [
+        "protocol/reader-command.schema.json",
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "book.search",
+      "name": "Book Search",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "protocol/reader-command.schema.json",
+      "status": "implemented"
+    },
+    {
+      "evidence": [
+        "protocol/reader-command.schema.json",
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "book.toc",
+      "name": "Book Toc",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "protocol/reader-command.schema.json",
+      "status": "implemented"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "booklist-scoping",
+      "name": "Booklist-Scoping",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "protocol/reader-command.schema.json",
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "chapter.content",
+      "name": "Chapter Content",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "protocol/reader-command.schema.json",
+      "status": "implemented"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "cookie-session-\u6301\u4e45\u5316",
+      "name": "Cookie-Session-\u6301\u4e45\u5316",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "cookie-\u7b56\u7565\u63a7\u5236",
+      "name": "Cookie-\u7b56\u7565\u63a7\u5236",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "protocol/reader-command.schema.json"
+      ],
+      "id": "core.info",
+      "name": "Core Info",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "protocol/reader-command.schema.json",
+      "status": "implemented"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "css-selector-\u89c4\u5219",
+      "name": "Css-Selector-\u89c4\u5219",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "epub-\u89e3\u6790",
+      "name": "Epub-\u89e3\u6790",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "missing"
+    },
+    {
+      "evidence": [
+        "protocol/reader-command.schema.json"
+      ],
+      "id": "host.bus.v1",
+      "name": "Host Bus V1",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "protocol/reader-command.schema.json",
+      "status": "implemented"
+    },
+    {
+      "evidence": [
+        "protocol/reader-command.schema.json"
+      ],
+      "id": "host.complete",
+      "name": "Host Complete",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "protocol/reader-command.schema.json",
+      "status": "implemented"
+    },
+    {
+      "evidence": [
+        "protocol/reader-command.schema.json"
+      ],
+      "id": "host.error",
+      "name": "Host Error",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "protocol/reader-command.schema.json",
+      "status": "implemented"
+    },
+    {
+      "evidence": [
+        "protocol/reader-event.schema.json"
+      ],
+      "id": "host.request",
+      "name": "Host Request",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "protocol/reader-event.schema.json",
+      "status": "implemented"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "html-\u89e3\u6790",
+      "name": "Html-\u89e3\u6790",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "http-transport",
+      "name": "Http-Transport",
+      "notes": "",
+      "owner": "host",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "protocol/reader-command.schema.json",
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "http.execute",
+      "name": "Http Execute",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "protocol/reader-command.schema.json",
+      "status": "implemented"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "js-host-api-console-fetch-crypto-etc.",
+      "name": "Js-Host-Api-Console-Fetch-Crypto-Etc ",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "js-\u6267\u884c-quickjs",
+      "name": "Js-\u6267\u884c-Quickjs",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "json-\u89e3\u6790",
+      "name": "Json-\u89e3\u6790",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "jsonpath-\u89c4\u5219",
+      "name": "Jsonpath-\u89c4\u5219",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "protocol/reader-command.schema.json"
+      ],
+      "id": "reading.progress.update",
+      "name": "Reading Progress Update",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "protocol/reader-command.schema.json",
+      "status": "implemented"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "recovery-\u6821\u9a8c-diff",
+      "name": "Recovery-\u6821\u9a8c-Diff",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "protocol/reader-command.schema.json",
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "remote.reading.v1",
+      "name": "Remote Reading V1",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "protocol/reader-command.schema.json",
+      "status": "implemented"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "rss-\u89e3\u6790\u548c\u8ba2\u9605\u72b6\u6001",
+      "name": "Rss-\u89e3\u6790\u548c\u8ba2\u9605\u72b6\u6001",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "protocol/reader-command.schema.json"
+      ],
+      "id": "runtime.config.v1",
+      "name": "Runtime Config V1",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "protocol/reader-command.schema.json",
+      "status": "implemented"
+    },
+    {
+      "evidence": [
+        "protocol/reader-command.schema.json"
+      ],
+      "id": "runtime.hostSmoke",
+      "name": "Runtime Hostsmoke",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "protocol/reader-command.schema.json",
+      "status": "implemented"
+    },
+    {
+      "evidence": [
+        "protocol/reader-command.schema.json"
+      ],
+      "id": "runtime.ping",
+      "name": "Runtime Ping",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "protocol/reader-command.schema.json",
+      "status": "implemented"
+    },
+    {
+      "evidence": [
+        "protocol/reader-command.schema.json",
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "source.import",
+      "name": "Source Import",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "protocol/reader-command.schema.json",
+      "status": "implemented"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "sqlite-schema-\u7ba1\u7406",
+      "name": "Sqlite-Schema-\u7ba1\u7406",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "tag.index",
+      "name": "Tag Index",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "tls-\u5b9e\u9645\u7f51\u7edc-socket",
+      "name": "Tls-\u5b9e\u9645\u7f51\u7edc-Socket",
+      "notes": "",
+      "owner": "host",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "tts-\u6587\u672c\u5207\u7247\u548c\u64ad\u653e\u961f\u5217",
+      "name": "Tts-\u6587\u672c\u5207\u7247\u548c\u64ad\u653e\u961f\u5217",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "txt-\u89e3\u6790",
+      "name": "Txt-\u89e3\u6790",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "missing"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "ui-\u7ec4\u4ef6\u548c\u5bfc\u822a",
+      "name": "Ui-\u7ec4\u4ef6\u548c\u5bfc\u822a",
+      "notes": "",
+      "owner": "host",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "webdav-\u534f\u8bae\u548c\u51b2\u7a81\u7b56\u7565",
+      "name": "Webdav-\u534f\u8bae\u548c\u51b2\u7a81\u7b56\u7565",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "webview-cookie-\u83b7\u53d6",
+      "name": "Webview-Cookie-\u83b7\u53d6",
+      "notes": "",
+      "owner": "host",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "xml-\u89e3\u6790",
+      "name": "Xml-\u89e3\u6790",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "xpath-\u89c4\u5219",
+      "name": "Xpath-\u89c4\u5219",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u4e0b\u8f7d\u961f\u5217",
+      "name": "\u4e0b\u8f7d\u961f\u5217",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u4e3b\u9898\u548c\u5b57\u4f53",
+      "name": "\u4e3b\u9898\u548c\u5b57\u4f53",
+      "notes": "",
+      "owner": "host",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u4e66\u6e90\u5bfc\u5165-\u5bfc\u51fa",
+      "name": "\u4e66\u6e90\u5bfc\u5165-\u5bfc\u51fa",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u4e66\u7c4d\u8be6\u60c5\u89c4\u5219",
+      "name": "\u4e66\u7c4d\u8be6\u60c5\u89c4\u5219",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u5185\u5bb9\u6e05\u6d17\u548c\u6807\u51c6\u5316",
+      "name": "\u5185\u5bb9\u6e05\u6d17\u548c\u6807\u51c6\u5316",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u5305\u4f53\u7b7e\u540d\u548c\u5206\u53d1",
+      "name": "\u5305\u4f53\u7b7e\u540d\u548c\u5206\u53d1",
+      "notes": "",
+      "owner": "host",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u53d8\u91cf\u4f5c\u7528\u57df",
+      "name": "\u53d8\u91cf\u4f5c\u7528\u57df",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u540c\u6b65-\u51b2\u7a81\u89e3\u51b3",
+      "name": "\u540c\u6b65-\u51b2\u7a81\u89e3\u51b3",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u540e\u53f0\u4efb\u52a1\u548c\u901a\u77e5",
+      "name": "\u540e\u53f0\u4efb\u52a1\u548c\u901a\u77e5",
+      "notes": "",
+      "owner": "host",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u54cd\u5e94\u7f16\u7801\u68c0\u6d4b\u548c\u8f6c\u6362",
+      "name": "\u54cd\u5e94\u7f16\u7801\u68c0\u6d4b\u548c\u8f6c\u6362",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u5907\u4efd-\u6062\u590d",
+      "name": "\u5907\u4efd-\u6062\u590d",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u591a\u5b57\u6bb5\u89c4\u5219",
+      "name": "\u591a\u5b57\u6bb5\u89c4\u5219",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u5b89\u5168\u51ed\u636e\u5b58\u50a8-keychain-keystore-etc",
+      "name": "\u5b89\u5168\u51ed\u636e\u5b58\u50a8-Keychain-Keystore-Etc",
+      "notes": "",
+      "owner": "host",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u641c\u7d22\u89c4\u5219",
+      "name": "\u641c\u7d22\u89c4\u5219",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u6570\u636e\u5e93\u8fc1\u79fb",
+      "name": "\u6570\u636e\u5e93\u8fc1\u79fb",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u6587\u4ef6\u9009\u62e9\u548c\u6c99\u7bb1\u6388\u6743",
+      "name": "\u6587\u4ef6\u9009\u62e9\u548c\u6c99\u7bb1\u6388\u6743",
+      "notes": "",
+      "owner": "host",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u66ff\u6362\u89c4\u5219",
+      "name": "\u66ff\u6362\u89c4\u5219",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u6700\u8fd1\u5386\u53f2",
+      "name": "\u6700\u8fd1\u5386\u53f2",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u6b63\u5219\u89c4\u5219",
+      "name": "\u6b63\u5219\u89c4\u5219",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u6b63\u6587\u89c4\u5219",
+      "name": "\u6b63\u6587\u89c4\u5219",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u767b\u5f55-webview-\u4ea4\u4e92",
+      "name": "\u767b\u5f55-Webview-\u4ea4\u4e92",
+      "notes": "",
+      "owner": "host",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u76ee\u5f55\u89c4\u5219",
+      "name": "\u76ee\u5f55\u89c4\u5219",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u7ae0\u8282\u5185\u5bb9\u7f13\u5b58",
+      "name": "\u7ae0\u8282\u5185\u5bb9\u7f13\u5b58",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u7cfb\u7edf-tts-\u53d1\u58f0",
+      "name": "\u7cfb\u7edf-Tts-\u53d1\u58f0",
+      "notes": "",
+      "owner": "host",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u8bf7\u6c42\u53c2\u6570\u6784\u5efa",
+      "name": "\u8bf7\u6c42\u53c2\u6570\u6784\u5efa",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u91cd\u5b9a\u5411\u7b56\u7565\u63a7\u5236",
+      "name": "\u91cd\u5b9a\u5411\u7b56\u7565\u63a7\u5236",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u94fe\u89c4\u5219",
+      "name": "\u94fe\u89c4\u5219",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    },
+    {
+      "evidence": [
+        "FEATURE_MATRIX.md"
+      ],
+      "id": "\u9605\u8bfb\u8fdb\u5ea6",
+      "name": "\u9605\u8bfb\u8fdb\u5ea6",
+      "notes": "",
+      "owner": "core",
+      "platforms": [
+        "ios",
+        "android",
+        "harmony"
+      ],
+      "source": "FEATURE_MATRIX.md",
+      "status": "unknown"
+    }
+  ],
+  "generated_at": "2026-06-25T07:40:32Z",
+  "summary": {
+    "by_owner": {
+      "core": 57,
+      "host": 11,
+      "shared": 0
+    },
+    "by_status": {
+      "implemented": 16,
+      "missing": 2,
+      "partial": 0,
+      "unknown": 50
+    },
+    "total": 68
+  },
+  "tool": "capability-catalog-generator",
+  "version": "capability-catalog/1"
+}

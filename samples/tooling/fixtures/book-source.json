@@ -1,0 +1,10 @@
+{
+  "id": "sample-book-source",
+  "source_type": "book-source",
+  "name": "Example Test Book Source",
+  "url": "https://example.test/",
+  "search_url": "https://example.test/search?q={q}",
+  "toc_url": "https://example.test/toc/{bookId}",
+  "chapter_url": "https://example.test/chapter/{chapterId}",
+  "comment": "Synthetic fixture for the fixture-manifest tool. No real data."
+}

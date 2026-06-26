@@ -1,0 +1,17 @@
+{
+  "version": "capability-catalog/1",
+  "generated_at": "2026-06-25T06:00:00Z",
+  "tool": "capability-catalog-generator",
+  "capabilities": [
+    {
+      "id": "reader.search",
+      "name": "Reader Search",
+      "owner": "core",
+      "platforms": ["ios", "android", "harmony"],
+      "source": "FEATURE_MATRIX.md",
+      "status": "implemented",
+      "evidence": ["FEATURE_MATRIX.md"]
+    }
+  ],
+  "summary": {"total": 1, "by_owner": {"core": 1, "host": 0, "shared": 0}, "by_status": {"implemented": 1, "missing": 0, "partial": 0, "unknown": 0}}
+}

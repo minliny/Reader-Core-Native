@@ -1,0 +1,15 @@
+{
+  "version": "platform-evidence/1",
+  "platform": "harmony",
+  "kind": "device",
+  "capability": "reader.chapter-content",
+  "status": "fail",
+  "timestamp": "2026-06-25T10:05:00Z",
+  "environment": {
+    "os": "OpenHarmony",
+    "arch": "arm64",
+    "toolchain": "ohos-sdk-5"
+  },
+  "artifact": "logs/harmony/device-chapter.log",
+  "notes": "Device run failed on a synthetic chapter payload from api.example.test."
+}
