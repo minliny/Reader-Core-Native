@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "title": "HarmonyOS Corpus Evidence Intake Manifest",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "platform",
+    "sourceRepo",
+    "sourceBranch",
+    "sourcePr",
+    "expectedCorpusOutputPath",
+    "nativeIntakePath",
+    "releaseGateCandidateName",
+    "blockerWhenMissing"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "platform": { "type": "string", "const": "harmony" },
+    "sourceRepo": { "type": "string" },
+    "sourceBranch": { "type": "string" },
+    "sourcePr": { "type": "string" },
+    "expectedCorpusOutputPath": { "type": "string" },
+    "nativeIntakePath": { "type": "string" },
+    "releaseGateCandidateName": { "type": "string", "const": "harmony" },
+    "blockerWhenMissing": {
+      "type": "object",
+      "required": ["id", "platform", "severity", "status", "reason"],
+      "properties": {
+        "id": { "type": "string" },
+        "platform": { "type": "string", "const": "harmony" },
+        "severity": { "type": "string" },
+        "status": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}

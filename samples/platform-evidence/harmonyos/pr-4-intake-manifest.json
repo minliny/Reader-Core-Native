@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "platform": "harmony",
+  "sourceRepo": "/Users/minliny/Documents/Reader for HarmonyOS",
+  "sourceBranch": "codex/harmony-signed-device-runtime",
+  "sourcePr": "https://github.com/minliny/Reader-for-HarmonyOS/pull/4",
+  "expectedCorpusOutputPath": "/Users/minliny/Documents/Reader for HarmonyOS/artifacts/corpus/harmonyos/pr-4-corpus-output.json",
+  "nativeIntakePath": "samples/platform-evidence/harmonyos/pr-4-corpus-output.json",
+  "releaseGateCandidateName": "harmony",
+  "blockerWhenMissing": {
+    "id": "missing-harmonyos-platform-output",
+    "platform": "harmony",
+    "severity": "high",
+    "status": "open",
+    "reason": "HarmonyOS PR #4 has an intake contract, but no HarmonyOS corpus output has been imported into the Native release gate yet."
+  }
+}
