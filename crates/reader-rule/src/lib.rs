@@ -114,13 +114,17 @@ impl RuleEngine {
         js: Option<&dyn RuleJsEvaluator>,
     ) -> RuleResult<RuleOutput> {
         let _ = js; // wired in Task 5
-        let _ = scope; // wired in Task 4
         let rule = rule.trim();
         if rule.is_empty() {
             return Ok(RuleOutput::new(Vec::new()));
         }
         let (mode, body) = detect_legado_rule_mode(rule);
-        let suffix = LegadoRegexSuffix::parse(body);
+        // @put extraction must happen before @get substitution (Legado
+        // splitPutRule → evalMatcher ordering) so @get:{key} can read pairs
+        // stored by an earlier @put:{...} in the same rule.
+        let body = extract_put_rules(body, scope);
+        let body = substitute_get_rules(&body, scope);
+        let suffix = LegadoRegexSuffix::parse(&body);
         let out = match mode {
             LegadoRuleMode::Default => self.execute_legado_css(input, suffix.selector)?,
             LegadoRuleMode::Xpath => {
@@ -299,6 +303,64 @@ impl<'a> LegadoRegexSuffix<'a> {
             }
         }
     }
+}
+
+/// Extract `@put:{...}` directives from a rule body, store the parsed
+/// key-value pairs into `scope`, and return the body with all `@put:{...}`
+/// segments removed.
+///
+/// Mirrors Legado `splitPutRule` (AnalyzeRule.kt:408-431) + `putPattern`
+/// (line 880, `@put:(\{[^}]+?\})` case-insensitive). The JSON object inside
+/// the braces is parsed as a string-keyed map; non-string values are
+/// JSON-stringified. Parse failures are silently skipped (Legado logs a
+/// warning but continues) — the `@put:{...}` segment is still stripped.
+fn extract_put_rules(body: &str, scope: &mut dyn RuleVariableScope) -> String {
+    let regex = match Regex::new(r"(?i)@put:(\{[^}]+?\})") {
+        Ok(r) => r,
+        Err(_) => return body.to_string(),
+    };
+    let mut cleaned = body.to_string();
+    // Collect first, mutate scope after iteration to avoid borrowing issues.
+    let mut to_store: Vec<(String, String)> = Vec::new();
+    for caps in regex.captures_iter(body) {
+        let full = caps.get(0).map(|m| m.as_str()).unwrap_or("");
+        let json_str = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+        cleaned = cleaned.replace(full, "");
+        if let Ok(map) = serde_json::from_str::<serde_json::Map<String, JsonValue>>(json_str) {
+            for (k, v) in map {
+                let value = match v {
+                    JsonValue::String(s) => s,
+                    other => other.to_string(),
+                };
+                to_store.push((k, value));
+            }
+        }
+    }
+    for (k, v) in to_store {
+        scope.put(k, v);
+    }
+    cleaned
+}
+
+/// Replace `@get:{key}` with the value stored in `scope`. Missing keys
+/// resolve to the empty string, matching Legado `get()` (AnalyzeRule.kt:754-769)
+/// which falls back to `""` when no variable / book / chapter / source has
+/// the key.
+///
+/// Mirrors the @get branch of Legado `evalPattern` (line 881,
+/// `@get:\{[^}]+?\}` case-insensitive) + `makeUpRule` getRuleType handling
+/// (line 698-699).
+fn substitute_get_rules(body: &str, scope: &dyn RuleVariableScope) -> String {
+    let regex = match Regex::new(r"(?i)@get:\{([^}]+?)\}") {
+        Ok(r) => r,
+        Err(_) => return body.to_string(),
+    };
+    regex
+        .replace_all(body, |caps: &regex::Captures| {
+            let key = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+            scope.get(key).unwrap_or_default()
+        })
+        .into_owned()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
