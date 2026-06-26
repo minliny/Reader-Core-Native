@@ -53,7 +53,7 @@ use crate::{
 /// in [`SCHEMA_V1_DDL`] (or its successors) changes. The JSON snapshot
 /// `schemaVersion` ([`STORAGE_SNAPSHOT_SCHEMA_VERSION`]) is a separate
 /// numbering space and must NOT be coupled to this constant.
-pub const SQLITE_SCHEMA_VERSION: u32 = 1;
+pub const SQLITE_SCHEMA_VERSION: u32 = 2;
 
 /// DDL for schema v1. Executed verbatim when a database is created at v0.
 ///
@@ -159,6 +159,72 @@ CREATE TABLE IF NOT EXISTS chapter_download_queue (
 CREATE INDEX IF NOT EXISTS idx_download_claim ON chapter_download_queue(status, priority, updated_at, created_at);
 "#;
 
+/// DDL for schema v2. Adds the four independent configurable entities ported
+/// from Legado `data/entities/`: `TxtTocRule`, `Bookmark`, `ReplaceRule`,
+/// `DictRule`. Executed as a forward migration from v1.
+///
+/// Design notes:
+/// - Column names are snake_case mirrors of the Rust struct fields in
+///   `reader-domain`. Legado uses camelCase column names (e.g. `sortOrder`);
+///   we normalize to snake_case (`sort_order`) for SQL ergonomics. The
+///   `reader-domain` `ReplaceRule.order` field maps to `sort_order` to match
+///   Legado's `@ColumnInfo(name = "sortOrder")` intent.
+/// - Booleans are `INTEGER` 0/1 (SQLite has no native bool).
+/// - `replace_rules.id` is `INTEGER PRIMARY KEY` (no AUTOINCREMENT) — Legado
+///   defaults to `System.currentTimeMillis()`, Rust leaves id assignment to
+///   the caller.
+/// - `bookmarks.time` is the PK (creation timestamp), matching Legado.
+/// - `dict_rules.name` is the PK (string), matching Legado.
+/// - No foreign keys: these entities are independent configuration rows, not
+///   tied to a specific source/book row (same permissive semantics as v1).
+pub const SCHEMA_V2_DDL: &str = r#"
+CREATE TABLE IF NOT EXISTS txt_toc_rules (
+    id             INTEGER PRIMARY KEY,
+    name           TEXT NOT NULL DEFAULT '',
+    rule           TEXT NOT NULL DEFAULT '',
+    example        TEXT,
+    serial_number  INTEGER NOT NULL DEFAULT -1,
+    enable         INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS bookmarks (
+    time           INTEGER PRIMARY KEY,
+    book_name      TEXT NOT NULL DEFAULT '',
+    book_author    TEXT NOT NULL DEFAULT '',
+    chapter_index  INTEGER NOT NULL DEFAULT 0,
+    chapter_pos    INTEGER NOT NULL DEFAULT 0,
+    chapter_name   TEXT NOT NULL DEFAULT '',
+    book_text      TEXT NOT NULL DEFAULT '',
+    content        TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_bookmarks_book ON bookmarks(book_name, book_author);
+
+CREATE TABLE IF NOT EXISTS replace_rules (
+    id                  INTEGER PRIMARY KEY,
+    name                TEXT NOT NULL DEFAULT '',
+    "group"             TEXT,
+    pattern             TEXT NOT NULL DEFAULT '',
+    replacement         TEXT NOT NULL DEFAULT '',
+    scope               TEXT,
+    scope_title         INTEGER NOT NULL DEFAULT 0,
+    scope_content       INTEGER NOT NULL DEFAULT 1,
+    exclude_scope       TEXT,
+    is_enabled          INTEGER NOT NULL DEFAULT 1,
+    is_regex            INTEGER NOT NULL DEFAULT 1,
+    timeout_millisecond INTEGER NOT NULL DEFAULT 3000,
+    sort_order          INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_replace_rules_id ON replace_rules(id);
+
+CREATE TABLE IF NOT EXISTS dict_rules (
+    name         TEXT PRIMARY KEY,
+    url_rule     TEXT NOT NULL DEFAULT '',
+    show_rule    TEXT NOT NULL DEFAULT '',
+    enabled      INTEGER NOT NULL DEFAULT 1,
+    sort_number  INTEGER NOT NULL DEFAULT 0
+);
+"#;
+
 /// SQLite-backed reader storage. Holds a single connection guarded by a `Mutex`,
 /// mirroring the `InMemoryStorage` concurrency model.
 pub struct SqliteStorage {
@@ -218,7 +284,10 @@ impl SqliteStorage {
         if current < 1 {
             conn.execute_batch(SCHEMA_V1_DDL).map_err(rusqlite_error)?;
         }
-        // Future migrations: `if current < 2 { conn.execute_batch(SCHEMA_V2_DDL)?; }`
+        if current < 2 {
+            conn.execute_batch(SCHEMA_V2_DDL).map_err(rusqlite_error)?;
+        }
+        // Future migrations: `if current < 3 { conn.execute_batch(SCHEMA_V3_DDL)?; }`
 
         if current != SQLITE_SCHEMA_VERSION {
             conn.pragma_update(None, "user_version", SQLITE_SCHEMA_VERSION)
@@ -1799,5 +1868,153 @@ impl StorageSnapshotStore for SqliteStorage {
         }
         tx.commit().map_err(rusqlite_error)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn table_exists(conn: &Connection, table: &str) -> bool {
+        conn.query_row(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?1",
+            params![table],
+            |_| Ok(()),
+        )
+        .is_ok()
+    }
+
+    #[test]
+    fn open_in_memory_migrates_to_v2() {
+        let storage = SqliteStorage::open_in_memory().unwrap();
+        let version = storage.user_version().unwrap();
+        assert_eq!(version, 2);
+    }
+
+    #[test]
+    fn v2_creates_four_entity_tables() {
+        let storage = SqliteStorage::open_in_memory().unwrap();
+        let conn = storage.lock().unwrap();
+        assert!(table_exists(&conn, "txt_toc_rules"));
+        assert!(table_exists(&conn, "bookmarks"));
+        assert!(table_exists(&conn, "replace_rules"));
+        assert!(table_exists(&conn, "dict_rules"));
+    }
+
+    #[test]
+    fn v2_creates_bookmarks_and_replace_rules_indexes() {
+        let storage = SqliteStorage::open_in_memory().unwrap();
+        let conn = storage.lock().unwrap();
+        let bookmark_idx: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_bookmarks_book'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(bookmark_idx, 1);
+        let replace_idx: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_replace_rules_id'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(replace_idx, 1);
+    }
+
+    #[test]
+    fn v1_to_v2_migration_adds_entity_tables() {
+        // Create a v1 database by running only SCHEMA_V1_DDL and setting
+        // user_version=1, then migrate to v2.
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(SCHEMA_V1_DDL).unwrap();
+        conn.pragma_update(None, "user_version", 1u32).unwrap();
+        assert_eq!(
+            conn.query_row("PRAGMA user_version", [], |row| row.get::<_, u32>(0)),
+            Ok(1)
+        );
+        // Run migration on the v1 database.
+        SqliteStorage::migrate(&conn).unwrap();
+        assert_eq!(
+            conn.query_row("PRAGMA user_version", [], |row| row.get::<_, u32>(0)),
+            Ok(2)
+        );
+        // v2 tables must now exist.
+        assert!(table_exists(&conn, "txt_toc_rules"));
+        assert!(table_exists(&conn, "bookmarks"));
+        assert!(table_exists(&conn, "replace_rules"));
+        assert!(table_exists(&conn, "dict_rules"));
+        // v1 tables must still exist.
+        assert!(table_exists(&conn, "sources"));
+        assert!(table_exists(&conn, "books"));
+        assert!(table_exists(&conn, "bookshelf"));
+    }
+
+    #[test]
+    fn v2_table_columns_match_domain_model() {
+        let storage = SqliteStorage::open_in_memory().unwrap();
+        let conn = storage.lock().unwrap();
+
+        // txt_toc_rules columns
+        let cols: Vec<String> = conn
+            .prepare("PRAGMA table_info(txt_toc_rules)")
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(
+            cols,
+            vec!["id", "name", "rule", "example", "serial_number", "enable"]
+        );
+
+        // replace_rules columns — verify sort_order column (maps to domain `order`)
+        let cols: Vec<String> = conn
+            .prepare("PRAGMA table_info(replace_rules)")
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert!(cols.contains(&"sort_order".to_string()));
+        assert!(cols.contains(&"timeout_millisecond".to_string()));
+        assert!(cols.contains(&"scope_title".to_string()));
+        assert!(cols.contains(&"scope_content".to_string()));
+
+        // dict_rules columns
+        let cols: Vec<String> = conn
+            .prepare("PRAGMA table_info(dict_rules)")
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(
+            cols,
+            vec!["name", "url_rule", "show_rule", "enabled", "sort_number"]
+        );
+
+        // bookmarks columns
+        let cols: Vec<String> = conn
+            .prepare("PRAGMA table_info(bookmarks)")
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(
+            cols,
+            vec![
+                "time",
+                "book_name",
+                "book_author",
+                "chapter_index",
+                "chapter_pos",
+                "chapter_name",
+                "book_text",
+                "content"
+            ]
+        );
     }
 }

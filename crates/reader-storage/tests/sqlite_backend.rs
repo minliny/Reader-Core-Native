@@ -125,9 +125,9 @@ fn test_progress(book: &str, idx: u32) -> ReadingProgress {
 // ---------- backend primitives ----------
 
 #[test]
-fn sqlite_open_in_memory_initializes_schema_v1() {
+fn sqlite_open_in_memory_initializes_schema_v2() {
     let storage = SqliteStorage::open_in_memory().expect("open in-memory");
-    assert_eq!(storage.user_version().unwrap(), 1);
+    assert_eq!(storage.user_version().unwrap(), 2);
 }
 
 #[test]
