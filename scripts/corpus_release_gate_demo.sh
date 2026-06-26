@@ -76,7 +76,7 @@ run_diff() {
     for platform in "${PLATFORMS[@]}"; do
         args+=(--candidate "$platform:$fixture/candidates/$platform-result.json")
     done
-    $DIFF "${args[@]}" -o "$out"
+    $DIFF "${args[@]}" --release-gate -o "$out"
 }
 
 write_manifest() {

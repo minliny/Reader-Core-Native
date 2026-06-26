@@ -40,6 +40,7 @@ Blocker entry::
       "platform": "<candidate name>",
       "fieldPath": "<difference path>",
       "kind": "value-mismatch | missing-in-candidate | unexpected-in-candidate",
+      "classification": "core-semantic-difference | host-capability-difference | platform-output-missing",
       "canonicalSha256": "...",
       "candidateSha256": "...",
       "canonicalSnippet": "...",
@@ -74,7 +75,7 @@ import sys
 
 
 TOOL_NAME = "release-blocker-register"
-TOOL_VERSION = "1.0"
+TOOL_VERSION = "1.1"
 SCHEMA_VERSION = 1
 
 PRIVATE_TMP = "/private/tmp"
@@ -89,6 +90,16 @@ SEVERITY_HIGH = "high"
 SEVERITY_MEDIUM = "medium"
 SEVERITY_LOW = "low"
 _SEVERITIES = (SEVERITY_HIGH, SEVERITY_MEDIUM, SEVERITY_LOW)
+
+CLASS_CORE_SEMANTIC = "core-semantic-difference"
+CLASS_HOST_CAPABILITY = "host-capability-difference"
+CLASS_PLATFORM_MISSING = "platform-output-missing"
+
+_CLASS_REASONS = {
+    CLASS_CORE_SEMANTIC: "Core semantic difference from canonical reference",
+    CLASS_HOST_CAPABILITY: "host capability difference from canonical reference",
+    CLASS_PLATFORM_MISSING: "platform output missing from release-gate evidence",
+}
 
 
 class RegisterError(Exception):
@@ -256,18 +267,27 @@ def blockers_from_diff(diff_result, run_id, severity):
         candidate_sha = info.get("sha256", "") or ""
         for diff in info.get("differences", []):
             field_path = diff.get("path", "") if isinstance(diff, dict) else ""
+            classification = (
+                diff.get("classification", CLASS_CORE_SEMANTIC)
+                if isinstance(diff, dict)
+                else CLASS_CORE_SEMANTIC
+            )
             entries.append({
                 "runId": run_id,
                 "platform": name,
                 "fieldPath": field_path,
                 "kind": diff.get("kind", "value-mismatch") if isinstance(diff, dict) else "value-mismatch",
+                "classification": classification,
                 "canonicalSha256": canonical_sha,
                 "candidateSha256": candidate_sha,
                 "canonicalSnippet": (diff.get("canonical") if isinstance(diff, dict) else None),
                 "candidateSnippet": (diff.get("candidate") if isinstance(diff, dict) else None),
                 "severity": severity,
                 "status": STATUS_OPEN,
-                "reason": "cross-platform divergence from canonical reference",
+                "reason": _CLASS_REASONS.get(
+                    classification,
+                    "cross-platform divergence from canonical reference",
+                ),
                 "waiver": None,
             })
     return entries
@@ -300,6 +320,7 @@ def add_manual_blocker(register, run_id, platform, field_path, severity, reason,
         "platform": platform,
         "fieldPath": field_path,
         "kind": "value-mismatch",
+        "classification": CLASS_CORE_SEMANTIC,
         "canonicalSha256": canonical_sha,
         "candidateSha256": candidate_sha,
         "canonicalSnippet": None,
@@ -405,6 +426,7 @@ def render_blocker_detail(entry):
         "  platform: {0}".format(entry.get("platform") or "-"),
         "  fieldPath: {0}".format(entry.get("fieldPath") or "-"),
         "  kind: {0}".format(entry.get("kind", "-")),
+        "  classification: {0}".format(entry.get("classification", "-")),
         "  reason: {0}".format(entry.get("reason", "-")),
         "  canonicalSha256: {0}".format(entry.get("canonicalSha256") or "-"),
         "  candidateSha256: {0}".format(entry.get("candidateSha256") or "-"),

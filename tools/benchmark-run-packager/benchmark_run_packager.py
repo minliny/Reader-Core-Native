@@ -46,8 +46,14 @@ import zipfile
 
 
 TOOL_NAME = "benchmark-run-packager"
-TOOL_VERSION = "1.0"
+TOOL_VERSION = "1.1"
 SCHEMA_VERSION = 1
+
+DIFF_CLASS_KEYS = (
+    "core-semantic-difference",
+    "host-capability-difference",
+    "platform-output-missing",
+)
 
 # (artifact key, expected filename). Order is stable for deterministic output.
 REQUIRED_ARTIFACTS = [
@@ -248,8 +254,7 @@ def derive_run_id(run_dir, manifest):
 
 
 def derive_diff_summary(diff_result):
-    """Derive a ``{"match": bool|None, "total": int|None}`` summary from a
-    diff-result document.
+    """Derive a compact summary from a diff-result document.
 
     Understands the shape produced by the sibling ``cross-platform-diff`` tool
     (a per-candidate ``summary`` with ``total`` counts) as well as plain
@@ -257,8 +262,13 @@ def derive_diff_summary(diff_result):
     """
     match = None
     total = None
+    classes = {key: 0 for key in DIFF_CLASS_KEYS}
+    release_gate = None
 
     if isinstance(diff_result, dict):
+        if isinstance(diff_result.get("releaseGate"), dict):
+            release_gate = diff_result["releaseGate"]
+
         summary = diff_result.get("summary")
         if isinstance(summary, dict) and summary:
             counted = 0
@@ -270,6 +280,13 @@ def derive_diff_summary(diff_result):
                         seen = True
                     except (TypeError, ValueError):
                         pass
+                class_counts = value.get("differenceClasses") if isinstance(value, dict) else None
+                if isinstance(class_counts, dict):
+                    for key, amount in class_counts.items():
+                        try:
+                            classes[key] = classes.get(key, 0) + int(amount)
+                        except (TypeError, ValueError):
+                            pass
             if seen:
                 total = counted
                 match = counted == 0
@@ -282,7 +299,12 @@ def derive_diff_summary(diff_result):
             except (TypeError, ValueError):
                 pass
 
-    return {"match": match, "total": total}
+    return {
+        "match": match,
+        "total": total,
+        "differenceClasses": classes,
+        "releaseGate": release_gate,
+    }
 
 
 def collect_environment(run_dir, env_value):
@@ -480,6 +502,23 @@ def render_summary(summary):
     if diff["total"] is not None:
         diff_text += " (total differences: {0})".format(diff["total"])
     lines.append("  diff: {0}".format(diff_text))
+    classes = diff.get("differenceClasses")
+    if isinstance(classes, dict) and any(classes.values()):
+        class_bits = []
+        for key in sorted(classes.keys()):
+            value = classes[key]
+            if value:
+                class_bits.append("{0}: {1}".format(key, value))
+        if class_bits:
+            lines.append("  diff classes: {0}".format(", ".join(class_bits)))
+    release_gate = diff.get("releaseGate")
+    if isinstance(release_gate, dict):
+        status = release_gate.get("status", "not-evaluated")
+        lines.append("  release gate: {0}".format(status))
+        reasons = release_gate.get("blockedReasons")
+        if isinstance(reasons, list):
+            for reason in reasons:
+                lines.append("    - {0}".format(reason))
 
     lines.append("  files packaged: {0}".format(len(summary["files"])))
     lines.append("  bundle dir: {0}".format(summary["bundle"]["outDir"]))

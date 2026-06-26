@@ -26,13 +26,31 @@ Output schema (``schemaVersion`` 1)::
           "sha256": "...",
           "match": true|false,
           "total": <int>,
+          "differenceClasses": {
+            "core-semantic-difference": <int>,
+            "host-capability-difference": <int>,
+            "platform-output-missing": <int>
+          },
           "differences": [
-            {"path": "<json-pointer-ish>", "canonical": <snip>, "candidate": <snip>}
+            {
+              "path": "<json-pointer-ish>",
+              "kind": "...",
+              "classification": "core-semantic-difference | ...",
+              "canonical": <snip>,
+              "candidate": <snip>
+            }
           ]
         }
       },
       "summary": {
-        "<name>": {"match": true|false, "total": <int>}
+        "<name>": {"match": true|false, "total": <int>, "differenceClasses": {...}}
+      },
+      "releaseGate": {
+        "status": "not-evaluated | passed | blocked",
+        "requiredCandidates": ["ios", "android", "harmony"],
+        "missingCandidates": [],
+        "mismatchingCandidates": [],
+        "blockedReasons": []
       },
       "match": true|false,
       "total": <int>
@@ -72,8 +90,35 @@ import corpus_canonicalize as cc  # noqa: E402
 
 
 TOOL_NAME = "cross-platform-diff"
-TOOL_VERSION = "1.0"
+TOOL_VERSION = "1.1"
 SCHEMA_VERSION = 1
+DEFAULT_RELEASE_GATE_CANDIDATES = ("ios", "android", "harmony")
+
+CLASS_CORE_SEMANTIC = "core-semantic-difference"
+CLASS_HOST_CAPABILITY = "host-capability-difference"
+CLASS_PLATFORM_MISSING = "platform-output-missing"
+
+_HOST_PATH_MARKERS = frozenset({
+    "host",
+    "hostrequest",
+    "hostrequests",
+    "capability",
+    "capabilities",
+    "http",
+    "request",
+    "requests",
+    "response",
+    "responses",
+    "headers",
+    "cookies",
+    "cookie",
+    "status",
+    "finalurl",
+    "charset",
+    "charsethint",
+    "bodybase64",
+    "transport",
+})
 
 # Maximum number of characters of a differing scalar value to retain in the
 # emitted difference record. Longer values are truncated with a sentinel so
@@ -128,6 +173,47 @@ def _join_ptr(prefix, key):
     if prefix == "":
         return str(key)
     return "{0}.{1}".format(prefix, key)
+
+
+def _path_markers(path):
+    lowered = path.lower()
+    token = ""
+    markers = []
+    for ch in lowered:
+        if ch.isalnum():
+            token += ch
+        else:
+            if token:
+                markers.append(token)
+                token = ""
+    if token:
+        markers.append(token)
+    return markers
+
+
+def classify_difference(diff):
+    kind = diff.get("kind") if isinstance(diff, dict) else None
+    if kind == CLASS_PLATFORM_MISSING:
+        return CLASS_PLATFORM_MISSING
+
+    path = diff.get("path", "") if isinstance(diff, dict) else ""
+    for marker in _path_markers(path):
+        if marker in _HOST_PATH_MARKERS:
+            return CLASS_HOST_CAPABILITY
+    return CLASS_CORE_SEMANTIC
+
+
+def _class_counts(diffs):
+    counts = {
+        CLASS_CORE_SEMANTIC: 0,
+        CLASS_HOST_CAPABILITY: 0,
+        CLASS_PLATFORM_MISSING: 0,
+    }
+    for diff in diffs:
+        classification = classify_difference(diff)
+        diff["classification"] = classification
+        counts[classification] = counts.get(classification, 0) + 1
+    return counts
 
 
 def collect_differences(canonical, candidate, prefix=""):
@@ -210,10 +296,79 @@ def compare_candidate(canonical_obj, candidate_path):
     """
     candidate_obj = load_canonical_object(candidate_path)
     diffs = collect_differences(canonical_obj, candidate_obj)
+    _class_counts(diffs)
     return (len(diffs) == 0), diffs
 
 
-def build_diff_result(canonical_path, candidates):
+def _missing_candidate_result(name):
+    diffs = [{
+        "path": "<candidate>",
+        "kind": CLASS_PLATFORM_MISSING,
+        "classification": CLASS_PLATFORM_MISSING,
+        "canonical": "required platform output present in canonical reference",
+        "candidate": None,
+    }]
+    return {
+        "path": None,
+        "sha256": None,
+        "match": False,
+        "total": 1,
+        "differenceClasses": _class_counts(diffs),
+        "differences": diffs,
+    }
+
+
+def _build_release_gate(candidate_results, required_candidates):
+    required = list(required_candidates or [])
+    if not required:
+        return {
+            "status": "not-evaluated",
+            "requiredCandidates": [],
+            "presentCandidates": [],
+            "matchingCandidates": [],
+            "missingCandidates": [],
+            "mismatchingCandidates": [],
+            "blockedReasons": [],
+        }
+
+    present = []
+    matching = []
+    missing = []
+    mismatching = []
+
+    for name in required:
+        info = candidate_results.get(name)
+        if not info or info.get("path") is None:
+            missing.append(name)
+            continue
+        present.append(name)
+        if info.get("match") is True:
+            matching.append(name)
+        else:
+            mismatching.append(name)
+
+    blocked_reasons = []
+    if missing:
+        blocked_reasons.append(
+            "missing required platform output: {0}".format(", ".join(missing))
+        )
+    if mismatching:
+        blocked_reasons.append(
+            "required platform output differs: {0}".format(", ".join(mismatching))
+        )
+
+    return {
+        "status": "passed" if not blocked_reasons else "blocked",
+        "requiredCandidates": required,
+        "presentCandidates": present,
+        "matchingCandidates": matching,
+        "missingCandidates": missing,
+        "mismatchingCandidates": mismatching,
+        "blockedReasons": blocked_reasons,
+    }
+
+
+def build_diff_result(canonical_path, candidates, required_candidates=None):
     """Build the full diff-result document.
 
     ``candidates`` is an ordered list of ``(name, path)`` tuples.
@@ -226,19 +381,42 @@ def build_diff_result(canonical_path, candidates):
     overall_match = True
     overall_total = 0
 
+    required_candidates = list(required_candidates or [])
+
     for name, path in candidates:
         match, diffs = compare_candidate(canonical_obj, path)
         total = len(diffs)
+        classes = _class_counts(diffs)
         candidate_results[name] = {
             "path": os.path.abspath(path),
             "sha256": sha256_of_file(path),
             "match": match,
             "total": total,
+            "differenceClasses": classes,
             "differences": diffs,
         }
-        summary[name] = {"match": match, "total": total}
+        summary[name] = {
+            "match": match,
+            "total": total,
+            "differenceClasses": classes,
+        }
         overall_match = overall_match and match
         overall_total += total
+
+    for name in required_candidates:
+        if name in candidate_results:
+            continue
+        missing = _missing_candidate_result(name)
+        candidate_results[name] = missing
+        summary[name] = {
+            "match": False,
+            "total": missing["total"],
+            "differenceClasses": missing["differenceClasses"],
+        }
+        overall_match = False
+        overall_total += missing["total"]
+
+    release_gate = _build_release_gate(candidate_results, required_candidates)
 
     return {
         "schemaVersion": SCHEMA_VERSION,
@@ -252,6 +430,7 @@ def build_diff_result(canonical_path, candidates):
         "summary": summary,
         "match": overall_match,
         "total": overall_total,
+        "releaseGate": release_gate,
     }
 
 
@@ -306,6 +485,23 @@ def parse_args(argv):
         default=None,
         help="Path to write the diff-result JSON (default: write to stdout).",
     )
+    parser.add_argument(
+        "--required-candidate",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help=(
+            "Candidate name required for release-gate evidence. Missing or "
+            "mismatching required candidates mark releaseGate.status=blocked."
+        ),
+    )
+    parser.add_argument(
+        "--release-gate",
+        action="store_true",
+        help=(
+            "Require the default three app candidates: ios, android, harmony."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -328,8 +524,18 @@ def main(argv=None):
         seen_names.add(name)
         candidates.append((name, path))
 
+    required_candidates = list(args.required_candidate)
+    if args.release_gate:
+        for name in DEFAULT_RELEASE_GATE_CANDIDATES:
+            if name not in required_candidates:
+                required_candidates.append(name)
+
     try:
-        result = build_diff_result(args.canonical, candidates)
+        result = build_diff_result(
+            args.canonical,
+            candidates,
+            required_candidates=required_candidates,
+        )
     except DiffError as err:
         sys.stderr.write("error: {0}\n".format(err))
         return 2
