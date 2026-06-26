@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "tool": "legacy-fixture-register",
+  "version": "1.0",
+  "updatedAt": "2026-06-26",
+  "statusValues": [
+    "covered",
+    "pending-rule-kernel",
+    "needs-platform-corpus-proof"
+  ],
+  "entries": [
+    {
+      "id": "booksource",
+      "area": "BookSource",
+      "status": "covered",
+      "sourceRepos": [
+        "/Users/minliny/Documents/Reader-Core",
+        "/Users/minliny/Documents/legado"
+      ],
+      "nativeEvidence": [
+        "PR #4 codex/booksource-compat-protocol",
+        "codex/booksource-domain-compat"
+      ],
+      "fixturePaths": [
+        "protocol/fixtures/conformance/commands/valid-source-import-legado-booksource.json",
+        "crates/reader-content/tests/fixtures/booksource_canonical.json"
+      ],
+      "notes": "BookSource raw payload and domain normalization are tracked separately from full rule execution."
+    },
+    {
+      "id": "runtime-host",
+      "area": "Runtime/Host",
+      "status": "covered",
+      "sourceRepos": [
+        "/Users/minliny/Documents/Reader-Core"
+      ],
+      "nativeEvidence": [
+        "PR #18 codex/request-host-contract",
+        "PR #19 codex/remote-reading-host-replay-e2e",
+        "codex/runtime-host-capability-contract"
+      ],
+      "fixturePaths": [
+        "protocol/fixtures/conformance/host/",
+        "tools/reader-cli/tests/host_replay.rs"
+      ],
+      "notes": "Core owns descriptors, schema, routing, and conformance; host apps own execution."
+    },
+    {
+      "id": "corpus-oracle",
+      "area": "Corpus oracle",
+      "status": "covered",
+      "sourceRepos": [
+        "/Users/minliny/Documents/Reader-Core",
+        "/Users/minliny/Documents/Reader-Core-Native"
+      ],
+      "nativeEvidence": [
+        "PR #13 codex/corpus-release-gates",
+        "PR #20 codex/corpus-four-platform-pack",
+        "PR #23 codex/corpus-booksource-oracle-diff"
+      ],
+      "fixturePaths": [
+        "samples/corpus-release-gate/",
+        "samples/corpus-booksource-oracle/"
+      ],
+      "notes": "Oracle and diff tooling are covered; platform-real output remains separate proof."
+    },
+    {
+      "id": "rule-dsl",
+      "area": "Rule DSL",
+      "status": "pending-rule-kernel",
+      "sourceRepos": [
+        "/Users/minliny/Documents/Reader-Core",
+        "/Users/minliny/Documents/legado"
+      ],
+      "nativeEvidence": [
+        "PR #15 codex/legado-rule-dsl-executor",
+        "codex/rule-kernel-legado-semantics"
+      ],
+      "fixturePaths": [
+        "crates/reader-rule/tests/legado_css_dsl.rs",
+        "crates/reader-rule/tests/rule_parity.rs"
+      ],
+      "notes": "Minimum DSL executor is merged; broader rule/content kernel changes stay out of corpus evidence PRs."
+    },
+    {
+      "id": "ios-platform",
+      "area": "iOS",
+      "status": "needs-platform-corpus-proof",
+      "sourceRepos": [
+        "/Users/minliny/Documents/Reader for iOS"
+      ],
+      "nativeEvidence": [
+        "Native PR #12 codex/ios-rust-host-adapter",
+        "Reader-for-iOS PR #10 codex/ios-real-app-core-evidence"
+      ],
+      "fixturePaths": [
+        "/Users/minliny/Documents/Reader for iOS/native_core_evidence.json"
+      ],
+      "platformOutputPath": "/Users/minliny/Documents/Reader for iOS/artifacts/corpus/ios/corpus-output.json",
+      "notes": "Needs corpus output from the app evidence path before release gate parity can pass."
+    },
+    {
+      "id": "android-platform",
+      "area": "Android",
+      "status": "needs-platform-corpus-proof",
+      "sourceRepos": [
+        "/Users/minliny/Documents/Reader for Android"
+      ],
+      "nativeEvidence": [
+        "Native PR #2 codex/android-host-adapter",
+        "Reader-for-Android PR #2 codex/android-real-core-runtime-evidence"
+      ],
+      "fixturePaths": [
+        "/Users/minliny/Documents/Reader for Android/ANDROID_NATIVE_RUNTIME_EVIDENCE.md"
+      ],
+      "platformOutputPath": "/Users/minliny/Documents/Reader for Android/artifacts/corpus/android/corpus-output.json",
+      "notes": "Needs Android runtime corpus output, not only JVM/native bridge evidence."
+    },
+    {
+      "id": "harmonyos-platform",
+      "area": "HarmonyOS",
+      "status": "needs-platform-corpus-proof",
+      "sourceRepos": [
+        "/Users/minliny/Documents/Reader for HarmonyOS"
+      ],
+      "nativeEvidence": [
+        "Reader-for-HarmonyOS PR #4 codex/harmony-signed-device-runtime"
+      ],
+      "fixturePaths": [
+        "samples/platform-evidence/harmonyos/pr-4-intake-manifest.json"
+      ],
+      "platformOutputPath": "/Users/minliny/Documents/Reader for HarmonyOS/artifacts/corpus/harmonyos/pr-4-corpus-output.json",
+      "notes": "Native only records intake; HarmonyOS adapter/device execution stays in Reader-for-HarmonyOS."
+    }
+  ],
+  "proofMatrix": {
+    "requiredRefs": {
+      "runtimeHost": "origin/codex/runtime-host-capability-contract",
+      "bookSourceOracle": "origin/codex/corpus-booksource-oracle-diff"
+    },
+    "releaseGateManifest": "samples/corpus-release-gate/four-platform-match/manifest.json",
+    "platformEvidence": {
+      "ios": {
+        "entryId": "ios-platform"
+      },
+      "android": {
+        "entryId": "android-platform"
+      },
+      "harmony": {
+        "entryId": "harmonyos-platform",
+        "intakeManifest": "samples/platform-evidence/harmonyos/pr-4-intake-manifest.json"
+      }
+    }
+  }
+}
