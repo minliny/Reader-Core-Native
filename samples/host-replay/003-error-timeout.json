@@ -1,0 +1,19 @@
+{
+  "format": "reader-host-replay/1",
+  "description": "Transport timeout error (host.error)",
+  "request": {
+    "capability": "http.execute",
+    "url": "https://slow.example.test/chapter/1",
+    "method": "GET",
+    "headers": {},
+    "body": null
+  },
+  "outcome": "error",
+  "error": {
+    "code": "HTTP_TRANSPORT_TIMEOUT",
+    "message": "connect timed out after 10000ms",
+    "retryable": true,
+    "details": { "phase": "connect", "url": "https://slow.example.test/chapter/1" }
+  },
+  "tags": ["error", "timeout"]
+}

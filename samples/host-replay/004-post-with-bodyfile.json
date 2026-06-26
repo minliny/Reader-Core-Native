@@ -1,0 +1,18 @@
+{
+  "format": "reader-host-replay/1",
+  "description": "POST with request body, response body loaded from sibling file",
+  "request": {
+    "capability": "http.execute",
+    "url": "https://api.example.test/login",
+    "method": "POST",
+    "headers": { "Content-Type": "application/json" },
+    "body": "{\"user\":\"reader\",\"pass\":\"secret\"}"
+  },
+  "response": {
+    "status": 200,
+    "headers": { "content-type": "application/json" },
+    "bodyFile": "004-login-response.json",
+    "bodyEncoding": "text"
+  },
+  "tags": ["post", "bodyFile"]
+}

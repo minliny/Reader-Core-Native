@@ -1,0 +1,19 @@
+{
+  "format": "reader-host-replay/1",
+  "description": "Simple GET returning JSON search results",
+  "request": {
+    "id": 502,
+    "operationId": 1,
+    "capability": "http.execute",
+    "url": "https://books.example.test/search?q=dune",
+    "method": "GET",
+    "headers": { "Accept": "application/json" },
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "headers": { "content-type": "application/json" },
+    "body": "{\"books\":[{\"bookId\":\"1\",\"title\":\"Dune\",\"author\":\"Frank Herbert\"}]}"
+  },
+  "tags": ["search", "json"]
+}
