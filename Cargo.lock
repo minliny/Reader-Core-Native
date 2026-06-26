@@ -631,7 +631,9 @@ dependencies = [
 name = "reader-cli"
 version = "0.1.0"
 dependencies = [
+ "reader-content",
  "reader-contract",
+ "reader-domain",
  "reader-runtime",
  "serde_json",
 ]
