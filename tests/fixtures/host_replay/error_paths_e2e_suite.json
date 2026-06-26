@@ -1,0 +1,276 @@
+{
+  "description": "Structured error-path e2e spec for remote reading (P2-S4 closure). Documents three failure modes: host transport timeout, JS rule evaluation unsupported, and network failure. Each step shows the book command Core receives, the host.request Core emits, the host response (error or complete), and the error result Core should produce. This fixture serves as the specification for extending reader-cli --host-replay-suite to support hostError steps; the existing suite replay only supports hostResult.",
+  "errorPathSpecVersion": 1,
+  "steps": [
+    {
+      "name": "book.search.host-timeout",
+      "description": "Host transport timeout during book.search. Core emits http.execute, host returns HTTP_TRANSPORT_TIMEOUT after the connect deadline. Core should surface the timeout as a retryable error result with the host diagnostics.",
+      "completionRequestId": 5001,
+      "command": {
+        "protocolVersion": 1,
+        "requestId": 501,
+        "method": "book.search",
+        "params": {
+          "sourceId": "timeout-src",
+          "searchRequest": {
+            "url": "https://slow.example.test/search?q=dune",
+            "method": "GET",
+            "headers": {
+              "Accept": "application/json"
+            },
+            "body": null,
+            "charset": "utf-8",
+            "followRedirects": true,
+            "maxRedirects": 3,
+            "retry": {
+              "maxAttempts": 1,
+              "backoffMillis": null
+            },
+            "usePlatformCookieJar": false,
+            "session": {
+              "id": "timeout-session"
+            }
+          },
+          "source": {
+            "sourceId": "timeout-src",
+            "name": "Timeout Test Source",
+            "baseUrl": "https://slow.example.test",
+            "rules": {
+              "search": [
+                { "kind": "jsonPath", "path": "$.books[*]" }
+              ]
+            }
+          }
+        }
+      },
+      "expectHostRequest": {
+        "capability": "http.execute",
+        "params": {
+          "url": "https://slow.example.test/search?q=dune",
+          "method": "GET",
+          "headers": {
+            "Accept": "application/json"
+          },
+          "body": null,
+          "charset": "utf-8",
+          "followRedirects": true,
+          "maxRedirects": 3,
+          "retry": {
+            "maxAttempts": 1,
+            "backoffMillis": null
+          },
+          "usePlatformCookieJar": false,
+          "session": {
+            "id": "timeout-session"
+          }
+        }
+      },
+      "hostError": {
+        "operationId": 1,
+        "error": {
+          "code": "HTTP_TRANSPORT_TIMEOUT",
+          "message": "connect timed out after 10000ms",
+          "retryable": true,
+          "details": {
+            "phase": "connect",
+            "timeoutMillis": 10000,
+            "url": "https://slow.example.test/search?q=dune"
+          }
+        }
+      },
+      "expectResult": {
+        "sourceId": "timeout-src",
+        "error": {
+          "code": "HTTP_TRANSPORT_TIMEOUT",
+          "message": "connect timed out after 10000ms",
+          "retryable": true
+        },
+        "http": {
+          "error": true,
+          "phase": "connect",
+          "timeoutMillis": 10000
+        }
+      }
+    },
+    {
+      "name": "book.search.js-unsupported",
+      "description": "JS rule evaluation failure. The source's search rule is JavaScript-based, but no JS runtime (QuickJS) is configured in the Core build. The host request succeeds (host.complete with HTML), but Core cannot evaluate the JS rule on the response, producing a non-retryable JS_RUNTIME_UNAVAILABLE error. This mirrors legado's ScriptException path when Rhino is absent — in Reader-Core-Native the JS runtime is optional and may be compiled out.",
+      "completionRequestId": 5101,
+      "command": {
+        "protocolVersion": 1,
+        "requestId": 601,
+        "method": "book.search",
+        "params": {
+          "sourceId": "js-src",
+          "searchRequest": {
+            "url": "https://js.example.test/search?q=dune",
+            "method": "GET",
+            "headers": {
+              "Accept": "text/html"
+            },
+            "body": null,
+            "charset": "utf-8",
+            "followRedirects": true,
+            "maxRedirects": 3,
+            "retry": {
+              "maxAttempts": 1,
+              "backoffMillis": null
+            },
+            "usePlatformCookieJar": false,
+            "session": {
+              "id": "js-session"
+            }
+          },
+          "source": {
+            "sourceId": "js-src",
+            "name": "JS-Required Test Source",
+            "baseUrl": "https://js.example.test",
+            "rules": {
+              "search": [
+                {
+                  "kind": "javascript",
+                  "script": "java.ajax(result.url).then(r => JSON.parse(r.body).books)"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "expectHostRequest": {
+        "capability": "http.execute",
+        "params": {
+          "url": "https://js.example.test/search?q=dune",
+          "method": "GET",
+          "headers": {
+            "Accept": "text/html"
+          },
+          "body": null,
+          "charset": "utf-8",
+          "followRedirects": true,
+          "maxRedirects": 3,
+          "retry": {
+            "maxAttempts": 1,
+            "backoffMillis": null
+          },
+          "usePlatformCookieJar": false,
+          "session": {
+            "id": "js-session"
+          }
+        }
+      },
+      "hostResult": {
+        "status": 200,
+        "headers": {
+          "content-type": "text/html; charset=utf-8"
+        },
+        "finalUrl": "https://js.example.test/search?q=dune",
+        "charsetHint": "utf-8",
+        "body": "<html><body><div class='book'>Dune</div></body></html>",
+        "session": {
+          "id": "js-session"
+        }
+      },
+      "expectResult": {
+        "sourceId": "js-src",
+        "error": {
+          "code": "JS_RUNTIME_UNAVAILABLE",
+          "message": "source rule requires JavaScript evaluation but no JS runtime is configured",
+          "retryable": false
+        },
+        "rule": {
+          "kind": "javascript",
+          "phase": "search",
+          "script": "java.ajax(result.url).then(r => JSON.parse(r.body).books)"
+        }
+      }
+    },
+    {
+      "name": "book.search.network-fail",
+      "description": "Network failure during book.search. Core emits http.execute, host returns HTTP_NETWORK_FAILURE after DNS resolution or connection refused. Retries are exhausted (maxAttempts=3). Core should surface the network error as a retryable error result with the host diagnostics.",
+      "completionRequestId": 5201,
+      "command": {
+        "protocolVersion": 1,
+        "requestId": 701,
+        "method": "book.search",
+        "params": {
+          "sourceId": "netfail-src",
+          "searchRequest": {
+            "url": "https://unreachable.example.test/search?q=dune",
+            "method": "GET",
+            "headers": {},
+            "body": null,
+            "charset": "utf-8",
+            "followRedirects": true,
+            "maxRedirects": 3,
+            "retry": {
+              "maxAttempts": 3,
+              "backoffMillis": 100
+            },
+            "usePlatformCookieJar": false,
+            "session": {
+              "id": "netfail-session"
+            }
+          },
+          "source": {
+            "sourceId": "netfail-src",
+            "name": "Network Failure Test Source",
+            "baseUrl": "https://unreachable.example.test",
+            "rules": {
+              "search": [
+                { "kind": "jsonPath", "path": "$.books[*]" }
+              ]
+            }
+          }
+        }
+      },
+      "expectHostRequest": {
+        "capability": "http.execute",
+        "params": {
+          "url": "https://unreachable.example.test/search?q=dune",
+          "method": "GET",
+          "headers": {},
+          "body": null,
+          "charset": "utf-8",
+          "followRedirects": true,
+          "maxRedirects": 3,
+          "retry": {
+            "maxAttempts": 3,
+            "backoffMillis": 100
+          },
+          "usePlatformCookieJar": false,
+          "session": {
+            "id": "netfail-session"
+          }
+        }
+      },
+      "hostError": {
+        "operationId": 1,
+        "error": {
+          "code": "HTTP_NETWORK_FAILURE",
+          "message": "dns resolution failed for unreachable.example.test after 3 attempts",
+          "retryable": true,
+          "details": {
+            "phase": "dns",
+            "errno": "ENOTFOUND",
+            "host": "unreachable.example.test",
+            "attempts": 3
+          }
+        }
+      },
+      "expectResult": {
+        "sourceId": "netfail-src",
+        "error": {
+          "code": "HTTP_NETWORK_FAILURE",
+          "message": "dns resolution failed for unreachable.example.test after 3 attempts",
+          "retryable": true
+        },
+        "http": {
+          "error": true,
+          "phase": "dns",
+          "errno": "ENOTFOUND",
+          "attempts": 3
+        }
+      }
+    }
+  ]
+}

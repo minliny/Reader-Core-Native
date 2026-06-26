@@ -1,0 +1,23 @@
+{
+  "format": "reader-host-replay/1",
+  "description": "Network failure error (host.error) — DNS resolution / connection refused",
+  "request": {
+    "capability": "http.execute",
+    "url": "https://unreachable.example.test/search?q=dune",
+    "method": "GET",
+    "headers": {},
+    "body": null
+  },
+  "outcome": "error",
+  "error": {
+    "code": "HTTP_NETWORK_FAILURE",
+    "message": "dns resolution failed for unreachable.example.test",
+    "retryable": true,
+    "details": {
+      "phase": "dns",
+      "errno": "ENOTFOUND",
+      "host": "unreachable.example.test"
+    }
+  },
+  "tags": ["error", "network-fail", "dns"]
+}
