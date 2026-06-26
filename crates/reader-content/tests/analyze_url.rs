@@ -4,7 +4,7 @@
 //! and the AnalyzeUrl builder ported from `BookSourceRequestBuilder.swift`.
 
 use reader_content::analyze_url::{
-    expand_static_templates, AnalyzeUrlContext, JsExpressionClassification, UrlDslParser,
+    expand_static_templates, AnalyzeUrl, AnalyzeUrlContext, JsExpressionClassification, UrlDslParser,
 };
 
 #[test]
@@ -113,4 +113,95 @@ fn expand_page_list_range_takes_first_value() {
     let ctx = AnalyzeUrlContext::for_search("k", 1);
     let out = expand_static_templates("https://example.test/list?p=<1-3>", &ctx);
     assert_eq!(out, "https://example.test/list?p=1");
+}
+
+// ===== Task 3: AnalyzeUrl::build_request — HostHttpRequest assembly =====
+
+#[test]
+fn build_request_plain_get_url() {
+    let ctx = AnalyzeUrlContext::for_search("mirror", 1);
+    let request = AnalyzeUrl::build_request(
+        "https://example.test/search?q={{key}}",
+        &ctx,
+        "https://example.test",
+        &Default::default(),
+    )
+    .expect("plain GET builds");
+    assert_eq!(request.url, "https://example.test/search?q=mirror");
+    assert_eq!(request.method, "GET");
+    assert!(request.body.is_none());
+}
+
+#[test]
+fn build_request_post_with_body_and_charset() {
+    let ctx = AnalyzeUrlContext::for_search("mirror", 1);
+    let raw = r#"https://example.test/search, {"method":"POST","body":"k={{key}}","charset":"gbk"}"#;
+    let request = AnalyzeUrl::build_request(raw, &ctx, "https://example.test", &Default::default())
+        .expect("POST+body builds");
+    assert_eq!(request.url, "https://example.test/search");
+    assert_eq!(request.method, "POST");
+    assert_eq!(request.body.as_deref(), Some("k=mirror"));
+    assert_eq!(request.charset.as_deref(), Some("gbk"));
+}
+
+#[test]
+fn build_request_merges_source_headers_and_dsl_headers() {
+    let ctx = AnalyzeUrlContext::for_search("k", 1);
+    let mut source_headers = serde_json::Map::new();
+    source_headers.insert(
+        "User-Agent".to_string(),
+        serde_json::Value::String("ReaderCoreTest".to_string()),
+    );
+    let raw = r#"https://example.test/search, {"method":"POST","body":"k=test","headers":{"X-Step":"search"}}"#;
+    let request = AnalyzeUrl::build_request(raw, &ctx, "https://example.test", &source_headers)
+        .expect("header merge builds");
+    let headers = request.headers.as_object().expect("headers object");
+    assert_eq!(headers["User-Agent"].as_str(), Some("ReaderCoreTest"));
+    assert_eq!(headers["X-Step"].as_str(), Some("search"));
+}
+
+#[test]
+fn build_request_resolves_relative_url_against_base() {
+    let ctx = AnalyzeUrlContext::for_url();
+    let request = AnalyzeUrl::build_request(
+        "/book/123/chapter/1",
+        &ctx,
+        "https://example.test",
+        &Default::default(),
+    )
+    .expect("relative URL builds");
+    assert_eq!(request.url, "https://example.test/book/123/chapter/1");
+}
+
+#[test]
+fn build_request_rejects_non_http_scheme() {
+    let ctx = AnalyzeUrlContext::for_url();
+    let result = AnalyzeUrl::build_request(
+        "file:///etc/passwd",
+        &ctx,
+        "https://example.test",
+        &Default::default(),
+    );
+    assert!(result.is_err());
+}
+
+#[test]
+fn build_request_auto_content_type_for_post_body() {
+    let ctx = AnalyzeUrlContext::for_search("k", 1);
+    let raw = r#"https://example.test/search, {"method":"POST","body":"k=test","charset":"gbk"}"#;
+    let request = AnalyzeUrl::build_request(raw, &ctx, "https://example.test", &Default::default())
+        .expect("POST builds");
+    let headers = request.headers.as_object().expect("headers object");
+    assert_eq!(
+        headers["Content-Type"].as_str(),
+        Some("application/x-www-form-urlencoded; charset=gbk")
+    );
+}
+
+#[test]
+fn build_request_rejects_js_url_in_non_js_build() {
+    let ctx = AnalyzeUrlContext::for_search("k", 1);
+    let raw = "https://example.test/search@js:result.replace(' ', '+')";
+    let result = AnalyzeUrl::build_request(raw, &ctx, "https://example.test", &Default::default());
+    assert!(result.is_err());
 }

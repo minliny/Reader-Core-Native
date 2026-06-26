@@ -9,6 +9,7 @@
 //!
 //! Core produces descriptors; Host executes HTTP. Core opens no socket.
 
+use reader_contract::remote::{HostHttpRequest, HostHttpRetryPolicy};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -302,6 +303,236 @@ fn classify_js_expression(url: &str) -> (Option<String>, JsExpressionClassificat
 }
 
 // HostHttpRequest assembly + AnalyzeUrl builder are added in later tasks.
+
+// ============================================================================
+// Task 3: AnalyzeUrl::build_request — HostHttpRequest assembly (no JS)
+// ============================================================================
+
+/// Errors raised by [`AnalyzeUrl::build_request`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AnalyzeUrlError {
+    Dsl(UrlDslParseError),
+    InvalidUrl(String),
+    JsUnsupported(String),
+}
+
+impl std::fmt::Display for AnalyzeUrlError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AnalyzeUrlError::Dsl(e) => write!(f, "URL DSL parse error: {e}"),
+            AnalyzeUrlError::InvalidUrl(msg) => write!(f, "invalid URL: {msg}"),
+            AnalyzeUrlError::JsUnsupported(msg) => {
+                write!(f, "URL JS execution unsupported in this build: {msg}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for AnalyzeUrlError {}
+
+impl From<UrlDslParseError> for AnalyzeUrlError {
+    fn from(e: UrlDslParseError) -> Self {
+        AnalyzeUrlError::Dsl(e)
+    }
+}
+
+/// Default User-Agent when neither source headers nor DSL headers supply one.
+/// Mirrors Legado's default iPhone UA.
+const DEFAULT_USER_AGENT: &str = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) \
+    AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1";
+
+/// AnalyzeUrl builder. Ports Swift `BookSourceRequestBuilder.makeSearchRequest`
+/// (non-JS path) + `buildURLDSLRequest`.
+pub struct AnalyzeUrl;
+
+impl AnalyzeUrl {
+    /// Build a [`HostHttpRequest`] from a raw URL DSL string + context.
+    ///
+    /// Steps (mirrors Swift `prepareSearchRequest` + `buildSearchRequest`):
+    /// 1. Expand static templates (`{{key}}`/`{{page}}`/page list) on the raw
+    ///    string.
+    /// 2. Parse URL DSL (`url, {...}`).
+    /// 3. If URL contains `@js:`/`<js>` or DSL option `js` is set, return
+    ///    [`AnalyzeUrlError::JsUnsupported`] — use
+    ///    [`AnalyzeUrl::build_request_with_js`] (Task 6) for JS URLs.
+    /// 4. Assemble `HostHttpRequest`: resolve relative URL, merge headers,
+    ///    set default User-Agent, auto Content-Type for POST+body, wire
+    ///    charset/retry/redirect.
+    pub fn build_request(
+        raw_url: &str,
+        ctx: &AnalyzeUrlContext,
+        base_url: &str,
+        source_headers: &Map<String, Value>,
+    ) -> Result<HostHttpRequest, AnalyzeUrlError> {
+        let expanded = expand_static_templates(raw_url, ctx);
+        let dsl = UrlDslParser::parse(&expanded)?;
+        if dsl.has_js_expression || dsl.options.js.is_some() {
+            return Err(AnalyzeUrlError::JsUnsupported(
+                "URL contains @js:/<js> or DSL option js; use build_request_with_js".into(),
+            ));
+        }
+        Self::assemble(dsl, ctx, base_url, source_headers)
+    }
+
+    fn assemble(
+        dsl: UrlDslResult,
+        ctx: &AnalyzeUrlContext,
+        base_url: &str,
+        source_headers: &Map<String, Value>,
+    ) -> Result<HostHttpRequest, AnalyzeUrlError> {
+        let final_url = resolve_relative_url(&dsl.url, base_url);
+        validate_absolute_http_url(&final_url)?;
+
+        // Body: expand static templates (harmless no-op if already expanded).
+        let body = dsl
+            .options
+            .body
+            .as_deref()
+            .map(|b| expand_static_templates(b, ctx));
+
+        // Merge source-level headers with DSL headers (DSL wins).
+        let mut headers = source_headers.clone();
+        for (key, value) in &dsl.options.headers {
+            headers.insert(key.clone(), value.clone());
+        }
+        if !headers.contains_key("User-Agent") {
+            headers.insert(
+                "User-Agent".to_string(),
+                Value::String(DEFAULT_USER_AGENT.to_string()),
+            );
+        }
+        // Apply static templates to header string values (e.g. Cookie with
+        // {{key}}).
+        let mut headers: Map<String, Value> = headers
+            .into_iter()
+            .map(|(k, v)| {
+                let expanded = match v {
+                    Value::String(s) => Value::String(expand_static_templates(&s, ctx)),
+                    other => other,
+                };
+                (k, expanded)
+            })
+            .collect();
+
+        let method = dsl.options.method.to_ascii_uppercase();
+        // Auto Content-Type for POST + body when not set (mirrors Swift
+        // `applyAutomaticContentTypeIfNeeded`).
+        if method == "POST" && body.is_some() && !headers.contains_key("Content-Type") {
+            let charset = content_type_charset(&dsl.options.charset);
+            headers.insert(
+                "Content-Type".to_string(),
+                Value::String(format!("application/x-www-form-urlencoded; charset={charset}")),
+            );
+        }
+
+        let retry = dsl.options.retry.and_then(|n| {
+            if n > 0 {
+                Some(HostHttpRetryPolicy {
+                    max_attempts: n,
+                    backoff_millis: None,
+                })
+            } else {
+                None
+            }
+        });
+
+        Ok(HostHttpRequest {
+            url: final_url,
+            method,
+            headers: Value::Object(headers),
+            body,
+            charset: Some(dsl.options.charset.clone()),
+            follow_redirects: dsl.options.follow_redirects,
+            max_redirects: None,
+            retry,
+            use_platform_cookie_jar: None,
+            session: None,
+        })
+    }
+}
+
+/// Resolve a possibly-relative URL against a base URL. Ports Swift
+/// `resolveRelativeURL`.
+fn resolve_relative_url(url: &str, base_url: &str) -> String {
+    let url = url.trim();
+    // Any absolute URL with a scheme (e.g. "http://", "https://", "file://")
+    // is returned as-is. Non-http schemes are later rejected by
+    // `validate_absolute_http_url`.
+    if has_url_scheme(url) {
+        return url.to_string();
+    }
+    let base = base_url.trim();
+    if base.is_empty() {
+        return url.to_string();
+    }
+    if url.starts_with("//") {
+        let scheme = base.split("://").next().unwrap_or("https");
+        return format!("{scheme}:{url}");
+    }
+    if url.starts_with('/') {
+        if let Some(origin) = url_origin(base) {
+            return format!("{origin}{url}");
+        }
+        return url.to_string();
+    }
+    // Relative path: append to base directory.
+    let directory = if base.ends_with('/') {
+        base.to_string()
+    } else {
+        base.rsplit_once('/')
+            .map(|(prefix, _)| format!("{prefix}/"))
+            .unwrap_or_else(|| format!("{base}/"))
+    };
+    format!("{directory}{url}")
+}
+
+/// Detect whether `url` has an RFC 3986 scheme prefix (`scheme://`).
+fn has_url_scheme(url: &str) -> bool {
+    let Some(idx) = url.find("://") else {
+        return false;
+    };
+    let scheme = &url[..idx];
+    !scheme.is_empty()
+        && scheme
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '-' || c == '.')
+}
+
+fn url_origin(value: &str) -> Option<String> {
+    let (scheme, rest) = value.split_once("://")?;
+    let host = rest.split('/').next()?;
+    if host.is_empty() {
+        None
+    } else {
+        Some(format!("{scheme}://{host}"))
+    }
+}
+
+fn validate_absolute_http_url(url: &str) -> Result<(), AnalyzeUrlError> {
+    let (scheme, rest) = url
+        .split_once("://")
+        .ok_or_else(|| AnalyzeUrlError::InvalidUrl(format!("missing scheme: {url}")))?;
+    let scheme = scheme.to_ascii_lowercase();
+    if scheme != "http" && scheme != "https" {
+        return Err(AnalyzeUrlError::InvalidUrl(format!(
+            "scheme must be http/https, got {scheme}"
+        )));
+    }
+    let host = rest.split(['/', '?', '#']).next().unwrap_or("");
+    if host.is_empty() {
+        return Err(AnalyzeUrlError::InvalidUrl(format!("missing host: {url}")));
+    }
+    Ok(())
+}
+
+fn content_type_charset(charset: &str) -> &str {
+    match charset.trim().to_ascii_lowercase().as_str() {
+        "gbk" | "gb2312" | "gb18030" | "windows-936" | "cp936" => "gbk",
+        "big5" | "big5-hkscs" | "windows-950" => "big5",
+        "iso-8859-1" | "latin1" | "latin-1" | "iso8859-1" => "iso-8859-1",
+        _ => "utf-8",
+    }
+}
 
 // ============================================================================
 // Task 2: Static template expander + page list
