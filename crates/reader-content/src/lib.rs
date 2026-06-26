@@ -15,6 +15,7 @@
 //! Content normalization helpers live in [`normalization`] and are applied to
 //! chapter body text before it is returned to callers.
 
+pub mod analyze_url;
 pub mod normalization;
 
 use std::collections::{BTreeMap, HashMap};
