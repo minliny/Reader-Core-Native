@@ -5,6 +5,8 @@
 //! local books, chapter cache, RSS subscriptions, and future settings can share
 //! the same merge and backup/restore rules.
 
+pub mod webdav_protocol;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
