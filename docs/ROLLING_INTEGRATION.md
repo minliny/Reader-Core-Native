@@ -4,6 +4,8 @@
 
 主线执行计划：`docs/MAINLINE_EXECUTION_PLAN.md`
 
+当前 PR 依赖与证据矩阵：`docs/CURRENT_PR_DEPENDENCY_AND_PROOF_MATRIX.md`
+
 Reader 迁移允许多个分支并行，但每个分支都必须以本地仓库实际代码为事实来源，并且
 必须能落到代码、构建和验证。
 
