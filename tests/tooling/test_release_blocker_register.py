@@ -101,6 +101,43 @@ class TestBlockersFromDiff(unittest.TestCase):
         diff = _diff_result(matching=("ios", "android"), mismatching=())
         self.assertEqual(rbr.blockers_from_diff(diff, "run-1", "medium"), [])
 
+    def test_preserves_diff_classification(self):
+        diff = _diff_result(matching=(), mismatching=("android",))
+        diff["candidates"]["android"]["differences"][0][
+            "classification"
+        ] = "host-capability-difference"
+        entries = rbr.blockers_from_diff(diff, run_id="run-1", severity="high")
+        self.assertEqual(entries[0]["classification"], "host-capability-difference")
+        self.assertEqual(
+            entries[0]["reason"],
+            "host capability difference from canonical reference",
+        )
+
+    def test_missing_platform_output_produces_blocker(self):
+        diff = _diff_result(matching=("ios", "android"), mismatching=())
+        diff["candidates"]["harmony"] = {
+            "match": False,
+            "total": 1,
+            "sha256": None,
+            "differences": [
+                {
+                    "path": "<candidate>",
+                    "kind": "platform-output-missing",
+                    "classification": "platform-output-missing",
+                    "canonical": "required platform output present in canonical reference",
+                    "candidate": None,
+                }
+            ],
+        }
+        entries = rbr.blockers_from_diff(diff, "run-1", "high")
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["platform"], "harmony")
+        self.assertEqual(entries[0]["classification"], "platform-output-missing")
+        self.assertEqual(
+            entries[0]["reason"],
+            "platform output missing from release-gate evidence",
+        )
+
     def test_rejects_non_object_diff(self):
         with self.assertRaises(rbr.RegisterError):
             rbr.blockers_from_diff([], "run-1", "medium")

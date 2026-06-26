@@ -146,13 +146,19 @@ class TestBuildDiffResult(unittest.TestCase):
         self.assertFalse(result["candidates"]["android"]["match"])
         self.assertEqual(result["candidates"]["android"]["total"], 1)
 
-        # summary shape consumed by the run packager's derive_diff_summary:
-        # per-candidate {match, total}.
+        # summary shape consumed by the run packager includes per-candidate
+        # match/total plus classified difference counts.
+        self.assertTrue(result["summary"]["ios"]["match"])
+        self.assertEqual(result["summary"]["ios"]["total"], 0)
+        self.assertFalse(result["summary"]["android"]["match"])
+        self.assertEqual(result["summary"]["android"]["total"], 1)
         self.assertEqual(
-            result["summary"],
-            {"ios": {"match": True, "total": 0},
-             "android": {"match": False, "total": 1}},
+            result["summary"]["android"]["differenceClasses"][
+                cpd.CLASS_CORE_SEMANTIC
+            ],
+            1,
         )
+        self.assertEqual(result["releaseGate"]["status"], "not-evaluated")
 
     def test_all_match(self):
         canonical = _write(self.tmp, "canonical.json", {"title": "x"})
@@ -177,13 +183,15 @@ class TestBuildDiffResult(unittest.TestCase):
         self.assertTrue(result["match"])
         self.assertEqual(result["total"], 0)
         self.assertEqual(set(result["candidates"].keys()), set(FOUR_PLATFORM_CANDIDATES))
-        self.assertEqual(
-            result["summary"],
-            {
-                platform: {"match": True, "total": 0}
-                for platform in FOUR_PLATFORM_CANDIDATES
-            },
-        )
+        for platform in FOUR_PLATFORM_CANDIDATES:
+            self.assertTrue(result["summary"][platform]["match"])
+            self.assertEqual(result["summary"][platform]["total"], 0)
+            self.assertEqual(
+                result["summary"][platform]["differenceClasses"][
+                    cpd.CLASS_CORE_SEMANTIC
+                ],
+                0,
+            )
 
     def test_four_platform_fixture_minimal_mismatch(self):
         canonical, candidates = _fixture_diff_inputs("four-platform-mismatch")
@@ -200,6 +208,65 @@ class TestBuildDiffResult(unittest.TestCase):
         self.assertEqual(android["total"], 1)
         self.assertEqual(android["differences"][0]["path"], "results[1].name")
         self.assertEqual(android["differences"][0]["kind"], "value-mismatch")
+        self.assertEqual(
+            android["differences"][0]["classification"],
+            cpd.CLASS_CORE_SEMANTIC,
+        )
+
+    def test_classifies_host_capability_differences(self):
+        canonical = _write(
+            self.tmp,
+            "canonical.json",
+            {"host": {"requests": [{"params": {"url": "https://a.test"}}]}},
+        )
+        cand = _write(
+            self.tmp,
+            "ios.json",
+            {"host": {"requests": [{"params": {"url": "https://b.test"}}]}},
+        )
+        result = cpd.build_diff_result(canonical, [("ios", cand)])
+        diff = result["candidates"]["ios"]["differences"][0]
+        self.assertEqual(diff["classification"], cpd.CLASS_HOST_CAPABILITY)
+        self.assertEqual(
+            result["summary"]["ios"]["differenceClasses"][
+                cpd.CLASS_HOST_CAPABILITY
+            ],
+            1,
+        )
+
+    def test_release_gate_passes_when_required_three_candidates_match(self):
+        canonical = _write(self.tmp, "canonical.json", {"title": "x"})
+        ios = _write(self.tmp, "ios.json", {"title": "x"})
+        android = _write(self.tmp, "android.json", {"title": "x"})
+        harmony = _write(self.tmp, "harmony.json", {"title": "x"})
+        result = cpd.build_diff_result(
+            canonical,
+            [("ios", ios), ("android", android), ("harmony", harmony)],
+            required_candidates=["ios", "android", "harmony"],
+        )
+        self.assertTrue(result["match"])
+        self.assertEqual(result["releaseGate"]["status"], "passed")
+        self.assertEqual(
+            result["releaseGate"]["matchingCandidates"],
+            ["ios", "android", "harmony"],
+        )
+
+    def test_release_gate_blocks_missing_platform_output(self):
+        canonical = _write(self.tmp, "canonical.json", {"title": "x"})
+        ios = _write(self.tmp, "ios.json", {"title": "x"})
+        android = _write(self.tmp, "android.json", {"title": "x"})
+        result = cpd.build_diff_result(
+            canonical,
+            [("ios", ios), ("android", android)],
+            required_candidates=["ios", "android", "harmony"],
+        )
+        self.assertFalse(result["match"])
+        self.assertEqual(result["releaseGate"]["status"], "blocked")
+        self.assertEqual(result["releaseGate"]["missingCandidates"], ["harmony"])
+        self.assertEqual(
+            result["candidates"]["harmony"]["differences"][0]["classification"],
+            cpd.CLASS_PLATFORM_MISSING,
+        )
 
 
 class TestCLI(unittest.TestCase):

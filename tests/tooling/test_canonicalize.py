@@ -137,6 +137,11 @@ class TestVariableTimestampFields(unittest.TestCase):
         b = {"name": "x", "traceId": "t2"}
         self.assertEqual(canon(a), canon(b))
 
+    def test_host_operation_and_run_ids_normalized(self):
+        a = {"operationId": 1, "runId": "run-a", "name": "x"}
+        b = {"operationId": 2, "runId": "run-b", "name": "x"}
+        self.assertEqual(canon(a), canon(b))
+
     def test_non_variable_field_kept(self):
         a = {"name": "x", "title": "different"}
         b = {"name": "x", "title": "values"}

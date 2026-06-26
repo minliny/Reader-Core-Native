@@ -1,0 +1,103 @@
+{
+  "errors": [],
+  "host": {
+    "requests": [
+      {
+        "capability": "http.execute",
+        "operationId": "<normalized>",
+        "params": {
+          "headers": {
+            "Accept": "application/json"
+          },
+          "url": "https://books.example.test/search?q=dune"
+        },
+        "requestId": "<normalized>"
+      }
+    ]
+  },
+  "inputId": "booksource-five-pipeline-001",
+  "pipelines": {
+    "chapter": {
+      "data": {
+        "bookId": "1",
+        "chapterTitle": "Chapter 1",
+        "content": "First paragraph of chapter one.\nSecond paragraph.",
+        "sourceId": "basic-src",
+        "via": "rule"
+      },
+      "method": "chapter.content",
+      "status": "ok"
+    },
+    "detail": {
+      "data": {
+        "book": {
+          "author": "Frank Herbert",
+          "bookId": "1",
+          "coverUrl": "https://img.example.test/dune.png",
+          "intro": "A desert planet.",
+          "title": "Dune"
+        },
+        "sourceId": "basic-src"
+      },
+      "method": "book.detail",
+      "status": "ok"
+    },
+    "search": {
+      "data": {
+        "books": [
+          {
+            "author": "Herbert",
+            "bookId": "1",
+            "title": "Dune"
+          },
+          {
+            "author": "Asimov",
+            "bookId": "2",
+            "title": "Foundation"
+          }
+        ],
+        "http": {
+          "headers": {
+            "content-type": "application/json"
+          },
+          "status": 200
+        },
+        "sourceId": "basic-src"
+      },
+      "method": "book.search",
+      "status": "ok"
+    },
+    "sourceImport": {
+      "data": {
+        "imported": true,
+        "name": "Basic Test Source",
+        "sourceId": "basic-src"
+      },
+      "method": "source.import",
+      "status": "ok"
+    },
+    "toc": {
+      "data": {
+        "bookId": "1",
+        "sourceId": "basic-src",
+        "toc": [
+          {
+            "title": "Chapter 1",
+            "url": "https://books.example.test/c1"
+          },
+          {
+            "title": "Chapter 2",
+            "url": "https://books.example.test/c2"
+          }
+        ]
+      },
+      "method": "book.toc",
+      "status": "ok"
+    }
+  },
+  "schemaVersion": 1,
+  "sourceId": "basic-src",
+  "tool": "corpus-booksource-oracle",
+  "type": "booksource-five-pipeline",
+  "version": "1.0"
+}

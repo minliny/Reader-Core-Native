@@ -169,6 +169,39 @@ class DeriveDiffSummaryTests(unittest.TestCase):
         self.assertIsNone(result["match"])
         self.assertIsNone(result["total"])
 
+    def test_release_gate_and_class_counts_preserved(self):
+        diff = {
+            "summary": {
+                "ios": {
+                    "total": 0,
+                    "differenceClasses": {
+                        "core-semantic-difference": 0,
+                        "host-capability-difference": 0,
+                        "platform-output-missing": 0,
+                    },
+                },
+                "harmony": {
+                    "total": 1,
+                    "differenceClasses": {
+                        "platform-output-missing": 1,
+                    },
+                },
+            },
+            "releaseGate": {
+                "status": "blocked",
+                "missingCandidates": ["harmony"],
+                "blockedReasons": ["missing required platform output: harmony"],
+            },
+        }
+        result = brp.derive_diff_summary(diff)
+        self.assertFalse(result["match"])
+        self.assertEqual(result["total"], 1)
+        self.assertEqual(
+            result["differenceClasses"]["platform-output-missing"],
+            1,
+        )
+        self.assertEqual(result["releaseGate"]["status"], "blocked")
+
 
 class SanitizeForPathTests(unittest.TestCase):
     def test_strips_unsafe_chars(self):
@@ -384,6 +417,23 @@ class RenderSummaryTests(unittest.TestCase):
             self.assertIn(out_dir, text)
             self.assertIn("validation: OK", text)
             self.assertIn("zip: (not created)", text)
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
+            shutil.rmtree(out_dir, ignore_errors=True)
+
+    def test_render_mentions_release_gate_blocked(self):
+        run_dir = _make_run_dir(_complete_files())
+        out_dir = tempfile.mkdtemp(prefix="brp-out-", dir=PRIVATE_TMP)
+        os.rmdir(out_dir)
+        try:
+            summary = brp.package_run(run_dir, out_dir=out_dir)
+            summary["diffSummary"]["releaseGate"] = {
+                "status": "blocked",
+                "blockedReasons": ["missing required platform output: harmony"],
+            }
+            text = brp.render_summary(summary)
+            self.assertIn("release gate: blocked", text)
+            self.assertIn("missing required platform output: harmony", text)
         finally:
             shutil.rmtree(run_dir, ignore_errors=True)
             shutil.rmtree(out_dir, ignore_errors=True)

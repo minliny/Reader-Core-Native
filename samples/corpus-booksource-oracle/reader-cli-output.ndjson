@@ -1,0 +1,7 @@
+{"type":"result","protocolVersion":1,"requestId":1,"data":{"sourceId":"basic-src","name":"Basic Test Source","imported":true}}
+{"type":"result","protocolVersion":1,"requestId":2,"data":{"sourceId":"basic-src","books":[{"bookId":"1","title":"Dune","author":"Herbert"},{"bookId":"2","title":"Foundation","author":"Asimov"}]}}
+{"type":"host.request","protocolVersion":1,"requestId":3,"operationId":77,"capability":"http.execute","params":{"url":"https://books.example.test/search?q=dune","headers":{"Accept":"application/json"}}}
+{"type":"result","protocolVersion":1,"requestId":4,"data":{"sourceId":"basic-src","books":[{"bookId":"1","title":"Dune","author":"Herbert"},{"bookId":"2","title":"Foundation","author":"Asimov"}],"http":{"status":200,"headers":{"content-type":"application/json"}}}}
+{"type":"result","protocolVersion":1,"requestId":5,"data":{"sourceId":"basic-src","book":{"bookId":"1","title":"Dune","author":"Frank Herbert","intro":"A desert planet.","coverUrl":"https://img.example.test/dune.png"}}}
+{"type":"result","protocolVersion":1,"requestId":6,"data":{"sourceId":"basic-src","bookId":"1","toc":[{"title":"Chapter 1","url":"https://books.example.test/c1"},{"title":"Chapter 2","url":"https://books.example.test/c2"}]}}
+{"type":"result","protocolVersion":1,"requestId":7,"data":{"sourceId":"basic-src","bookId":"1","chapterTitle":"Chapter 1","content":"First paragraph of chapter one.\nSecond paragraph.","via":"rule"}}

@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reader-core-native.local/schemas/booksource-five-pipeline.schema.json",
+  "title": "Reader Core BookSource five-pipeline corpus oracle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "type",
+    "tool",
+    "version",
+    "inputId",
+    "sourceId",
+    "pipelines",
+    "host",
+    "errors"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "type": { "type": "string", "const": "booksource-five-pipeline" },
+    "tool": { "type": "string", "const": "corpus-booksource-oracle" },
+    "version": { "type": "string" },
+    "inputId": { "type": "string", "minLength": 1 },
+    "sourceId": { "type": ["string", "null"] },
+    "pipelines": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceImport", "search", "detail", "toc", "chapter"],
+      "properties": {
+        "sourceImport": { "$ref": "#/$defs/pipelineResult" },
+        "search": { "$ref": "#/$defs/pipelineResult" },
+        "detail": { "$ref": "#/$defs/pipelineResult" },
+        "toc": { "$ref": "#/$defs/pipelineResult" },
+        "chapter": { "$ref": "#/$defs/pipelineResult" }
+      }
+    },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requests"],
+      "properties": {
+        "requests": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/hostRequest" }
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": { "type": "object" }
+    }
+  },
+  "$defs": {
+    "pipelineResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "status", "data"],
+      "properties": {
+        "method": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "enum": ["ok", "missing"] },
+        "data": { "type": ["object", "null"] }
+      }
+    },
+    "hostRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId", "operationId", "capability", "params"],
+      "properties": {
+        "requestId": { "type": ["integer", "string", "null"] },
+        "operationId": { "type": ["integer", "string", "null"] },
+        "capability": { "type": ["string", "null"] },
+        "params": { "type": "object" }
+      }
+    }
+  }
+}

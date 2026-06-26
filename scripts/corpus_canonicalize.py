@@ -43,6 +43,8 @@ VARIABLE_FIELDS = frozenset({
     "created_at", "updated_at", "created", "updated",
     "date", "datetime",
     "request_id", "req_id", "requestId",
+    "operation_id", "operationId",
+    "run_id", "runId",
     "trace_id", "traceId",
 })
 
