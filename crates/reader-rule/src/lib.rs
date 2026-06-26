@@ -120,18 +120,25 @@ impl RuleEngine {
             return Ok(RuleOutput::new(Vec::new()));
         }
         let (mode, body) = detect_legado_rule_mode(rule);
-        match mode {
-            LegadoRuleMode::Default => self.execute_legado_css(input, body),
+        let suffix = LegadoRegexSuffix::parse(body);
+        let out = match mode {
+            LegadoRuleMode::Default => self.execute_legado_css(input, suffix.selector)?,
             LegadoRuleMode::Xpath => {
-                let step = RuleStep::XPath(XPathRule::new(body));
-                self.execute_step(input, &step)
+                let step = RuleStep::XPath(XPathRule::new(suffix.selector));
+                self.execute_step(input, &step)?
             }
             LegadoRuleMode::Json => {
-                let step = RuleStep::JsonPath(JsonPathRule::new(body));
-                self.execute_step(input, &step)
+                let step = RuleStep::JsonPath(JsonPathRule::new(suffix.selector));
+                self.execute_step(input, &step)?
             }
-            LegadoRuleMode::Regex => self.execute_legado_css(input, body),
-            LegadoRuleMode::Js => Ok(RuleOutput::new(Vec::new())),
+            LegadoRuleMode::Regex => self.execute_legado_css(input, suffix.selector)?,
+            LegadoRuleMode::Js => RuleOutput::new(Vec::new()),
+        };
+        if suffix.has_regex() {
+            let replaced = out.values().iter().map(|v| suffix.apply(v)).collect();
+            Ok(RuleOutput::new(replaced))
+        } else {
+            Ok(out)
         }
     }
 }
@@ -216,6 +223,82 @@ fn detect_legado_rule_mode(rule: &str) -> (LegadoRuleMode, &str) {
         return (LegadoRuleMode::Xpath, rule);
     }
     (LegadoRuleMode::Default, rule)
+}
+
+/// Parsed `##regex##replacement` suffix from a Legado rule body.
+///
+/// Mirrors `AnalyzeRule.SourceRule.init` lines 708-718: after mode detection
+/// the body is split on `##`. The first part is the selector; subsequent parts
+/// configure optional regex replacement applied to each extracted value via
+/// `replaceRegex` (lines 436-460).
+///
+/// `replaceFirst` semantics (Legado 441-452): find the first regex match; if
+/// found, return the `replacement` template expanded against the match's
+/// capture groups (the rest of the value is discarded); if no match, return
+/// the empty string; if the regex fails to compile, return `replacement`
+/// verbatim.
+///
+/// replace-all semantics (Legado 453-459): if the regex compiles, replace
+/// every match with `replacement`; if it fails to compile, fall back to
+/// literal `str::replace`.
+struct LegadoRegexSuffix<'a> {
+    /// The selector portion (before any `##`), trimmed.
+    selector: &'a str,
+    /// The regex pattern (not trimmed). `None` if no `##` present.
+    replace_regex: Option<&'a str>,
+    /// Replacement template (supports `$1`/`$2`/`${name}` capture expansion).
+    replacement: String,
+    /// If true, only the first match is considered (Legado `replaceFirst`).
+    replace_first: bool,
+}
+
+impl<'a> LegadoRegexSuffix<'a> {
+    fn parse(body: &'a str) -> Self {
+        let mut parts = body.split("##");
+        let selector = parts.next().unwrap_or("").trim();
+        let replace_regex = parts.next();
+        let replacement = parts.next().unwrap_or("").to_string();
+        let replace_first = parts.next().is_some();
+        Self {
+            selector,
+            replace_regex,
+            replacement,
+            replace_first,
+        }
+    }
+
+    fn has_regex(&self) -> bool {
+        self.replace_regex.is_some_and(|r| !r.is_empty())
+    }
+
+    fn apply(&self, value: &str) -> String {
+        let Some(regex_str) = self.replace_regex else {
+            return value.to_string();
+        };
+        if regex_str.is_empty() {
+            return value.to_string();
+        }
+        if self.replace_first {
+            match Regex::new(regex_str) {
+                Ok(regex) => match regex.captures(value) {
+                    Some(caps) => {
+                        let mut dst = String::new();
+                        caps.expand(self.replacement.as_str(), &mut dst);
+                        dst
+                    }
+                    None => String::new(),
+                },
+                Err(_) => self.replacement.clone(),
+            }
+        } else {
+            match Regex::new(regex_str) {
+                Ok(regex) => regex
+                    .replace_all(value, self.replacement.as_str())
+                    .into_owned(),
+                Err(_) => value.replace(regex_str, self.replacement.as_str()),
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
