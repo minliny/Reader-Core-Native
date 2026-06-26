@@ -20,9 +20,12 @@ pub mod normalization;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use reader_domain::{Book, ReadingProgress, Source, TocEntry};
+use reader_domain::{
+    Book, BookInfoRule, ContentRule, ExploreRule, LegadoBookSource, ReadingProgress, SearchRule,
+    Source, TocEntry, TocRule,
+};
 use reader_js::{JsError, JsErrorKind, JsEvaluation, JsSandbox as JsSandboxTrait, QuickJsSandbox};
-use reader_rule::{CaptureGroup, RuleEngine, RuleError, RuleOutput, RuleStep};
+use reader_rule::{CaptureGroup, LegadoRuleContext, RuleEngine, RuleError, RuleOutput, RuleStep};
 use serde::{Deserialize, Serialize};
 
 /// Current content library snapshot schema version.
@@ -511,6 +514,168 @@ impl RemoteContentPipeline {
         Ok(self.engine.execute_chain(input, &steps)?)
     }
 
+    /// Run ordered raw Legado field rules against the same response while
+    /// sharing Legado's `@put` / `@get` variable context.
+    pub fn run_legado_field_rules_with_context<I, K, R>(
+        &self,
+        input: &str,
+        rules: I,
+        context: &mut LegadoRuleContext,
+    ) -> Result<Vec<(String, RuleOutput)>, ContentError>
+    where
+        I: IntoIterator<Item = (K, R)>,
+        K: Into<String>,
+        R: AsRef<str>,
+    {
+        let mut outputs = Vec::new();
+        for (field, rule) in rules {
+            let output =
+                self.engine
+                    .execute_legado_css_with_context(input, rule.as_ref(), context)?;
+            outputs.push((field.into(), output));
+        }
+        Ok(outputs)
+    }
+
+    /// Run a structured Legado `bookInfoRule` with Rust-owned field ordering.
+    ///
+    /// `init` is executed first so its `@put` bindings can seed later fields,
+    /// but it is not returned as extracted book metadata.
+    pub fn run_legado_book_info_rule_with_context(
+        &self,
+        input: &str,
+        rule: &BookInfoRule,
+        context: &mut LegadoRuleContext,
+    ) -> Result<Vec<(String, RuleOutput)>, ContentError> {
+        if let Some(init) = rule
+            .r#init
+            .as_deref()
+            .filter(|rule| !rule.trim().is_empty())
+        {
+            self.engine
+                .execute_legado_css_with_context(input, init, context)?;
+        }
+
+        self.run_legado_field_rules_with_context(input, legado_book_info_rule_fields(rule), context)
+    }
+
+    /// Run the Rust-owned extraction fields from a structured Legado
+    /// `contentRule`.
+    ///
+    /// JS and host-side action fields remain outside this method; callers get a
+    /// deterministic Core result for extractable text/URL fields only.
+    pub fn run_legado_content_rule_with_context(
+        &self,
+        input: &str,
+        rule: &ContentRule,
+        context: &mut LegadoRuleContext,
+    ) -> Result<Vec<(String, RuleOutput)>, ContentError> {
+        let mut fields = self.run_legado_field_rules_with_context(
+            input,
+            legado_content_rule_fields(rule),
+            context,
+        )?;
+        for (field, output) in &mut fields {
+            if field == "content" {
+                let content =
+                    normalization::normalize_extracted_content(&output.values().join("\n"));
+                *output = RuleOutput::new(vec![content]);
+            }
+        }
+        Ok(fields)
+    }
+
+    /// Run a structured Legado `searchRule` by selecting book-list items and
+    /// mapping supported item fields into [`Book`] values.
+    pub fn run_legado_search_rule_with_context(
+        &self,
+        input: &str,
+        rule: &SearchRule,
+        context: &mut LegadoRuleContext,
+    ) -> Result<Vec<Book>, ContentError> {
+        let item_inputs =
+            self.legado_list_item_inputs(input, rule.book_list.as_deref(), context)?;
+        let mut books = Vec::new();
+        for item_input in &item_inputs {
+            let mut item_context = context.clone();
+            let fields = self.run_legado_field_rules_with_context(
+                item_input,
+                legado_search_rule_fields(rule),
+                &mut item_context,
+            )?;
+            books.push(book_from_legado_book_fields(&fields));
+        }
+        Ok(books)
+    }
+
+    /// Run a structured Legado `exploreRule` by selecting book-list items and
+    /// mapping supported item fields into [`Book`] values.
+    pub fn run_legado_explore_rule_with_context(
+        &self,
+        input: &str,
+        rule: &ExploreRule,
+        context: &mut LegadoRuleContext,
+    ) -> Result<Vec<Book>, ContentError> {
+        let item_inputs =
+            self.legado_list_item_inputs(input, rule.book_list.as_deref(), context)?;
+        let mut books = Vec::new();
+        for item_input in &item_inputs {
+            let mut item_context = context.clone();
+            let fields = self.run_legado_field_rules_with_context(
+                item_input,
+                legado_explore_rule_fields(rule),
+                &mut item_context,
+            )?;
+            books.push(book_from_legado_book_fields(&fields));
+        }
+        Ok(books)
+    }
+
+    /// Run a structured Legado `tocRule` by selecting chapter-list items and
+    /// evaluating chapter fields inside each item context.
+    pub fn run_legado_toc_rule_with_context(
+        &self,
+        input: &str,
+        rule: &TocRule,
+        context: &mut LegadoRuleContext,
+    ) -> Result<Vec<TocEntry>, ContentError> {
+        let item_inputs =
+            self.legado_list_item_inputs(input, rule.chapter_list.as_deref(), context)?;
+        let mut entries = Vec::new();
+        for (index, item_input) in item_inputs.iter().enumerate() {
+            let mut item_context = context.clone();
+            let fields = self.run_legado_field_rules_with_context(
+                item_input,
+                legado_toc_rule_fields(rule),
+                &mut item_context,
+            )?;
+            let title = first_field_value(&fields, "chapterName").unwrap_or_default();
+            let url = first_field_value(&fields, "chapterUrl").unwrap_or_default();
+            entries.push(TocEntry {
+                index: index as u32,
+                title,
+                url,
+            });
+        }
+        Ok(entries)
+    }
+
+    fn legado_list_item_inputs(
+        &self,
+        input: &str,
+        list_rule: Option<&str>,
+        context: &mut LegadoRuleContext,
+    ) -> Result<Vec<String>, ContentError> {
+        if let Some(list_rule) = list_rule.filter(|rule| !rule.trim().is_empty()) {
+            Ok(self
+                .engine
+                .execute_legado_css_list_items_with_context(input, list_rule, context)?
+                .into_values())
+        } else {
+            Ok(vec![input.to_string()])
+        }
+    }
+
     /// Extract a list of books from a search response.
     ///
     /// The rule chain is expected to yield, for each book, a JSON object string
@@ -521,12 +686,67 @@ impl RemoteContentPipeline {
         source: &Source,
         search_response: &str,
     ) -> Result<Vec<Book>, ContentError> {
+        if let Some(book_source) = legado_book_source(source)? {
+            if let Some(search_rule) = book_source.search_rule.as_ref() {
+                let mut context = legado_context_for_source(source, &book_source);
+                return self.run_legado_search_rule_with_context(
+                    search_response,
+                    search_rule,
+                    &mut context,
+                );
+            }
+            if let Some(search_rule) = book_source
+                .rule_search
+                .as_ref()
+                .and_then(|rule| rule.as_structured())
+            {
+                let mut context = legado_context_for_source(source, &book_source);
+                return self.run_legado_search_rule_with_context(
+                    search_response,
+                    search_rule,
+                    &mut context,
+                );
+            }
+            if let Some(search_rule) = legacy_search_rule_from_book_source(&book_source) {
+                let mut context = legado_context_for_source(source, &book_source);
+                return self.run_legado_search_rule_with_context(
+                    search_response,
+                    &search_rule,
+                    &mut context,
+                );
+            }
+        }
+
         let out = self.run_chain(search_response, &source.rules.search)?;
         let mut books = Vec::new();
         for value in out.values() {
             books.push(parse_book_value(value));
         }
         Ok(books)
+    }
+
+    /// Extract an explore/discovery book list from a source response.
+    ///
+    /// Explore is a Legado BookSource capability rather than a V1 `SourceRules`
+    /// stage, so sources without a structured `exploreRule` simply return an
+    /// empty list.
+    pub fn explore(
+        &self,
+        source: &Source,
+        explore_response: &str,
+    ) -> Result<Vec<Book>, ContentError> {
+        if let Some(book_source) = legado_book_source(source)? {
+            if let Some(explore_rule) = book_source.explore_rule.as_ref() {
+                let mut context = legado_context_for_source(source, &book_source);
+                return self.run_legado_explore_rule_with_context(
+                    explore_response,
+                    explore_rule,
+                    &mut context,
+                );
+            }
+        }
+
+        Ok(Vec::new())
     }
 
     /// Merge detail metadata into a base book. Detail extraction yields key/value
@@ -538,6 +758,20 @@ impl RemoteContentPipeline {
         base: &Book,
         detail_response: &str,
     ) -> Result<Book, ContentError> {
+        if let Some(book_source) = legado_book_source(source)? {
+            if let Some(book_info_rule) = book_source.book_info_rule.as_ref() {
+                let mut context = legado_context_for_source(source, &book_source);
+                let fields = self.run_legado_book_info_rule_with_context(
+                    detail_response,
+                    book_info_rule,
+                    &mut context,
+                )?;
+                let mut merged = base.clone();
+                merge_legado_book_fields(&mut merged, &fields);
+                return Ok(merged);
+            }
+        }
+
         let out = self.run_chain(detail_response, &source.rules.detail)?;
         let mut merged = base.clone();
         if let Some(first) = out.first() {
@@ -569,6 +803,13 @@ impl RemoteContentPipeline {
     /// Extract the table of contents. The rule chain should yield alternating
     /// `title`, `url` values, or a JSON array of `{title, url}` objects.
     pub fn toc(&self, source: &Source, toc_response: &str) -> Result<Vec<TocEntry>, ContentError> {
+        if let Some(book_source) = legado_book_source(source)? {
+            if let Some(toc_rule) = book_source.toc_rule.as_ref() {
+                let mut context = legado_context_for_source(source, &book_source);
+                return self.run_legado_toc_rule_with_context(toc_response, toc_rule, &mut context);
+            }
+        }
+
         let out = self.run_chain(toc_response, &source.rules.toc)?;
         let mut entries = Vec::new();
 
@@ -619,6 +860,18 @@ impl RemoteContentPipeline {
         source: &Source,
         chapter_response: &str,
     ) -> Result<String, ContentError> {
+        if let Some(book_source) = legado_book_source(source)? {
+            if let Some(content_rule) = book_source.content_rule.as_ref() {
+                let mut context = legado_context_for_source(source, &book_source);
+                let fields = self.run_legado_content_rule_with_context(
+                    chapter_response,
+                    content_rule,
+                    &mut context,
+                )?;
+                return Ok(first_field_value(&fields, "content").unwrap_or_default());
+            }
+        }
+
         let out = self.run_chain(chapter_response, &source.rules.chapter)?;
         Ok(normalization::normalize_extracted_content(
             &out.values().join("\n"),
@@ -662,6 +915,176 @@ impl RemoteContentPipeline {
             }
         }
     }
+}
+
+fn legado_book_info_rule_fields(rule: &BookInfoRule) -> Vec<(&'static str, &str)> {
+    let mut fields = Vec::new();
+    push_optional_legado_field(&mut fields, "name", &rule.name);
+    push_optional_legado_field(&mut fields, "author", &rule.author);
+    push_optional_legado_field(&mut fields, "intro", &rule.intro);
+    push_optional_legado_field(&mut fields, "kind", &rule.kind);
+    push_optional_legado_field(&mut fields, "lastChapter", &rule.last_chapter);
+    push_optional_legado_field(&mut fields, "updateTime", &rule.update_time);
+    push_optional_legado_field(&mut fields, "coverUrl", &rule.cover_url);
+    push_optional_legado_field(&mut fields, "tocUrl", &rule.toc_url);
+    push_optional_legado_field(&mut fields, "wordCount", &rule.word_count);
+    push_optional_legado_field(&mut fields, "canReName", &rule.can_re_name);
+    push_optional_legado_field(&mut fields, "downloadUrls", &rule.download_urls);
+    push_optional_legado_field(&mut fields, "reply", &rule.reply);
+    fields
+}
+
+fn legado_search_rule_fields(rule: &SearchRule) -> Vec<(&'static str, &str)> {
+    let mut fields = Vec::new();
+    push_optional_legado_field(&mut fields, "name", &rule.name);
+    push_optional_legado_field(&mut fields, "author", &rule.author);
+    push_optional_legado_field(&mut fields, "intro", &rule.intro);
+    push_optional_legado_field(&mut fields, "kind", &rule.kind);
+    push_optional_legado_field(&mut fields, "lastChapter", &rule.last_chapter);
+    push_optional_legado_field(&mut fields, "updateTime", &rule.update_time);
+    push_optional_legado_field(&mut fields, "bookUrl", &rule.book_url);
+    push_optional_legado_field(&mut fields, "coverUrl", &rule.cover_url);
+    push_optional_legado_field(&mut fields, "wordCount", &rule.word_count);
+    push_optional_legado_field(&mut fields, "checkKeyWord", &rule.check_key_word);
+    push_optional_legado_field(&mut fields, "searchFields", &rule.search_fields);
+    fields
+}
+
+fn legado_explore_rule_fields(rule: &ExploreRule) -> Vec<(&'static str, &str)> {
+    let mut fields = Vec::new();
+    push_optional_legado_field(&mut fields, "name", &rule.name);
+    push_optional_legado_field(&mut fields, "author", &rule.author);
+    push_optional_legado_field(&mut fields, "intro", &rule.intro);
+    push_optional_legado_field(&mut fields, "kind", &rule.kind);
+    push_optional_legado_field(&mut fields, "lastChapter", &rule.last_chapter);
+    push_optional_legado_field(&mut fields, "bookUrl", &rule.book_url);
+    push_optional_legado_field(&mut fields, "coverUrl", &rule.cover_url);
+    push_optional_legado_field(&mut fields, "wordCount", &rule.word_count);
+    fields
+}
+
+fn book_from_legado_book_fields(fields: &[(String, RuleOutput)]) -> Book {
+    Book {
+        book_id: first_field_value(fields, "bookUrl").unwrap_or_default(),
+        title: first_field_value(fields, "name").unwrap_or_default(),
+        author: first_field_value(fields, "author").unwrap_or_default(),
+        cover_url: first_non_empty_field_value(fields, "coverUrl"),
+        intro: first_non_empty_field_value(fields, "intro"),
+        kind: first_non_empty_field_value(fields, "kind"),
+        last_chapter: first_non_empty_field_value(fields, "lastChapter"),
+    }
+}
+
+fn merge_legado_book_fields(book: &mut Book, fields: &[(String, RuleOutput)]) {
+    for (field, output) in fields {
+        let Some(value) = output.first().filter(|value| !value.trim().is_empty()) else {
+            continue;
+        };
+        match field.as_str() {
+            "name" => book.title = value.to_string(),
+            "author" => book.author = value.to_string(),
+            "coverUrl" => book.cover_url = Some(value.to_string()),
+            "intro" => book.intro = Some(value.to_string()),
+            "kind" => book.kind = Some(value.to_string()),
+            "lastChapter" => book.last_chapter = Some(value.to_string()),
+            _ => {}
+        }
+    }
+}
+
+fn legado_content_rule_fields(rule: &ContentRule) -> Vec<(&'static str, &str)> {
+    let mut fields = Vec::new();
+    push_optional_legado_field(&mut fields, "title", &rule.title);
+    push_optional_legado_field(&mut fields, "content", &rule.content);
+    push_optional_legado_field(&mut fields, "nextContentUrl", &rule.next_content_url);
+    fields
+}
+
+fn legado_toc_rule_fields(rule: &TocRule) -> Vec<(&'static str, &str)> {
+    let mut fields = Vec::new();
+    push_optional_legado_field(&mut fields, "chapterName", &rule.chapter_name);
+    push_optional_legado_field(&mut fields, "chapterUrl", &rule.chapter_url);
+    push_optional_legado_field(&mut fields, "isVolume", &rule.is_volume);
+    push_optional_legado_field(&mut fields, "isVip", &rule.is_vip);
+    push_optional_legado_field(&mut fields, "isPay", &rule.is_pay);
+    push_optional_legado_field(&mut fields, "updateTime", &rule.update_time);
+    push_optional_legado_field(&mut fields, "nextTocUrl", &rule.next_toc_url);
+    fields
+}
+
+fn first_field_value(fields: &[(String, RuleOutput)], target: &str) -> Option<String> {
+    fields
+        .iter()
+        .find(|(field, _)| field == target)
+        .and_then(|(_, output)| output.first().map(ToString::to_string))
+}
+
+fn first_non_empty_field_value(fields: &[(String, RuleOutput)], target: &str) -> Option<String> {
+    first_field_value(fields, target).filter(|value| !value.trim().is_empty())
+}
+
+fn push_optional_legado_field<'a>(
+    fields: &mut Vec<(&'static str, &'a str)>,
+    field: &'static str,
+    rule: &'a Option<String>,
+) {
+    if let Some(rule) = rule.as_deref().filter(|rule| !rule.trim().is_empty()) {
+        fields.push((field, rule));
+    }
+}
+
+fn legado_book_source(source: &Source) -> Result<Option<LegadoBookSource>, ContentError> {
+    if source.book_source.is_null() {
+        return Ok(None);
+    }
+
+    serde_json::from_value(source.book_source.clone())
+        .map(Some)
+        .map_err(|e| ContentError::RuleSpec(format!("invalid Legado bookSource: {e}")))
+}
+
+fn legacy_search_rule_from_book_source(book_source: &LegadoBookSource) -> Option<SearchRule> {
+    let rule = SearchRule {
+        book_list: book_source
+            .rule_search
+            .as_ref()
+            .and_then(|rule| rule.as_raw())
+            .map(ToString::to_string)
+            .filter(|value| !value.trim().is_empty()),
+        name: non_empty_string(book_source.rule_search_name.clone()),
+        author: non_empty_string(book_source.rule_search_author.clone()),
+        book_url: non_empty_string(book_source.rule_search_note_url.clone())
+            .or_else(|| non_empty_string(book_source.rule_search_url.clone())),
+        ..SearchRule::default()
+    };
+
+    if rule.book_list.is_some()
+        || rule.name.is_some()
+        || rule.author.is_some()
+        || rule.book_url.is_some()
+    {
+        Some(rule)
+    } else {
+        None
+    }
+}
+
+fn non_empty_string(value: Option<String>) -> Option<String> {
+    value.filter(|value| !value.trim().is_empty())
+}
+
+fn legado_context_for_source(source: &Source, book_source: &LegadoBookSource) -> LegadoRuleContext {
+    let mut context = LegadoRuleContext::new();
+    if let Some(url) = book_source
+        .book_source_url
+        .as_deref()
+        .filter(|url| !url.trim().is_empty())
+        .or_else(|| (!source.base_url.trim().is_empty()).then_some(source.base_url.as_str()))
+    {
+        context.put_variable("sourceHost", url);
+        context.put_variable("bookSourceUrl", url);
+    }
+    context
 }
 
 /// Normalize a chapter body independent of the extraction path.
@@ -1309,7 +1732,7 @@ fn merge_book(book: &mut Book, map: &serde_json::Map<String, serde_json::Value>)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use reader_domain::SourceRules;
+    use reader_domain::{BookInfoRule, ContentRule, SearchRule, SourceRules, TocRule};
     use reader_js::{HostCallbackRegistry, JsRuntimeConfig};
 
     fn sample_source() -> Source {
@@ -1396,6 +1819,292 @@ mod tests {
     }
 
     #[test]
+    fn search_uses_structured_legado_book_source_search_rule() {
+        let mut source = sample_source();
+        source.book_source = serde_json::json!({
+            "bookSourceName": "Legado Compat",
+            "bookSourceUrl": "https://books.example.test",
+            "searchRule": {
+                "bookList": "section.results&&article.book",
+                "name": "a.title@text@put:{href:\"a.title@href\"}",
+                "author": "span.author@text",
+                "bookUrl": "@get:{sourceHost}@get:{href}",
+                "coverUrl": "img.cover@src",
+                "lastChapter": "span.latest@text"
+            }
+        });
+        let pipeline = RemoteContentPipeline::new();
+        let resp = r#"
+            <section class="results">
+                <article class="book">
+                    <a class="title" href="/book/1">Dune</a>
+                    <span class="author">Frank Herbert</span>
+                    <img class="cover" src="/covers/dune.jpg">
+                    <span class="latest">Chapter 7</span>
+                </article>
+                <article class="book">
+                    <a class="title" href="/book/2">Foundation</a>
+                    <span class="author">Isaac Asimov</span>
+                    <img class="cover" src="/covers/foundation.jpg">
+                    <span class="latest">Chapter 3</span>
+                </article>
+            </section>
+        "#;
+
+        let books = pipeline.search(&source, resp).unwrap();
+
+        assert_eq!(books.len(), 2);
+        assert_eq!(books[0].title, "Dune");
+        assert_eq!(books[0].author, "Frank Herbert");
+        assert_eq!(books[0].book_id, "https://books.example.test/book/1");
+        assert_eq!(books[0].cover_url.as_deref(), Some("/covers/dune.jpg"));
+        assert_eq!(books[0].last_chapter.as_deref(), Some("Chapter 7"));
+        assert_eq!(books[1].title, "Foundation");
+        assert_eq!(books[1].author, "Isaac Asimov");
+        assert_eq!(books[1].book_id, "https://books.example.test/book/2");
+        assert_eq!(
+            books[1].cover_url.as_deref(),
+            Some("/covers/foundation.jpg")
+        );
+        assert_eq!(books[1].last_chapter.as_deref(), Some("Chapter 3"));
+    }
+
+    #[test]
+    fn search_uses_legado_rule_search_object() {
+        let mut source = sample_source();
+        source.book_source = serde_json::json!({
+            "bookSourceName": "Legado Compat",
+            "bookSourceUrl": "https://books.example.test",
+            "ruleSearch": {
+                "bookList": "section.results&&article.book",
+                "name": "a.title@text@put:{href:\"a.title@href\"}",
+                "author": "span.author@text",
+                "bookUrl": "@get:{sourceHost}@get:{href}",
+                "coverUrl": "img.cover@src",
+                "lastChapter": "span.latest@text"
+            }
+        });
+        let pipeline = RemoteContentPipeline::new();
+        let resp = r#"
+            <section class="results">
+                <article class="book">
+                    <a class="title" href="/book/1">Dune</a>
+                    <span class="author">Frank Herbert</span>
+                    <img class="cover" src="/covers/dune.jpg">
+                    <span class="latest">Chapter 7</span>
+                </article>
+                <article class="book">
+                    <a class="title" href="/book/2">Foundation</a>
+                    <span class="author">Isaac Asimov</span>
+                    <img class="cover" src="/covers/foundation.jpg">
+                    <span class="latest">Chapter 3</span>
+                </article>
+            </section>
+        "#;
+
+        let books = pipeline.search(&source, resp).unwrap();
+
+        assert_eq!(books.len(), 2);
+        assert_eq!(books[0].title, "Dune");
+        assert_eq!(books[0].author, "Frank Herbert");
+        assert_eq!(books[0].book_id, "https://books.example.test/book/1");
+        assert_eq!(books[0].cover_url.as_deref(), Some("/covers/dune.jpg"));
+        assert_eq!(books[0].last_chapter.as_deref(), Some("Chapter 7"));
+        assert_eq!(books[1].title, "Foundation");
+        assert_eq!(books[1].author, "Isaac Asimov");
+        assert_eq!(books[1].book_id, "https://books.example.test/book/2");
+        assert_eq!(
+            books[1].cover_url.as_deref(),
+            Some("/covers/foundation.jpg")
+        );
+        assert_eq!(books[1].last_chapter.as_deref(), Some("Chapter 3"));
+    }
+
+    #[test]
+    fn search_uses_legacy_legado_rule_search_fields() {
+        let mut source = sample_source();
+        source.book_source = serde_json::json!({
+            "bookSourceName": "Legacy Legado Compat",
+            "bookSourceUrl": "https://legacy.example.test",
+            "ruleSearch": "css:.item",
+            "ruleSearchName": "css:a.title",
+            "ruleSearchAuthor": "css:p.author",
+            "ruleSearchUrl": "css:a.title@href"
+        });
+        let pipeline = RemoteContentPipeline::new();
+        let resp = r#"
+            <section class="results">
+                <div class="item">
+                    <a class="title" href="/book/1">Dune</a>
+                    <p class="author">Frank Herbert</p>
+                </div>
+                <div class="item">
+                    <a class="title" href="/book/2">Foundation</a>
+                    <p class="author">Isaac Asimov</p>
+                </div>
+            </section>
+        "#;
+
+        let books = pipeline.search(&source, resp).unwrap();
+
+        assert_eq!(books.len(), 2);
+        assert_eq!(books[0].title, "Dune");
+        assert_eq!(books[0].author, "Frank Herbert");
+        assert_eq!(books[0].book_id, "/book/1");
+        assert_eq!(books[1].title, "Foundation");
+        assert_eq!(books[1].author, "Isaac Asimov");
+        assert_eq!(books[1].book_id, "/book/2");
+    }
+
+    #[test]
+    fn search_uses_legacy_legado_rule_search_note_url_for_book_url() {
+        let mut source = sample_source();
+        source.book_source = serde_json::json!({
+            "bookSourceName": "Legacy Legado Compat",
+            "bookSourceUrl": "https://legacy.example.test",
+            "ruleSearchUrl": "/search?keyword={{key}}",
+            "ruleSearch": "css:.item",
+            "ruleSearchName": "css:a.title",
+            "ruleSearchAuthor": "css:p.author",
+            "ruleSearchNoteUrl": "css:a.title@href"
+        });
+        let pipeline = RemoteContentPipeline::new();
+        let resp = r#"
+            <section class="results">
+                <div class="item">
+                    <a class="title" href="/book/1">Dune</a>
+                    <p class="author">Frank Herbert</p>
+                </div>
+            </section>
+        "#;
+
+        let books = pipeline.search(&source, resp).unwrap();
+
+        assert_eq!(books.len(), 1);
+        assert_eq!(books[0].title, "Dune");
+        assert_eq!(books[0].author, "Frank Herbert");
+        assert_eq!(books[0].book_id, "/book/1");
+    }
+
+    #[test]
+    fn explore_uses_structured_legado_book_source_explore_rule() {
+        let mut source = sample_source();
+        source.book_source = serde_json::json!({
+            "bookSourceName": "Legado Compat",
+            "bookSourceUrl": "https://books.example.test",
+            "enabledExplore": true,
+            "exploreRule": {
+                "bookList": "div.explore&&article.book",
+                "name": "a.title@text@put:{href:\"a.title@href\"}",
+                "author": "span.author@text",
+                "bookUrl": "@get:{sourceHost}@get:{href}",
+                "coverUrl": "img.cover@src",
+                "kind": "span.kind@text",
+                "intro": "p.intro@text",
+                "lastChapter": "span.latest@text"
+            }
+        });
+        let pipeline = RemoteContentPipeline::new();
+        let resp = r#"
+            <div class="explore">
+                <article class="book">
+                    <a class="title" href="/explore/book/1">Dune</a>
+                    <span class="author">Frank Herbert</span>
+                    <img class="cover" src="/covers/dune.jpg">
+                    <span class="kind">Sci-Fi</span>
+                    <p class="intro">A spice novel</p>
+                    <span class="latest">Chapter 7</span>
+                </article>
+                <article class="book">
+                    <a class="title" href="/explore/book/2">Foundation</a>
+                    <span class="author">Isaac Asimov</span>
+                    <img class="cover" src="/covers/foundation.jpg">
+                    <span class="kind">Sci-Fi</span>
+                    <p class="intro">A psychohistory novel</p>
+                    <span class="latest">Chapter 3</span>
+                </article>
+            </div>
+        "#;
+
+        let books = pipeline.explore(&source, resp).unwrap();
+
+        assert_eq!(books.len(), 2);
+        assert_eq!(books[0].title, "Dune");
+        assert_eq!(books[0].author, "Frank Herbert");
+        assert_eq!(
+            books[0].book_id,
+            "https://books.example.test/explore/book/1"
+        );
+        assert_eq!(books[0].cover_url.as_deref(), Some("/covers/dune.jpg"));
+        assert_eq!(books[0].kind.as_deref(), Some("Sci-Fi"));
+        assert_eq!(books[0].intro.as_deref(), Some("A spice novel"));
+        assert_eq!(books[0].last_chapter.as_deref(), Some("Chapter 7"));
+        assert_eq!(books[1].title, "Foundation");
+        assert_eq!(books[1].author, "Isaac Asimov");
+        assert_eq!(
+            books[1].book_id,
+            "https://books.example.test/explore/book/2"
+        );
+        assert_eq!(books[1].intro.as_deref(), Some("A psychohistory novel"));
+        assert_eq!(books[1].last_chapter.as_deref(), Some("Chapter 3"));
+    }
+
+    #[test]
+    fn legado_search_rule_runs_fields_per_book_list_item() {
+        let pipeline = RemoteContentPipeline::new();
+        let mut context = reader_rule::LegadoRuleContext::new();
+        context.put_variable("sourceHost", "https://books.example.test");
+        let rule = SearchRule {
+            book_list: Some("div.list&&article.book".into()),
+            name: Some(r#"a.title@text@put:{href:"a.title@href"}"#.into()),
+            author: Some("span.author@text".into()),
+            book_url: Some("@get:{sourceHost}@get:{href}".into()),
+            cover_url: Some("img.cover@src".into()),
+            kind: Some("span.kind@text".into()),
+            last_chapter: Some("span.latest@text".into()),
+            ..SearchRule::default()
+        };
+        let html = r#"
+            <div class="list">
+                <article class="book">
+                    <a class="title" href="/book/1">Dune</a>
+                    <span class="author">Frank Herbert</span>
+                    <img class="cover" src="/covers/dune.jpg">
+                    <span class="kind">Sci-Fi</span>
+                    <span class="latest">Chapter 7</span>
+                </article>
+                <article class="book">
+                    <a class="title" href="/book/2">Foundation</a>
+                    <span class="author">Isaac Asimov</span>
+                    <img class="cover" src="/covers/foundation.jpg">
+                    <span class="kind">Sci-Fi</span>
+                    <span class="latest">Chapter 3</span>
+                </article>
+            </div>
+        "#;
+
+        let books = pipeline
+            .run_legado_search_rule_with_context(html, &rule, &mut context)
+            .unwrap();
+
+        assert_eq!(books.len(), 2);
+        assert_eq!(books[0].title, "Dune");
+        assert_eq!(books[0].author, "Frank Herbert");
+        assert_eq!(books[0].book_id, "https://books.example.test/book/1");
+        assert_eq!(books[0].cover_url.as_deref(), Some("/covers/dune.jpg"));
+        assert_eq!(books[0].kind.as_deref(), Some("Sci-Fi"));
+        assert_eq!(books[0].last_chapter.as_deref(), Some("Chapter 7"));
+        assert_eq!(books[1].title, "Foundation");
+        assert_eq!(books[1].author, "Isaac Asimov");
+        assert_eq!(books[1].book_id, "https://books.example.test/book/2");
+        assert_eq!(
+            books[1].cover_url.as_deref(),
+            Some("/covers/foundation.jpg")
+        );
+        assert_eq!(books[1].last_chapter.as_deref(), Some("Chapter 3"));
+    }
+
+    #[test]
     fn detail_merges_metadata_from_json_object() {
         let mut source = sample_source();
         source.rules.detail = serde_json::json!([{ "kind": "cssText", "selector": "meta.detail" }]);
@@ -1475,6 +2184,223 @@ mod tests {
     }
 
     #[test]
+    fn detail_uses_structured_legado_book_source_book_info_rule() {
+        let mut source = sample_source();
+        source.book_source = serde_json::json!({
+            "bookSourceName": "Legado Compat",
+            "bookSourceUrl": "https://books.example.test",
+            "bookInfoRule": {
+                "init": "@put:{a:\"span.author@text\",k:\"span.kind@text\"}",
+                "name": "h1.name@text",
+                "author": "@get:{a}",
+                "intro": "p.intro@text",
+                "kind": "@get:{k}",
+                "coverUrl": "img.cover@src",
+                "lastChapter": "a.latest@text"
+            }
+        });
+        let pipeline = RemoteContentPipeline::new();
+        let base = Book {
+            book_id: "/book/1".into(),
+            title: "Old title".into(),
+            author: String::new(),
+            cover_url: None,
+            intro: None,
+            kind: None,
+            last_chapter: None,
+        };
+        let resp = r#"
+            <article class="detail">
+                <h1 class="name">Dune</h1>
+                <span class="author">Frank Herbert</span>
+                <p class="intro">A spice novel</p>
+                <span class="kind">Sci-Fi</span>
+                <img class="cover" src="/covers/dune.jpg">
+                <a class="latest" href="/c/7">Chapter 7</a>
+            </article>
+        "#;
+
+        let merged = pipeline.detail(&source, &base, resp).unwrap();
+
+        assert_eq!(merged.book_id, "/book/1");
+        assert_eq!(merged.title, "Dune");
+        assert_eq!(merged.author, "Frank Herbert");
+        assert_eq!(merged.intro.as_deref(), Some("A spice novel"));
+        assert_eq!(merged.kind.as_deref(), Some("Sci-Fi"));
+        assert_eq!(merged.cover_url.as_deref(), Some("/covers/dune.jpg"));
+        assert_eq!(merged.last_chapter.as_deref(), Some("Chapter 7"));
+    }
+
+    #[test]
+    fn legado_field_rules_share_context_across_content_pipeline_calls() {
+        let pipeline = RemoteContentPipeline::new();
+        let mut context = reader_rule::LegadoRuleContext::new();
+
+        let book_json = r#"{
+            "id": "book-42",
+            "name": "Dune",
+            "author": "Frank Herbert"
+        }"#;
+
+        let detail = pipeline
+            .run_legado_field_rules_with_context(
+                book_json,
+                [
+                    ("name", "$.name@put:{id:id,name:name,author:author}"),
+                    ("author", "@get:{author}"),
+                    (
+                        "tocUrl",
+                        "https://api.example.test/books/@get:{id}/toc##$##?webView=true",
+                    ),
+                ],
+                &mut context,
+            )
+            .unwrap();
+
+        assert_eq!(detail[0].0, "name");
+        assert_eq!(detail[0].1.values(), &["Dune".to_string()]);
+        assert_eq!(detail[1].0, "author");
+        assert_eq!(detail[1].1.values(), &["Frank Herbert".to_string()]);
+        assert_eq!(detail[2].0, "tocUrl");
+        assert_eq!(
+            detail[2].1.values(),
+            &["https://api.example.test/books/book-42/toc?webView=true".to_string()]
+        );
+
+        let chapter_json = r#"{ "chapter_id": "chapter-7" }"#;
+        let chapter = pipeline
+            .run_legado_field_rules_with_context(
+                chapter_json,
+                [(
+                    "chapterUrl",
+                    "https://api.example.test/books/@get:{id}/chapters/{{$.chapter_id}}",
+                )],
+                &mut context,
+            )
+            .unwrap();
+
+        assert_eq!(chapter[0].0, "chapterUrl");
+        assert_eq!(
+            chapter[0].1.values(),
+            &["https://api.example.test/books/book-42/chapters/chapter-7".to_string()]
+        );
+    }
+
+    #[test]
+    fn legado_book_info_rule_init_populates_context_before_fields() {
+        let pipeline = RemoteContentPipeline::new();
+        let mut context = reader_rule::LegadoRuleContext::new();
+        let rule = BookInfoRule {
+            r#init: Some(r#"@put:{n:"h1.name@text",a:"span.author@text",t:"a.toc@href"}"#.into()),
+            name: Some("@get:{n}".into()),
+            author: Some("@get:{a}".into()),
+            toc_url: Some("https://api.example.test@get:{t}".into()),
+            ..BookInfoRule::default()
+        };
+        let html = r#"
+            <article>
+                <h1 class="name">Dune</h1>
+                <span class="author">Frank Herbert</span>
+                <a class="toc" href="/books/book-42/toc">toc</a>
+            </article>
+        "#;
+
+        let fields = pipeline
+            .run_legado_book_info_rule_with_context(html, &rule, &mut context)
+            .unwrap();
+
+        let values: HashMap<_, _> = fields
+            .iter()
+            .map(|(field, output)| (field.as_str(), output.first().unwrap_or("")))
+            .collect();
+        assert_eq!(values.get("name").copied(), Some("Dune"));
+        assert_eq!(values.get("author").copied(), Some("Frank Herbert"));
+        assert_eq!(
+            values.get("tocUrl").copied(),
+            Some("https://api.example.test/books/book-42/toc")
+        );
+        assert!(!values.contains_key("init"));
+        assert_eq!(context.get_variable("n"), Some("Dune"));
+        assert_eq!(context.get_variable("a"), Some("Frank Herbert"));
+        assert_eq!(context.get_variable("t"), Some("/books/book-42/toc"));
+    }
+
+    #[test]
+    fn legado_content_rule_fields_share_context_for_next_content_url() {
+        let pipeline = RemoteContentPipeline::new();
+        let mut context = reader_rule::LegadoRuleContext::new();
+        context.put_variable("bookId", "book-42");
+        let rule = ContentRule {
+            content: Some(r#"article.chapter@html@put:{next:"a.next@href"}"#.into()),
+            title: Some("h1.title@text".into()),
+            next_content_url: Some(
+                "https://api.example.test/books/@get:{bookId}/chapters@get:{next}".into(),
+            ),
+            ..ContentRule::default()
+        };
+        let html = r#"
+            <main>
+                <h1 class="title">Chapter 7</h1>
+                <article class="chapter">
+                    <p>First paragraph.</p>
+                    <p>Second paragraph.</p>
+                </article>
+                <a class="next" href="/chapter-8">next</a>
+            </main>
+        "#;
+
+        let fields = pipeline
+            .run_legado_content_rule_with_context(html, &rule, &mut context)
+            .unwrap();
+
+        let values: HashMap<_, _> = fields
+            .iter()
+            .map(|(field, output)| (field.as_str(), output.first().unwrap_or("")))
+            .collect();
+        assert_eq!(values.get("title").copied(), Some("Chapter 7"));
+        assert_eq!(
+            values.get("content").copied(),
+            Some("First paragraph.\nSecond paragraph.")
+        );
+        assert_eq!(
+            values.get("nextContentUrl").copied(),
+            Some("https://api.example.test/books/book-42/chapters/chapter-8")
+        );
+        assert_eq!(context.get_variable("next"), Some("/chapter-8"));
+    }
+
+    #[test]
+    fn legado_toc_rule_runs_fields_per_chapter_list_item() {
+        let pipeline = RemoteContentPipeline::new();
+        let mut context = reader_rule::LegadoRuleContext::new();
+        context.put_variable("bookId", "book-42");
+        let rule = TocRule {
+            chapter_list: Some("ul.toc&&li.chapter".into()),
+            chapter_name: Some(r#"a@text@put:{href:"a@href"}"#.into()),
+            chapter_url: Some("https://api.example.test/books/@get:{bookId}@get:{href}".into()),
+            ..TocRule::default()
+        };
+        let html = r#"
+            <ul class="toc">
+                <li class="chapter"><a href="/c/1">Chapter 1</a></li>
+                <li class="chapter"><a href="/c/2">Chapter 2</a></li>
+            </ul>
+        "#;
+
+        let toc = pipeline
+            .run_legado_toc_rule_with_context(html, &rule, &mut context)
+            .unwrap();
+
+        assert_eq!(toc.len(), 2);
+        assert_eq!(toc[0].index, 0);
+        assert_eq!(toc[0].title, "Chapter 1");
+        assert_eq!(toc[0].url, "https://api.example.test/books/book-42/c/1");
+        assert_eq!(toc[1].index, 1);
+        assert_eq!(toc[1].title, "Chapter 2");
+        assert_eq!(toc[1].url, "https://api.example.test/books/book-42/c/2");
+    }
+
+    #[test]
     fn toc_extracts_from_json_array() {
         let mut source = sample_source();
         source.rules.toc = serde_json::json!([{ "kind": "jsonPath", "path": "$.chapters" }]);
@@ -1493,16 +2419,16 @@ mod tests {
     #[test]
     fn toc_accepts_raw_legado_css_rule_string() {
         let mut source = sample_source();
-        source.rules.toc = serde_json::json!("script.toc@html");
+        source.rules.toc = serde_json::json!("div.toc@text");
         let pipeline = RemoteContentPipeline::new();
         let resp = r#"
             <html>
-                <script class="toc" type="application/json">
+                <div class="toc">
                     [
                         {"title":"Ch 1","url":"/c/1"},
                         {"title":"Ch 2","url":"/c/2"}
                     ]
-                </script>
+                </div>
             </html>
         "#;
 
@@ -1512,6 +2438,37 @@ mod tests {
         assert_eq!(toc[0].title, "Ch 1");
         assert_eq!(toc[0].url, "/c/1");
         assert_eq!(toc[1].index, 1);
+    }
+
+    #[test]
+    fn toc_uses_structured_legado_book_source_toc_rule() {
+        let mut source = sample_source();
+        source.book_source = serde_json::json!({
+            "bookSourceName": "Legado Compat",
+            "bookSourceUrl": "https://books.example.test",
+            "tocRule": {
+                "chapterList": "ol.toc&&li.chapter",
+                "chapterName": "a@text@put:{href:\"a@href\"}",
+                "chapterUrl": "@get:{sourceHost}@get:{href}"
+            }
+        });
+        let pipeline = RemoteContentPipeline::new();
+        let resp = r#"
+            <ol class="toc">
+                <li class="chapter"><a href="/book/1/c/1">Chapter 1</a></li>
+                <li class="chapter"><a href="/book/1/c/2">Chapter 2</a></li>
+            </ol>
+        "#;
+
+        let toc = pipeline.toc(&source, resp).unwrap();
+
+        assert_eq!(toc.len(), 2);
+        assert_eq!(toc[0].index, 0);
+        assert_eq!(toc[0].title, "Chapter 1");
+        assert_eq!(toc[0].url, "https://books.example.test/book/1/c/1");
+        assert_eq!(toc[1].index, 1);
+        assert_eq!(toc[1].title, "Chapter 2");
+        assert_eq!(toc[1].url, "https://books.example.test/book/1/c/2");
     }
 
     #[test]
@@ -1536,6 +2493,33 @@ mod tests {
                     <p>Second<br/>line.</p>
                 </article>
             </html>
+        "#;
+
+        let content = pipeline.chapter_content(&source, resp).unwrap();
+
+        assert_eq!(content, "First & bold line.\nSecond\nline.");
+    }
+
+    #[test]
+    fn chapter_content_uses_structured_legado_book_source_content_rule() {
+        let mut source = sample_source();
+        source.book_source = serde_json::json!({
+            "bookSourceName": "Legado Compat",
+            "bookSourceUrl": "https://books.example.test",
+            "contentRule": {
+                "title": "h1.title@text",
+                "content": "article.chapter@html"
+            }
+        });
+        let pipeline = RemoteContentPipeline::new();
+        let resp = r#"
+            <main>
+                <h1 class="title">Chapter 7</h1>
+                <article class="chapter">
+                    <p>First&nbsp;&amp; <em>bold</em> line.</p>
+                    <p>Second<br/>line.</p>
+                </article>
+            </main>
         "#;
 
         let content = pipeline.chapter_content(&source, resp).unwrap();

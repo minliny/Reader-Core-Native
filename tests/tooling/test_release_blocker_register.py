@@ -38,18 +38,29 @@ def _fixture_diff_inputs(name):
     return canonical, candidates
 
 
-def _diff_result(matching=("ios",), mismatching=("android",)):
+def _diff_result(matching=None, mismatching=("android",)):
     """Build a minimal diff-result with the requested candidate outcomes."""
+    if matching is None:
+        matching = tuple(
+            platform for platform in FOUR_PLATFORM_CANDIDATES
+            if platform not in mismatching
+        )
     candidates = {}
     for name in matching:
-        candidates[name] = {"match": True, "total": 0, "sha256": "c" * 64,
-                            "differences": []}
+        candidates[name] = {
+            "match": True,
+            "total": 0,
+            "sha256": "c" * 64,
+            "canonicalizedSha256": "d" * 64,
+            "differences": [],
+        }
     diffs = []
     for name in mismatching:
         candidates[name] = {
             "match": False,
             "total": 1,
             "sha256": "a" * 64,
+            "canonicalizedSha256": "b" * 64,
             "differences": [
                 {"path": "title", "kind": "value-mismatch",
                  "canonical": "x", "candidate": "y"},
@@ -60,7 +71,11 @@ def _diff_result(matching=("ios",), mismatching=("android",)):
         "schemaVersion": 1,
         "tool": "cross-platform-diff",
         "version": "1.0",
-        "canonical": {"path": "/tmp/canon.json", "sha256": "c" * 64},
+        "canonical": {
+            "path": "/tmp/canon.json",
+            "sha256": "c" * 64,
+            "canonicalizedSha256": "d" * 64,
+        },
         "candidates": candidates,
         "summary": {n: {"match": c["match"], "total": c["total"]}
                     for n, c in candidates.items()},
@@ -87,7 +102,10 @@ class TestPathPolicy(unittest.TestCase):
 
 class TestBlockersFromDiff(unittest.TestCase):
     def test_only_mismatching_candidates_produce_blockers(self):
-        diff = _diff_result(matching=("ios",), mismatching=("android", "harmony"))
+        diff = _diff_result(
+            matching=("cli", "ios"),
+            mismatching=("android", "harmony"),
+        )
         entries = rbr.blockers_from_diff(diff, run_id="run-1", severity="high")
         platforms = sorted(e["platform"] for e in entries)
         self.assertEqual(platforms, ["android", "harmony"])
@@ -96,10 +114,37 @@ class TestBlockersFromDiff(unittest.TestCase):
             self.assertEqual(e["severity"], "high")
             self.assertEqual(e["runId"], "run-1")
             self.assertEqual(e["fieldPath"], "title")
+            self.assertEqual(e["canonicalSha256"], "c" * 64)
+            self.assertEqual(e["candidateSha256"], "a" * 64)
+            self.assertEqual(e["canonicalizedSha256"], "d" * 64)
+            self.assertEqual(e["candidateCanonicalizedSha256"], "b" * 64)
 
     def test_all_matching_yields_no_blockers(self):
-        diff = _diff_result(matching=("ios", "android"), mismatching=())
+        diff = _diff_result(matching=FOUR_PLATFORM_CANDIDATES, mismatching=())
         self.assertEqual(rbr.blockers_from_diff(diff, "run-1", "medium"), [])
+
+    def test_missing_required_candidate_yields_platform_blocker(self):
+        diff = _diff_result(matching=("ios",), mismatching=())
+
+        entries = rbr.blockers_from_diff(diff, run_id="run-1", severity="high")
+
+        self.assertEqual(
+            [(e["platform"], e["kind"], e["fieldPath"]) for e in entries],
+            [
+                ("android", "missing-platform-candidate", "<candidate>"),
+                ("cli", "missing-platform-candidate", "<candidate>"),
+                ("harmony", "missing-platform-candidate", "<candidate>"),
+            ],
+        )
+        for entry in entries:
+            self.assertEqual(
+                entry["reason"],
+                "required four-platform candidate missing from diff-result",
+            )
+            self.assertEqual(entry["canonicalSha256"], "c" * 64)
+            self.assertEqual(entry["candidateSha256"], "")
+            self.assertEqual(entry["canonicalizedSha256"], "d" * 64)
+            self.assertEqual(entry["candidateCanonicalizedSha256"], "")
 
     def test_rejects_non_object_diff(self):
         with self.assertRaises(rbr.RegisterError):
@@ -124,6 +169,8 @@ class TestBlockersFromDiff(unittest.TestCase):
         self.assertEqual(blocker["kind"], "value-mismatch")
         self.assertEqual(blocker["severity"], "high")
         self.assertEqual(blocker["status"], rbr.STATUS_OPEN)
+        self.assertEqual(len(blocker["canonicalizedSha256"]), 64)
+        self.assertEqual(len(blocker["candidateCanonicalizedSha256"]), 64)
 
 
 class TestRegisterLifecycle(unittest.TestCase):
@@ -279,6 +326,22 @@ class TestCLI(unittest.TestCase):
         self._run("add-from-diff", self.diff_path, "--run-id", "run-1")
         rc = self._run("gate")
         self.assertEqual(rc, 1)  # open blocker present
+
+    def test_gate_blocks_partial_platform_diff(self):
+        with open(self.diff_path, "w", encoding="utf-8") as handle:
+            json.dump(_diff_result(matching=("ios",), mismatching=()), handle)
+
+        self._run("add-from-diff", self.diff_path, "--run-id", "run-1")
+        rc = self._run("gate")
+
+        self.assertEqual(rc, 1)
+        reg = rbr.load_register(self.path)
+        kinds = sorted(entry["kind"] for entry in reg["blockers"])
+        self.assertEqual(kinds, [
+            "missing-platform-candidate",
+            "missing-platform-candidate",
+            "missing-platform-candidate",
+        ])
 
     def test_gate_exit_code_clear_after_close(self):
         self._run("add-from-diff", self.diff_path, "--run-id", "run-1")

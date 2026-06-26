@@ -167,7 +167,51 @@ class TestBuildDiffResult(unittest.TestCase):
         cand = _write(self.tmp, "c.json", {"title": "x"})
         result = cpd.build_diff_result(canonical, [("c", cand)])
         self.assertEqual(len(result["canonical"]["sha256"]), 64)
+        self.assertEqual(len(result["canonical"]["canonicalizedSha256"]), 64)
         self.assertEqual(len(result["candidates"]["c"]["sha256"]), 64)
+        self.assertEqual(len(result["candidates"]["c"]["canonicalizedSha256"]), 64)
+
+    def test_normalization_policy_recorded(self):
+        canonical = _write(self.tmp, "canonical.json", {"title": "x"})
+        cand = _write(self.tmp, "c.json", {"title": "x"})
+        result = cpd.build_diff_result(canonical, [("c", cand)])
+        policy = result["normalization"]
+        self.assertEqual(policy["canonicalizer"], "corpus_canonicalize")
+        self.assertEqual(policy["variableFieldScope"], "top-level")
+        self.assertIn("traceId", policy["variableFields"])
+        self.assertIn("normalize-top-level-run-metadata", policy["rules"])
+
+    def test_canonicalized_sha_matches_for_synonymous_outputs(self):
+        canonical = _write(
+            self.tmp,
+            "canonical.json",
+            {
+                "title": "A &amp; B",
+                "url": "https://example.test/book/",
+                "timestamp": 1,
+            },
+        )
+        cand = _write(
+            self.tmp,
+            "c.json",
+            {
+                "timestamp": 2,
+                "url": "https://example.test/book",
+                "title": "A & B",
+            },
+        )
+
+        result = cpd.build_diff_result(canonical, [("c", cand)])
+
+        self.assertNotEqual(
+            result["canonical"]["sha256"],
+            result["candidates"]["c"]["sha256"],
+        )
+        self.assertEqual(
+            result["canonical"]["canonicalizedSha256"],
+            result["candidates"]["c"]["canonicalizedSha256"],
+        )
+        self.assertTrue(result["match"])
 
     def test_four_platform_fixture_all_candidates_match(self):
         canonical, candidates = _fixture_diff_inputs("four-platform-match")

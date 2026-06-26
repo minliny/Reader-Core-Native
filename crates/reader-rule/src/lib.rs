@@ -8,6 +8,7 @@
 use regex::{Regex, RegexBuilder};
 use scraper::{ElementRef, Html, Selector};
 use serde_json::Value as JsonValue;
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use sxd_xpath::{Context, Factory, Value as XPathValue};
@@ -70,8 +71,62 @@ impl RuleEngine {
     }
 
     pub fn execute_legado_css(&self, input: &str, rule: &str) -> RuleResult<RuleOutput> {
-        let rule = LegadoCssRule::parse(rule)?;
+        let mut context = LegadoRuleContext::new();
+        self.execute_legado_css_with_context(input, rule, &mut context)
+    }
+
+    pub fn execute_legado_css_with_context(
+        &self,
+        input: &str,
+        rule: &str,
+        context: &mut LegadoRuleContext,
+    ) -> RuleResult<RuleOutput> {
+        let (rule, put_bindings) = split_legado_put_bindings(rule)?;
+        for binding in put_bindings {
+            let value = self.evaluate_legado_put_binding(input, &binding.rule, context)?;
+            context.put_variable(binding.key, value);
+        }
+
+        let (rule, has_get) = materialize_legado_get_variables(&rule, context);
+        if has_get && !rule.contains("{{") {
+            return Ok(RuleOutput::new(apply_legado_literal_rule(&rule)));
+        }
+
+        if let Some(path) = strip_legado_json_path_prefix(&rule) {
+            return Ok(RuleOutput::new(apply_json_path(
+                input,
+                &JsonPathRule::new(path),
+            )?));
+        }
+
+        if let Some(expression) = strip_legado_xpath_prefix(&rule) {
+            return Ok(RuleOutput::new(apply_xpath(
+                input,
+                &XPathRule::new(expression),
+            )?));
+        }
+
+        if let Some(values) = evaluate_legado_rule_embedded_template(input, &rule, context)? {
+            return Ok(RuleOutput::new(values));
+        }
+
+        if let Some(values) = evaluate_legado_css_embedded_template(input, &rule, context)? {
+            return Ok(RuleOutput::new(values));
+        }
+
+        let rule = LegadoCssRule::parse(&rule)?;
         self.execute_legado_css_rule(input, &rule)
+    }
+
+    fn evaluate_legado_put_binding(
+        &self,
+        input: &str,
+        rule: &str,
+        context: &mut LegadoRuleContext,
+    ) -> RuleResult<String> {
+        let rule = normalize_legado_put_value_rule(input, rule);
+        let output = self.execute_legado_css_with_context(input, &rule, context)?;
+        Ok(output.into_values().join("\n"))
     }
 
     pub fn execute_optional_legado_css(
@@ -92,6 +147,48 @@ impl RuleEngine {
         rule: &LegadoCssRule,
     ) -> RuleResult<RuleOutput> {
         Ok(RuleOutput::new(apply_legado_css(input, rule)?))
+    }
+
+    pub fn execute_legado_css_list_items_with_context(
+        &self,
+        input: &str,
+        rule: &str,
+        context: &mut LegadoRuleContext,
+    ) -> RuleResult<RuleOutput> {
+        let (rule, put_bindings) = split_legado_put_bindings(rule)?;
+        for binding in put_bindings {
+            let value = self.evaluate_legado_put_binding(input, &binding.rule, context)?;
+            context.put_variable(binding.key, value);
+        }
+
+        let (rule, _) = materialize_legado_get_variables(&rule, context);
+        let rule = LegadoCssRule::parse(&rule)?;
+        Ok(RuleOutput::new(apply_legado_css_list_items(input, &rule)?))
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct LegadoRuleContext {
+    variables: HashMap<String, String>,
+}
+
+impl LegadoRuleContext {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn put_variable(&mut self, key: impl Into<String>, value: impl Into<String>) -> String {
+        let value = value.into();
+        self.variables.insert(key.into(), value.clone());
+        value
+    }
+
+    pub fn get_variable(&self, key: &str) -> Option<&str> {
+        self.variables.get(key).map(String::as_str)
+    }
+
+    pub fn variables(&self) -> &HashMap<String, String> {
+        &self.variables
     }
 }
 
@@ -304,6 +401,10 @@ pub enum CssExtraction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LegadoCssRule {
     steps: Vec<LegadoCssStep>,
+    combination: Option<LegadoCssCombination>,
+    branches: Vec<Vec<LegadoCssStep>>,
+    selector_mode: LegadoCssSelectorMode,
+    replacement: Option<LegadoRuleReplacement>,
 }
 
 impl LegadoCssRule {
@@ -315,7 +416,13 @@ impl LegadoCssRule {
     }
 
     pub fn missing() -> Self {
-        Self { steps: Vec::new() }
+        Self {
+            steps: Vec::new(),
+            combination: None,
+            branches: Vec::new(),
+            selector_mode: LegadoCssSelectorMode::Default,
+            replacement: None,
+        }
     }
 
     pub fn steps(&self) -> &[LegadoCssStep] {
@@ -323,8 +430,28 @@ impl LegadoCssRule {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.steps.is_empty()
+        self.steps.is_empty() && self.branches.is_empty()
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LegadoCssCombination {
+    And,
+    Or,
+    Zip,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LegadoCssSelectorMode {
+    Default,
+    CssSource,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct LegadoRuleReplacement {
+    pattern: String,
+    replacement: String,
+    first_match_only: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -339,7 +466,10 @@ pub enum LegadoCssStep {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LegadoCssExtraction {
     Text,
+    TextNodes,
+    OwnText,
     Html,
+    All,
     Attr(String),
 }
 
@@ -850,6 +980,19 @@ fn apply_json_path(input: &str, rule: &JsonPathRule) -> RuleResult<Vec<String>> 
 }
 
 fn evaluate_json_path_expression(value: &JsonValue, path: &str) -> Result<Vec<String>, String> {
+    if find_json_path_template_marker(path).is_some() {
+        return evaluate_json_path_expression_without_replacement(value, path);
+    }
+
+    let (path, replacement) = split_legado_rule_replacement(path);
+    let values = evaluate_json_path_expression_without_replacement(value, path)?;
+    Ok(apply_legado_rule_replacement(values, replacement.as_ref()))
+}
+
+fn evaluate_json_path_expression_without_replacement(
+    value: &JsonValue,
+    path: &str,
+) -> Result<Vec<String>, String> {
     if let Some(branches) = split_json_path_top_level_operator(path, "||")? {
         for branch in branches {
             let results = evaluate_json_path_expression(value, branch)?;
@@ -882,7 +1025,792 @@ fn evaluate_json_path_expression(value: &JsonValue, path: &str) -> Result<Vec<St
         return Ok(output);
     }
 
+    if let Some(value) = evaluate_json_path_embedded_template(value, path)? {
+        return Ok(value);
+    }
+
     evaluate_json_path_rule(value, path)
+}
+
+fn evaluate_json_path_embedded_template(
+    value: &JsonValue,
+    template: &str,
+) -> Result<Option<Vec<String>>, String> {
+    let mut output = String::new();
+    let mut literal_start = 0usize;
+    let mut search_start = 0usize;
+    let mut saw_template = false;
+    let mut replaced = false;
+
+    while let Some(relative_marker) = find_json_path_template_marker(&template[search_start..]) {
+        let marker = relative_marker.shifted(search_start);
+        saw_template = true;
+        let Ok(end) = find_json_path_template_end(template, marker) else {
+            search_start = marker.rule_start;
+            continue;
+        };
+        let rule = &template[marker.rule_start..end.rule_end];
+
+        let Ok(values) = evaluate_json_path_expression(value, rule) else {
+            search_start = end.template_end;
+            continue;
+        };
+        if values.is_empty() {
+            search_start = end.template_end;
+            continue;
+        }
+
+        output.push_str(&template[literal_start..marker.start]);
+        output.push_str(&values.join("\n"));
+        literal_start = end.template_end;
+        search_start = literal_start;
+        replaced = true;
+    }
+
+    if !replaced {
+        if saw_template {
+            return Ok(Some(Vec::new()));
+        }
+        return Ok(None);
+    }
+
+    output.push_str(&template[literal_start..]);
+    Ok(Some(vec![output]))
+}
+
+fn strip_legado_json_path_prefix(rule: &str) -> Option<&str> {
+    let trimmed = rule.trim();
+
+    trimmed
+        .get(.."@JSON:".len())
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("@JSON:"))
+        .then(|| trimmed["@JSON:".len()..].trim())
+        .or_else(|| {
+            (trimmed == "$" || trimmed.starts_with("$.") || trimmed.starts_with("$["))
+                .then_some(trimmed)
+        })
+}
+
+fn strip_legado_xpath_prefix(rule: &str) -> Option<&str> {
+    let trimmed = rule.trim();
+
+    trimmed
+        .get(.."@XPATH:".len())
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("@XPATH:"))
+        .then(|| trimmed["@XPATH:".len()..].trim())
+        .or_else(|| trimmed.starts_with('/').then_some(trimmed))
+}
+
+#[derive(Clone, Copy)]
+struct JsonPathTemplateMarker {
+    start: usize,
+    rule_start: usize,
+    delimiter: JsonPathTemplateDelimiter,
+}
+
+impl JsonPathTemplateMarker {
+    fn shifted(self, offset: usize) -> Self {
+        Self {
+            start: self.start + offset,
+            rule_start: self.rule_start + offset,
+            delimiter: self.delimiter,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum JsonPathTemplateDelimiter {
+    SingleBrace,
+    DoubleBrace,
+}
+
+struct JsonPathTemplateEnd {
+    rule_end: usize,
+    template_end: usize,
+}
+
+fn find_json_path_template_marker(value: &str) -> Option<JsonPathTemplateMarker> {
+    let mut quote = None;
+    let mut escaped = false;
+    let mut index = 0usize;
+
+    while index < value.len() {
+        let current = value[index..].chars().next()?;
+
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if current == '\\' {
+                escaped = true;
+            } else if current == active_quote {
+                quote = None;
+            }
+            index += current.len_utf8();
+            continue;
+        }
+
+        if current == '\'' || current == '"' {
+            quote = Some(current);
+            index += current.len_utf8();
+            continue;
+        }
+
+        if value[index..].starts_with("{{$.") {
+            return Some(JsonPathTemplateMarker {
+                start: index,
+                rule_start: index + "{{".len(),
+                delimiter: JsonPathTemplateDelimiter::DoubleBrace,
+            });
+        }
+
+        if value[index..].starts_with("{$.") {
+            return Some(JsonPathTemplateMarker {
+                start: index,
+                rule_start: index + "{".len(),
+                delimiter: JsonPathTemplateDelimiter::SingleBrace,
+            });
+        }
+
+        index += current.len_utf8();
+    }
+
+    None
+}
+
+fn find_json_path_template_end(
+    template: &str,
+    marker: JsonPathTemplateMarker,
+) -> Result<JsonPathTemplateEnd, String> {
+    match marker.delimiter {
+        JsonPathTemplateDelimiter::SingleBrace => {
+            find_single_brace_json_path_template_end(template, marker)
+        }
+        JsonPathTemplateDelimiter::DoubleBrace => {
+            find_double_brace_json_path_template_end(template, marker)
+        }
+    }
+}
+
+fn find_single_brace_json_path_template_end(
+    template: &str,
+    marker: JsonPathTemplateMarker,
+) -> Result<JsonPathTemplateEnd, String> {
+    let mut quote = None;
+    let mut escaped = false;
+    let mut brace_depth = 0usize;
+    let mut index = marker.start;
+
+    while index < template.len() {
+        let value = template[index..]
+            .chars()
+            .next()
+            .ok_or_else(|| "invalid JSONPath embedded rule template".to_string())?;
+
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            index += value.len_utf8();
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            index += value.len_utf8();
+            continue;
+        }
+
+        match value {
+            '{' => brace_depth += 1,
+            '}' => {
+                if brace_depth == 0 {
+                    return Err(format!("unmatched `}}` in JSONPath template `{template}`"));
+                }
+                brace_depth -= 1;
+                if brace_depth == 0 {
+                    return Ok(JsonPathTemplateEnd {
+                        rule_end: index,
+                        template_end: index + '}'.len_utf8(),
+                    });
+                }
+            }
+            _ => {}
+        }
+
+        index += value.len_utf8();
+    }
+
+    Err(format!(
+        "unterminated JSONPath embedded rule template in `{template}`"
+    ))
+}
+
+fn find_double_brace_json_path_template_end(
+    template: &str,
+    marker: JsonPathTemplateMarker,
+) -> Result<JsonPathTemplateEnd, String> {
+    let mut quote = None;
+    let mut escaped = false;
+    let mut brace_depth = 0usize;
+    let mut index = marker.rule_start;
+
+    while index < template.len() {
+        let value = template[index..]
+            .chars()
+            .next()
+            .ok_or_else(|| "invalid JSONPath embedded rule template".to_string())?;
+
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            index += value.len_utf8();
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            index += value.len_utf8();
+            continue;
+        }
+
+        if brace_depth == 0 && template[index..].starts_with("}}") {
+            return Ok(JsonPathTemplateEnd {
+                rule_end: index,
+                template_end: index + "}}".len(),
+            });
+        }
+
+        match value {
+            '{' => brace_depth += 1,
+            '}' => {
+                if brace_depth == 0 {
+                    return Err(format!("unmatched `}}` in JSONPath template `{template}`"));
+                }
+                brace_depth -= 1;
+            }
+            _ => {}
+        }
+
+        index += value.len_utf8();
+    }
+
+    Err(format!(
+        "unterminated JSONPath embedded rule template in `{template}`"
+    ))
+}
+
+fn evaluate_legado_css_embedded_template(
+    input: &str,
+    template: &str,
+    context: &mut LegadoRuleContext,
+) -> RuleResult<Option<Vec<String>>> {
+    let (template, replacement) = split_legado_embedded_template_replacement(template);
+    let mut output = String::new();
+    let mut literal_start = 0usize;
+    let mut search_start = 0usize;
+    let mut saw_template = false;
+    let mut replaced = false;
+
+    while let Some(relative_marker) =
+        find_legado_css_embedded_template_marker(&template[search_start..])
+    {
+        let marker = relative_marker.shifted(search_start);
+        saw_template = true;
+        let end = find_legado_css_embedded_template_end(template, marker).map_err(|message| {
+            RuleError::LegadoCssSyntax {
+                rule: template.to_string(),
+                message,
+            }
+        })?;
+        let rule = &template[marker.rule_start..end];
+        let values = RuleEngine::new()
+            .execute_legado_css_with_context(input, rule, context)?
+            .into_values();
+
+        if values.is_empty() {
+            search_start = end + "}}".len();
+            continue;
+        }
+
+        output.push_str(&template[literal_start..marker.start]);
+        output.push_str(&values.join("\n"));
+        literal_start = end + "}}".len();
+        search_start = literal_start;
+        replaced = true;
+    }
+
+    if !replaced {
+        if saw_template {
+            return Ok(Some(Vec::new()));
+        }
+        return Ok(None);
+    }
+
+    output.push_str(&template[literal_start..]);
+    Ok(Some(apply_legado_rule_replacement(
+        vec![output],
+        replacement.as_ref(),
+    )))
+}
+
+fn evaluate_legado_rule_embedded_template(
+    input: &str,
+    template: &str,
+    context: &mut LegadoRuleContext,
+) -> RuleResult<Option<Vec<String>>> {
+    let (template, replacement) = split_legado_embedded_template_replacement(template);
+    let mut output = String::new();
+    let mut literal_start = 0usize;
+    let mut search_start = 0usize;
+    let mut saw_template = false;
+    let mut replaced = false;
+
+    while let Some(relative_marker) =
+        find_legado_rule_embedded_template_marker(&template[search_start..])
+    {
+        let marker = relative_marker.shifted(search_start);
+        saw_template = true;
+        let end = find_legado_css_embedded_template_end(template, marker).map_err(|message| {
+            RuleError::LegadoCssSyntax {
+                rule: template.to_string(),
+                message,
+            }
+        })?;
+        let rule = &template[marker.rule_start..end];
+        let values = RuleEngine::new()
+            .execute_legado_css_with_context(input, rule, context)?
+            .into_values();
+
+        if values.is_empty() {
+            search_start = end + "}}".len();
+            continue;
+        }
+
+        output.push_str(&template[literal_start..marker.start]);
+        output.push_str(&values.join("\n"));
+        literal_start = end + "}}".len();
+        search_start = literal_start;
+        replaced = true;
+    }
+
+    if !replaced {
+        if saw_template {
+            return Ok(Some(Vec::new()));
+        }
+        return Ok(None);
+    }
+
+    output.push_str(&template[literal_start..]);
+    Ok(Some(apply_legado_rule_replacement(
+        vec![output],
+        replacement.as_ref(),
+    )))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct LegadoPutBinding {
+    key: String,
+    rule: String,
+}
+
+fn split_legado_put_bindings(rule: &str) -> RuleResult<(String, Vec<LegadoPutBinding>)> {
+    let mut output = String::new();
+    let mut bindings = Vec::new();
+    let mut index = 0usize;
+
+    while let Some(relative_start) = find_ascii_case_insensitive(&rule[index..], "@put:{") {
+        let start = index + relative_start;
+        let body_start = start + "@put:".len();
+        let Some(relative_end) = rule[body_start..].find('}') else {
+            return Err(RuleError::LegadoCssSyntax {
+                rule: rule.to_string(),
+                message: "unterminated @put binding".to_string(),
+            });
+        };
+        let end = body_start + relative_end;
+        output.push_str(&rule[index..start]);
+        bindings.extend(parse_legado_put_bindings(rule, &rule[body_start + 1..end])?);
+        index = end + '}'.len_utf8();
+    }
+
+    output.push_str(&rule[index..]);
+    Ok((output, bindings))
+}
+
+fn parse_legado_put_bindings(rule: &str, body: &str) -> RuleResult<Vec<LegadoPutBinding>> {
+    let mut bindings = Vec::new();
+    for entry in split_legado_put_entries(body).map_err(|message| RuleError::LegadoCssSyntax {
+        rule: rule.to_string(),
+        message,
+    })? {
+        let Some(colon) = find_legado_put_entry_colon(entry) else {
+            return Err(RuleError::LegadoCssSyntax {
+                rule: rule.to_string(),
+                message: format!("invalid @put binding `{entry}`"),
+            });
+        };
+        let key = strip_legado_put_token(&entry[..colon]);
+        if key.is_empty() {
+            return Err(RuleError::LegadoCssSyntax {
+                rule: rule.to_string(),
+                message: format!("empty @put key in `{entry}`"),
+            });
+        }
+        let value = strip_legado_put_token(&entry[colon + ':'.len_utf8()..]);
+        bindings.push(LegadoPutBinding { key, rule: value });
+    }
+    Ok(bindings)
+}
+
+fn split_legado_put_entries(body: &str) -> Result<Vec<&str>, String> {
+    let mut entries = Vec::new();
+    let mut quote = None;
+    let mut escaped = false;
+    let mut start = 0usize;
+    let mut index = 0usize;
+
+    while index < body.len() {
+        let value = body[index..]
+            .chars()
+            .next()
+            .ok_or_else(|| "invalid @put body".to_string())?;
+
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            index += value.len_utf8();
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            index += value.len_utf8();
+            continue;
+        }
+
+        if value == ',' {
+            let entry = body[start..index].trim();
+            if !entry.is_empty() {
+                entries.push(entry);
+            }
+            start = index + value.len_utf8();
+        }
+        index += value.len_utf8();
+    }
+
+    if quote.is_some() {
+        return Err("unterminated quote in @put body".to_string());
+    }
+
+    let entry = body[start..].trim();
+    if !entry.is_empty() {
+        entries.push(entry);
+    }
+    Ok(entries)
+}
+
+fn find_legado_put_entry_colon(entry: &str) -> Option<usize> {
+    let mut quote = None;
+    let mut escaped = false;
+    let mut index = 0usize;
+
+    while index < entry.len() {
+        let value = entry[index..].chars().next()?;
+
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            index += value.len_utf8();
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+        } else if value == ':' {
+            return Some(index);
+        }
+
+        index += value.len_utf8();
+    }
+
+    None
+}
+
+fn strip_legado_put_token(value: &str) -> String {
+    let value = value.trim();
+    if value.len() >= 2 {
+        let first = value.as_bytes()[0] as char;
+        let last = value.as_bytes()[value.len() - 1] as char;
+        if (first == '"' && last == '"') || (first == '\'' && last == '\'') {
+            return unescape_legado_quoted_put_token(&value[1..value.len() - 1]);
+        }
+    }
+    value.to_string()
+}
+
+fn unescape_legado_quoted_put_token(value: &str) -> String {
+    let mut output = String::new();
+    let mut escaped = false;
+    for item in value.chars() {
+        if escaped {
+            output.push(item);
+            escaped = false;
+        } else if item == '\\' {
+            escaped = true;
+        } else {
+            output.push(item);
+        }
+    }
+    if escaped {
+        output.push('\\');
+    }
+    output
+}
+
+fn normalize_legado_put_value_rule(input: &str, rule: &str) -> String {
+    let rule = rule.trim();
+    if is_bare_legado_json_key(rule) && serde_json::from_str::<JsonValue>(input).is_ok() {
+        format!("$.{rule}")
+    } else {
+        rule.to_string()
+    }
+}
+
+fn is_bare_legado_json_key(rule: &str) -> bool {
+    let mut chars = rule.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    (first == '_' || first.is_ascii_alphabetic())
+        && chars.all(|value| value == '_' || value.is_ascii_alphanumeric())
+}
+
+fn materialize_legado_get_variables(rule: &str, context: &LegadoRuleContext) -> (String, bool) {
+    let mut output = String::new();
+    let mut index = 0usize;
+    let mut replaced = false;
+
+    while let Some(relative_start) = find_ascii_case_insensitive(&rule[index..], "@get:{") {
+        let start = index + relative_start;
+        let key_start = start + "@get:{".len();
+        let Some(relative_end) = rule[key_start..].find('}') else {
+            break;
+        };
+        let end = key_start + relative_end;
+        output.push_str(&rule[index..start]);
+        output.push_str(
+            context
+                .get_variable(rule[key_start..end].trim())
+                .unwrap_or(""),
+        );
+        index = end + '}'.len_utf8();
+        replaced = true;
+    }
+
+    if !replaced {
+        return (rule.to_string(), false);
+    }
+
+    output.push_str(&rule[index..]);
+    (output, true)
+}
+
+fn apply_legado_literal_rule(rule: &str) -> Vec<String> {
+    let (base_rule, replacement) = split_legado_embedded_template_replacement(rule);
+    apply_legado_rule_replacement(vec![base_rule.to_string()], replacement.as_ref())
+}
+
+fn find_ascii_case_insensitive(haystack: &str, needle: &str) -> Option<usize> {
+    haystack.char_indices().find_map(|(index, _)| {
+        haystack[index..]
+            .get(..needle.len())
+            .filter(|candidate| candidate.eq_ignore_ascii_case(needle))
+            .map(|_| index)
+    })
+}
+
+fn split_legado_embedded_template_replacement(rule: &str) -> (&str, Option<LegadoRuleReplacement>) {
+    let separators = find_legado_embedded_template_replacement_separators(rule);
+    let Some(first_separator) = separators.first().copied() else {
+        return (rule, None);
+    };
+
+    let base_rule = rule[..first_separator].trim();
+    let pattern_start = first_separator + "##".len();
+    let pattern_end = separators.get(1).copied().unwrap_or(rule.len());
+    let pattern = &rule[pattern_start..pattern_end];
+    if pattern.is_empty() {
+        return (base_rule, None);
+    }
+
+    let replacement = separators
+        .get(1)
+        .map(|separator| {
+            let replacement_start = separator + "##".len();
+            let replacement_end = separators.get(2).copied().unwrap_or(rule.len());
+            &rule[replacement_start..replacement_end]
+        })
+        .unwrap_or_default();
+
+    (
+        base_rule,
+        Some(LegadoRuleReplacement {
+            pattern: pattern.to_string(),
+            replacement: replacement.to_string(),
+            first_match_only: separators.len() > 2,
+        }),
+    )
+}
+
+fn find_legado_embedded_template_replacement_separators(rule: &str) -> Vec<usize> {
+    let mut separators = Vec::new();
+    let mut index = 0usize;
+
+    while index < rule.len() {
+        if rule[index..].starts_with("{{") {
+            let marker = LegadoCssEmbeddedTemplateMarker {
+                start: index,
+                rule_start: index + "{{".len(),
+            };
+            if let Ok(end) = find_legado_css_embedded_template_end(rule, marker) {
+                index = end + "}}".len();
+                continue;
+            }
+        }
+
+        if rule[index..].starts_with("##") {
+            separators.push(index);
+            index += "##".len();
+            continue;
+        }
+
+        let value = rule[index..]
+            .chars()
+            .next()
+            .expect("index is inside rule bounds");
+        index += value.len_utf8();
+    }
+
+    separators
+}
+
+fn find_legado_rule_embedded_template_marker(
+    value: &str,
+) -> Option<LegadoCssEmbeddedTemplateMarker> {
+    let mut search_start = 0usize;
+    while let Some(relative_start) = value[search_start..].find("{{") {
+        let start = search_start + relative_start;
+        let rule_start = start + "{{".len();
+        let rule = &value[rule_start..];
+
+        if rule.starts_with("//")
+            || rule.starts_with("$.")
+            || rule.starts_with("$[")
+            || rule
+                .get(.."@XPATH:".len())
+                .is_some_and(|prefix| prefix.eq_ignore_ascii_case("@XPATH:"))
+            || rule
+                .get(.."@JSON:".len())
+                .is_some_and(|prefix| prefix.eq_ignore_ascii_case("@JSON:"))
+        {
+            return Some(LegadoCssEmbeddedTemplateMarker { start, rule_start });
+        }
+
+        search_start = rule_start;
+    }
+
+    None
+}
+
+#[derive(Clone, Copy)]
+struct LegadoCssEmbeddedTemplateMarker {
+    start: usize,
+    rule_start: usize,
+}
+
+impl LegadoCssEmbeddedTemplateMarker {
+    fn shifted(self, offset: usize) -> Self {
+        Self {
+            start: self.start + offset,
+            rule_start: self.rule_start + offset,
+        }
+    }
+}
+
+fn find_legado_css_embedded_template_marker(
+    value: &str,
+) -> Option<LegadoCssEmbeddedTemplateMarker> {
+    let start = value.find("{{@")?;
+    let rule_start = if value[start..].starts_with("{{@@") {
+        start + "{{@@".len()
+    } else {
+        start + "{{@".len()
+    };
+
+    Some(LegadoCssEmbeddedTemplateMarker { start, rule_start })
+}
+
+fn find_legado_css_embedded_template_end(
+    template: &str,
+    marker: LegadoCssEmbeddedTemplateMarker,
+) -> Result<usize, String> {
+    let mut quote = None;
+    let mut escaped = false;
+    let mut index = marker.rule_start;
+
+    while index < template.len() {
+        let value = template[index..]
+            .chars()
+            .next()
+            .ok_or_else(|| "invalid Legado CSS embedded rule template".to_string())?;
+
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            index += value.len_utf8();
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            index += value.len_utf8();
+            continue;
+        }
+
+        if template[index..].starts_with("}}") {
+            return Ok(index);
+        }
+
+        index += value.len_utf8();
+    }
+
+    Err(format!(
+        "unterminated Legado CSS embedded rule template in `{template}`"
+    ))
 }
 
 fn zip_json_path_combination_results(results: Vec<Vec<String>>) -> Vec<String> {
@@ -981,7 +1909,7 @@ fn split_json_path_top_level_operator<'a>(
             ']' if bracket_depth > 0 => bracket_depth -= 1,
             '(' => paren_depth += 1,
             ')' if paren_depth > 0 => paren_depth -= 1,
-            '{' if paren_depth > 0 => brace_depth += 1,
+            '{' => brace_depth += 1,
             '}' if brace_depth > 0 => brace_depth -= 1,
             _ => {}
         }
@@ -3172,22 +4100,463 @@ fn json_value_to_rule_text(value: &JsonValue) -> String {
 }
 
 fn parse_legado_css_rule(rule: &str) -> Result<LegadoCssRule, String> {
-    if rule.trim().is_empty() {
-        return Ok(LegadoCssRule { steps: Vec::new() });
+    let rule = rule.trim();
+    if rule.is_empty() {
+        return Ok(LegadoCssRule::missing());
     }
 
+    let (rule, replacement) = split_legado_rule_replacement(rule);
+    let mut parsed = parse_legado_css_rule_without_replacement(rule)?;
+    parsed.replacement = replacement;
+    Ok(parsed)
+}
+
+fn parse_legado_css_rule_without_replacement(rule: &str) -> Result<LegadoCssRule, String> {
+    let rule = rule.trim();
+    if rule.is_empty() {
+        return Ok(LegadoCssRule::missing());
+    }
+
+    if let Some(default_rule) = strip_legado_default_css_escape_prefix(rule) {
+        return parse_legado_css_rule_without_replacement(default_rule);
+    }
+
+    if let Some(source_rule) = strip_legado_css_source_prefix(rule) {
+        return parse_legado_css_source_rule(source_rule);
+    }
+
+    if let Some(branches) = split_legado_css_top_level_operator(rule, "&&")? {
+        if let Some(branches) = parse_legado_css_default_and_branches(branches)? {
+            return Ok(LegadoCssRule {
+                steps: Vec::new(),
+                combination: Some(LegadoCssCombination::And),
+                branches,
+                selector_mode: LegadoCssSelectorMode::Default,
+                replacement: None,
+            });
+        }
+    }
+
+    if let Some(branches) = split_legado_css_top_level_operator(rule, "||")? {
+        return Ok(LegadoCssRule {
+            steps: Vec::new(),
+            combination: Some(LegadoCssCombination::Or),
+            branches: parse_legado_css_branches(branches, LegadoCssSelectorMode::Default)?,
+            selector_mode: LegadoCssSelectorMode::Default,
+            replacement: None,
+        });
+    }
+
+    if let Some(branches) = split_legado_css_top_level_operator(rule, "%%")? {
+        return Ok(LegadoCssRule {
+            steps: Vec::new(),
+            combination: Some(LegadoCssCombination::Zip),
+            branches: parse_legado_css_branches(branches, LegadoCssSelectorMode::Default)?,
+            selector_mode: LegadoCssSelectorMode::Default,
+            replacement: None,
+        });
+    }
+
+    Ok(LegadoCssRule {
+        steps: parse_legado_css_steps(rule, LegadoCssSelectorMode::Default)?,
+        combination: None,
+        branches: Vec::new(),
+        selector_mode: LegadoCssSelectorMode::Default,
+        replacement: None,
+    })
+}
+
+fn split_legado_rule_replacement(rule: &str) -> (&str, Option<LegadoRuleReplacement>) {
+    let parts = rule.split("##").collect::<Vec<_>>();
+    if parts.len() == 1 {
+        return (rule, None);
+    }
+
+    let base_rule = parts[0].trim();
+    let pattern = parts.get(1).copied().unwrap_or_default();
+    if pattern.is_empty() {
+        return (base_rule, None);
+    }
+
+    (
+        base_rule,
+        Some(LegadoRuleReplacement {
+            pattern: pattern.to_string(),
+            replacement: parts.get(2).copied().unwrap_or_default().to_string(),
+            first_match_only: parts.len() > 3,
+        }),
+    )
+}
+
+fn parse_legado_css_branches(
+    branches: Vec<&str>,
+    selector_mode: LegadoCssSelectorMode,
+) -> Result<Vec<Vec<LegadoCssStep>>, String> {
+    branches
+        .into_iter()
+        .map(|branch| parse_legado_css_steps(branch, selector_mode))
+        .collect::<Result<Vec<_>, _>>()
+}
+
+fn parse_legado_css_default_and_branches(
+    branches: Vec<&str>,
+) -> Result<Option<Vec<Vec<LegadoCssStep>>>, String> {
+    let parsed = branches
+        .into_iter()
+        .map(|branch| parse_legado_css_steps(branch, LegadoCssSelectorMode::Default))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    if parsed.iter().all(|steps| {
+        matches!(
+            steps.last(),
+            Some(LegadoCssStep::Extract {
+                selector: _,
+                extraction: _
+            })
+        )
+    }) {
+        Ok(Some(parsed))
+    } else {
+        Ok(None)
+    }
+}
+
+fn strip_legado_default_css_escape_prefix(rule: &str) -> Option<&str> {
+    rule.starts_with("@@").then(|| rule[2..].trim())
+}
+
+fn strip_legado_css_source_prefix(rule: &str) -> Option<&str> {
+    if rule
+        .get(.."@CSS:".len())
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("@CSS:"))
+    {
+        Some(rule[5..].trim())
+    } else if rule
+        .get(.."CSS:".len())
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("CSS:"))
+    {
+        Some(rule[4..].trim())
+    } else {
+        None
+    }
+}
+
+fn parse_legado_css_source_rule(rule: &str) -> Result<LegadoCssRule, String> {
+    let rule = rule.trim();
+    if rule.is_empty() {
+        return Ok(LegadoCssRule::missing());
+    }
+
+    if let Some(operator) = find_legado_css_top_level_operator(rule, &["&&", "||", "%%"])? {
+        let branches = split_legado_css_top_level_operator(rule, operator)?
+            .expect("operator found by top-level scan must split into branches");
+        let combination = match operator {
+            "&&" => LegadoCssCombination::And,
+            "||" => LegadoCssCombination::Or,
+            "%%" => LegadoCssCombination::Zip,
+            _ => unreachable!(),
+        };
+        return Ok(LegadoCssRule {
+            steps: Vec::new(),
+            combination: Some(combination),
+            branches: parse_legado_css_branches(branches, LegadoCssSelectorMode::CssSource)?,
+            selector_mode: LegadoCssSelectorMode::CssSource,
+            replacement: None,
+        });
+    }
+
+    Ok(LegadoCssRule {
+        steps: parse_legado_css_steps(rule, LegadoCssSelectorMode::CssSource)?,
+        combination: None,
+        branches: Vec::new(),
+        selector_mode: LegadoCssSelectorMode::CssSource,
+        replacement: None,
+    })
+}
+
+fn find_legado_css_top_level_operator<'a>(
+    rule: &str,
+    operators: &[&'a str],
+) -> Result<Option<&'a str>, String> {
+    let mut quote = None;
+    let mut escaped = false;
+    let mut bracket_depth = 0usize;
+    let mut paren_depth = 0usize;
+    let mut index = 0usize;
+
+    while index < rule.len() {
+        let value = rule[index..]
+            .chars()
+            .next()
+            .ok_or_else(|| "invalid Legado CSS combination expression".to_string())?;
+
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            index += value.len_utf8();
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            index += value.len_utf8();
+            continue;
+        }
+
+        if bracket_depth == 0 && paren_depth == 0 {
+            if let Some(operator) = operators
+                .iter()
+                .copied()
+                .find(|operator| rule[index..].starts_with(operator))
+            {
+                return Ok(Some(operator));
+            }
+        }
+
+        match value {
+            '[' => bracket_depth += 1,
+            ']' if bracket_depth > 0 => bracket_depth -= 1,
+            '(' => paren_depth += 1,
+            ')' if paren_depth > 0 => paren_depth -= 1,
+            _ => {}
+        }
+
+        index += value.len_utf8();
+    }
+
+    if quote.is_some() || bracket_depth != 0 || paren_depth != 0 {
+        return Err(format!("unterminated Legado CSS source rule in `{rule}`"));
+    }
+
+    Ok(None)
+}
+
+fn parse_legado_css_steps(
+    rule: &str,
+    selector_mode: LegadoCssSelectorMode,
+) -> Result<Vec<LegadoCssStep>, String> {
     let parts = split_legado_css_pipeline(rule)?;
-    let mut steps = Vec::with_capacity(parts.len());
+    let mut steps = Vec::new();
 
     for (index, part) in parts.iter().enumerate() {
-        let step = parse_legado_css_step(part)?;
-        if matches!(step, LegadoCssStep::Extract { .. }) && index + 1 != parts.len() {
+        let segment_steps = parse_legado_css_segment(part, selector_mode)?;
+        if segment_steps
+            .iter()
+            .any(|step| matches!(step, LegadoCssStep::Extract { .. }))
+            && index + 1 != parts.len()
+        {
             return Err("extraction step must be the final pipeline segment".to_string());
         }
-        steps.push(step);
+        steps.extend(segment_steps);
     }
 
-    Ok(LegadoCssRule { steps })
+    Ok(steps)
+}
+
+fn parse_legado_css_segment(
+    part: &str,
+    selector_mode: LegadoCssSelectorMode,
+) -> Result<Vec<LegadoCssStep>, String> {
+    let part = part.trim();
+    if part.is_empty() {
+        return Err("empty pipeline segment".to_string());
+    }
+
+    if selector_mode == LegadoCssSelectorMode::Default {
+        let segments = split_legado_css_at_segments(part)?;
+        if segments.len() > 2 {
+            return parse_legado_css_at_selector_chain(&segments);
+        }
+    }
+
+    Ok(vec![parse_legado_css_step(part)?])
+}
+
+fn split_legado_css_at_segments(part: &str) -> Result<Vec<&str>, String> {
+    let mut segments = Vec::new();
+    let mut quote = None;
+    let mut escaped = false;
+    let mut bracket_depth = 0usize;
+    let mut paren_depth = 0usize;
+    let mut start = 0usize;
+
+    for (index, value) in part.char_indices() {
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            continue;
+        }
+
+        if value == '@' && bracket_depth == 0 && paren_depth == 0 {
+            segments.push(&part[start..index]);
+            start = index + value.len_utf8();
+            continue;
+        }
+
+        match value {
+            '[' => bracket_depth += 1,
+            ']' => {
+                if bracket_depth == 0 {
+                    return Err("unmatched `]` in selector".to_string());
+                }
+                bracket_depth -= 1;
+            }
+            '(' => paren_depth += 1,
+            ')' => {
+                if paren_depth == 0 {
+                    return Err("unmatched `)` in selector".to_string());
+                }
+                paren_depth -= 1;
+            }
+            _ => {}
+        }
+    }
+
+    if quote.is_some() {
+        return Err("unterminated quoted selector segment".to_string());
+    }
+    if bracket_depth != 0 {
+        return Err("unterminated attribute selector".to_string());
+    }
+    if paren_depth != 0 {
+        return Err("unterminated selector function".to_string());
+    }
+
+    segments.push(&part[start..]);
+    Ok(segments)
+}
+
+fn parse_legado_css_at_selector_chain(segments: &[&str]) -> Result<Vec<LegadoCssStep>, String> {
+    let extraction = segments
+        .last()
+        .map(|segment| segment.trim())
+        .filter(|segment| !segment.is_empty())
+        .ok_or_else(|| "missing extraction after `@`".to_string())?;
+    let selector_segments = &segments[..segments.len() - 1];
+    let extraction_selector = selector_segments
+        .last()
+        .map(|segment| segment.trim())
+        .filter(|segment| !segment.is_empty())
+        .ok_or_else(|| "missing selector before nested `@` extraction".to_string())?;
+
+    let mut steps = Vec::new();
+    for selector in &selector_segments[..selector_segments.len() - 1] {
+        let selector = selector.trim();
+        if selector.is_empty() {
+            return Err("empty nested `@` selector segment".to_string());
+        }
+        steps.push(LegadoCssStep::Select(selector.to_string()));
+    }
+    steps.push(LegadoCssStep::Extract {
+        selector: Some(extraction_selector.to_string()),
+        extraction: parse_legado_css_extraction(extraction),
+    });
+
+    Ok(steps)
+}
+
+fn split_legado_css_top_level_operator<'a>(
+    rule: &'a str,
+    operator: &str,
+) -> Result<Option<Vec<&'a str>>, String> {
+    let operator_marker = operator
+        .chars()
+        .next()
+        .ok_or_else(|| "Legado CSS combination operator must not be empty".to_string())?;
+    let mut quote = None;
+    let mut escaped = false;
+    let mut bracket_depth = 0usize;
+    let mut paren_depth = 0usize;
+    let mut branches = Vec::new();
+    let mut start = 0usize;
+    let mut index = 0usize;
+
+    while index < rule.len() {
+        let value = rule[index..]
+            .chars()
+            .next()
+            .ok_or_else(|| "invalid Legado CSS combination expression".to_string())?;
+
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            index += value.len_utf8();
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            index += value.len_utf8();
+            continue;
+        }
+
+        if value == operator_marker
+            && rule[index..].starts_with(operator)
+            && bracket_depth == 0
+            && paren_depth == 0
+        {
+            let branch = rule[start..index].trim();
+            if branch.is_empty() {
+                return Err(format!(
+                    "empty Legado CSS `{operator}` combination branch in `{rule}`"
+                ));
+            }
+            branches.push(branch);
+            index += operator.len();
+            start = index;
+            continue;
+        }
+
+        match value {
+            '[' => bracket_depth += 1,
+            ']' if bracket_depth > 0 => bracket_depth -= 1,
+            '(' => paren_depth += 1,
+            ')' if paren_depth > 0 => paren_depth -= 1,
+            _ => {}
+        }
+
+        index += value.len_utf8();
+    }
+
+    if branches.is_empty() {
+        return Ok(None);
+    }
+
+    if quote.is_some() || bracket_depth != 0 || paren_depth != 0 {
+        return Err(format!(
+            "unterminated Legado CSS `{operator}` combination branch in `{rule}`"
+        ));
+    }
+
+    let branch = rule[start..].trim();
+    if branch.is_empty() {
+        return Err(format!(
+            "empty Legado CSS `{operator}` combination branch in `{rule}`"
+        ));
+    }
+    branches.push(branch);
+
+    Ok(Some(branches))
 }
 
 fn split_legado_css_pipeline(rule: &str) -> Result<Vec<&str>, String> {
@@ -3301,12 +4670,13 @@ fn parse_legado_css_step(part: &str) -> Result<LegadoCssStep, String> {
 }
 
 fn parse_legado_css_extraction(extraction: &str) -> LegadoCssExtraction {
-    if extraction.eq_ignore_ascii_case("text") {
-        LegadoCssExtraction::Text
-    } else if extraction.eq_ignore_ascii_case("html") {
-        LegadoCssExtraction::Html
-    } else {
-        LegadoCssExtraction::Attr(extraction.to_string())
+    match extraction {
+        "text" => LegadoCssExtraction::Text,
+        "textNodes" => LegadoCssExtraction::TextNodes,
+        "ownText" => LegadoCssExtraction::OwnText,
+        "html" => LegadoCssExtraction::Html,
+        "all" => LegadoCssExtraction::All,
+        _ => LegadoCssExtraction::Attr(extraction.to_string()),
     }
 }
 
@@ -3377,16 +4747,118 @@ enum LegadoCssContext<'a> {
 
 fn apply_legado_css(input: &str, rule: &LegadoCssRule) -> RuleResult<Vec<String>> {
     if rule.is_empty() {
+        if rule.replacement.is_some() {
+            return Ok(apply_legado_rule_replacement(
+                vec![input.to_string()],
+                rule.replacement.as_ref(),
+            ));
+        }
+        return Ok(Vec::new());
+    }
+
+    let values = match rule.combination {
+        Some(LegadoCssCombination::And) => {
+            let mut output = Vec::new();
+            for branch in &rule.branches {
+                let results = apply_legado_css_steps(input, branch, rule.selector_mode)?;
+                if !results.is_empty() {
+                    output.extend(results);
+                }
+            }
+            output
+        }
+        Some(LegadoCssCombination::Or) => {
+            let mut output = Vec::new();
+            for branch in &rule.branches {
+                let results = apply_legado_css_steps(input, branch, rule.selector_mode)?;
+                if !results.is_empty() {
+                    output = results;
+                    break;
+                }
+            }
+            output
+        }
+        Some(LegadoCssCombination::Zip) => {
+            let mut branch_results = Vec::new();
+            for branch in &rule.branches {
+                let results = apply_legado_css_steps(input, branch, rule.selector_mode)?;
+                if !results.is_empty() {
+                    branch_results.push(results);
+                }
+            }
+            zip_legado_css_combination_results(branch_results)
+        }
+        None => apply_legado_css_steps(input, rule.steps(), rule.selector_mode)?,
+    };
+
+    Ok(apply_legado_rule_replacement(
+        values,
+        rule.replacement.as_ref(),
+    ))
+}
+
+fn apply_legado_css_list_items(input: &str, rule: &LegadoCssRule) -> RuleResult<Vec<String>> {
+    if rule.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let values = match rule.combination {
+        Some(LegadoCssCombination::And) => {
+            let mut output = Vec::new();
+            for branch in &rule.branches {
+                let results = apply_legado_css_list_item_steps(input, branch, rule.selector_mode)?;
+                if !results.is_empty() {
+                    output.extend(results);
+                }
+            }
+            output
+        }
+        Some(LegadoCssCombination::Or) => {
+            let mut output = Vec::new();
+            for branch in &rule.branches {
+                let results = apply_legado_css_list_item_steps(input, branch, rule.selector_mode)?;
+                if !results.is_empty() {
+                    output = results;
+                    break;
+                }
+            }
+            output
+        }
+        Some(LegadoCssCombination::Zip) => {
+            let mut branch_results = Vec::new();
+            for branch in &rule.branches {
+                let results = apply_legado_css_list_item_steps(input, branch, rule.selector_mode)?;
+                if !results.is_empty() {
+                    branch_results.push(results);
+                }
+            }
+            zip_legado_css_combination_results(branch_results)
+        }
+        None => apply_legado_css_list_item_steps(input, rule.steps(), rule.selector_mode)?,
+    };
+
+    Ok(apply_legado_rule_replacement(
+        values,
+        rule.replacement.as_ref(),
+    ))
+}
+
+fn apply_legado_css_list_item_steps(
+    input: &str,
+    steps: &[LegadoCssStep],
+    selector_mode: LegadoCssSelectorMode,
+) -> RuleResult<Vec<String>> {
+    if steps.is_empty() {
         return Ok(Vec::new());
     }
 
     let document = Html::parse_document(input);
     let mut contexts = vec![LegadoCssContext::Document(&document)];
 
-    for step in rule.steps() {
+    for step in steps {
         match step {
             LegadoCssStep::Select(selector) => {
-                contexts = legado_css_select_contexts(&contexts, selector)?;
+                contexts = legado_css_select_contexts(&contexts, selector, selector_mode)?;
                 if contexts.is_empty() {
                     return Ok(Vec::new());
                 }
@@ -3396,7 +4868,167 @@ fn apply_legado_css(input: &str, rule: &LegadoCssRule) -> RuleResult<Vec<String>
                 extraction,
             } => {
                 let elements = if let Some(selector) = selector {
-                    legado_css_select_elements(&contexts, selector)?
+                    legado_css_select_elements(&contexts, selector, selector_mode)?
+                } else {
+                    legado_css_context_elements(&contexts)
+                };
+                return Ok(extract_legado_css_values(elements, extraction));
+            }
+        }
+    }
+
+    Ok(legado_css_context_elements(&contexts)
+        .into_iter()
+        .map(|element| element.html())
+        .filter(|html| !html.is_empty())
+        .collect())
+}
+
+fn apply_legado_rule_replacement(
+    values: Vec<String>,
+    replacement: Option<&LegadoRuleReplacement>,
+) -> Vec<String> {
+    let Some(replacement) = replacement else {
+        return values;
+    };
+    let regex_pattern = legado_regex_pattern_for_rust(&replacement.pattern);
+    let regex = Regex::new(&regex_pattern).ok();
+    let regex_replacement = legado_regex_replacement_for_rust(&replacement.replacement);
+
+    values
+        .into_iter()
+        .map(|value| {
+            apply_legado_rule_replacement_to_value(
+                value,
+                replacement,
+                regex.as_ref(),
+                &regex_replacement,
+            )
+        })
+        .collect()
+}
+
+fn apply_legado_rule_replacement_to_value(
+    value: String,
+    replacement: &LegadoRuleReplacement,
+    regex: Option<&Regex>,
+    regex_replacement: &str,
+) -> String {
+    if replacement.first_match_only {
+        if let Some(regex) = regex {
+            return regex
+                .find(&value)
+                .map(|matched| {
+                    regex
+                        .replacen(matched.as_str(), 1, regex_replacement)
+                        .into_owned()
+                })
+                .unwrap_or_default();
+        }
+        return replacement.replacement.clone();
+    }
+
+    if let Some(regex) = regex {
+        regex.replace_all(&value, regex_replacement).into_owned()
+    } else {
+        value.replace(&replacement.pattern, &replacement.replacement)
+    }
+}
+
+fn legado_regex_pattern_for_rust(pattern: &str) -> String {
+    let mut output = String::with_capacity(pattern.len());
+    let chars = pattern.chars().collect::<Vec<_>>();
+    let mut index = 0usize;
+    let mut in_char_class = false;
+
+    while index < chars.len() {
+        let value = chars[index];
+
+        if value == '\\' {
+            if chars.get(index + 1) == Some(&'h') {
+                if in_char_class {
+                    output.push_str(r"\t\p{Zs}");
+                } else {
+                    output.push_str(r"[\t\p{Zs}]");
+                }
+                index += 2;
+                continue;
+            }
+
+            output.push(value);
+            index += 1;
+            continue;
+        }
+
+        match value {
+            '[' if !in_char_class => in_char_class = true,
+            ']' if in_char_class => in_char_class = false,
+            _ => {}
+        }
+        output.push(value);
+        index += 1;
+    }
+
+    output
+}
+
+fn legado_regex_replacement_for_rust(replacement: &str) -> String {
+    let mut output = String::with_capacity(replacement.len());
+    let chars = replacement.chars().collect::<Vec<_>>();
+    let mut index = 0usize;
+
+    while index < chars.len() {
+        if chars[index] != '$' {
+            output.push(chars[index]);
+            index += 1;
+            continue;
+        }
+
+        let digit_start = index + 1;
+        let mut digit_end = digit_start;
+        while digit_end < chars.len() && chars[digit_end].is_ascii_digit() {
+            digit_end += 1;
+        }
+
+        if digit_end == digit_start {
+            output.push('$');
+            index += 1;
+            continue;
+        }
+
+        output.push_str("${");
+        for value in &chars[digit_start..digit_end] {
+            output.push(*value);
+        }
+        output.push('}');
+        index = digit_end;
+    }
+
+    output
+}
+
+fn apply_legado_css_steps(
+    input: &str,
+    steps: &[LegadoCssStep],
+    selector_mode: LegadoCssSelectorMode,
+) -> RuleResult<Vec<String>> {
+    let document = Html::parse_document(input);
+    let mut contexts = vec![LegadoCssContext::Document(&document)];
+
+    for step in steps {
+        match step {
+            LegadoCssStep::Select(selector) => {
+                contexts = legado_css_select_contexts(&contexts, selector, selector_mode)?;
+                if contexts.is_empty() {
+                    return Ok(Vec::new());
+                }
+            }
+            LegadoCssStep::Extract {
+                selector,
+                extraction,
+            } => {
+                let elements = if let Some(selector) = selector {
+                    legado_css_select_elements(&contexts, selector, selector_mode)?
                 } else {
                     legado_css_context_elements(&contexts)
                 };
@@ -3411,30 +5043,373 @@ fn apply_legado_css(input: &str, rule: &LegadoCssRule) -> RuleResult<Vec<String>
     ))
 }
 
+fn zip_legado_css_combination_results(results: Vec<Vec<String>>) -> Vec<String> {
+    let Some(first) = results.first() else {
+        return Vec::new();
+    };
+
+    let mut output = Vec::new();
+    for index in 0..first.len() {
+        for result in &results {
+            if let Some(value) = result.get(index) {
+                output.push(value.clone());
+            }
+        }
+    }
+
+    output
+}
+
 fn legado_css_select_contexts<'a>(
     contexts: &[LegadoCssContext<'a>],
     selector: &str,
+    selector_mode: LegadoCssSelectorMode,
 ) -> RuleResult<Vec<LegadoCssContext<'a>>> {
-    Ok(legado_css_select_elements(contexts, selector)?
-        .into_iter()
-        .map(LegadoCssContext::Element)
-        .collect())
+    Ok(
+        legado_css_select_elements(contexts, selector, selector_mode)?
+            .into_iter()
+            .map(LegadoCssContext::Element)
+            .collect(),
+    )
 }
 
 fn legado_css_select_elements<'a>(
     contexts: &[LegadoCssContext<'a>],
     selector: &str,
+    selector_mode: LegadoCssSelectorMode,
 ) -> RuleResult<Vec<ElementRef<'a>>> {
-    let compiled = compile_legado_css_selector(selector)?;
+    match selector_mode {
+        LegadoCssSelectorMode::Default => select_legado_jsoup_default_elements(contexts, selector),
+        LegadoCssSelectorMode::CssSource => select_css_compat_elements(contexts, selector),
+    }
+}
+
+fn select_legado_jsoup_default_elements<'a>(
+    contexts: &[LegadoCssContext<'a>],
+    selector: &str,
+) -> RuleResult<Vec<ElementRef<'a>>> {
+    let (base_selector, index_filter) = parse_legado_jsoup_index_filter(selector);
+    let elements = if base_selector.is_empty() || is_legado_jsoup_children_selector(base_selector) {
+        legado_jsoup_direct_children(contexts)
+    } else if let Some(shorthand) = parse_legado_jsoup_shorthand_selector(base_selector) {
+        let candidates = legado_jsoup_default_candidates(contexts)?;
+        candidates
+            .into_iter()
+            .filter(|element| legado_jsoup_shorthand_matches(element, shorthand))
+            .collect()
+    } else {
+        select_css_compat_elements(contexts, base_selector)?
+    };
+
+    Ok(apply_legado_jsoup_index_filter(elements, index_filter))
+}
+
+#[derive(Clone, Copy)]
+enum LegadoJsoupShorthandSelector<'a> {
+    Class(&'a str),
+    Tag(&'a str),
+    Id(&'a str),
+    OwnText(&'a str),
+}
+
+fn parse_legado_jsoup_shorthand_selector(
+    selector: &str,
+) -> Option<LegadoJsoupShorthandSelector<'_>> {
+    let mut parts = selector.split('.');
+    let kind = parts.next()?;
+    let value = parts.next()?;
+    if value.is_empty() {
+        return None;
+    }
+
+    match kind {
+        "class" => Some(LegadoJsoupShorthandSelector::Class(value)),
+        "tag" => Some(LegadoJsoupShorthandSelector::Tag(value)),
+        "id" => Some(LegadoJsoupShorthandSelector::Id(value)),
+        "text" => Some(LegadoJsoupShorthandSelector::OwnText(value)),
+        _ => None,
+    }
+}
+
+#[derive(Clone, Copy)]
+enum LegadoJsoupIndexMode {
+    Select,
+    Exclude,
+}
+
+struct LegadoJsoupIndexFilter {
+    mode: LegadoJsoupIndexMode,
+    selectors: Vec<LegadoJsoupIndexSelector>,
+}
+
+enum LegadoJsoupIndexSelector {
+    Index(isize),
+    Range {
+        start: Option<isize>,
+        end: Option<isize>,
+        step: isize,
+    },
+}
+
+fn parse_legado_jsoup_index_filter(selector: &str) -> (&str, Option<LegadoJsoupIndexFilter>) {
+    let selector = selector.trim();
+
+    if let Some((base, filter)) = parse_legado_jsoup_bracket_index_filter(selector) {
+        return (base, Some(filter));
+    }
+
+    if let Some((base, filter)) = parse_legado_jsoup_legacy_index_filter(selector) {
+        return (base, Some(filter));
+    }
+
+    (selector, None)
+}
+
+fn parse_legado_jsoup_bracket_index_filter(
+    selector: &str,
+) -> Option<(&str, LegadoJsoupIndexFilter)> {
+    if !selector.ends_with(']') {
+        return None;
+    }
+
+    let bracket = selector.rfind('[')?;
+    let base = selector[..bracket].trim();
+
+    let content = selector[bracket + 1..selector.len() - 1].trim();
+    let (mode, content) = if let Some(content) = content.strip_prefix('!') {
+        (LegadoJsoupIndexMode::Exclude, content.trim())
+    } else {
+        (LegadoJsoupIndexMode::Select, content)
+    };
+    if content.is_empty() {
+        return None;
+    }
+
+    let selectors = content
+        .split(',')
+        .map(parse_legado_jsoup_bracket_index_token)
+        .collect::<Option<Vec<_>>>()?;
+    if selectors.is_empty() {
+        return None;
+    }
+
+    Some((base, LegadoJsoupIndexFilter { mode, selectors }))
+}
+
+fn parse_legado_jsoup_bracket_index_token(token: &str) -> Option<LegadoJsoupIndexSelector> {
+    let token = token.trim();
+    if token.is_empty() {
+        return None;
+    }
+
+    if token.contains(':') {
+        let parts = token.split(':').collect::<Vec<_>>();
+        if parts.len() < 2 || parts.len() > 3 {
+            return None;
+        }
+
+        return Some(LegadoJsoupIndexSelector::Range {
+            start: parse_optional_legado_jsoup_index(parts[0].trim())?,
+            end: parse_optional_legado_jsoup_index(parts[1].trim())?,
+            step: if parts.len() == 3 {
+                parts[2].trim().parse::<isize>().ok()?
+            } else {
+                1
+            },
+        });
+    }
+
+    Some(LegadoJsoupIndexSelector::Index(
+        token.parse::<isize>().ok()?,
+    ))
+}
+
+fn parse_optional_legado_jsoup_index(value: &str) -> Option<Option<isize>> {
+    if value.is_empty() {
+        Some(None)
+    } else {
+        value.parse::<isize>().ok().map(Some)
+    }
+}
+
+fn parse_legado_jsoup_legacy_index_filter(
+    selector: &str,
+) -> Option<(&str, LegadoJsoupIndexFilter)> {
+    for (index, value) in selector.char_indices().rev() {
+        if value != '.' && value != '!' {
+            continue;
+        }
+
+        let base = selector[..index].trim();
+        let suffix = selector[index + value.len_utf8()..].trim();
+
+        let selectors = parse_legado_jsoup_legacy_index_sequence(suffix)?;
+        let mode = if value == '!' {
+            LegadoJsoupIndexMode::Exclude
+        } else {
+            LegadoJsoupIndexMode::Select
+        };
+        return Some((base, LegadoJsoupIndexFilter { mode, selectors }));
+    }
+
+    None
+}
+
+fn parse_legado_jsoup_legacy_index_sequence(suffix: &str) -> Option<Vec<LegadoJsoupIndexSelector>> {
+    let suffix = suffix.trim();
+    if suffix.is_empty() {
+        return None;
+    }
+
+    suffix
+        .split(':')
+        .map(|part| {
+            let part = part.trim();
+            if part.is_empty() {
+                return None;
+            }
+            Some(LegadoJsoupIndexSelector::Index(part.parse::<isize>().ok()?))
+        })
+        .collect()
+}
+
+fn apply_legado_jsoup_index_filter<'a>(
+    elements: Vec<ElementRef<'a>>,
+    filter: Option<LegadoJsoupIndexFilter>,
+) -> Vec<ElementRef<'a>> {
+    let Some(filter) = filter else {
+        return elements;
+    };
+
+    let indices = resolve_legado_jsoup_index_filter(&filter, elements.len());
+    match filter.mode {
+        LegadoJsoupIndexMode::Select => indices
+            .into_iter()
+            .filter_map(|index| elements.get(index).copied())
+            .collect(),
+        LegadoJsoupIndexMode::Exclude => elements
+            .into_iter()
+            .enumerate()
+            .filter_map(|(index, element)| {
+                if indices.contains(&index) {
+                    None
+                } else {
+                    Some(element)
+                }
+            })
+            .collect(),
+    }
+}
+
+fn resolve_legado_jsoup_index_filter(filter: &LegadoJsoupIndexFilter, len: usize) -> Vec<usize> {
+    let mut indices = Vec::new();
+    if len == 0 {
+        return indices;
+    }
+
+    for selector in &filter.selectors {
+        match selector {
+            LegadoJsoupIndexSelector::Index(index) => {
+                if let Some(index) = resolve_legado_jsoup_index(*index, len) {
+                    push_unique_index(&mut indices, index);
+                }
+            }
+            LegadoJsoupIndexSelector::Range { start, end, step } => {
+                resolve_legado_jsoup_range(*start, *end, *step, len, &mut indices);
+            }
+        }
+    }
+
+    indices
+}
+
+fn resolve_legado_jsoup_index(index: isize, len: usize) -> Option<usize> {
+    let len = len as isize;
+    if index >= 0 && index < len {
+        Some(index as usize)
+    } else if index < 0 && len >= -index {
+        Some((index + len) as usize)
+    } else {
+        None
+    }
+}
+
+fn resolve_legado_jsoup_range(
+    start: Option<isize>,
+    end: Option<isize>,
+    step: isize,
+    len: usize,
+    indices: &mut Vec<usize>,
+) {
+    let len = len as isize;
+    let mut start = start.unwrap_or(0);
+    if start < 0 {
+        start += len;
+    }
+    let mut end = end.unwrap_or(len - 1);
+    if end < 0 {
+        end += len;
+    }
+
+    if (start < 0 && end < 0) || (start >= len && end >= len) {
+        return;
+    }
+    start = start.clamp(0, len - 1);
+    end = end.clamp(0, len - 1);
+
+    if start == end || step >= len {
+        push_unique_index(indices, start as usize);
+        return;
+    }
+
+    let step = if step > 0 {
+        step
+    } else if -step < len {
+        step + len
+    } else {
+        1
+    };
+    let step = if step <= 0 { len } else { step };
+
+    let mut current = start;
+    if end > start {
+        while current <= end {
+            push_unique_index(indices, current as usize);
+            current += step;
+        }
+    } else {
+        loop {
+            push_unique_index(indices, current as usize);
+            let next = current - step;
+            if next < end {
+                break;
+            }
+            current = next;
+        }
+    }
+}
+
+fn push_unique_index(indices: &mut Vec<usize>, index: usize) {
+    if !indices.contains(&index) {
+        indices.push(index);
+    }
+}
+
+fn legado_jsoup_default_candidates<'a>(
+    contexts: &[LegadoCssContext<'a>],
+) -> RuleResult<Vec<ElementRef<'a>>> {
+    let universal = Selector::parse("*").map_err(|err| RuleError::CssSelectorSyntax {
+        selector: "*".to_string(),
+        message: format!("{err:?}"),
+    })?;
     let mut elements = Vec::new();
 
     for context in contexts {
         match context {
-            LegadoCssContext::Document(document) => {
-                elements.extend(document.select(&compiled));
-            }
+            LegadoCssContext::Document(document) => elements.extend(document.select(&universal)),
             LegadoCssContext::Element(element) => {
-                elements.extend(element.select(&compiled));
+                elements.push(*element);
+                elements.extend(element.select(&universal));
             }
         }
     }
@@ -3442,19 +5417,49 @@ fn legado_css_select_elements<'a>(
     Ok(elements)
 }
 
-fn compile_legado_css_selector(selector: &str) -> RuleResult<Selector> {
-    Selector::parse(selector).map_err(|err| RuleError::CssSelectorSyntax {
-        selector: selector.to_string(),
-        message: format!("{err:?}"),
-    })
+fn is_legado_jsoup_children_selector(selector: &str) -> bool {
+    selector.split('.').next() == Some("children")
+}
+
+fn legado_jsoup_direct_children<'a>(contexts: &[LegadoCssContext<'a>]) -> Vec<ElementRef<'a>> {
+    let mut elements = Vec::new();
+
+    for context in contexts {
+        match context {
+            LegadoCssContext::Document(document) => elements.push(document.root_element()),
+            LegadoCssContext::Element(element) => elements.extend(element.child_elements()),
+        }
+    }
+
+    elements
+}
+
+fn legado_jsoup_shorthand_matches(
+    element: &ElementRef<'_>,
+    shorthand: LegadoJsoupShorthandSelector<'_>,
+) -> bool {
+    match shorthand {
+        LegadoJsoupShorthandSelector::Class(class_name) => element
+            .value()
+            .attr("class")
+            .is_some_and(|value| value.split_whitespace().any(|item| item == class_name)),
+        LegadoJsoupShorthandSelector::Tag(tag_name) => {
+            tag_name == "*" || element.value().name() == tag_name
+        }
+        LegadoJsoupShorthandSelector::Id(id) => element.value().attr("id") == Some(id),
+        LegadoJsoupShorthandSelector::OwnText(needle) => {
+            let own_text = normalize_text(&element_own_text(element)).to_lowercase();
+            own_text.contains(&needle.to_lowercase())
+        }
+    }
 }
 
 fn legado_css_context_elements<'a>(contexts: &[LegadoCssContext<'a>]) -> Vec<ElementRef<'a>> {
     contexts
         .iter()
-        .filter_map(|context| match context {
-            LegadoCssContext::Document(_) => None,
-            LegadoCssContext::Element(element) => Some(*element),
+        .map(|context| match context {
+            LegadoCssContext::Document(document) => document.root_element(),
+            LegadoCssContext::Element(element) => *element,
         })
         .collect()
 }
@@ -3463,28 +5468,535 @@ fn extract_legado_css_values(
     elements: Vec<ElementRef<'_>>,
     extraction: &LegadoCssExtraction,
 ) -> Vec<String> {
+    if matches!(
+        extraction,
+        LegadoCssExtraction::Html | LegadoCssExtraction::All
+    ) {
+        return extract_legado_css_outer_html(elements, extraction);
+    }
+
     let mut output = Vec::new();
 
     for element in elements {
         match extraction {
             LegadoCssExtraction::Text => {
-                output.push(element_text(&element));
+                let value = element_text(&element);
+                if !value.is_empty() {
+                    output.push(value);
+                }
             }
-            LegadoCssExtraction::Html => {
-                let value = element.inner_html();
+            LegadoCssExtraction::TextNodes => {
+                let value = element_legado_text_nodes(&element);
+                if !value.is_empty() {
+                    output.push(value);
+                }
+            }
+            LegadoCssExtraction::OwnText => {
+                let value = normalize_text(&element_own_text(&element));
                 if !value.is_empty() {
                     output.push(value);
                 }
             }
             LegadoCssExtraction::Attr(attr) => {
                 if let Some(value) = element.value().attr(attr) {
+                    if value.trim().is_empty() || output.iter().any(|item| item == value) {
+                        continue;
+                    }
                     output.push(value.to_string());
                 }
             }
+            LegadoCssExtraction::Html | LegadoCssExtraction::All => unreachable!(),
         }
     }
 
     output
+}
+
+fn extract_legado_css_outer_html(
+    elements: Vec<ElementRef<'_>>,
+    extraction: &LegadoCssExtraction,
+) -> Vec<String> {
+    if elements.is_empty() {
+        return Vec::new();
+    }
+
+    let html = elements
+        .into_iter()
+        .map(|element| element.html())
+        .collect::<Vec<_>>()
+        .join("\n");
+    let html = match extraction {
+        LegadoCssExtraction::Html => clean_legado_html_extraction(&html),
+        LegadoCssExtraction::All => html,
+        _ => unreachable!(),
+    };
+
+    if html.is_empty() {
+        Vec::new()
+    } else {
+        vec![html]
+    }
+}
+
+fn clean_legado_html_extraction(html: &str) -> String {
+    Regex::new(r"(?is)<script\b[^>]*>.*?</script>|<style\b[^>]*>.*?</style>")
+        .expect("script/style cleanup regex must compile")
+        .replace_all(html, "")
+        .into_owned()
+}
+
+fn element_legado_text_nodes(element: &ElementRef<'_>) -> String {
+    element
+        .children()
+        .filter_map(|child| {
+            let text = child.value().as_text()?;
+            let text = text.trim_matches(|value: char| value <= ' ');
+            if text.is_empty() {
+                None
+            } else {
+                Some(text.to_string())
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn select_css_compat_elements<'a>(
+    contexts: &[LegadoCssContext<'a>],
+    selector_text: &str,
+) -> RuleResult<Vec<ElementRef<'a>>> {
+    let compat_selector = parse_css_compat_selector(selector_text).map_err(|message| {
+        RuleError::CssSelectorSyntax {
+            selector: selector_text.to_string(),
+            message,
+        }
+    })?;
+    let selector =
+        Selector::parse(&compat_selector.selector).map_err(|err| RuleError::CssSelectorSyntax {
+            selector: selector_text.to_string(),
+            message: format!("{err:?}"),
+        })?;
+    let has_selector = compat_selector
+        .has_selector_filter
+        .as_ref()
+        .map(|filter| {
+            Selector::parse(&filter.selector).map_err(|err| RuleError::CssSelectorSyntax {
+                selector: selector_text.to_string(),
+                message: format!("{err:?}"),
+            })
+        })
+        .transpose()?;
+    let has_data_selector = compat_selector
+        .has_data_filter
+        .as_ref()
+        .map(|filter| {
+            Selector::parse(&filter.selector).map_err(|err| RuleError::CssSelectorSyntax {
+                selector: selector_text.to_string(),
+                message: format!("{err:?}"),
+            })
+        })
+        .transpose()?;
+    let has_text_selector = compat_selector
+        .has_text_filter
+        .as_ref()
+        .map(|filter| {
+            Selector::parse(&filter.selector).map_err(|err| RuleError::CssSelectorSyntax {
+                selector: selector_text.to_string(),
+                message: format!("{err:?}"),
+            })
+        })
+        .transpose()?;
+    let has_text_filter_regex = if let Some(filter) = &compat_selector.has_text_filter {
+        if filter.text_filter.matcher == CssTextMatcher::Regex {
+            Some(Regex::new(&filter.text_filter.value).map_err(|err| {
+                RuleError::CssSelectorSyntax {
+                    selector: selector_text.to_string(),
+                    message: err.to_string(),
+                }
+            })?)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    let anchored_text_selectors = compat_selector
+        .anchored_text_filters
+        .iter()
+        .map(|filter| {
+            Selector::parse(&filter.selector).map_err(|err| RuleError::CssSelectorSyntax {
+                selector: selector_text.to_string(),
+                message: format!("{err:?}"),
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let anchored_text_filter_regexes = compat_selector
+        .anchored_text_filters
+        .iter()
+        .map(|filter| {
+            if filter.text_filter.matcher == CssTextMatcher::Regex {
+                Regex::new(&filter.text_filter.value)
+                    .map(Some)
+                    .map_err(|err| RuleError::CssSelectorSyntax {
+                        selector: selector_text.to_string(),
+                        message: err.to_string(),
+                    })
+            } else {
+                Ok(None)
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let anchored_has_selectors = compat_selector
+        .anchored_has_filters
+        .iter()
+        .map(|filter| {
+            Selector::parse(&filter.selector).map_err(|err| RuleError::CssSelectorSyntax {
+                selector: selector_text.to_string(),
+                message: format!("{err:?}"),
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let anchored_data_selectors = compat_selector
+        .anchored_data_filters
+        .iter()
+        .map(|filter| {
+            Selector::parse(&filter.selector).map_err(|err| RuleError::CssSelectorSyntax {
+                selector: selector_text.to_string(),
+                message: format!("{err:?}"),
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let anchored_result_selectors = compat_selector
+        .anchored_result_filters
+        .iter()
+        .map(|filter| {
+            Selector::parse(&filter.selector).map_err(|err| RuleError::CssSelectorSyntax {
+                selector: selector_text.to_string(),
+                message: format!("{err:?}"),
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let anchored_parent_selectors = compat_selector
+        .anchored_parent_filters
+        .iter()
+        .map(|filter| {
+            Selector::parse(&filter.selector).map_err(|err| RuleError::CssSelectorSyntax {
+                selector: selector_text.to_string(),
+                message: format!("{err:?}"),
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let text_filter_regexes = compat_selector
+        .text_filters
+        .iter()
+        .map(|filter| {
+            if filter.text_filter.matcher == CssTextMatcher::Regex {
+                Regex::new(&filter.text_filter.value)
+                    .map(Some)
+                    .map_err(|err| RuleError::CssSelectorSyntax {
+                        selector: selector_text.to_string(),
+                        message: err.to_string(),
+                    })
+            } else {
+                Ok(None)
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let result_group_selectors = compat_selector
+        .result_filter_groups
+        .as_ref()
+        .map(|groups| {
+            groups
+                .iter()
+                .map(|group| {
+                    Selector::parse(&group.selector).map_err(|err| RuleError::CssSelectorSyntax {
+                        selector: selector_text.to_string(),
+                        message: format!("{err:?}"),
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .transpose()?;
+    let anchored_result_elements = compat_selector
+        .anchored_result_filters
+        .iter()
+        .zip(anchored_result_selectors.iter())
+        .map(|(anchored_result_filter, anchored_result_selector)| {
+            let mut anchors = Vec::new();
+            for context in contexts {
+                match context {
+                    LegadoCssContext::Document(document) => {
+                        anchors.extend(document.select(anchored_result_selector));
+                    }
+                    LegadoCssContext::Element(element) => {
+                        anchors.extend(element.select(anchored_result_selector));
+                    }
+                }
+            }
+            apply_css_result_filters(anchors, &anchored_result_filter.filters)
+        })
+        .collect::<Vec<_>>();
+
+    let collect_matching_elements = |selector: &Selector| {
+        let mut elements = Vec::new();
+        for context in contexts {
+            let selected: Vec<ElementRef<'a>> = match context {
+                LegadoCssContext::Document(document) => document.select(selector).collect(),
+                LegadoCssContext::Element(element) => element.select(selector).collect(),
+            };
+
+            for element in selected {
+                if let Some(parent_filter) = compat_selector.parent_filter {
+                    if !css_parent_filter_matches(&element, parent_filter) {
+                        continue;
+                    }
+                }
+                if let Some(has_selector_filter) = &compat_selector.has_selector_filter {
+                    let Some(has_selector) = has_selector.as_ref() else {
+                        continue;
+                    };
+                    let matches = !css_has_filter_candidates(
+                        &element,
+                        has_selector,
+                        has_selector_filter.direct_child,
+                        &has_selector_filter.result_filters,
+                        has_selector_filter.parent_filter,
+                        has_selector_filter.nested_filter.as_ref(),
+                    )
+                    .is_empty();
+                    match has_selector_filter.mode {
+                        CssTextFilterMode::Contains if !matches => continue,
+                        CssTextFilterMode::NotContains if matches => continue,
+                        _ => {}
+                    }
+                }
+                if let Some(has_data_filter) = &compat_selector.has_data_filter {
+                    let Some(has_data_selector) = has_data_selector.as_ref() else {
+                        continue;
+                    };
+                    let has_matching_data = css_has_filter_candidates(
+                        &element,
+                        has_data_selector,
+                        has_data_filter.direct_child,
+                        &has_data_filter.result_filters,
+                        has_data_filter.parent_filter,
+                        None,
+                    )
+                    .into_iter()
+                    .any(|descendant| {
+                        css_element_data_filter_matches(&descendant, &has_data_filter.data_filter)
+                    });
+                    match has_data_filter.mode {
+                        CssTextFilterMode::Contains if !has_matching_data => continue,
+                        CssTextFilterMode::NotContains if has_matching_data => continue,
+                        _ => {}
+                    }
+                }
+                if let Some(has_text_filter) = &compat_selector.has_text_filter {
+                    let Some(has_text_selector) = has_text_selector.as_ref() else {
+                        continue;
+                    };
+                    let has_matching_text = css_has_filter_candidates(
+                        &element,
+                        has_text_selector,
+                        has_text_filter.direct_child,
+                        &has_text_filter.result_filters,
+                        has_text_filter.parent_filter,
+                        None,
+                    )
+                    .into_iter()
+                    .any(|descendant| {
+                        css_element_text_filter_mode_matches(
+                            &descendant,
+                            &has_text_filter.text_filter,
+                            has_text_filter.text_filter_mode,
+                            has_text_filter_regex.as_ref(),
+                        )
+                    });
+                    match has_text_filter.mode {
+                        CssTextFilterMode::Contains if !has_matching_text => continue,
+                        CssTextFilterMode::NotContains if has_matching_text => continue,
+                        _ => {}
+                    }
+                }
+                if !compat_selector.anchored_text_filters.is_empty()
+                    && !compat_selector
+                        .anchored_text_filters
+                        .iter()
+                        .zip(anchored_text_selectors.iter())
+                        .zip(anchored_text_filter_regexes.iter())
+                        .all(|((anchored_text_filter, anchored_text_selector), regex)| {
+                            element
+                                .ancestors()
+                                .filter_map(ElementRef::wrap)
+                                .any(|ancestor| {
+                                    anchored_text_selector.matches(&ancestor)
+                                        && match anchored_text_filter.mode {
+                                            CssTextFilterMode::Contains => {
+                                                css_element_text_filter_matches(
+                                                    &ancestor,
+                                                    &anchored_text_filter.text_filter,
+                                                    regex.as_ref(),
+                                                )
+                                            }
+                                            CssTextFilterMode::NotContains => {
+                                                !css_element_text_filter_matches(
+                                                    &ancestor,
+                                                    &anchored_text_filter.text_filter,
+                                                    regex.as_ref(),
+                                                )
+                                            }
+                                        }
+                                })
+                        })
+                {
+                    continue;
+                }
+                if !compat_selector.anchored_has_filters.is_empty()
+                    && !compat_selector
+                        .anchored_has_filters
+                        .iter()
+                        .zip(anchored_has_selectors.iter())
+                        .all(|(anchored_has_filter, anchored_has_selector)| {
+                            element
+                                .ancestors()
+                                .filter_map(ElementRef::wrap)
+                                .any(|ancestor| {
+                                    anchored_has_selector.matches(&ancestor)
+                                        && css_nested_has_filter_matches(
+                                            &ancestor,
+                                            &anchored_has_filter.filter,
+                                        )
+                                })
+                        })
+                {
+                    continue;
+                }
+                if !compat_selector.anchored_data_filters.is_empty()
+                    && !compat_selector
+                        .anchored_data_filters
+                        .iter()
+                        .zip(anchored_data_selectors.iter())
+                        .all(|(anchored_data_filter, anchored_data_selector)| {
+                            element
+                                .ancestors()
+                                .filter_map(ElementRef::wrap)
+                                .any(|ancestor| {
+                                    anchored_data_selector.matches(&ancestor)
+                                        && css_element_data_filter_matches(
+                                            &ancestor,
+                                            &anchored_data_filter.data_filter,
+                                        )
+                                })
+                        })
+                {
+                    continue;
+                }
+                if !anchored_result_elements.is_empty()
+                    && !anchored_result_elements
+                        .iter()
+                        .all(|anchors| css_element_has_anchored_result_match(&element, anchors))
+                {
+                    continue;
+                }
+                if !compat_selector.anchored_parent_filters.is_empty()
+                    && !compat_selector
+                        .anchored_parent_filters
+                        .iter()
+                        .zip(anchored_parent_selectors.iter())
+                        .all(|(anchored_parent_filter, anchored_parent_selector)| {
+                            element
+                                .ancestors()
+                                .filter_map(ElementRef::wrap)
+                                .any(|ancestor| {
+                                    anchored_parent_selector.matches(&ancestor)
+                                        && css_parent_filter_matches(
+                                            &ancestor,
+                                            anchored_parent_filter.parent_filter,
+                                        )
+                                })
+                        })
+                {
+                    continue;
+                }
+                if !compat_selector
+                    .data_filters
+                    .iter()
+                    .all(|data_filter| css_element_data_filter_matches(&element, data_filter))
+                {
+                    continue;
+                }
+
+                if !compat_selector.text_filters.is_empty()
+                    && !compat_selector
+                        .text_filters
+                        .iter()
+                        .zip(text_filter_regexes.iter())
+                        .all(|(filter, regex)| {
+                            let haystack =
+                                css_element_text_filter_haystack(&element, &filter.text_filter);
+                            let matches = css_text_filter_matches(
+                                &haystack,
+                                &filter.text_filter,
+                                regex.as_ref(),
+                            );
+                            match filter.mode {
+                                CssTextFilterMode::Contains => matches,
+                                CssTextFilterMode::NotContains => !matches,
+                            }
+                        })
+                {
+                    continue;
+                }
+
+                elements.push(element);
+            }
+        }
+        elements
+    };
+
+    if let Some(groups) = &compat_selector.result_filter_groups {
+        let Some(group_selectors) = result_group_selectors.as_ref() else {
+            return Err(RuleError::CssSelectorSyntax {
+                selector: selector_text.to_string(),
+                message: "CSS result filter groups were not compiled".to_string(),
+            });
+        };
+        let mut elements = Vec::new();
+        for (group, selector) in groups.iter().zip(group_selectors) {
+            let group_elements = collect_matching_elements(selector);
+            elements.extend(apply_css_result_filters(group_elements, &group.filters));
+        }
+        Ok(elements)
+    } else {
+        Ok(apply_css_result_filters(
+            collect_matching_elements(&selector),
+            &compat_selector.result_filters,
+        ))
+    }
+}
+
+fn extract_css_attr_value(element: &ElementRef<'_>, attr: &str) -> Option<String> {
+    if attr == "html" {
+        let value = element.inner_html();
+        if !value.is_empty() {
+            return Some(value);
+        }
+    } else if attr == "textNodes" {
+        let value = element_text(element);
+        if !value.is_empty() {
+            return Some(value);
+        }
+    } else if attr == "ownText" {
+        let value = normalize_text(&element_own_text(element));
+        if !value.is_empty() {
+            return Some(value);
+        }
+    } else if let Some(value) = element.value().attr(attr) {
+        return Some(value.to_string());
+    }
+
+    None
 }
 
 fn apply_css(input: &str, rule: &CssRule) -> RuleResult<Vec<String>> {
@@ -3500,6 +6012,16 @@ fn apply_css(input: &str, rule: &CssRule) -> RuleResult<Vec<String>> {
             selector: rule.selector.clone(),
             message: format!("{err:?}"),
         })?;
+    let has_selector = compat_selector
+        .has_selector_filter
+        .as_ref()
+        .map(|filter| {
+            Selector::parse(&filter.selector).map_err(|err| RuleError::CssSelectorSyntax {
+                selector: rule.selector.clone(),
+                message: format!("{err:?}"),
+            })
+        })
+        .transpose()?;
     let has_data_selector = compat_selector
         .has_data_filter
         .as_ref()
@@ -3534,44 +6056,88 @@ fn apply_css(input: &str, rule: &CssRule) -> RuleResult<Vec<String>> {
     } else {
         None
     };
-    let anchored_text_selector = compat_selector
-        .anchored_text_filter
-        .as_ref()
+    let anchored_text_selectors = compat_selector
+        .anchored_text_filters
+        .iter()
         .map(|filter| {
             Selector::parse(&filter.selector).map_err(|err| RuleError::CssSelectorSyntax {
                 selector: rule.selector.clone(),
                 message: format!("{err:?}"),
             })
         })
-        .transpose()?;
-    let anchored_text_filter_regex = if let Some(filter) = &compat_selector.anchored_text_filter {
-        if filter.text_filter.matcher == CssTextMatcher::Regex {
-            Some(Regex::new(&filter.text_filter.value).map_err(|err| {
-                RuleError::CssSelectorSyntax {
-                    selector: rule.selector.clone(),
-                    message: err.to_string(),
-                }
-            })?)
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-    let text_filter_regex = if let Some(filter) = &compat_selector.text_filter {
-        if filter.matcher == CssTextMatcher::Regex {
-            Some(
-                Regex::new(&filter.value).map_err(|err| RuleError::CssSelectorSyntax {
-                    selector: rule.selector.clone(),
-                    message: err.to_string(),
-                })?,
-            )
-        } else {
-            None
-        }
-    } else {
-        None
-    };
+        .collect::<Result<Vec<_>, _>>()?;
+    let anchored_text_filter_regexes = compat_selector
+        .anchored_text_filters
+        .iter()
+        .map(|filter| {
+            if filter.text_filter.matcher == CssTextMatcher::Regex {
+                Regex::new(&filter.text_filter.value)
+                    .map(Some)
+                    .map_err(|err| RuleError::CssSelectorSyntax {
+                        selector: rule.selector.clone(),
+                        message: err.to_string(),
+                    })
+            } else {
+                Ok(None)
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let anchored_has_selectors = compat_selector
+        .anchored_has_filters
+        .iter()
+        .map(|filter| {
+            Selector::parse(&filter.selector).map_err(|err| RuleError::CssSelectorSyntax {
+                selector: rule.selector.clone(),
+                message: format!("{err:?}"),
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let anchored_data_selectors = compat_selector
+        .anchored_data_filters
+        .iter()
+        .map(|filter| {
+            Selector::parse(&filter.selector).map_err(|err| RuleError::CssSelectorSyntax {
+                selector: rule.selector.clone(),
+                message: format!("{err:?}"),
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let anchored_result_selectors = compat_selector
+        .anchored_result_filters
+        .iter()
+        .map(|filter| {
+            Selector::parse(&filter.selector).map_err(|err| RuleError::CssSelectorSyntax {
+                selector: rule.selector.clone(),
+                message: format!("{err:?}"),
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let anchored_parent_selectors = compat_selector
+        .anchored_parent_filters
+        .iter()
+        .map(|filter| {
+            Selector::parse(&filter.selector).map_err(|err| RuleError::CssSelectorSyntax {
+                selector: rule.selector.clone(),
+                message: format!("{err:?}"),
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let text_filter_regexes = compat_selector
+        .text_filters
+        .iter()
+        .map(|filter| {
+            if filter.text_filter.matcher == CssTextMatcher::Regex {
+                Regex::new(&filter.text_filter.value)
+                    .map(Some)
+                    .map_err(|err| RuleError::CssSelectorSyntax {
+                        selector: rule.selector.clone(),
+                        message: err.to_string(),
+                    })
+            } else {
+                Ok(None)
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let result_group_selectors = compat_selector
         .result_filter_groups
         .as_ref()
@@ -3587,15 +6153,42 @@ fn apply_css(input: &str, rule: &CssRule) -> RuleResult<Vec<String>> {
                 .collect::<Result<Vec<_>, _>>()
         })
         .transpose()?;
+    let anchored_result_elements = compat_selector
+        .anchored_result_filters
+        .iter()
+        .zip(anchored_result_selectors.iter())
+        .map(|(anchored_result_filter, anchored_result_selector)| {
+            apply_css_result_filters(
+                document.select(anchored_result_selector).collect(),
+                &anchored_result_filter.filters,
+            )
+        })
+        .collect::<Vec<_>>();
 
     let collect_matching_elements = |selector: &Selector| {
         let mut elements = Vec::new();
         for element in document.select(selector) {
             if let Some(parent_filter) = compat_selector.parent_filter {
-                let has_child_nodes = element_has_child_nodes(&element);
-                match parent_filter {
-                    CssParentFilter::HasChildren if !has_child_nodes => continue,
-                    CssParentFilter::Empty if has_child_nodes => continue,
+                if !css_parent_filter_matches(&element, parent_filter) {
+                    continue;
+                }
+            }
+            if let Some(has_selector_filter) = &compat_selector.has_selector_filter {
+                let Some(has_selector) = has_selector.as_ref() else {
+                    continue;
+                };
+                let matches = !css_has_filter_candidates(
+                    &element,
+                    has_selector,
+                    has_selector_filter.direct_child,
+                    &has_selector_filter.result_filters,
+                    has_selector_filter.parent_filter,
+                    has_selector_filter.nested_filter.as_ref(),
+                )
+                .is_empty();
+                match has_selector_filter.mode {
+                    CssTextFilterMode::Contains if !matches => continue,
+                    CssTextFilterMode::NotContains if matches => continue,
                     _ => {}
                 }
             }
@@ -3603,90 +6196,176 @@ fn apply_css(input: &str, rule: &CssRule) -> RuleResult<Vec<String>> {
                 let Some(has_data_selector) = has_data_selector.as_ref() else {
                     continue;
                 };
-                if !element.select(has_data_selector).any(|descendant| {
-                    let matches =
-                        css_contains_data_matches(&descendant, &has_data_filter.data_filter.value);
-                    match has_data_filter.data_filter.mode {
-                        CssDataFilterMode::Contains => matches,
-                        CssDataFilterMode::NotContains => !matches,
-                    }
-                }) {
-                    continue;
+                let has_matching_data = css_has_filter_candidates(
+                    &element,
+                    has_data_selector,
+                    has_data_filter.direct_child,
+                    &has_data_filter.result_filters,
+                    has_data_filter.parent_filter,
+                    None,
+                )
+                .into_iter()
+                .any(|descendant| {
+                    css_element_data_filter_matches(&descendant, &has_data_filter.data_filter)
+                });
+                match has_data_filter.mode {
+                    CssTextFilterMode::Contains if !has_matching_data => continue,
+                    CssTextFilterMode::NotContains if has_matching_data => continue,
+                    _ => {}
                 }
             }
             if let Some(has_text_filter) = &compat_selector.has_text_filter {
                 let Some(has_text_selector) = has_text_selector.as_ref() else {
                     continue;
                 };
-                let has_matching_text = if has_text_filter.direct_child {
-                    element.child_elements().any(|child| {
-                        has_text_selector.matches(&child)
-                            && css_element_text_filter_matches(
-                                &child,
-                                &has_text_filter.text_filter,
-                                has_text_filter_regex.as_ref(),
-                            )
-                    })
-                } else {
-                    element.select(has_text_selector).any(|descendant| {
-                        css_element_text_filter_matches(
-                            &descendant,
-                            &has_text_filter.text_filter,
-                            has_text_filter_regex.as_ref(),
-                        )
-                    })
-                };
-                if !has_matching_text {
-                    continue;
-                }
-            }
-            if let Some(anchored_text_filter) = &compat_selector.anchored_text_filter {
-                let Some(anchored_text_selector) = anchored_text_selector.as_ref() else {
-                    continue;
-                };
-                let anchor_matches =
-                    element
-                        .ancestors()
-                        .filter_map(ElementRef::wrap)
-                        .any(|ancestor| {
-                            anchored_text_selector.matches(&ancestor)
-                                && match anchored_text_filter.mode {
-                                    CssTextFilterMode::Contains => css_element_text_filter_matches(
-                                        &ancestor,
-                                        &anchored_text_filter.text_filter,
-                                        anchored_text_filter_regex.as_ref(),
-                                    ),
-                                    CssTextFilterMode::NotContains => {
-                                        !css_element_text_filter_matches(
-                                            &ancestor,
-                                            &anchored_text_filter.text_filter,
-                                            anchored_text_filter_regex.as_ref(),
-                                        )
-                                    }
-                                }
-                        });
-                if !anchor_matches {
-                    continue;
-                }
-            }
-            if let Some(data_filter) = &compat_selector.data_filter {
-                let matches = css_contains_data_matches(&element, &data_filter.value);
-                match data_filter.mode {
-                    CssDataFilterMode::Contains if !matches => continue,
-                    CssDataFilterMode::NotContains if matches => continue,
+                let has_matching_text = css_has_filter_candidates(
+                    &element,
+                    has_text_selector,
+                    has_text_filter.direct_child,
+                    &has_text_filter.result_filters,
+                    has_text_filter.parent_filter,
+                    None,
+                )
+                .into_iter()
+                .any(|descendant| {
+                    css_element_text_filter_mode_matches(
+                        &descendant,
+                        &has_text_filter.text_filter,
+                        has_text_filter.text_filter_mode,
+                        has_text_filter_regex.as_ref(),
+                    )
+                });
+                match has_text_filter.mode {
+                    CssTextFilterMode::Contains if !has_matching_text => continue,
+                    CssTextFilterMode::NotContains if has_matching_text => continue,
                     _ => {}
                 }
+            }
+            if !compat_selector.anchored_text_filters.is_empty()
+                && !compat_selector
+                    .anchored_text_filters
+                    .iter()
+                    .zip(anchored_text_selectors.iter())
+                    .zip(anchored_text_filter_regexes.iter())
+                    .all(|((anchored_text_filter, anchored_text_selector), regex)| {
+                        element
+                            .ancestors()
+                            .filter_map(ElementRef::wrap)
+                            .any(|ancestor| {
+                                anchored_text_selector.matches(&ancestor)
+                                    && match anchored_text_filter.mode {
+                                        CssTextFilterMode::Contains => {
+                                            css_element_text_filter_matches(
+                                                &ancestor,
+                                                &anchored_text_filter.text_filter,
+                                                regex.as_ref(),
+                                            )
+                                        }
+                                        CssTextFilterMode::NotContains => {
+                                            !css_element_text_filter_matches(
+                                                &ancestor,
+                                                &anchored_text_filter.text_filter,
+                                                regex.as_ref(),
+                                            )
+                                        }
+                                    }
+                            })
+                    })
+            {
+                continue;
+            }
+            if !compat_selector.anchored_has_filters.is_empty()
+                && !compat_selector
+                    .anchored_has_filters
+                    .iter()
+                    .zip(anchored_has_selectors.iter())
+                    .all(|(anchored_has_filter, anchored_has_selector)| {
+                        element
+                            .ancestors()
+                            .filter_map(ElementRef::wrap)
+                            .any(|ancestor| {
+                                anchored_has_selector.matches(&ancestor)
+                                    && css_nested_has_filter_matches(
+                                        &ancestor,
+                                        &anchored_has_filter.filter,
+                                    )
+                            })
+                    })
+            {
+                continue;
+            }
+            if !compat_selector.anchored_data_filters.is_empty()
+                && !compat_selector
+                    .anchored_data_filters
+                    .iter()
+                    .zip(anchored_data_selectors.iter())
+                    .all(|(anchored_data_filter, anchored_data_selector)| {
+                        element
+                            .ancestors()
+                            .filter_map(ElementRef::wrap)
+                            .any(|ancestor| {
+                                anchored_data_selector.matches(&ancestor)
+                                    && css_element_data_filter_matches(
+                                        &ancestor,
+                                        &anchored_data_filter.data_filter,
+                                    )
+                            })
+                    })
+            {
+                continue;
+            }
+            if !anchored_result_elements.is_empty()
+                && !anchored_result_elements
+                    .iter()
+                    .all(|anchors| css_element_has_anchored_result_match(&element, anchors))
+            {
+                continue;
+            }
+            if !compat_selector.anchored_parent_filters.is_empty()
+                && !compat_selector
+                    .anchored_parent_filters
+                    .iter()
+                    .zip(anchored_parent_selectors.iter())
+                    .all(|(anchored_parent_filter, anchored_parent_selector)| {
+                        element
+                            .ancestors()
+                            .filter_map(ElementRef::wrap)
+                            .any(|ancestor| {
+                                anchored_parent_selector.matches(&ancestor)
+                                    && css_parent_filter_matches(
+                                        &ancestor,
+                                        anchored_parent_filter.parent_filter,
+                                    )
+                            })
+                    })
+            {
+                continue;
+            }
+            if !compat_selector
+                .data_filters
+                .iter()
+                .all(|data_filter| css_element_data_filter_matches(&element, data_filter))
+            {
+                continue;
             }
 
-            if let Some(filter) = &compat_selector.text_filter {
-                let haystack = css_element_text_filter_haystack(&element, filter);
-                let matches =
-                    css_text_filter_matches(&haystack, filter, text_filter_regex.as_ref());
-                match compat_selector.text_filter_mode {
-                    CssTextFilterMode::Contains if !matches => continue,
-                    CssTextFilterMode::NotContains if matches => continue,
-                    _ => {}
-                }
+            if !compat_selector.text_filters.is_empty()
+                && !compat_selector
+                    .text_filters
+                    .iter()
+                    .zip(text_filter_regexes.iter())
+                    .all(|(filter, regex)| {
+                        let haystack =
+                            css_element_text_filter_haystack(&element, &filter.text_filter);
+                        let matches =
+                            css_text_filter_matches(&haystack, &filter.text_filter, regex.as_ref());
+                        match filter.mode {
+                            CssTextFilterMode::Contains => matches,
+                            CssTextFilterMode::NotContains => !matches,
+                        }
+                    })
+            {
+                continue;
             }
 
             elements.push(element);
@@ -3720,23 +6399,8 @@ fn apply_css(input: &str, rule: &CssRule) -> RuleResult<Vec<String>> {
                 output.push(element_text(&element));
             }
             CssExtraction::Attr(attr) => {
-                if attr == "html" {
-                    let value = element.inner_html();
-                    if !value.is_empty() {
-                        output.push(value);
-                    }
-                } else if attr == "textNodes" {
-                    let value = element_text(&element);
-                    if !value.is_empty() {
-                        output.push(value);
-                    }
-                } else if attr == "ownText" {
-                    let value = normalize_text(&element_own_text(&element));
-                    if !value.is_empty() {
-                        output.push(value);
-                    }
-                } else if let Some(value) = element.value().attr(attr) {
-                    output.push(value.to_string());
+                if let Some(value) = extract_css_attr_value(&element, attr) {
+                    output.push(value);
                 }
             }
         }
@@ -3784,6 +6448,140 @@ fn apply_css_result_filters<'a>(
     elements
 }
 
+fn css_element_has_anchored_result_match(
+    element: &ElementRef<'_>,
+    anchors: &[ElementRef<'_>],
+) -> bool {
+    element
+        .ancestors()
+        .filter_map(ElementRef::wrap)
+        .any(|ancestor| anchors.iter().any(|anchor| *anchor == ancestor))
+}
+
+fn css_parent_filter_matches(element: &ElementRef<'_>, parent_filter: CssParentFilter) -> bool {
+    let has_child_nodes = element_has_child_nodes(element);
+    match parent_filter {
+        CssParentFilter::HasChildren => has_child_nodes,
+        CssParentFilter::Empty => !has_child_nodes,
+    }
+}
+
+fn css_has_filter_candidates<'a>(
+    element: &ElementRef<'a>,
+    selector: &Selector,
+    direct_child: bool,
+    filters: &[CssResultFilter],
+    parent_filter: Option<CssParentFilter>,
+    nested_filter: Option<&CssNestedHasFilter>,
+) -> Vec<ElementRef<'a>> {
+    let mut elements = if direct_child {
+        element
+            .child_elements()
+            .filter(|child| selector.matches(child))
+            .collect::<Vec<_>>()
+    } else {
+        element.select(selector).collect::<Vec<_>>()
+    };
+
+    if let Some(parent_filter) = parent_filter {
+        elements.retain(|element| css_parent_filter_matches(element, parent_filter));
+    }
+
+    if let Some(nested_filter) = nested_filter {
+        elements.retain(|element| css_nested_has_filter_matches(element, nested_filter));
+    }
+
+    apply_css_result_filters(elements, filters)
+}
+
+fn css_has_selector_filter_matches(
+    element: &ElementRef<'_>,
+    filter: &CssHasSelectorFilter,
+) -> bool {
+    let Ok(selector) = Selector::parse(&filter.selector) else {
+        return false;
+    };
+    let matches = !css_has_filter_candidates(
+        element,
+        &selector,
+        filter.direct_child,
+        &filter.result_filters,
+        filter.parent_filter,
+        filter.nested_filter.as_ref(),
+    )
+    .is_empty();
+
+    match filter.mode {
+        CssTextFilterMode::Contains => matches,
+        CssTextFilterMode::NotContains => !matches,
+    }
+}
+
+fn css_nested_has_filter_matches(element: &ElementRef<'_>, filter: &CssNestedHasFilter) -> bool {
+    match filter {
+        CssNestedHasFilter::Selector(filter) => css_has_selector_filter_matches(element, filter),
+        CssNestedHasFilter::Data(filter) => css_has_data_filter_matches(element, filter),
+        CssNestedHasFilter::Text(filter) => css_has_text_filter_matches(element, filter),
+    }
+}
+
+fn css_has_data_filter_matches(element: &ElementRef<'_>, filter: &CssHasDataFilter) -> bool {
+    let Ok(selector) = Selector::parse(&filter.selector) else {
+        return false;
+    };
+    let has_matching_data = css_has_filter_candidates(
+        element,
+        &selector,
+        filter.direct_child,
+        &filter.result_filters,
+        filter.parent_filter,
+        None,
+    )
+    .into_iter()
+    .any(|candidate| css_element_data_filter_matches(&candidate, &filter.data_filter));
+
+    match filter.mode {
+        CssTextFilterMode::Contains => has_matching_data,
+        CssTextFilterMode::NotContains => !has_matching_data,
+    }
+}
+
+fn css_has_text_filter_matches(element: &ElementRef<'_>, filter: &CssHasTextFilter) -> bool {
+    let Ok(selector) = Selector::parse(&filter.selector) else {
+        return false;
+    };
+    let regex = if filter.text_filter.matcher == CssTextMatcher::Regex {
+        match Regex::new(&filter.text_filter.value) {
+            Ok(regex) => Some(regex),
+            Err(_) => return false,
+        }
+    } else {
+        None
+    };
+    let has_matching_text = css_has_filter_candidates(
+        element,
+        &selector,
+        filter.direct_child,
+        &filter.result_filters,
+        filter.parent_filter,
+        None,
+    )
+    .into_iter()
+    .any(|candidate| {
+        css_element_text_filter_mode_matches(
+            &candidate,
+            &filter.text_filter,
+            filter.text_filter_mode,
+            regex.as_ref(),
+        )
+    });
+
+    match filter.mode {
+        CssTextFilterMode::Contains => has_matching_text,
+        CssTextFilterMode::NotContains => !has_matching_text,
+    }
+}
+
 fn resolve_css_result_index(index: isize, len: usize) -> isize {
     if index < 0 {
         len as isize + index
@@ -3808,6 +6606,19 @@ fn css_element_text_filter_matches(
     let haystack = css_element_text_filter_haystack(element, filter);
 
     css_text_filter_matches(&haystack, filter, regex)
+}
+
+fn css_element_text_filter_mode_matches(
+    element: &ElementRef<'_>,
+    filter: &CssTextFilter,
+    mode: CssTextFilterMode,
+    regex: Option<&Regex>,
+) -> bool {
+    let matches = css_element_text_filter_matches(element, filter, regex);
+    match mode {
+        CssTextFilterMode::Contains => matches,
+        CssTextFilterMode::NotContains => !matches,
+    }
 }
 
 fn css_element_text_filter_haystack(element: &ElementRef<'_>, filter: &CssTextFilter) -> String {
@@ -3925,6 +6736,14 @@ fn css_contains_data_matches(element: &ElementRef<'_>, needle: &str) -> bool {
     })
 }
 
+fn css_element_data_filter_matches(element: &ElementRef<'_>, filter: &CssDataFilter) -> bool {
+    let matches = css_contains_data_matches(element, &filter.value);
+    match filter.mode {
+        CssDataFilterMode::Contains => matches,
+        CssDataFilterMode::NotContains => !matches,
+    }
+}
+
 fn element_own_text(element: &ElementRef<'_>) -> String {
     element
         .children()
@@ -3946,14 +6765,18 @@ fn element_whole_own_text(element: &ElementRef<'_>) -> String {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CssCompatSelector {
     selector: String,
-    text_filter: Option<CssTextFilter>,
-    text_filter_mode: CssTextFilterMode,
+    text_filters: Vec<CssTextFilterPredicate>,
     result_filters: Vec<CssResultFilter>,
     result_filter_groups: Option<Vec<CssResultFilterGroup>>,
-    data_filter: Option<CssDataFilter>,
+    data_filters: Vec<CssDataFilter>,
+    has_selector_filter: Option<CssHasSelectorFilter>,
     has_data_filter: Option<CssHasDataFilter>,
     has_text_filter: Option<CssHasTextFilter>,
-    anchored_text_filter: Option<CssAnchoredTextFilter>,
+    anchored_text_filters: Vec<CssAnchoredTextFilter>,
+    anchored_has_filters: Vec<CssAnchoredHasFilter>,
+    anchored_data_filters: Vec<CssAnchoredDataFilter>,
+    anchored_result_filters: Vec<CssAnchoredResultFilter>,
+    anchored_parent_filters: Vec<CssAnchoredParentFilter>,
     parent_filter: Option<CssParentFilter>,
 }
 
@@ -3984,16 +6807,65 @@ struct CssAnchoredTextFilter {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct CssHasDataFilter {
+struct CssAnchoredHasFilter {
+    selector: String,
+    filter: CssNestedHasFilter,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CssAnchoredDataFilter {
     selector: String,
     data_filter: CssDataFilter,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CssAnchoredResultFilter {
+    selector: String,
+    filters: Vec<CssResultFilter>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CssAnchoredParentFilter {
+    selector: String,
+    parent_filter: CssParentFilter,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CssHasSelectorFilter {
+    selector: String,
+    direct_child: bool,
+    result_filters: Vec<CssResultFilter>,
+    parent_filter: Option<CssParentFilter>,
+    nested_filter: Option<CssNestedHasFilter>,
+    mode: CssTextFilterMode,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CssNestedHasFilter {
+    Selector(Box<CssHasSelectorFilter>),
+    Data(CssHasDataFilter),
+    Text(CssHasTextFilter),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CssHasDataFilter {
+    selector: String,
+    direct_child: bool,
+    result_filters: Vec<CssResultFilter>,
+    parent_filter: Option<CssParentFilter>,
+    data_filter: CssDataFilter,
+    mode: CssTextFilterMode,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CssHasTextFilter {
     selector: String,
     direct_child: bool,
+    result_filters: Vec<CssResultFilter>,
+    parent_filter: Option<CssParentFilter>,
     text_filter: CssTextFilter,
+    text_filter_mode: CssTextFilterMode,
+    mode: CssTextFilterMode,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -4019,6 +6891,12 @@ struct CssTextFilter {
     value: String,
     scope: CssTextScope,
     matcher: CssTextMatcher,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CssTextFilterPredicate {
+    text_filter: CssTextFilter,
+    mode: CssTextFilterMode,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -4068,29 +6946,102 @@ fn parse_css_compat_selector(selector: &str) -> Result<CssCompatSelector, String
         selector = value;
     }
 
+    let mut anchored_result_filters = Vec::new();
+    if split_css_selector_groups(&selector).len() == 1 {
+        while let Some((rewritten, filter)) = extract_css_anchored_result_filter(&selector)? {
+            selector = rewritten;
+            anchored_result_filters.push(filter);
+        }
+    }
+    let mut anchored_parent_filters = Vec::new();
+    if split_css_selector_groups(&selector).len() == 1 {
+        while let Some((rewritten, filter)) = extract_css_anchored_parent_filter(&selector)? {
+            selector = rewritten;
+            anchored_parent_filters.push(filter);
+        }
+    }
+
     let (rewritten_selector, result_filters, result_filter_groups) =
         extract_css_result_filter_groups(&selector)?;
     selector = rewritten_selector;
 
-    let mut anchored_text_filter = None;
-    if let Some((rewritten, filter)) = extract_css_anchored_text_filter(&selector)? {
+    let mut anchored_text_filters = Vec::new();
+    while let Some((rewritten, filter)) = extract_css_anchored_text_filter(&selector)? {
         selector = rewritten;
-        anchored_text_filter = Some(filter);
+        anchored_text_filters.push(filter);
+    }
+    let mut anchored_has_filters = Vec::new();
+    while let Some((rewritten, filter)) = extract_css_anchored_has_filter(&selector)? {
+        selector = rewritten;
+        anchored_has_filters.push(filter);
+    }
+    let mut anchored_data_filters = Vec::new();
+    while let Some((rewritten, filter)) = extract_css_anchored_data_filter(&selector)? {
+        selector = rewritten;
+        anchored_data_filters.push(filter);
     }
 
+    let mut has_selector_filter = None;
     let mut has_data_filter = None;
     let mut has_text_filter = None;
-    if let Some(suffix) = find_css_has_filter_suffix(&selector) {
+    if let Some(suffix) = find_css_not_has_filter_suffix(&selector) {
+        let close_index = selector.len() - 2;
+        let base = selector[..suffix.open_index].trim();
+        let inner = selector[suffix.open_index + suffix.prefix_len..close_index].trim();
+        if inner.is_empty() {
+            return Err(format!("CSS {} requires selector", suffix.name));
+        }
+        if find_css_not_data_filter_suffix(inner).is_some()
+            || find_css_data_filter_suffix(inner).is_some()
+        {
+            has_data_filter = Some(parse_css_has_data_filter(
+                inner,
+                CssTextFilterMode::NotContains,
+            )?);
+        } else if find_css_not_text_filter_suffix(inner).is_some()
+            || find_css_text_filter_suffix(inner).is_some()
+        {
+            has_text_filter = Some(parse_css_has_text_filter(
+                inner,
+                CssTextFilterMode::NotContains,
+            )?);
+        } else {
+            has_selector_filter = Some(parse_css_has_selector_filter(
+                inner,
+                CssTextFilterMode::NotContains,
+            )?);
+        }
+        selector = if base.is_empty() {
+            "*".to_string()
+        } else {
+            base.to_string()
+        };
+    } else if let Some(suffix) = find_css_has_filter_suffix(&selector) {
         let close_index = selector.len() - 1;
         let base = selector[..suffix.open_index].trim();
         let inner = selector[suffix.open_index + suffix.prefix_len..close_index].trim();
         if inner.is_empty() {
             return Err(format!("CSS {} requires selector", suffix.name));
         }
-        if find_css_data_filter_suffix(inner).is_some() {
-            has_data_filter = Some(parse_css_has_data_filter(inner)?);
+        if find_css_not_data_filter_suffix(inner).is_some()
+            || find_css_data_filter_suffix(inner).is_some()
+        {
+            has_data_filter = Some(parse_css_has_data_filter(
+                inner,
+                CssTextFilterMode::Contains,
+            )?);
+        } else if find_css_not_text_filter_suffix(inner).is_some()
+            || find_css_text_filter_suffix(inner).is_some()
+        {
+            has_text_filter = Some(parse_css_has_text_filter(
+                inner,
+                CssTextFilterMode::Contains,
+            )?);
         } else {
-            has_text_filter = Some(parse_css_has_text_filter(inner)?);
+            has_selector_filter = Some(parse_css_has_selector_filter(
+                inner,
+                CssTextFilterMode::Contains,
+            )?);
         }
         selector = if base.is_empty() {
             "*".to_string()
@@ -4099,33 +7050,27 @@ fn parse_css_compat_selector(selector: &str) -> Result<CssCompatSelector, String
         };
     }
 
-    let mut data_filter = None;
-    if let Some(suffix) = find_css_not_data_filter_suffix(&selector) {
-        let close_index = selector.len() - 2;
-        let base = selector[..suffix.open_index].trim();
-        let argument = selector[suffix.open_index + suffix.prefix_len..close_index].trim();
-        if argument.is_empty() {
-            return Err(format!("CSS {} requires text", suffix.name));
-        }
-        data_filter = Some(CssDataFilter {
-            value: parse_css_text_filter_argument(argument, suffix.name)?,
-            mode: CssDataFilterMode::NotContains,
-        });
-        selector = if base.is_empty() {
-            "*".to_string()
+    let mut data_filters = Vec::new();
+    loop {
+        let data_filter = if let Some(suffix) = find_css_not_data_filter_suffix(&selector) {
+            Some((suffix, selector.len() - 2, CssDataFilterMode::NotContains))
         } else {
-            base.to_string()
+            find_css_data_filter_suffix(&selector)
+                .map(|suffix| (suffix, selector.len() - 1, CssDataFilterMode::Contains))
         };
-    } else if let Some(suffix) = find_css_data_filter_suffix(&selector) {
-        let close_index = selector.len() - 1;
+
+        let Some((suffix, close_index, mode)) = data_filter else {
+            break;
+        };
+
         let base = selector[..suffix.open_index].trim();
         let argument = selector[suffix.open_index + suffix.prefix_len..close_index].trim();
         if argument.is_empty() {
             return Err(format!("CSS {} requires text", suffix.name));
         }
-        data_filter = Some(CssDataFilter {
+        data_filters.push(CssDataFilter {
             value: parse_css_text_filter_argument(argument, suffix.name)?,
-            mode: CssDataFilterMode::Contains,
+            mode,
         });
         selector = if base.is_empty() {
             "*".to_string()
@@ -4134,58 +7079,188 @@ fn parse_css_compat_selector(selector: &str) -> Result<CssCompatSelector, String
         };
     }
 
-    let mut text_filter_mode = CssTextFilterMode::Contains;
-    let text_filter = if let Some(suffix) = find_css_not_text_filter_suffix(&selector) {
-        text_filter_mode = CssTextFilterMode::NotContains;
-        Some((suffix, selector.len() - 2))
-    } else {
-        find_css_text_filter_suffix(&selector).map(|suffix| (suffix, selector.len() - 1))
-    };
+    let mut text_filters = Vec::new();
+    loop {
+        let text_filter = if let Some(suffix) = find_css_not_text_filter_suffix(&selector) {
+            Some((suffix, selector.len() - 2, CssTextFilterMode::NotContains))
+        } else {
+            find_css_text_filter_suffix(&selector)
+                .map(|suffix| (suffix, selector.len() - 1, CssTextFilterMode::Contains))
+        };
 
-    let Some((suffix, close_index)) = text_filter else {
-        return Ok(CssCompatSelector {
-            selector: if selector.is_empty() {
-                "*".to_string()
-            } else {
-                selector
+        let Some((suffix, close_index, mode)) = text_filter else {
+            break;
+        };
+
+        let base = selector[..suffix.open_index].trim();
+        let argument = selector[suffix.open_index + suffix.prefix_len..close_index].trim();
+        if argument.is_empty() {
+            return Err(format!("CSS {} requires text", suffix.name));
+        }
+
+        text_filters.push(CssTextFilterPredicate {
+            text_filter: CssTextFilter {
+                value: parse_css_text_filter_argument(argument, suffix.name)?,
+                scope: suffix.scope,
+                matcher: suffix.matcher,
             },
-            text_filter: None,
-            text_filter_mode,
-            result_filters,
-            result_filter_groups,
-            data_filter,
-            has_data_filter,
-            has_text_filter,
-            anchored_text_filter,
-            parent_filter,
+            mode,
         });
-    };
-
-    let base = selector[..suffix.open_index].trim();
-    let argument = selector[suffix.open_index + suffix.prefix_len..close_index].trim();
-    if argument.is_empty() {
-        return Err(format!("CSS {} requires text", suffix.name));
+        selector = if base.is_empty() {
+            "*".to_string()
+        } else {
+            base.to_string()
+        };
     }
 
-    let filter_value = parse_css_text_filter_argument(argument, suffix.name)?;
-    let selector = if base.is_empty() { "*" } else { base };
+    let selector = if selector.is_empty() {
+        "*".to_string()
+    } else {
+        selector
+    };
 
     Ok(CssCompatSelector {
-        selector: selector.to_string(),
-        text_filter: Some(CssTextFilter {
-            value: filter_value,
-            scope: suffix.scope,
-            matcher: suffix.matcher,
-        }),
-        text_filter_mode,
+        selector: normalize_css_unquoted_attribute_values(&selector),
+        text_filters,
         result_filters,
         result_filter_groups,
-        data_filter,
+        data_filters,
+        has_selector_filter,
         has_data_filter,
         has_text_filter,
-        anchored_text_filter,
+        anchored_text_filters,
+        anchored_has_filters,
+        anchored_data_filters,
+        anchored_result_filters,
+        anchored_parent_filters,
         parent_filter,
     })
+}
+
+fn normalize_css_unquoted_attribute_values(selector: &str) -> String {
+    let mut output = String::with_capacity(selector.len());
+    let mut index = 0usize;
+
+    while index < selector.len() {
+        let value = selector[index..]
+            .chars()
+            .next()
+            .expect("index is inside selector bounds");
+
+        if value != '[' {
+            output.push(value);
+            index += value.len_utf8();
+            continue;
+        }
+
+        let Some(end) = find_css_attribute_selector_end(selector, index) else {
+            output.push_str(&selector[index..]);
+            break;
+        };
+        output.push('[');
+        output.push_str(&normalize_css_attribute_selector_content(
+            &selector[index + '['.len_utf8()..end],
+        ));
+        output.push(']');
+        index = end + ']'.len_utf8();
+    }
+
+    output
+}
+
+fn find_css_attribute_selector_end(selector: &str, start: usize) -> Option<usize> {
+    let mut quote = None;
+    let mut escaped = false;
+    let mut index = start + '['.len_utf8();
+
+    while index < selector.len() {
+        let value = selector[index..].chars().next()?;
+
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            index += value.len_utf8();
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            index += value.len_utf8();
+            continue;
+        }
+
+        if value == ']' {
+            return Some(index);
+        }
+
+        index += value.len_utf8();
+    }
+
+    None
+}
+
+fn normalize_css_attribute_selector_content(content: &str) -> String {
+    let Some(equal_index) = content.find('=') else {
+        return content.to_string();
+    };
+
+    let mut value_start = equal_index + '='.len_utf8();
+    while value_start < content.len() {
+        let value = content[value_start..]
+            .chars()
+            .next()
+            .expect("index is inside attribute selector bounds");
+        if !value.is_whitespace() {
+            break;
+        }
+        value_start += value.len_utf8();
+    }
+
+    if value_start >= content.len() {
+        return content.to_string();
+    }
+
+    let first = content[value_start..]
+        .chars()
+        .next()
+        .expect("index is inside attribute selector bounds");
+    if first == '"' || first == '\'' {
+        return content.to_string();
+    }
+
+    let mut value_end = value_start;
+    while value_end < content.len() {
+        let value = content[value_end..]
+            .chars()
+            .next()
+            .expect("index is inside attribute selector bounds");
+        if value.is_whitespace() {
+            break;
+        }
+        value_end += value.len_utf8();
+    }
+
+    if value_end == value_start {
+        return content.to_string();
+    }
+
+    let mut output = String::with_capacity(content.len() + 2);
+    output.push_str(&content[..value_start]);
+    output.push('"');
+    for value in content[value_start..value_end].chars() {
+        if value == '"' || value == '\\' {
+            output.push('\\');
+        }
+        output.push(value);
+    }
+    output.push('"');
+    output.push_str(&content[value_end..]);
+    output
 }
 
 fn extract_css_result_filter_groups(
@@ -4271,6 +7346,167 @@ fn split_css_selector_groups(selector: &str) -> Vec<&str> {
     groups
 }
 
+fn extract_css_anchored_result_filter(
+    selector: &str,
+) -> Result<Option<(String, CssAnchoredResultFilter)>, String> {
+    let mut quote = None;
+    let mut escaped = false;
+    let mut bracket_depth = 0usize;
+    let mut paren_depth = 0usize;
+    let mut index = 0usize;
+
+    while index < selector.len() {
+        let value = selector[index..]
+            .chars()
+            .next()
+            .ok_or_else(|| "invalid CSS selector".to_string())?;
+
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            index += value.len_utf8();
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            index += value.len_utf8();
+            continue;
+        }
+
+        if value == ':' && bracket_depth == 0 && paren_depth == 0 {
+            let mut filters = Vec::new();
+            let mut cursor = index;
+            while let Some((filter, consumed)) = parse_css_result_filter_at(selector, cursor)? {
+                filters.push(filter);
+                cursor += consumed;
+            }
+
+            if !filters.is_empty() {
+                let tail = &selector[cursor..];
+                if tail.trim().is_empty() {
+                    return Ok(None);
+                }
+
+                let base = selector[..index].trim_end();
+                if base.is_empty() {
+                    return Ok(None);
+                }
+
+                return Ok(Some((
+                    format!("{base}{tail}"),
+                    CssAnchoredResultFilter {
+                        selector: base.to_string(),
+                        filters,
+                    },
+                )));
+            }
+        }
+
+        match value {
+            '[' => bracket_depth += 1,
+            ']' => bracket_depth = bracket_depth.saturating_sub(1),
+            '(' => paren_depth += 1,
+            ')' => paren_depth = paren_depth.saturating_sub(1),
+            _ => {}
+        }
+        index += value.len_utf8();
+    }
+
+    Ok(None)
+}
+
+fn extract_css_anchored_parent_filter(
+    selector: &str,
+) -> Result<Option<(String, CssAnchoredParentFilter)>, String> {
+    let mut quote = None;
+    let mut escaped = false;
+    let mut bracket_depth = 0usize;
+    let mut paren_depth = 0usize;
+    let mut index = 0usize;
+
+    while index < selector.len() {
+        let value = selector[index..]
+            .chars()
+            .next()
+            .ok_or_else(|| "invalid CSS selector".to_string())?;
+
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            index += value.len_utf8();
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            index += value.len_utf8();
+            continue;
+        }
+
+        if bracket_depth == 0 && paren_depth == 0 {
+            if selector[index..].starts_with(":not(:parent)") {
+                let tail_index = index + ":not(:parent)".len();
+                let tail = &selector[tail_index..];
+                if tail.trim().is_empty() {
+                    return Ok(None);
+                }
+                let base = selector[..index].trim_end();
+                if base.is_empty() {
+                    return Ok(None);
+                }
+                return Ok(Some((
+                    format!("{base}{tail}"),
+                    CssAnchoredParentFilter {
+                        selector: base.to_string(),
+                        parent_filter: CssParentFilter::Empty,
+                    },
+                )));
+            }
+
+            if css_result_keyword_matches(&selector[index..], ":parent") {
+                let tail_index = index + ":parent".len();
+                let tail = &selector[tail_index..];
+                if tail.trim().is_empty() {
+                    return Ok(None);
+                }
+                let base = selector[..index].trim_end();
+                if base.is_empty() {
+                    return Ok(None);
+                }
+                return Ok(Some((
+                    format!("{base}{tail}"),
+                    CssAnchoredParentFilter {
+                        selector: base.to_string(),
+                        parent_filter: CssParentFilter::HasChildren,
+                    },
+                )));
+            }
+        }
+
+        match value {
+            '[' => bracket_depth += 1,
+            ']' => bracket_depth = bracket_depth.saturating_sub(1),
+            '(' => paren_depth += 1,
+            ')' => paren_depth = paren_depth.saturating_sub(1),
+            _ => {}
+        }
+        index += value.len_utf8();
+    }
+
+    Ok(None)
+}
+
 fn extract_css_result_filters(selector: &str) -> Result<(String, Vec<CssResultFilter>), String> {
     let mut rewritten = String::new();
     let mut filters = Vec::new();
@@ -4346,6 +7582,37 @@ fn extract_css_result_filters(selector: &str) -> Result<(String, Vec<CssResultFi
     Ok((rewritten, filters))
 }
 
+fn parse_css_result_filter_at(
+    selector: &str,
+    index: usize,
+) -> Result<Option<(CssResultFilter, usize)>, String> {
+    if let Some((filter, consumed)) = css_result_filter_keyword(&selector[index..]) {
+        return Ok(Some((filter, consumed)));
+    }
+
+    let Some((kind, prefix, name)) = css_result_filter_prefix(&selector[index..]) else {
+        return Ok(None);
+    };
+    let argument_start = index + prefix.len();
+    let close_index = matching_css_function_close(selector, argument_start)
+        .ok_or_else(|| format!("unterminated CSS {name} argument in `{selector}`"))?;
+    let argument = selector[argument_start..close_index].trim();
+    if argument.is_empty() {
+        return Err(format!("CSS {name} requires index"));
+    }
+    let index_value = argument
+        .parse::<isize>()
+        .map_err(|_| format!("CSS {name} index must be an integer"))?;
+
+    Ok(Some((
+        CssResultFilter {
+            kind,
+            index: index_value,
+        },
+        close_index + 1 - index,
+    )))
+}
+
 fn css_result_filter_keyword(selector: &str) -> Option<(CssResultFilter, usize)> {
     if css_result_keyword_matches(selector, ":first") {
         Some((
@@ -4400,7 +7667,7 @@ fn css_result_filter_prefix(
 fn extract_css_anchored_text_filter(
     selector: &str,
 ) -> Result<Option<(String, CssAnchoredTextFilter)>, String> {
-    if let Some(suffix) = find_css_not_text_filter_function(selector) {
+    if let Some(suffix) = find_first_css_not_text_filter_function(selector) {
         let argument_start = suffix.open_index + suffix.prefix_len;
         let close_index = matching_css_function_close(selector, argument_start)
             .ok_or_else(|| format!("unterminated CSS {} argument in `{selector}`", suffix.name))?;
@@ -4441,7 +7708,7 @@ fn extract_css_anchored_text_filter(
         )));
     }
 
-    let Some(suffix) = find_css_text_filter_function(selector) else {
+    let Some(suffix) = find_first_css_text_filter_function(selector) else {
         return Ok(None);
     };
 
@@ -4477,67 +7744,292 @@ fn extract_css_anchored_text_filter(
     )))
 }
 
-fn parse_css_has_data_filter(selector: &str) -> Result<CssHasDataFilter, String> {
-    let Some(suffix) = find_css_data_filter_suffix(selector) else {
+fn extract_css_anchored_has_filter(
+    selector: &str,
+) -> Result<Option<(String, CssAnchoredHasFilter)>, String> {
+    let Some((suffix, mode)) = find_first_css_has_filter_for_anchor(selector) else {
+        return Ok(None);
+    };
+
+    let argument_start = suffix.open_index + suffix.prefix_len;
+    let close_index = matching_css_function_close(selector, argument_start)
+        .ok_or_else(|| format!("unterminated CSS {} argument in `{selector}`", suffix.name))?;
+    let tail_index = if mode == CssTextFilterMode::NotContains {
+        let outer_close_index = close_index + 1;
+        if selector.as_bytes().get(outer_close_index) != Some(&b')') {
+            return Err(format!(
+                "unterminated CSS {} argument in `{selector}`",
+                suffix.name
+            ));
+        }
+        outer_close_index + 1
+    } else {
+        close_index + 1
+    };
+    let tail = &selector[tail_index..];
+    if tail.trim().is_empty() {
+        return Ok(None);
+    }
+    if !css_selector_tail_has_top_level_combinator(tail) {
+        return Ok(None);
+    }
+
+    let base = selector[..suffix.open_index].trim_end();
+    if base.is_empty() {
+        return Ok(None);
+    }
+
+    let inner = selector[argument_start..close_index].trim();
+    if inner.is_empty() {
+        return Err(format!("CSS {} requires selector", suffix.name));
+    }
+
+    Ok(Some((
+        format!("{base}{tail}"),
+        CssAnchoredHasFilter {
+            selector: base.to_string(),
+            filter: parse_css_nested_has_filter(inner, mode)?,
+        },
+    )))
+}
+
+fn extract_css_anchored_data_filter(
+    selector: &str,
+) -> Result<Option<(String, CssAnchoredDataFilter)>, String> {
+    let Some((suffix, mode)) = find_first_css_data_filter_for_anchor(selector) else {
+        return Ok(None);
+    };
+
+    let argument_start = suffix.open_index + suffix.prefix_len;
+    let close_index = matching_css_function_close(selector, argument_start)
+        .ok_or_else(|| format!("unterminated CSS {} argument in `{selector}`", suffix.name))?;
+    let tail_index = if mode == CssDataFilterMode::NotContains {
+        let outer_close_index = close_index + 1;
+        if selector.as_bytes().get(outer_close_index) != Some(&b')') {
+            return Err(format!(
+                "unterminated CSS {} argument in `{selector}`",
+                suffix.name
+            ));
+        }
+        outer_close_index + 1
+    } else {
+        close_index + 1
+    };
+    let tail = &selector[tail_index..];
+    if tail.trim().is_empty() {
+        return Ok(None);
+    }
+    if !css_selector_tail_has_top_level_combinator(tail) {
+        return Ok(None);
+    }
+
+    let base = selector[..suffix.open_index].trim_end();
+    if base.is_empty() {
+        return Ok(None);
+    }
+
+    let argument = selector[argument_start..close_index].trim();
+    if argument.is_empty() {
+        return Err(format!("CSS {} requires text", suffix.name));
+    }
+
+    Ok(Some((
+        format!("{base}{tail}"),
+        CssAnchoredDataFilter {
+            selector: base.to_string(),
+            data_filter: CssDataFilter {
+                value: parse_css_text_filter_argument(argument, suffix.name)?,
+                mode,
+            },
+        },
+    )))
+}
+
+fn parse_css_has_data_filter(
+    selector: &str,
+    mode: CssTextFilterMode,
+) -> Result<CssHasDataFilter, String> {
+    let mut data_filter_mode = CssDataFilterMode::Contains;
+    let (suffix, close_index) = if let Some(suffix) = find_css_not_data_filter_suffix(selector) {
+        data_filter_mode = CssDataFilterMode::NotContains;
+        (suffix, selector.len() - 2)
+    } else if let Some(suffix) = find_css_data_filter_suffix(selector) {
+        (suffix, selector.len() - 1)
+    } else {
         return Err(format!(
             "CSS :has() compatibility requires :containsData() in `{selector}`"
         ));
     };
 
-    let close_index = selector.len() - 1;
     let base = selector[..suffix.open_index].trim();
     let argument = selector[suffix.open_index + suffix.prefix_len..close_index].trim();
     if argument.is_empty() {
         return Err(format!("CSS {} requires text", suffix.name));
     }
 
+    let (selector, direct_child, result_filters, parent_filter) =
+        parse_css_has_base_selector(base)?;
+
     Ok(CssHasDataFilter {
-        selector: if base.is_empty() {
-            "*".to_string()
-        } else {
-            base.to_string()
-        },
+        selector,
+        direct_child,
+        result_filters,
+        parent_filter,
         data_filter: CssDataFilter {
             value: parse_css_text_filter_argument(argument, suffix.name)?,
-            mode: CssDataFilterMode::Contains,
+            mode: data_filter_mode,
         },
+        mode,
     })
 }
 
-fn parse_css_has_text_filter(selector: &str) -> Result<CssHasTextFilter, String> {
-    let Some(suffix) = find_css_text_filter_suffix(selector) else {
+fn parse_css_has_selector_filter(
+    selector: &str,
+    mode: CssTextFilterMode,
+) -> Result<CssHasSelectorFilter, String> {
+    let selector = selector.trim();
+    if selector.is_empty() {
+        return Err("CSS :has() requires selector".to_string());
+    }
+    let mut selector = selector;
+    let mut nested_filter = None;
+    if let Some(suffix) = find_css_not_has_filter_suffix(selector) {
+        let close_index = selector.len() - 2;
+        let base = selector[..suffix.open_index].trim();
+        let inner = selector[suffix.open_index + suffix.prefix_len..close_index].trim();
+        if inner.is_empty() {
+            return Err(format!("CSS {} requires selector", suffix.name));
+        }
+        nested_filter = Some(parse_css_nested_has_filter(
+            inner,
+            CssTextFilterMode::NotContains,
+        )?);
+        selector = base;
+    } else if let Some(suffix) = find_css_has_filter_suffix(selector) {
+        let close_index = selector.len() - 1;
+        let base = selector[..suffix.open_index].trim();
+        let inner = selector[suffix.open_index + suffix.prefix_len..close_index].trim();
+        if inner.is_empty() {
+            return Err(format!("CSS {} requires selector", suffix.name));
+        }
+        nested_filter = Some(parse_css_nested_has_filter(
+            inner,
+            CssTextFilterMode::Contains,
+        )?);
+        selector = base;
+    }
+    let (selector, direct_child, result_filters, parent_filter) =
+        parse_css_has_base_selector(selector)?;
+
+    Ok(CssHasSelectorFilter {
+        selector,
+        direct_child,
+        result_filters,
+        parent_filter,
+        nested_filter,
+        mode,
+    })
+}
+
+fn parse_css_nested_has_filter(
+    selector: &str,
+    mode: CssTextFilterMode,
+) -> Result<CssNestedHasFilter, String> {
+    let selector = selector.trim();
+    if find_css_not_data_filter_suffix(selector).is_some()
+        || find_css_data_filter_suffix(selector).is_some()
+    {
+        return Ok(CssNestedHasFilter::Data(parse_css_has_data_filter(
+            selector, mode,
+        )?));
+    }
+
+    if find_css_not_text_filter_suffix(selector).is_some()
+        || find_css_text_filter_suffix(selector).is_some()
+    {
+        return Ok(CssNestedHasFilter::Text(parse_css_has_text_filter(
+            selector, mode,
+        )?));
+    }
+
+    Ok(CssNestedHasFilter::Selector(Box::new(
+        parse_css_has_selector_filter(selector, mode)?,
+    )))
+}
+
+fn parse_css_has_text_filter(
+    selector: &str,
+    mode: CssTextFilterMode,
+) -> Result<CssHasTextFilter, String> {
+    let mut text_filter_mode = CssTextFilterMode::Contains;
+    let (suffix, close_index) = if let Some(suffix) = find_css_not_text_filter_suffix(selector) {
+        text_filter_mode = CssTextFilterMode::NotContains;
+        (suffix, selector.len() - 2)
+    } else if let Some(suffix) = find_css_text_filter_suffix(selector) {
+        (suffix, selector.len() - 1)
+    } else {
         return Err(format!(
             "CSS :has() compatibility requires a supported text filter in `{selector}`"
         ));
     };
 
-    let close_index = selector.len() - 1;
     let base = selector[..suffix.open_index].trim();
     let argument = selector[suffix.open_index + suffix.prefix_len..close_index].trim();
     if argument.is_empty() {
         return Err(format!("CSS {} requires text", suffix.name));
     }
 
-    let direct_child = base.starts_with('>');
-    let selector = if direct_child {
-        base.trim_start_matches('>').trim()
-    } else {
-        base
-    };
+    let (selector, direct_child, result_filters, parent_filter) =
+        parse_css_has_base_selector(base)?;
 
     Ok(CssHasTextFilter {
-        selector: if selector.is_empty() {
-            "*".to_string()
-        } else {
-            selector.to_string()
-        },
+        selector,
         direct_child,
+        result_filters,
+        parent_filter,
         text_filter: CssTextFilter {
             value: parse_css_text_filter_argument(argument, suffix.name)?,
             scope: suffix.scope,
             matcher: suffix.matcher,
         },
+        text_filter_mode,
+        mode,
     })
+}
+
+fn parse_css_has_base_selector(
+    selector: &str,
+) -> Result<(String, bool, Vec<CssResultFilter>, Option<CssParentFilter>), String> {
+    let selector = selector.trim();
+    let direct_child = selector.starts_with('>');
+    let selector = if direct_child {
+        selector.trim_start_matches('>').trim()
+    } else {
+        selector
+    };
+    let (selector, result_filters) = extract_css_result_filters(selector)?;
+    let mut selector = selector.trim().to_string();
+    let mut parent_filter = None;
+    if let Some(base) = selector
+        .strip_suffix(":not(:parent)")
+        .map(|base| base.trim().to_string())
+    {
+        selector = base;
+        parent_filter = Some(CssParentFilter::Empty);
+    } else if let Some(base) = selector
+        .strip_suffix(":parent")
+        .map(|base| base.trim().to_string())
+    {
+        selector = base;
+        parent_filter = Some(CssParentFilter::HasChildren);
+    }
+    let selector = if selector.trim().is_empty() {
+        "*".to_string()
+    } else {
+        selector.trim().to_string()
+    };
+
+    Ok((selector, direct_child, result_filters, parent_filter))
 }
 
 fn strip_redundant_has_parent_filter(selector: &str) -> Option<String> {
@@ -4638,10 +8130,68 @@ fn find_css_has_filter_suffix(selector: &str) -> Option<CssHasFilterSuffix> {
         return None;
     }
 
+    find_css_has_filter_function(selector)
+}
+
+fn find_css_not_has_filter_suffix(selector: &str) -> Option<CssHasFilterSuffix> {
+    if !selector.ends_with("))") {
+        return None;
+    }
+
+    find_css_not_has_filter_function(selector)
+}
+
+fn find_css_has_filter_function(selector: &str) -> Option<CssHasFilterSuffix> {
     find_css_function_suffix(selector, ":has(").map(|open_index| CssHasFilterSuffix {
         open_index,
         prefix_len: ":has(".len(),
         name: ":has()",
+    })
+}
+
+fn find_css_not_has_filter_function(selector: &str) -> Option<CssHasFilterSuffix> {
+    find_css_function_suffix(selector, ":not(:has(").map(|open_index| CssHasFilterSuffix {
+        open_index,
+        prefix_len: ":not(:has(".len(),
+        name: ":not(:has())",
+    })
+}
+
+fn find_first_css_has_filter_for_anchor(
+    selector: &str,
+) -> Option<(CssHasFilterSuffix, CssTextFilterMode)> {
+    let positive = find_first_css_has_filter_function(selector)
+        .map(|suffix| (suffix, CssTextFilterMode::Contains));
+    let negative = find_first_css_not_has_filter_function(selector)
+        .map(|suffix| (suffix, CssTextFilterMode::NotContains));
+
+    match (positive, negative) {
+        (Some(positive), Some(negative)) => {
+            if positive.0.open_index < negative.0.open_index {
+                Some(positive)
+            } else {
+                Some(negative)
+            }
+        }
+        (Some(positive), None) => Some(positive),
+        (None, Some(negative)) => Some(negative),
+        (None, None) => None,
+    }
+}
+
+fn find_first_css_has_filter_function(selector: &str) -> Option<CssHasFilterSuffix> {
+    find_first_css_function(selector, ":has(").map(|open_index| CssHasFilterSuffix {
+        open_index,
+        prefix_len: ":has(".len(),
+        name: ":has()",
+    })
+}
+
+fn find_first_css_not_has_filter_function(selector: &str) -> Option<CssHasFilterSuffix> {
+    find_first_css_function(selector, ":not(:has(").map(|open_index| CssHasFilterSuffix {
+        open_index,
+        prefix_len: ":not(:has(".len(),
+        name: ":not(:has())",
     })
 }
 
@@ -4650,11 +8200,7 @@ fn find_css_data_filter_suffix(selector: &str) -> Option<CssDataFilterSuffix> {
         return None;
     }
 
-    find_css_function_suffix(selector, ":containsData(").map(|open_index| CssDataFilterSuffix {
-        open_index,
-        prefix_len: ":containsData(".len(),
-        name: ":containsData()",
-    })
+    find_css_data_filter_function(selector)
 }
 
 fn find_css_not_data_filter_suffix(selector: &str) -> Option<CssDataFilterSuffix> {
@@ -4662,12 +8208,62 @@ fn find_css_not_data_filter_suffix(selector: &str) -> Option<CssDataFilterSuffix
         return None;
     }
 
+    find_css_not_data_filter_function(selector)
+}
+
+fn find_css_data_filter_function(selector: &str) -> Option<CssDataFilterSuffix> {
+    find_css_function_suffix(selector, ":containsData(").map(|open_index| CssDataFilterSuffix {
+        open_index,
+        prefix_len: ":containsData(".len(),
+        name: ":containsData()",
+    })
+}
+
+fn find_css_not_data_filter_function(selector: &str) -> Option<CssDataFilterSuffix> {
     find_css_function_suffix(selector, ":not(:containsData(").map(|open_index| {
         CssDataFilterSuffix {
             open_index,
             prefix_len: ":not(:containsData(".len(),
             name: ":not(:containsData())",
         }
+    })
+}
+
+fn find_first_css_data_filter_for_anchor(
+    selector: &str,
+) -> Option<(CssDataFilterSuffix, CssDataFilterMode)> {
+    let positive = find_first_css_data_filter_function(selector)
+        .map(|suffix| (suffix, CssDataFilterMode::Contains));
+    let negative = find_first_css_not_data_filter_function(selector)
+        .map(|suffix| (suffix, CssDataFilterMode::NotContains));
+
+    match (positive, negative) {
+        (Some(positive), Some(negative)) => {
+            if positive.0.open_index < negative.0.open_index {
+                Some(positive)
+            } else {
+                Some(negative)
+            }
+        }
+        (Some(positive), None) => Some(positive),
+        (None, Some(negative)) => Some(negative),
+        (None, None) => None,
+    }
+}
+
+fn find_first_css_data_filter_function(selector: &str) -> Option<CssDataFilterSuffix> {
+    find_first_css_function(selector, ":containsData(").map(|open_index| CssDataFilterSuffix {
+        open_index,
+        prefix_len: ":containsData(".len(),
+        name: ":containsData()",
+    })
+}
+
+fn find_first_css_not_data_filter_function(selector: &str) -> Option<CssDataFilterSuffix> {
+    find_first_css_function(selector, ":not(:containsData(").map(|open_index| CssDataFilterSuffix {
+        open_index,
+        prefix_len: ":not(:containsData(".len(),
+        name: ":not(:containsData())",
     })
 }
 
@@ -4759,6 +8355,185 @@ fn find_css_not_text_filter_function(selector: &str) -> Option<CssTextFilterSuff
             matcher: CssTextMatcher::Regex,
             name: ":not(:matches())",
         });
+    }
+
+    None
+}
+
+fn find_first_css_not_text_filter_function(selector: &str) -> Option<CssTextFilterSuffix> {
+    find_first_css_text_filter_function_by(selector, true)
+}
+
+fn find_first_css_text_filter_function(selector: &str) -> Option<CssTextFilterSuffix> {
+    find_first_css_text_filter_function_by(selector, false)
+}
+
+fn find_first_css_text_filter_function_by(
+    selector: &str,
+    negated: bool,
+) -> Option<CssTextFilterSuffix> {
+    let mut quote = None;
+    let mut escaped = false;
+    let mut bracket_depth = 0usize;
+    let mut paren_depth = 0usize;
+
+    for (index, value) in selector.char_indices() {
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            continue;
+        }
+
+        match value {
+            '[' => bracket_depth += 1,
+            ']' => bracket_depth = bracket_depth.saturating_sub(1),
+            '(' => paren_depth += 1,
+            ')' => paren_depth = paren_depth.saturating_sub(1),
+            ':' if bracket_depth == 0 && paren_depth == 0 => {
+                if negated {
+                    if selector[index..].starts_with(":not(:containsWholeOwnText(") {
+                        return Some(CssTextFilterSuffix {
+                            open_index: index,
+                            prefix_len: ":not(:containsWholeOwnText(".len(),
+                            scope: CssTextScope::WholeOwn,
+                            matcher: CssTextMatcher::ContainsCaseSensitive,
+                            name: ":not(:containsWholeOwnText())",
+                        });
+                    } else if selector[index..].starts_with(":not(:containsWholeText(") {
+                        return Some(CssTextFilterSuffix {
+                            open_index: index,
+                            prefix_len: ":not(:containsWholeText(".len(),
+                            scope: CssTextScope::WholeDescendant,
+                            matcher: CssTextMatcher::ContainsCaseSensitive,
+                            name: ":not(:containsWholeText())",
+                        });
+                    } else if selector[index..].starts_with(":not(:containsOwn(") {
+                        return Some(CssTextFilterSuffix {
+                            open_index: index,
+                            prefix_len: ":not(:containsOwn(".len(),
+                            scope: CssTextScope::Own,
+                            matcher: CssTextMatcher::Contains,
+                            name: ":not(:containsOwn())",
+                        });
+                    } else if selector[index..].starts_with(":not(:contains(") {
+                        return Some(CssTextFilterSuffix {
+                            open_index: index,
+                            prefix_len: ":not(:contains(".len(),
+                            scope: CssTextScope::Descendant,
+                            matcher: CssTextMatcher::Contains,
+                            name: ":not(:contains())",
+                        });
+                    } else if selector[index..].starts_with(":not(:matchesWholeOwnText(") {
+                        return Some(CssTextFilterSuffix {
+                            open_index: index,
+                            prefix_len: ":not(:matchesWholeOwnText(".len(),
+                            scope: CssTextScope::WholeOwn,
+                            matcher: CssTextMatcher::Regex,
+                            name: ":not(:matchesWholeOwnText())",
+                        });
+                    } else if selector[index..].starts_with(":not(:matchesWholeText(") {
+                        return Some(CssTextFilterSuffix {
+                            open_index: index,
+                            prefix_len: ":not(:matchesWholeText(".len(),
+                            scope: CssTextScope::WholeDescendant,
+                            matcher: CssTextMatcher::Regex,
+                            name: ":not(:matchesWholeText())",
+                        });
+                    } else if selector[index..].starts_with(":not(:matchesOwn(") {
+                        return Some(CssTextFilterSuffix {
+                            open_index: index,
+                            prefix_len: ":not(:matchesOwn(".len(),
+                            scope: CssTextScope::Own,
+                            matcher: CssTextMatcher::Regex,
+                            name: ":not(:matchesOwn())",
+                        });
+                    } else if selector[index..].starts_with(":not(:matches(") {
+                        return Some(CssTextFilterSuffix {
+                            open_index: index,
+                            prefix_len: ":not(:matches(".len(),
+                            scope: CssTextScope::Descendant,
+                            matcher: CssTextMatcher::Regex,
+                            name: ":not(:matches())",
+                        });
+                    }
+                } else if selector[index..].starts_with(":containsWholeOwnText(") {
+                    return Some(CssTextFilterSuffix {
+                        open_index: index,
+                        prefix_len: ":containsWholeOwnText(".len(),
+                        scope: CssTextScope::WholeOwn,
+                        matcher: CssTextMatcher::ContainsCaseSensitive,
+                        name: ":containsWholeOwnText()",
+                    });
+                } else if selector[index..].starts_with(":containsWholeText(") {
+                    return Some(CssTextFilterSuffix {
+                        open_index: index,
+                        prefix_len: ":containsWholeText(".len(),
+                        scope: CssTextScope::WholeDescendant,
+                        matcher: CssTextMatcher::ContainsCaseSensitive,
+                        name: ":containsWholeText()",
+                    });
+                } else if selector[index..].starts_with(":containsOwn(") {
+                    return Some(CssTextFilterSuffix {
+                        open_index: index,
+                        prefix_len: ":containsOwn(".len(),
+                        scope: CssTextScope::Own,
+                        matcher: CssTextMatcher::Contains,
+                        name: ":containsOwn()",
+                    });
+                } else if selector[index..].starts_with(":contains(") {
+                    return Some(CssTextFilterSuffix {
+                        open_index: index,
+                        prefix_len: ":contains(".len(),
+                        scope: CssTextScope::Descendant,
+                        matcher: CssTextMatcher::Contains,
+                        name: ":contains()",
+                    });
+                } else if selector[index..].starts_with(":matchesWholeOwnText(") {
+                    return Some(CssTextFilterSuffix {
+                        open_index: index,
+                        prefix_len: ":matchesWholeOwnText(".len(),
+                        scope: CssTextScope::WholeOwn,
+                        matcher: CssTextMatcher::Regex,
+                        name: ":matchesWholeOwnText()",
+                    });
+                } else if selector[index..].starts_with(":matchesWholeText(") {
+                    return Some(CssTextFilterSuffix {
+                        open_index: index,
+                        prefix_len: ":matchesWholeText(".len(),
+                        scope: CssTextScope::WholeDescendant,
+                        matcher: CssTextMatcher::Regex,
+                        name: ":matchesWholeText()",
+                    });
+                } else if selector[index..].starts_with(":matchesOwn(") {
+                    return Some(CssTextFilterSuffix {
+                        open_index: index,
+                        prefix_len: ":matchesOwn(".len(),
+                        scope: CssTextScope::Own,
+                        matcher: CssTextMatcher::Regex,
+                        name: ":matchesOwn()",
+                    });
+                } else if selector[index..].starts_with(":matches(") {
+                    return Some(CssTextFilterSuffix {
+                        open_index: index,
+                        prefix_len: ":matches(".len(),
+                        scope: CssTextScope::Descendant,
+                        matcher: CssTextMatcher::Regex,
+                        name: ":matches()",
+                    });
+                }
+            }
+            _ => {}
+        }
     }
 
     None
@@ -4909,6 +8684,86 @@ fn find_css_function_suffix(selector: &str, function: &str) -> Option<usize> {
     candidate
 }
 
+fn find_first_css_function(selector: &str, function: &str) -> Option<usize> {
+    let mut quote = None;
+    let mut escaped = false;
+    let mut bracket_depth = 0usize;
+    let mut paren_depth = 0usize;
+
+    for (index, value) in selector.char_indices() {
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            continue;
+        }
+
+        match value {
+            '[' => bracket_depth += 1,
+            ']' => bracket_depth = bracket_depth.saturating_sub(1),
+            '(' => paren_depth += 1,
+            ')' => paren_depth = paren_depth.saturating_sub(1),
+            ':' if bracket_depth == 0
+                && paren_depth == 0
+                && selector[index..].starts_with(function) =>
+            {
+                return Some(index);
+            }
+            _ => {}
+        }
+    }
+
+    None
+}
+
+fn css_selector_tail_has_top_level_combinator(tail: &str) -> bool {
+    let mut quote = None;
+    let mut escaped = false;
+    let mut bracket_depth = 0usize;
+    let mut paren_depth = 0usize;
+
+    for value in tail.chars() {
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            continue;
+        }
+
+        match value {
+            '[' => bracket_depth += 1,
+            ']' => bracket_depth = bracket_depth.saturating_sub(1),
+            '(' => paren_depth += 1,
+            ')' => paren_depth = paren_depth.saturating_sub(1),
+            '>' | '+' | '~' if bracket_depth == 0 && paren_depth == 0 => return true,
+            value if value.is_whitespace() && bracket_depth == 0 && paren_depth == 0 => {
+                return true;
+            }
+            _ => {}
+        }
+    }
+
+    false
+}
+
 fn parse_css_text_filter_argument(argument: &str, name: &str) -> Result<String, String> {
     let chars = argument.chars().collect::<Vec<_>>();
     if matches!(chars.first(), Some('\'' | '"')) {
@@ -4966,6 +8821,55 @@ fn normalize_text(text: &str) -> String {
 
 fn apply_xpath(input: &str, rule: &XPathRule) -> RuleResult<Vec<String>> {
     validate_xpath_namespaces(rule)?;
+    evaluate_xpath_expression(input, &rule.expression, &rule.namespaces)
+}
+
+fn evaluate_xpath_expression(
+    input: &str,
+    expression: &str,
+    namespaces: &[(String, String)],
+) -> RuleResult<Vec<String>> {
+    let (expression, replacement) = split_legado_rule_replacement(expression);
+    let values = evaluate_xpath_expression_without_replacement(input, expression, namespaces)?;
+    Ok(apply_legado_rule_replacement(values, replacement.as_ref()))
+}
+
+fn evaluate_xpath_expression_without_replacement(
+    input: &str,
+    expression: &str,
+    namespaces: &[(String, String)],
+) -> RuleResult<Vec<String>> {
+    if let Some(branches) = split_xpath_top_level_operator(expression, "||")? {
+        for branch in branches {
+            let results = evaluate_xpath_expression(input, branch, namespaces)?;
+            if !results.is_empty() {
+                return Ok(results);
+            }
+        }
+        return Ok(Vec::new());
+    }
+
+    if let Some(branches) = split_xpath_top_level_operator(expression, "%%")? {
+        let mut branch_results = Vec::new();
+        for branch in branches {
+            let results = evaluate_xpath_expression(input, branch, namespaces)?;
+            if !results.is_empty() {
+                branch_results.push(results);
+            }
+        }
+        return Ok(zip_json_path_combination_results(branch_results));
+    }
+
+    if let Some(branches) = split_xpath_top_level_operator(expression, "&&")? {
+        let mut output = Vec::new();
+        for branch in branches {
+            let results = evaluate_xpath_expression(input, branch, namespaces)?;
+            if !results.is_empty() {
+                output.extend(results);
+            }
+        }
+        return Ok(output);
+    }
 
     let package = sxd_document::parser::parse(input).map_err(|err| RuleError::XPathInputParse {
         message: err.to_string(),
@@ -4973,24 +8877,24 @@ fn apply_xpath(input: &str, rule: &XPathRule) -> RuleResult<Vec<String>> {
     let document = package.as_document();
     let factory = Factory::new();
     let xpath = factory
-        .build(&rule.expression)
+        .build(expression)
         .map_err(|err| RuleError::XPathSyntax {
-            expression: rule.expression.clone(),
+            expression: expression.to_string(),
             message: err.to_string(),
         })?
         .ok_or_else(|| RuleError::XPathSyntax {
-            expression: rule.expression.clone(),
+            expression: expression.to_string(),
             message: "empty expression".to_string(),
         })?;
     let mut context = Context::new();
-    for (prefix, uri) in &rule.namespaces {
+    for (prefix, uri) in namespaces {
         context.set_namespace(prefix, uri);
     }
 
     match xpath
         .evaluate(&context, document.root())
         .map_err(|err| RuleError::XPathEvaluation {
-            expression: rule.expression.clone(),
+            expression: expression.to_string(),
             message: err.to_string(),
         })? {
         XPathValue::Nodeset(nodes) => Ok(nodes
@@ -5002,6 +8906,18 @@ fn apply_xpath(input: &str, rule: &XPathRule) -> RuleResult<Vec<String>> {
         XPathValue::Number(value) => Ok(vec![value.to_string()]),
         XPathValue::Boolean(value) => Ok(vec![value.to_string()]),
     }
+}
+
+fn split_xpath_top_level_operator<'a>(
+    expression: &'a str,
+    operator: &str,
+) -> RuleResult<Option<Vec<&'a str>>> {
+    split_json_path_top_level_operator(expression, operator).map_err(|message| {
+        RuleError::XPathSyntax {
+            expression: expression.to_string(),
+            message,
+        }
+    })
 }
 
 fn validate_xpath_namespaces(rule: &XPathRule) -> RuleResult<()> {

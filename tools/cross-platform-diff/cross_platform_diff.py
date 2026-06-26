@@ -5,7 +5,7 @@ Compares a single canonical reference result against one or more platform
 candidate results, after running every side through the sibling
 ``corpus_canonicalize`` normalizer. Synonymous outputs (differing only in
 field order, whitespace, line endings, HTML entities, URL trailing slash,
-or run-variable timestamps) therefore compare equal; only genuine
+or top-level run-variable metadata) therefore compare equal; only genuine
 cross-platform divergence is reported as a difference.
 
 The produced ``diff-result.json`` document is the artifact consumed by the
@@ -19,11 +19,13 @@ Output schema (``schemaVersion`` 1)::
       "schemaVersion": 1,
       "tool": "cross-platform-diff",
       "version": "1.0",
-      "canonical": {"path": "...", "sha256": "..."},
+      "normalization": {"canonicalizer": "corpus_canonicalize", "...": "..."},
+      "canonical": {"path": "...", "sha256": "...", "canonicalizedSha256": "..."},
       "candidates": {
         "<name>": {
           "path": "...",
           "sha256": "...",
+          "canonicalizedSha256": "...",
           "match": true|false,
           "total": <int>,
           "differences": [
@@ -99,18 +101,54 @@ def sha256_of_file(path, chunk_size=65536):
     return digest.hexdigest()
 
 
-def load_canonical_object(path):
-    """Parse ``path`` as JSON and return its *canonicalized* form."""
+def sha256_of_text(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def load_json_object(path, label):
+    """Parse ``path`` as JSON and return its decoded object."""
     try:
         with open(path, "r", encoding="utf-8") as handle:
-            raw = json.load(handle)
+            return json.load(handle)
     except FileNotFoundError:
-        raise DiffError("canonical file not found: {0}".format(path))
+        raise DiffError("{0} file not found: {1}".format(label, path))
     except (OSError, IOError) as err:
-        raise DiffError("cannot read canonical {0}: {1}".format(path, err))
+        raise DiffError("cannot read {0} {1}: {2}".format(label, path, err))
     except json.JSONDecodeError as err:
-        raise DiffError("invalid JSON in canonical {0}: {1}".format(path, err))
-    return cc.canonicalize(raw)
+        raise DiffError("invalid JSON in {0} {1}: {2}".format(label, path, err))
+
+
+def load_canonical_object(path, label="canonical"):
+    """Parse ``path`` as JSON and return its *canonicalized* form."""
+    return cc.canonicalize(load_json_object(path, label))
+
+
+def canonicalized_sha256(obj):
+    """Hash the exact canonical JSON bytes used for comparison.
+
+    The trailing newline matches ``scripts/corpus_canonicalize.py -o`` and the
+    collector's canonicalized artifact writer.
+    """
+    return sha256_of_text(cc.serialize(obj) + "\n")
+
+
+def normalization_policy():
+    return {
+        "canonicalizer": "corpus_canonicalize",
+        "schemaVersion": cc.__dict__.get("SCHEMA_VERSION", 1),
+        "rules": [
+            "sort-object-keys",
+            "decode-html-entities",
+            "normalize-line-endings",
+            "collapse-non-newline-whitespace",
+            "trim-line-and-document-whitespace",
+            "strip-http-url-trailing-path-slash",
+            "normalize-top-level-run-metadata",
+        ],
+        "variableFieldScope": "top-level",
+        "variableFields": sorted(cc.VARIABLE_FIELDS),
+        "variableSentinel": cc.VARIABLE_SENTINEL,
+    }
 
 
 def _snippet(value):
@@ -208,9 +246,9 @@ def compare_candidate(canonical_obj, candidate_path):
     Returns ``(match, differences)`` where ``differences`` is the list
     produced by :func:`collect_differences`.
     """
-    candidate_obj = load_canonical_object(candidate_path)
+    candidate_obj = load_canonical_object(candidate_path, "candidate")
     diffs = collect_differences(canonical_obj, candidate_obj)
-    return (len(diffs) == 0), diffs
+    return (len(diffs) == 0), diffs, candidate_obj
 
 
 def build_diff_result(canonical_path, candidates):
@@ -220,6 +258,7 @@ def build_diff_result(canonical_path, candidates):
     """
     canonical_obj = load_canonical_object(canonical_path)
     canonical_sha = sha256_of_file(canonical_path)
+    canonicalized_sha = canonicalized_sha256(canonical_obj)
 
     candidate_results = {}
     summary = {}
@@ -227,11 +266,12 @@ def build_diff_result(canonical_path, candidates):
     overall_total = 0
 
     for name, path in candidates:
-        match, diffs = compare_candidate(canonical_obj, path)
+        match, diffs, candidate_obj = compare_candidate(canonical_obj, path)
         total = len(diffs)
         candidate_results[name] = {
             "path": os.path.abspath(path),
             "sha256": sha256_of_file(path),
+            "canonicalizedSha256": canonicalized_sha256(candidate_obj),
             "match": match,
             "total": total,
             "differences": diffs,
@@ -244,9 +284,11 @@ def build_diff_result(canonical_path, candidates):
         "schemaVersion": SCHEMA_VERSION,
         "tool": TOOL_NAME,
         "version": TOOL_VERSION,
+        "normalization": normalization_policy(),
         "canonical": {
             "path": os.path.abspath(canonical_path),
             "sha256": canonical_sha,
+            "canonicalizedSha256": canonicalized_sha,
         },
         "candidates": candidate_results,
         "summary": summary,

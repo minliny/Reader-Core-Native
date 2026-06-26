@@ -130,7 +130,7 @@ pub struct LegadoBookSource {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub review_rule: Option<ReviewRule>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rule_search: Option<String>,
+    pub rule_search: Option<LegadoRuleSearchCompat>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub search_rule: Option<SearchRule>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -139,6 +139,8 @@ pub struct LegadoBookSource {
     pub rule_search_author: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rule_search_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rule_search_note_url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rule_book_info: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -176,6 +178,29 @@ pub struct LegadoBookSource {
 }
 
 pub type BookSourceCompat = LegadoBookSource;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum LegadoRuleSearchCompat {
+    Raw(String),
+    Structured(SearchRule),
+}
+
+impl LegadoRuleSearchCompat {
+    pub fn as_raw(&self) -> Option<&str> {
+        match self {
+            LegadoRuleSearchCompat::Raw(value) => Some(value),
+            LegadoRuleSearchCompat::Structured(_) => None,
+        }
+    }
+
+    pub fn as_structured(&self) -> Option<&SearchRule> {
+        match self {
+            LegadoRuleSearchCompat::Raw(_) => None,
+            LegadoRuleSearchCompat::Structured(rule) => Some(rule),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -404,6 +429,7 @@ mod tests {
   "bookSourceGroup": "compat",
   "searchUrl": "/search?q={{key}}",
   "ruleSearch": "div.list&&div.item;div.name&&a@text",
+  "ruleSearchNoteUrl": "div.name&&a@href",
   "ruleBookInfo": "div.detail",
   "ruleToc": "div.chapter&&a@href",
   "ruleContent": "div.content@html",
@@ -450,8 +476,12 @@ mod tests {
             Some("Legado Compat Source")
         );
         assert_eq!(
-            source.rule_search.as_deref(),
+            source.rule_search.as_ref().and_then(|rule| rule.as_raw()),
             Some("div.list&&div.item;div.name&&a@text")
+        );
+        assert_eq!(
+            source.rule_search_note_url.as_deref(),
+            Some("div.name&&a@href")
         );
         assert_eq!(
             source
@@ -498,6 +528,7 @@ mod tests {
 
         for field in [
             "ruleSearch",
+            "ruleSearchNoteUrl",
             "ruleBookInfo",
             "ruleToc",
             "ruleContent",
@@ -518,5 +549,34 @@ mod tests {
             encoded.get("baseUrl").is_none(),
             "compat encoding must not invent V1 fields"
         );
+    }
+
+    #[test]
+    fn legado_book_source_decodes_rule_search_object_as_structured_rule() {
+        let raw = serde_json::json!({
+            "bookSourceName": "Legado RuleSearch Object",
+            "bookSourceUrl": "https://books.example.test",
+            "ruleSearch": {
+                "bookList": "div.list&&article.book",
+                "name": "a.title@text",
+                "author": "span.author@text",
+                "bookUrl": "a.title@href"
+            }
+        });
+
+        let source: LegadoBookSource = serde_json::from_value(raw.clone()).unwrap();
+        let rule = source
+            .rule_search
+            .as_ref()
+            .and_then(|rule| rule.as_structured())
+            .expect("ruleSearch object should decode as a structured SearchRule");
+
+        assert_eq!(rule.book_list.as_deref(), Some("div.list&&article.book"));
+        assert_eq!(rule.name.as_deref(), Some("a.title@text"));
+        assert_eq!(rule.author.as_deref(), Some("span.author@text"));
+        assert_eq!(rule.book_url.as_deref(), Some("a.title@href"));
+
+        let encoded = serde_json::to_value(source).unwrap();
+        assert_eq!(encoded["ruleSearch"], raw["ruleSearch"]);
     }
 }

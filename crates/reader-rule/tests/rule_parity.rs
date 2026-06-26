@@ -2,7 +2,7 @@
 //! error expressions, duplicate results, encoding/escaping, and the
 //! JSONPath/CSS/JS expression surface that reader-rule owns.
 
-use reader_rule::{CaptureGroup, RuleEngine, RuleError, RuleStep};
+use reader_rule::{CaptureGroup, LegadoRuleContext, RuleEngine, RuleError, RuleStep};
 
 const HTML: &str = include_str!("fixtures/catalog.html");
 const JSON: &str = include_str!("fixtures/catalog.json");
@@ -481,6 +481,59 @@ fn css_comma_selector_applies_first_last_per_group_like_jsoup() {
 }
 
 #[test]
+fn css_selector_result_filter_middle_segment_filters_parent_before_child_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <section class="cards">
+            <article data-id="a">
+                <a href="/a0">A0</a>
+                <a href="/a1">A1</a>
+            </article>
+            <article data-id="b"><a href="/b0">B0</a></article>
+            <article data-id="c"><a href="/c0">C0</a></article>
+        </section>
+    "#;
+
+    let second_article_link = engine
+        .execute_step(html, &RuleStep::css_attr(".cards>article:eq(1)>a", "href"))
+        .unwrap();
+
+    assert_eq!(second_article_link.values(), &["/b0".to_string()]);
+
+    let first_two_article_links = engine
+        .execute_step(html, &RuleStep::css_attr(".cards>article:lt(2)>a", "href"))
+        .unwrap();
+
+    assert_eq!(
+        first_two_article_links.values(),
+        &["/a0".to_string(), "/a1".to_string(), "/b0".to_string()]
+    );
+
+    let nested_html = r#"
+        <section class="cards">
+            <article data-id="a">
+                <div><a href="/a0x">A0X</a><a href="/a0y">A0Y</a></div>
+                <div><a href="/a1">A1</a></div>
+            </article>
+            <article data-id="b">
+                <div><a href="/b0">B0</a></div>
+                <div><a href="/b1">B1</a></div>
+            </article>
+        </section>
+    "#;
+
+    let nested_second_div_link = engine
+        .execute_step(
+            nested_html,
+            &RuleStep::css_attr(".cards>article:eq(0)>div:eq(1)>a", "href"),
+        )
+        .unwrap();
+
+    assert_eq!(nested_second_div_link.values(), &["/a1".to_string()]);
+}
+
+#[test]
 fn css_selector_contains_filters_by_text() {
     let engine = RuleEngine::new();
 
@@ -541,6 +594,26 @@ fn css_selector_contains_own_ignores_descendant_text() {
         .unwrap();
 
     assert_eq!(output.values(), &["Dune Appendix".to_string()]);
+
+    let stacked_html = r#"
+        <section class="chapters">
+            <a href="/free">Chapter 1</a>
+            <a href="/vip">Chapter 2 VIP</a>
+            <a href="/about">About</a>
+        </section>
+    "#;
+
+    let public_chapters = engine
+        .execute_step(
+            stacked_html,
+            &RuleStep::css_attr(
+                ".chapters>a:containsOwn(Chapter):not(:containsOwn(VIP))",
+                "href",
+            ),
+        )
+        .unwrap();
+
+    assert_eq!(public_chapters.values(), &["/free".to_string()]);
 }
 
 #[test]
@@ -612,6 +685,36 @@ fn css_selector_contains_own_middle_segment_filters_parent_before_child_like_jso
         .unwrap();
 
     assert_eq!(output.values(), &["/alice".to_string()]);
+
+    let nested_html = r#"
+        <section class="cards">
+            <article data-id="a">
+                Featured
+                <div>Target <a href="/a">A</a></div>
+                <div>Other <a href="/a-other">Other</a></div>
+            </article>
+            <article data-id="b">
+                Plain
+                <div>Target <a href="/b">B</a></div>
+            </article>
+            <article data-id="c">
+                Featured
+                <div>Other <a href="/c">C</a></div>
+            </article>
+        </section>
+    "#;
+
+    let nested_output = engine
+        .execute_step(
+            nested_html,
+            &RuleStep::css_attr(
+                ".cards>article:containsOwn(Featured)>div:containsOwn(Target)>a",
+                "href",
+            ),
+        )
+        .unwrap();
+
+    assert_eq!(nested_output.values(), &["/a".to_string()]);
 }
 
 #[test]
@@ -847,14 +950,66 @@ fn css_selector_not_parent_matches_elements_without_children_like_jsoup() {
 }
 
 #[test]
+fn css_selector_parent_middle_segment_filters_parent_before_child_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <section class="cards">
+            <article data-id="empty"></article>
+            <article data-id="text"><a href="/text">Text</a></article>
+            <article data-id="child"><a href="/child"><span>Child</span></a></article>
+        </section>
+    "#;
+
+    let child_links = engine
+        .execute_step(html, &RuleStep::css_attr(".cards>article:parent>a", "href"))
+        .unwrap();
+
+    assert_eq!(
+        child_links.values(),
+        &["/text".to_string(), "/child".to_string()]
+    );
+
+    let not_parent_child_links = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(".cards>article:not(:parent)>a", "href"),
+        )
+        .unwrap();
+
+    assert!(not_parent_child_links.is_empty());
+
+    let nested_html = r#"
+        <section class="cards">
+            <article data-id="a">
+                <div><a href="/a">A</a></div>
+            </article>
+            <article data-id="b">
+                <div></div>
+            </article>
+            <article data-id="c"></article>
+        </section>
+    "#;
+
+    let nested_parent_links = engine
+        .execute_step(
+            nested_html,
+            &RuleStep::css_attr(".cards>article:parent>div:parent>a", "href"),
+        )
+        .unwrap();
+
+    assert_eq!(nested_parent_links.values(), &["/a".to_string()]);
+}
+
+#[test]
 fn css_selector_has_parent_matches_child_parent_like_jsoup() {
     let engine = RuleEngine::new();
 
     let html = r#"
         <section class="cards">
-            <article><a href="/empty"></a></article>
-            <article><a href="/text">Text</a></article>
-            <article><span>None</span></article>
+            <article data-id="empty"><a href="/empty"></a></article>
+            <article data-id="text"><a href="/text">Text</a></article>
+            <article data-id="none"><span>None</span></article>
         </section>
     "#;
 
@@ -866,6 +1021,111 @@ fn css_selector_has_parent_matches_child_parent_like_jsoup() {
         .unwrap();
 
     assert_eq!(output.values(), &["/text".to_string()]);
+
+    let articles = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(".cards > article:has(> a:parent)", "data-id"),
+        )
+        .unwrap();
+
+    assert_eq!(articles.values(), &["text".to_string()]);
+}
+
+#[test]
+fn css_selector_has_generic_selector_matches_descendant_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <section class="cards">
+            <article data-id="a"><a href="/a">A</a></article>
+            <article data-id="b"><p><a href="/nested">Nested</a></p></article>
+            <article data-id="c"><span>None</span></article>
+            <article data-id="d"><div><a href="/deep">Deep</a></div></article>
+            <article data-id="e"><div><a href="/nested-deep"><span>Deep</span></a></div></article>
+        </section>
+    "#;
+
+    let descendants = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(".cards>article:has(a)", "data-id"),
+        )
+        .unwrap();
+    assert_eq!(
+        descendants.values(),
+        &[
+            "a".to_string(),
+            "b".to_string(),
+            "d".to_string(),
+            "e".to_string()
+        ]
+    );
+
+    let direct_children = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(".cards>article:has(> a)", "data-id"),
+        )
+        .unwrap();
+    assert_eq!(direct_children.values(), &["a".to_string()]);
+
+    let nested_has = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(".cards>article:has(div:has(a))", "data-id"),
+        )
+        .unwrap();
+    assert_eq!(nested_has.values(), &["d".to_string(), "e".to_string()]);
+
+    let nested_has_text_filter = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(
+                ".cards>article:has(div:has(> a:containsOwn(Deep)))",
+                "data-id",
+            ),
+        )
+        .unwrap();
+    assert_eq!(nested_has_text_filter.values(), &["d".to_string()]);
+
+    let without_links = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(".cards>article:not(:has(a))", "data-id"),
+        )
+        .unwrap();
+    assert_eq!(without_links.values(), &["c".to_string()]);
+
+    let without_nested_has = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(".cards>article:not(:has(div:has(a)))", "data-id"),
+        )
+        .unwrap();
+    assert_eq!(
+        without_nested_has.values(),
+        &["a".to_string(), "b".to_string(), "c".to_string()]
+    );
+
+    let without_nested_has_text_filter = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(
+                ".cards>article:not(:has(div:has(> a:containsOwn(Deep))))",
+                "data-id",
+            ),
+        )
+        .unwrap();
+    assert_eq!(
+        without_nested_has_text_filter.values(),
+        &[
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "e".to_string()
+        ]
+    );
 }
 
 #[test]
@@ -888,6 +1148,165 @@ fn css_selector_has_contains_own_matches_direct_child_own_text_like_jsoup() {
         .unwrap();
 
     assert_eq!(output.values(), &["a".to_string()]);
+
+    let without_direct_flag = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(".cards>article:not(:has(> p:containsOwn(Flag)))", "data-id"),
+        )
+        .unwrap();
+
+    assert_eq!(
+        without_direct_flag.values(),
+        &["b".to_string(), "c".to_string()]
+    );
+}
+
+#[test]
+fn css_selector_has_middle_segment_filters_parent_before_child_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <section class="cards">
+            <article data-id="flag"><p>Flag</p><a href="/flag">Flag</a></article>
+            <article data-id="nested"><p><span>Flag</span></p><a href="/nested">Nested</a></article>
+            <article data-id="plain"><p>Plain</p><a href="/plain">Plain</a></article>
+        </section>
+    "#;
+
+    let direct_own_text = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(".cards>article:has(> p:containsOwn(Flag))>a", "href"),
+        )
+        .unwrap();
+
+    assert_eq!(direct_own_text.values(), &["/flag".to_string()]);
+
+    let without_direct_own_text = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(".cards>article:not(:has(> p:containsOwn(Flag)))>a", "href"),
+        )
+        .unwrap();
+
+    assert_eq!(
+        without_direct_own_text.values(),
+        &["/nested".to_string(), "/plain".to_string()]
+    );
+
+    let nested_html = r#"
+        <section class="cards">
+            <article data-id="a">
+                <header>Featured</header>
+                <div><span class="target">Target</span><a href="/a">A</a></div>
+                <div><a href="/a-other">Other</a></div>
+            </article>
+            <article data-id="b">
+                <div><span class="target">Target</span><a href="/b">B</a></div>
+            </article>
+            <article data-id="c">
+                <header>Featured</header>
+                <div><a href="/c">C</a></div>
+            </article>
+        </section>
+    "#;
+
+    let nested_has = engine
+        .execute_step(
+            nested_html,
+            &RuleStep::css_attr(
+                ".cards>article:has(> header)>div:has(> span.target)>a",
+                "href",
+            ),
+        )
+        .unwrap();
+
+    assert_eq!(nested_has.values(), &["/a".to_string()]);
+}
+
+#[test]
+fn css_selector_has_not_contains_own_matches_inner_negation_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <section class="cards">
+            <article data-id="free"><p>Free</p></article>
+            <article data-id="vip"><p>VIP</p></article>
+            <article data-id="nested-vip"><p><span>VIP</span></p></article>
+            <article data-id="mixed"><p>VIP</p><p>Free</p></article>
+        </section>
+    "#;
+
+    let has_non_vip_child = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(".cards>article:has(> p:not(:containsOwn(VIP)))", "data-id"),
+        )
+        .unwrap();
+
+    assert_eq!(
+        has_non_vip_child.values(),
+        &[
+            "free".to_string(),
+            "nested-vip".to_string(),
+            "mixed".to_string()
+        ]
+    );
+
+    let without_vip_child = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(".cards>article:not(:has(> p:containsOwn(VIP)))", "data-id"),
+        )
+        .unwrap();
+
+    assert_eq!(
+        without_vip_child.values(),
+        &["free".to_string(), "nested-vip".to_string()]
+    );
+}
+
+#[test]
+fn css_selector_has_result_filter_applies_before_text_filter_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <section class="cards">
+            <article data-id="first-vip"><p>VIP</p><p>Free</p></article>
+            <article data-id="second-vip"><p>Free</p><p>VIP</p></article>
+            <article data-id="nested-vip"><p><span>VIP</span></p><p>Free</p></article>
+            <article data-id="first-free"><p>Free</p></article>
+        </section>
+    "#;
+
+    let first_child_vip = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(".cards>article:has(> p:eq(0):containsOwn(VIP))", "data-id"),
+        )
+        .unwrap();
+
+    assert_eq!(first_child_vip.values(), &["first-vip".to_string()]);
+
+    let without_first_child_vip = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(
+                ".cards>article:not(:has(> p:eq(0):containsOwn(VIP)))",
+                "data-id",
+            ),
+        )
+        .unwrap();
+
+    assert_eq!(
+        without_first_child_vip.values(),
+        &[
+            "second-vip".to_string(),
+            "nested-vip".to_string(),
+            "first-free".to_string()
+        ]
+    );
 }
 
 #[test]
@@ -916,6 +1335,26 @@ fn css_selector_contains_data_matches_script_data_like_jsoup() {
 
     assert_eq!(output.values(), &["script".to_string()]);
     assert!(visible_text_output.is_empty());
+
+    let stacked_html = r#"
+        <section>
+            <script data-id="free">BookData = { chapter: 1 };</script>
+            <script data-id="vip">BookData = { chapter: 2, tag: "VIP" };</script>
+            <p data-id="visible">BookData VIP visible text</p>
+        </section>
+    "#;
+
+    let public_data = engine
+        .execute_step(
+            stacked_html,
+            &RuleStep::css_attr(
+                "script:containsData(BookData):not(:containsData(VIP))",
+                "data-id",
+            ),
+        )
+        .unwrap();
+
+    assert_eq!(public_data.values(), &["free".to_string()]);
 }
 
 #[test]
@@ -944,13 +1383,94 @@ fn css_selector_not_contains_data_excludes_script_data_like_jsoup() {
 }
 
 #[test]
+fn css_selector_contains_data_middle_segment_filters_parent_before_child_like_jsoup() {
+    let engine = RuleEngine::new();
+
+    let html = r#"
+        <section class="cards">
+            <article data-id="script">
+                <script>BookData = { chapter: 1 };</script>
+                <a href="/script">Script</a>
+            </article>
+            <article data-id="visible">
+                <p>BookData visible text</p>
+                <a href="/visible">Visible</a>
+            </article>
+            <article data-id="plain">
+                <p>Plain text</p>
+                <a href="/plain">Plain</a>
+            </article>
+        </section>
+    "#;
+
+    let data_parent_links = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(".cards>article:containsData(BookData)>a", "href"),
+        )
+        .unwrap();
+
+    assert_eq!(data_parent_links.values(), &["/script".to_string()]);
+
+    let without_data_parent_links = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(".cards>article:not(:containsData(BookData))>a", "href"),
+        )
+        .unwrap();
+
+    assert_eq!(
+        without_data_parent_links.values(),
+        &["/visible".to_string(), "/plain".to_string()]
+    );
+
+    let nested_html = r#"
+        <section class="cards">
+            <article data-id="a">
+                <script>ArticleData = true;</script>
+                <div>
+                    <script>TargetData = true;</script>
+                    <a href="/a">A</a>
+                </div>
+                <div><a href="/a-other">Other</a></div>
+            </article>
+            <article data-id="b">
+                <div>
+                    <script>TargetData = true;</script>
+                    <a href="/b">B</a>
+                </div>
+            </article>
+            <article data-id="c">
+                <script>ArticleData = true;</script>
+                <div><a href="/c">C</a></div>
+            </article>
+        </section>
+    "#;
+
+    let nested_data = engine
+        .execute_step(
+            nested_html,
+            &RuleStep::css_attr(
+                ".cards>article:containsData(ArticleData)>div:containsData(TargetData)>a",
+                "href",
+            ),
+        )
+        .unwrap();
+
+    assert_eq!(nested_data.values(), &["/a".to_string()]);
+}
+
+#[test]
 fn css_selector_has_contains_data_matches_descendant_data_like_jsoup() {
     let engine = RuleEngine::new();
 
     let html = r#"
         <section class="cards">
-            <article data-id="article">
+            <article data-id="direct">
                 <script>BookData = { chapter: 1 };</script>
+            </article>
+            <article data-id="nested">
+                <div><script>BookData = { chapter: 2 };</script></div>
             </article>
             <article data-id="plain">
                 <p>Plain text</p>
@@ -968,7 +1488,37 @@ fn css_selector_has_contains_data_matches_descendant_data_like_jsoup() {
         )
         .unwrap();
 
-    assert_eq!(output.values(), &["article".to_string()]);
+    assert_eq!(
+        output.values(),
+        &["direct".to_string(), "nested".to_string()]
+    );
+
+    let direct_child = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(
+                ".cards>article:has(> script:containsData(BookData))",
+                "data-id",
+            ),
+        )
+        .unwrap();
+
+    assert_eq!(direct_child.values(), &["direct".to_string()]);
+
+    let without_direct_child = engine
+        .execute_step(
+            html,
+            &RuleStep::css_attr(
+                ".cards>article:not(:has(> script:containsData(BookData)))",
+                "data-id",
+            ),
+        )
+        .unwrap();
+
+    assert_eq!(
+        without_direct_child.values(),
+        &["nested".to_string(), "plain".to_string()]
+    );
 }
 
 #[test]
@@ -1241,7 +1791,9 @@ fn jsonpath_top_level_and_merges_non_empty_branches_like_legado() {
     let engine = RuleEngine::new();
 
     let json = r#"{
-        "book": { "title": "Dune", "author": "Frank Herbert" }
+        "book": { "title": "Dune", "author": "Frank Herbert" },
+        "titles": ["Dune", "Foundation"],
+        "authors": ["Frank Herbert", "Isaac Asimov"]
     }"#;
 
     let output = engine
@@ -1280,6 +1832,416 @@ fn jsonpath_top_level_percent_zips_branches_like_legado() {
             "Foundation".to_string(),
             "Isaac Asimov".to_string()
         ]
+    );
+}
+
+#[test]
+fn jsonpath_embedded_rule_template_matches_legado_get_string_list() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "book": { "title": "Dune", "author": "Frank Herbert" }
+    }"#;
+
+    let output = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("《{$.book.title}》 by {$.book.author}"),
+        )
+        .unwrap();
+
+    assert_eq!(output.values(), &["《Dune》 by Frank Herbert".to_string()]);
+
+    let combined_inside_template = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("pair: {$.book.title&&$.book.author}"),
+        )
+        .unwrap();
+
+    assert_eq!(
+        combined_inside_template.values(),
+        &["pair: Dune\nFrank Herbert".to_string()]
+    );
+
+    let missing_only = engine
+        .execute_step(json, &RuleStep::json_path("missing {$.book.subtitle}"))
+        .unwrap();
+    assert!(missing_only.is_empty());
+
+    let mixed_missing = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("title: {$.book.title}; missing: {$.book.subtitle}"),
+        )
+        .unwrap();
+
+    assert_eq!(
+        mixed_missing.values(),
+        &["title: Dune; missing: {$.book.subtitle}".to_string()]
+    );
+
+    let zip_inside_template = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("zip: {$.titles[*]%%$.authors[*]}"),
+        )
+        .unwrap();
+    assert!(zip_inside_template.is_empty());
+
+    let mixed_zip = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("title: {$.book.title}; zip: {$.titles[*]%%$.authors[*]}"),
+        )
+        .unwrap();
+
+    assert_eq!(
+        mixed_zip.values(),
+        &["title: Dune; zip: {$.titles[*]%%$.authors[*]}".to_string()]
+    );
+}
+
+#[test]
+fn jsonpath_hash_regex_replacement_matches_legado_source_rule() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "book": {
+            "title": "Dune 小说",
+            "created": "2026-06-25T21:14:57+00:00",
+            "cover": "/book/12345/index.html"
+        }
+    }"#;
+
+    let cleaned_title = engine
+        .execute_step(json, &RuleStep::json_path("$.book.title##小说"))
+        .unwrap();
+    assert_eq!(cleaned_title.values(), &["Dune ".to_string()]);
+
+    let template = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path("created: {$.book.created##T|\\+.*## }"),
+        )
+        .unwrap();
+    assert_eq!(
+        template.values(),
+        &["created: 2026-06-25 21:14:57 ".to_string()]
+    );
+
+    let cover_url = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path(
+                "$.book.cover##.+\\D((\\d+)\\d{3})\\D##/files/article/image/$2/$1/$1s.jpg###",
+            ),
+        )
+        .unwrap();
+    assert_eq!(
+        cover_url.values(),
+        &["/files/article/image/12/12345/12345s.jpg".to_string()]
+    );
+}
+
+#[test]
+fn jsonpath_double_brace_template_matches_legado_source_rule() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "book": {
+            "title": "Dune 小说",
+            "created": "2026-06-25T21:14:57+00:00"
+        }
+    }"#;
+
+    let output = engine
+        .execute_step(
+            json,
+            &RuleStep::json_path(
+                "《{{$.book.title##小说}}》 updated {{$.book.created##T|\\+.*## }}",
+            ),
+        )
+        .unwrap();
+
+    assert_eq!(
+        output.values(),
+        &["《Dune 》 updated 2026-06-25 21:14:57 ".to_string()]
+    );
+}
+
+#[test]
+fn legado_json_prefix_routes_to_jsonpath_like_legado() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "cover": "/covers/dune.jpg",
+        "maxChapterId": 42,
+        "body": "Chapter body",
+        "cpContent": "Fallback body"
+    }"#;
+
+    let cover = engine.execute_legado_css(json, "@JSon:$.cover").unwrap();
+    assert_eq!(cover.values(), &["/covers/dune.jpg".to_string()]);
+
+    let fallback = engine
+        .execute_legado_css(json, "@json:$.missing||$.cover")
+        .unwrap();
+    assert_eq!(fallback.values(), &["/covers/dune.jpg".to_string()]);
+
+    let template = engine
+        .execute_legado_css(json, "@Json:第{$.maxChapterId}章")
+        .unwrap();
+    assert_eq!(template.values(), &["第42章".to_string()]);
+
+    let merged = engine
+        .execute_legado_css(json, "@JSON:$..body&&$..cpContent")
+        .unwrap();
+    assert_eq!(
+        merged.values(),
+        &["Chapter body".to_string(), "Fallback body".to_string()]
+    );
+}
+
+#[test]
+fn legado_bare_jsonpath_rule_routes_to_jsonpath_like_legado() {
+    let engine = RuleEngine::new();
+
+    let json = r#"{
+        "cover": "/covers/dune.jpg",
+        "books": [
+            { "title": "Dune" },
+            { "title": "Foundation" }
+        ]
+    }"#;
+
+    let cover = engine.execute_legado_css(json, "$.cover").unwrap();
+    assert_eq!(cover.values(), &["/covers/dune.jpg".to_string()]);
+
+    let indexed = engine
+        .execute_legado_css(r#"[{"title":"Dune"}]"#, "$[0].title")
+        .unwrap();
+    assert_eq!(indexed.values(), &["Dune".to_string()]);
+
+    let recursive = engine.execute_legado_css(json, "$..title").unwrap();
+    assert_eq!(
+        recursive.values(),
+        &["Dune".to_string(), "Foundation".to_string()]
+    );
+}
+
+#[test]
+fn legado_xpath_prefix_routes_to_xpath_like_legado() {
+    let engine = RuleEngine::new();
+
+    let xml = r#"
+        <player>
+            <div id="jp_container_1">
+                <ul id="jp-lines">
+                    <li data-code="abc-123">Line</li>
+                </ul>
+            </div>
+        </player>
+    "#;
+
+    let code = engine
+        .execute_legado_css(
+            xml,
+            "@XPath://div[@id=\"jp_container_1\"][1]/ul[@id=\"jp-lines\"]/li[1]/@data-code",
+        )
+        .unwrap();
+    assert_eq!(code.values(), &["abc-123".to_string()]);
+
+    let text = engine
+        .execute_legado_css(xml, "@xpath://li/text()")
+        .unwrap();
+    assert_eq!(text.values(), &["Line".to_string()]);
+}
+
+#[test]
+fn legado_bare_slash_rule_routes_to_xpath_like_legado() {
+    let engine = RuleEngine::new();
+
+    let xml = r#"
+        <catalog>
+            <book href="/books/1">
+                <title>Dune</title>
+            </book>
+        </catalog>
+    "#;
+
+    let href = engine.execute_legado_css(xml, "//book[1]/@href").unwrap();
+    assert_eq!(href.values(), &["/books/1".to_string()]);
+
+    let title = engine
+        .execute_legado_css(xml, "/catalog/book/title/text()")
+        .unwrap();
+    assert_eq!(title.values(), &["Dune".to_string()]);
+}
+
+#[test]
+fn legado_xpath_combinations_match_legado_rule_split() {
+    let engine = RuleEngine::new();
+
+    let xml = r#"
+        <catalog>
+            <book href="/books/1">
+                <title>Dune</title>
+            </book>
+            <book href="/books/2">
+                <title>Foundation</title>
+            </book>
+        </catalog>
+    "#;
+
+    let fallback = engine
+        .execute_legado_css(xml, "@XPath://missing||//book/title/text()")
+        .unwrap();
+    assert_eq!(
+        fallback.values(),
+        &["Dune".to_string(), "Foundation".to_string()]
+    );
+
+    let merged = engine
+        .execute_legado_css(xml, "@XPath://book/title/text()&&//book/@href")
+        .unwrap();
+    assert_eq!(
+        merged.values(),
+        &[
+            "Dune".to_string(),
+            "Foundation".to_string(),
+            "/books/1".to_string(),
+            "/books/2".to_string()
+        ]
+    );
+
+    let zipped = engine
+        .execute_legado_css(xml, "@XPath://book/title/text()%%//book/@href")
+        .unwrap();
+    assert_eq!(
+        zipped.values(),
+        &[
+            "Dune".to_string(),
+            "/books/1".to_string(),
+            "Foundation".to_string(),
+            "/books/2".to_string()
+        ]
+    );
+}
+
+#[test]
+fn legado_xpath_hash_regex_replacement_matches_source_rule() {
+    let engine = RuleEngine::new();
+
+    let xml = r#"
+        <catalog>
+            <book href="/books/1">
+                <title>卷一·Dune</title>
+            </book>
+            <book href="/books/2">
+                <title>卷二·Foundation</title>
+            </book>
+        </catalog>
+    "#;
+
+    let titles = engine
+        .execute_legado_css(xml, "@XPath://book/title/text()##卷[一二]·##")
+        .unwrap();
+    assert_eq!(
+        titles.values(),
+        &["Dune".to_string(), "Foundation".to_string()]
+    );
+
+    let href_id = engine
+        .execute_legado_css(xml, "@XPath://book/@href##.+/(\\d+)##id=$1###")
+        .unwrap();
+    assert_eq!(href_id.values(), &["id=1".to_string(), "id=2".to_string()]);
+}
+
+#[test]
+fn legado_xpath_double_brace_template_matches_source_rule() {
+    let engine = RuleEngine::new();
+
+    let xml = r#"
+        <metadata>
+            <data name="Title">Dune</data>
+            <data name="Author" value="Frank Herbert" />
+            <data name="BookUrl" value="https://example.test/book/42" />
+        </metadata>
+    "#;
+
+    let intro = engine
+        .execute_legado_css(
+            xml,
+            "📖 书名：{{//data[@name='Title']/text()}}\n✏️ 作者：{{//data[@name='Author']/@value}}",
+        )
+        .unwrap();
+    assert_eq!(
+        intro.values(),
+        &["📖 书名：Dune\n✏️ 作者：Frank Herbert".to_string()]
+    );
+
+    let book_id = engine
+        .execute_legado_css(
+            xml,
+            "id={{//data[@name='BookUrl']/@value##.*/(\\d+)##$1###}}",
+        )
+        .unwrap();
+    assert_eq!(book_id.values(), &["id=42".to_string()]);
+}
+
+#[test]
+fn legado_put_get_context_matches_source_rule_variables() {
+    let engine = RuleEngine::new();
+    let mut context = LegadoRuleContext::new();
+
+    let book_json = r#"{
+        "id": "book-42",
+        "name": "Dune",
+        "author": "Frank Herbert"
+    }"#;
+
+    let name = engine
+        .execute_legado_css_with_context(
+            book_json,
+            "$.name@put:{id:id,name:name,author:author}",
+            &mut context,
+        )
+        .unwrap();
+    assert_eq!(name.values(), &["Dune".to_string()]);
+    assert_eq!(context.get_variable("id"), Some("book-42"));
+    assert_eq!(context.get_variable("name"), Some("Dune"));
+    assert_eq!(context.get_variable("author"), Some("Frank Herbert"));
+    context.put_variable("toc", "/books/book-42/toc");
+
+    let chapter_json = r#"{ "chapter_id": "chapter-7" }"#;
+    let url = engine
+        .execute_legado_css_with_context(
+            chapter_json,
+            "https://api.example.test/books/@get:{id}/chapters/{{$.chapter_id}}",
+            &mut context,
+        )
+        .unwrap();
+    assert_eq!(
+        url.values(),
+        &["https://api.example.test/books/book-42/chapters/chapter-7".to_string()]
+    );
+
+    let author = engine
+        .execute_legado_css_with_context(book_json, "@get:{author}", &mut context)
+        .unwrap();
+    assert_eq!(author.values(), &["Frank Herbert".to_string()]);
+
+    let toc_url = engine
+        .execute_legado_css_with_context(
+            book_json,
+            "@get:{toc}##$##,{'webView': true}",
+            &mut context,
+        )
+        .unwrap();
+    assert_eq!(
+        toc_url.values(),
+        &["/books/book-42/toc,{'webView': true}".to_string()]
     );
 }
 

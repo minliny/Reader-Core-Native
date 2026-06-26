@@ -8,8 +8,8 @@ or:
 
 These tests prove that synonymous outputs from different platforms
 (differing only in field order, whitespace, line endings, HTML entity
-encoding, URL trailing slash, or run-variable timestamps) collapse to
-the same canonical JSON.
+encoding, URL trailing slash, or top-level run-variable metadata) collapse
+to the same canonical JSON.
 """
 
 import json
@@ -137,6 +137,16 @@ class TestVariableTimestampFields(unittest.TestCase):
         b = {"name": "x", "traceId": "t2"}
         self.assertEqual(canon(a), canon(b))
 
+    def test_nested_timestamp_is_business_data(self):
+        a = {"results": [{"name": "x", "timestamp": 1700000000}]}
+        b = {"results": [{"name": "x", "timestamp": 1700000099}]}
+        self.assertNotEqual(canon(a), canon(b))
+
+    def test_business_date_fields_are_not_normalized(self):
+        a = {"name": "x", "updated_at": "2024-01-01", "date": "2024-01-01"}
+        b = {"name": "x", "updated_at": "2024-02-01", "date": "2024-02-01"}
+        self.assertNotEqual(canon(a), canon(b))
+
     def test_non_variable_field_kept(self):
         a = {"name": "x", "title": "different"}
         b = {"name": "x", "title": "values"}
@@ -228,7 +238,7 @@ class TestResultTypePairs(unittest.TestCase):
         }
         b = {
             "intro": "Line1\nLine2",
-            "updated_at": "2024-06-01T12:00:00Z",
+            "updated_at": "2024-01-01T00:00:00Z",
             "coverUrl": "https://h.test/cover.jpg",
             "author": "A B",
             "name": "Demo & Co",
@@ -289,7 +299,6 @@ class TestCli(unittest.TestCase):
         import tempfile
         import subprocess
 
-        # NOTE: avoid field name "t" — it is a variable (timestamp) field.
         inp = {"b": 2, "a": 1, "text": "x &amp; y", "url": "https://h.test/p/"}
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
             json.dump(inp, f)

@@ -4,15 +4,79 @@
   "scenario": "four-platform-search",
   "input": "input.json",
   "canonical": "canonical-result.json",
+  "coreIdentity": {
+    "businessKernel": "reader-core-native-rust",
+    "coreCommit": "090b96f",
+    "abiVersion": 1,
+    "protocolVersion": 1
+  },
   "candidates": {
     "cli": "candidates/cli-result.json",
     "ios": "candidates/ios-result.json",
     "android": "candidates/android-result.json",
     "harmony": "candidates/harmony-result.json"
   },
+  "artifacts": {
+    "input": "294e1e2ebb2455138f58f5b67c18794b8ab8d399ff52da106cdbfe576bcc8ea9",
+    "canonical": "29e1a15a92c5166cde206ff353b916ebbb2cf110a1c7370b6b140d2b8ca98184",
+    "candidates": {
+      "cli": "f077050158e666cdc81b8cc55d421d210341b0e243ee105c68ae3d62e07043f2",
+      "ios": "5d26ae735b249d46f857baadc88f0f8b00bd74a1f1243e7058dc8f84e5928abc",
+      "android": "e0cf3b152bccd66c5c937cbbe26bfd72a4693b836d5595ee0f776e1299cdd1b8",
+      "harmony": "a5f5b77f55cdc7a2cb0d0be92abcd01c4cb9a74fa445c21acc4f723d84ab8813"
+    }
+  },
+  "platformRuns": {
+    "cli": {
+      "businessKernel": "reader-core-native-rust",
+      "coreCommit": "090b96f",
+      "abiVersion": 1,
+      "protocolVersion": 1
+    },
+    "ios": {
+      "businessKernel": "reader-core-native-rust",
+      "coreCommit": "090b96f",
+      "abiVersion": 1,
+      "protocolVersion": 1
+    },
+    "android": {
+      "businessKernel": "reader-core-native-rust",
+      "coreCommit": "090b96f",
+      "abiVersion": 1,
+      "protocolVersion": 1
+    },
+    "harmony": {
+      "businessKernel": "reader-core-native-rust",
+      "coreCommit": "090b96f",
+      "abiVersion": 1,
+      "protocolVersion": 1
+    }
+  },
   "expected": {
     "match": false,
     "total": 1,
+    "hostParity": {
+      "match": false,
+      "total": 1
+    },
+    "byPlatform": {
+      "cli": {
+        "match": true,
+        "total": 0
+      },
+      "ios": {
+        "match": true,
+        "total": 0
+      },
+      "android": {
+        "match": false,
+        "total": 1
+      },
+      "harmony": {
+        "match": true,
+        "total": 0
+      }
+    },
     "blockerPlatform": "android",
     "blockerPath": "results[1].name"
   }

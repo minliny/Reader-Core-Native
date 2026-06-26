@@ -16,10 +16,11 @@ Normalizations applied:
                         (&#65; &#x42;) entities decoded.
   5. URL trailing     — a single trailing '/' on the path component of
      slash             http(s) URLs is removed (root and query preserved).
-  6. Variable fields  — values of known run-volatile fields (timestamps,
-                        request/trace ids) are replaced with a sentinel so
-                        two runs that differ only in these fields compare
-                        equal.
+  6. Run metadata     — values of known top-level run-volatile fields
+                        (timestamps, request/trace ids) are replaced with a
+                        sentinel so two runs that differ only in collection
+                        metadata compare equal. Business date/time fields
+                        remain comparable.
 
 No network access. No remote data. Pure local text transformation.
 
@@ -35,13 +36,12 @@ import re
 import sys
 
 
-# Field names whose values are run-variable (timestamps, request/trace ids).
+# Top-level field names whose values are run-variable collection metadata.
 # Values of these fields are replaced with a constant sentinel so that two
-# runs that differ only in these volatile fields compare equal.
+# runs that differ only in volatile collection metadata compare equal. Keep
+# this list narrow: business fields such as book update dates must still diff.
 VARIABLE_FIELDS = frozenset({
-    "timestamp", "time", "ts", "t",
-    "created_at", "updated_at", "created", "updated",
-    "date", "datetime",
+    "timestamp",
     "request_id", "req_id", "requestId",
     "trace_id", "traceId",
 })
@@ -77,18 +77,22 @@ def _normalize_string(s):
     return s
 
 
-def canonicalize(obj):
+def _is_variable_field(path, key):
+    return not path and key in VARIABLE_FIELDS
+
+
+def canonicalize(obj, path=()):
     """Return a canonicalized copy of ``obj`` (dict / list / scalar)."""
     if isinstance(obj, dict):
         out = {}
         for key in sorted(obj.keys()):
-            if key in VARIABLE_FIELDS:
+            if _is_variable_field(path, key):
                 out[key] = VARIABLE_SENTINEL
             else:
-                out[key] = canonicalize(obj[key])
+                out[key] = canonicalize(obj[key], path + (key,))
         return out
     if isinstance(obj, list):
-        return [canonicalize(item) for item in obj]
+        return [canonicalize(item, path + ("[]",)) for item in obj]
     if isinstance(obj, str):
         return _normalize_string(obj)
     return obj
