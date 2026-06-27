@@ -12,7 +12,7 @@
   是"能力底线 = Legado"的验收基准。任何"能力已完成"的判断必须对照本清单逐项验证。
 - `docs/CAPABILITY_GAP_PLAN.md` — 能力缺口补齐方案（45 项未实现 + 16 项待验证），
   按优先级排序。补齐后必须更新清单状态并用测试工具链验证。
-- `docs/STATUS_SNAPSHOT_2026-06-27.md` — 2026-06-27 项目状态快照（仓库状态 + S 阶段
+- `docs/STATUS_SNAPSHOT_2026-28.md` — 2026-06-28 项目状态快照（7个能力缺口 agent 完成 + 全量459源批量测试）（仓库状态 + S 阶段
   修正进度 + release blockers + 能力对标 + 测试工具链 + 平台侧状态）。时间点快照，
   不作为永久事实。
 
@@ -54,7 +54,7 @@ git log -5 --oneline
 `docs/PROJECT_CHARTER.md` > `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md` >
 `docs/MAINLINE_EXECUTION_PLAN.md` > `docs/LEGADO_CAPABILITY_INVENTORY.md` >
 `docs/CAPABILITY_GAP_PLAN.md` > `docs/TEST_AND_VERIFICATION_PLAN.md` >
-状态快照 `docs/STATUS_SNAPSHOT_*.md` > 其他 roadmap / 审计 / 报告 > 历史归档文档。
+状态快照 `docs/STATUS_SNAPSHOT_*.md`（最新为准）> 其他 roadmap / 审计 / 报告 > 历史归档文档。
 冲突时以上层为准。
 
 ## TTS 策略（强制）

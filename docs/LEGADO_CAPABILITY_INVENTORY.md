@@ -49,7 +49,7 @@
 | 详情 (WebBook.getBookInfo) | BookInfo.kt | ✅ protocol book.detail | 3 源 fixture |
 | 目录 (WebBook.getChapterList) | BookChapterList.kt | ✅ protocol book.toc | 3 源 fixture |
 | 正文 (WebBook.getBookContent) | BookContent.kt | ✅ protocol chapter.content | 3 源 fixture |
-| 发现 (WebBook.exploreBook) | BookList.kt (explore) | ⚠️ 有 ruleExplore 解析但无 explore 协议方法 | 0 真实源 |
+| 发现 (WebBook.exploreBook) | BookList.kt (explore) | ✅ protocol source.exploreKinds + source.explore | 0 真实源 (待批量验证) |
 | 多页加载 (nextPage/nextTocUrl) | BookList/BookChapterList | ❌ 未实现 | 0 代码 |
 | 段评 (ReviewRule) | ruleReview | ❌ 未实现 | 0 代码 |
 | 书源校验 (CheckSource) | CheckSource.kt + Service | ❌ 未实现 | 0 代码 |
@@ -82,7 +82,7 @@
 | PDF | PdfFile.kt | ✅ reader-local-book/pdf.rs | crate test |
 | Mobi | MobiFile.kt | ⚠️ reader-local-book/mobi.rs 有但未验证 | 0 真实文件 |
 | Umd | UmdFile.kt | ❌ 未实现 | 0 代码 |
-| TXT 目录规则 (TxtTocRule) | TxtTocRule.kt | ❌ 未实现 | 0 代码 |
+| TXT 目录规则 (TxtTocRule) | TxtTocRule.kt | ✅ reader-domain + reader-local-book split_chapters + txt-toc-rule.* CRUD | 6 单元测试 |
 
 ---
 
@@ -134,7 +134,7 @@
 | BookGroup (书架分组) | BookGroup.kt | ❌ 未实现 | 0 代码 |
 | Bookmark (书签) | Bookmark.kt | ❌ 未实现 | 0 代码 |
 | ReplaceRule (替换规则) | ReplaceRule.kt | ❌ 未实现 | 0 代码 |
-| TxtTocRule | TxtTocRule.kt | ❌ 未实现 | 0 代码 |
+| TxtTocRule | TxtTocRule.kt | ✅ reader-domain + storage CRUD + txt-toc-rule.* protocol | 6 单元测试 |
 | DictRule (字典规则) | DictRule.kt | ❌ 未实现 | 0 代码 |
 | HttpTTS | HttpTTS.kt | ❌ 未实现 | 0 代码 |
 | RssSource | RssSource.kt | ✅ reader-domain | |
