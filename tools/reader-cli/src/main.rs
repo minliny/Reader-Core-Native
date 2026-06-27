@@ -20,7 +20,7 @@ use reader_domain::{Book, BookSourceSemantics, LegadoBookSource};
 use reader_runtime::{EventSink, Runtime};
 use serde_json::Value;
 
-const EVENT_TIMEOUT: Duration = Duration::from_secs(2);
+const EVENT_TIMEOUT: Duration = Duration::from_secs(30);
 
 struct ChannelSink {
     tx: mpsc::Sender<Event>,

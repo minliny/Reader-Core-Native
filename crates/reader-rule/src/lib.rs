@@ -3600,11 +3600,15 @@ fn parse_legado_css_rule(rule: &str) -> Result<LegadoCssRule, String> {
     let mut steps = Vec::with_capacity(parts.len());
 
     for (index, part) in parts.iter().enumerate() {
-        let step = parse_legado_css_step(part)?;
-        if matches!(step, LegadoCssStep::Extract { .. }) && index + 1 != parts.len() {
+        let part_steps = parse_legado_css_step(part)?;
+        let has_extract = part_steps
+            .iter()
+            .any(|step| matches!(step, LegadoCssStep::Extract { .. }));
+        // 抽取步骤只能是整条管道的末尾,不能被后续 select 跟随。
+        if has_extract && index + 1 != parts.len() {
             return Err("extraction step must be the final pipeline segment".to_string());
         }
-        steps.push(step);
+        steps.extend(part_steps);
     }
 
     Ok(LegadoCssRule { steps })
@@ -3694,30 +3698,51 @@ fn split_legado_css_pipeline(rule: &str) -> Result<Vec<&str>, String> {
     Ok(parts)
 }
 
-fn parse_legado_css_step(part: &str) -> Result<LegadoCssStep, String> {
+fn parse_legado_css_step(part: &str) -> Result<Vec<LegadoCssStep>, String> {
     let part = part.trim();
     if part.is_empty() {
         return Err("empty pipeline segment".to_string());
     }
 
-    if let Some(separator) = find_legado_css_extraction_separator(part)? {
-        let selector = part[..separator].trim();
-        let extraction = part[separator + '@'.len_utf8()..].trim();
-        if extraction.is_empty() {
-            return Err("missing extraction after `@`".to_string());
-        }
+    // Legado AnalyzeByJSoup.kt getResultList (line 200-224):用 `@` 切割规则,
+    // 前 n-1 段是 select(逐级缩小元素集),最后一段是 getResultLast 抽取。
+    // 例如 `tag.h3@tag.a@text` -> [Select("tag.h3"), Extract { Some("tag.a"), Text }]。
+    let segments = split_legado_css_at_pipeline(part)?;
 
-        return Ok(LegadoCssStep::Extract {
-            selector: if selector.is_empty() {
-                None
-            } else {
-                Some(selector.to_string())
-            },
-            extraction: parse_legado_css_extraction(extraction),
-        });
+    if segments.len() == 1 {
+        // 没有 `@`:整段是 select,抽取由管道末尾的默认 text 兜底。
+        return Ok(vec![LegadoCssStep::Select(segments[0].trim().to_string())]);
     }
 
-    Ok(LegadoCssStep::Select(part.to_string()))
+    // 2+ 段:最后一段是抽取,倒数第二段是抽取步骤的 selector,前面所有段是独立 Select。
+    let last_idx = segments.len() - 1;
+    let selector_idx = last_idx - 1;
+    let mut steps = Vec::with_capacity(segments.len());
+
+    for seg in &segments[..selector_idx] {
+        let seg = seg.trim();
+        if seg.is_empty() {
+            return Err("empty selector in pipeline segment".to_string());
+        }
+        steps.push(LegadoCssStep::Select(seg.to_string()));
+    }
+
+    let selector_str = segments[selector_idx].trim();
+    let selector = if selector_str.is_empty() {
+        None
+    } else {
+        Some(selector_str.to_string())
+    };
+
+    let extraction_str = segments[last_idx].trim();
+    if extraction_str.is_empty() {
+        return Err("missing extraction after `@`".to_string());
+    }
+    let extraction = parse_legado_css_extraction(extraction_str);
+
+    steps.push(LegadoCssStep::Extract { selector, extraction });
+
+    Ok(steps)
 }
 
 fn parse_legado_css_extraction(extraction: &str) -> LegadoCssExtraction {
@@ -3730,11 +3755,18 @@ fn parse_legado_css_extraction(extraction: &str) -> LegadoCssExtraction {
     }
 }
 
-fn find_legado_css_extraction_separator(part: &str) -> Result<Option<usize>, String> {
+/// 按 top-level `@` 切分 Legado CSS 管道段,尊重引号/方括号/圆括号嵌套。
+///
+/// 对应 Legado `AnalyzeByJSoup.kt` `RuleAnalyzer.splitRule("@")` 的语义。
+/// 例如 `tag.h3@tag.a@text` -> ["tag.h3", "tag.a", "text"],
+/// `a.book@text` -> ["a.book", "text"],`@href` -> ["", "href"]。
+fn split_legado_css_at_pipeline(part: &str) -> Result<Vec<&str>, String> {
+    let mut segments = Vec::new();
     let mut quote = None;
     let mut escaped = false;
     let mut bracket_depth = 0usize;
     let mut paren_depth = 0usize;
+    let mut start = 0usize;
 
     for (index, value) in part.char_indices() {
         if let Some(active_quote) = quote {
@@ -3754,7 +3786,9 @@ fn find_legado_css_extraction_separator(part: &str) -> Result<Option<usize>, Str
         }
 
         if value == '@' && bracket_depth == 0 && paren_depth == 0 {
-            return Ok(Some(index));
+            segments.push(&part[start..index]);
+            start = index + '@'.len_utf8();
+            continue;
         }
 
         match value {
@@ -3786,7 +3820,8 @@ fn find_legado_css_extraction_separator(part: &str) -> Result<Option<usize>, Str
         return Err("unterminated selector function".to_string());
     }
 
-    Ok(None)
+    segments.push(&part[start..]);
+    Ok(segments)
 }
 
 #[derive(Clone, Copy)]
@@ -3845,7 +3880,8 @@ fn legado_css_select_elements<'a>(
     contexts: &[LegadoCssContext<'a>],
     selector: &str,
 ) -> RuleResult<Vec<ElementRef<'a>>> {
-    let compiled = compile_legado_css_selector(selector)?;
+    let (base, index) = parse_legado_css_index(selector);
+    let compiled = compile_legado_css_selector(base)?;
     let mut elements = Vec::new();
 
     for context in contexts {
@@ -3859,14 +3895,121 @@ fn legado_css_select_elements<'a>(
         }
     }
 
+    if let Some(idx) = index {
+        elements = apply_legado_css_index(elements, idx);
+    }
+
     Ok(elements)
 }
 
+/// Parse the Legado dot-syntax index from the end of a selector.
+///
+/// Mirrors Legado `AnalyzeByJSoup.kt` `findIndexSet` dot-syntax branch
+/// (line 482-506): trailing `.N` or `.-N` is a single-element index.
+/// Returns `(base_selector, Some(index))` for `tag.p.1` -> `("tag.p", Some(1))`,
+/// or `(selector, None)` when the trailing segment is non-numeric (e.g.
+/// `div.item` -> the `.item` is a CSS class, not an index).
+///
+/// Only handles the simple `.N` / `.-N` select case. The `.!N` exclusion
+/// form and the bracket `[N:M:K]` range form are not yet supported.
+fn parse_legado_css_index(selector: &str) -> (&str, Option<i64>) {
+    let bytes = selector.as_bytes();
+    if bytes.is_empty() {
+        return (selector, None);
+    }
+
+    // Collect trailing digits.
+    let end = bytes.len();
+    let mut start = end;
+    while start > 0 && bytes[start - 1].is_ascii_digit() {
+        start -= 1;
+    }
+
+    if start == end {
+        return (selector, None); // no trailing digits
+    }
+
+    // Optional `-` before digits (negative index).
+    let mut sign_start = start;
+    if sign_start > 0 && bytes[sign_start - 1] == b'-' {
+        sign_start -= 1;
+    }
+
+    // Must be preceded by `.` to be a Legado index separator.
+    if sign_start > 0 && bytes[sign_start - 1] == b'.' {
+        let index_str = &selector[sign_start..end];
+        if let Ok(index) = index_str.parse::<i64>() {
+            let base = &selector[..sign_start - 1];
+            return (base, Some(index));
+        }
+    }
+
+    (selector, None)
+}
+
+/// Apply a Legado single-index selector to the selected elements.
+///
+/// Mirrors Legado `AnalyzeByJSoup.kt` `ElementsSingle.getElementsSingle`
+/// (line 324-402): positive index selects the Nth element; negative index
+/// counts from the end. Out-of-range indices return an empty set.
+fn apply_legado_css_index<'a>(
+    elements: Vec<ElementRef<'a>>,
+    index: i64,
+) -> Vec<ElementRef<'a>> {
+    let len = elements.len() as i64;
+    if len == 0 {
+        return Vec::new();
+    }
+
+    let resolved = if index >= 0 {
+        index
+    } else {
+        index + len
+    };
+
+    if (0..len).contains(&resolved) {
+        vec![elements[resolved as usize]]
+    } else {
+        Vec::new()
+    }
+}
+
 fn compile_legado_css_selector(selector: &str) -> RuleResult<Selector> {
-    Selector::parse(selector).map_err(|err| RuleError::CssSelectorSyntax {
+    let translated = translate_legado_css_shorthand(selector);
+    Selector::parse(&translated).map_err(|err| RuleError::CssSelectorSyntax {
         selector: selector.to_string(),
         message: format!("{err:?}"),
     })
+}
+
+/// Translate Legado CSS shorthand prefixes to standard CSS selectors.
+///
+/// Mirrors Legado `AnalyzeByJSoup.kt` `ElementsSingle.getElementsSingle`
+/// (lines 313-321): `beforeRule.split(".")` dispatches on `rules[0]`:
+///   - `class.X` -> `getElementsByClass(X)` = CSS `.X`
+///   - `tag.X`   -> `getElementsByTag(X)`   = CSS `X`
+///   - `id.X`    -> `Evaluator.Id(X)`       = CSS `#X`
+///
+/// Only translates when the selector starts with `class.`, `tag.`, or `id.`
+/// followed by a non-empty value. Other selectors pass through unchanged
+/// (Legado's `else -> temp.select(beforeRule)` branch handles raw CSS).
+fn translate_legado_css_shorthand(selector: &str) -> String {
+    if let Some(rest) = selector.strip_prefix("class.") {
+        if !rest.is_empty() {
+            return format!(".{rest}");
+        }
+    }
+    if let Some(rest) = selector.strip_prefix("tag.") {
+        if !rest.is_empty() {
+            return rest.to_string();
+        }
+    }
+    if let Some(rest) = selector.strip_prefix("id.") {
+        if !rest.is_empty() {
+            return format!("#{rest}");
+        }
+    }
+    selector.to_string()
 }
 
 fn legado_css_context_elements<'a>(contexts: &[LegadoCssContext<'a>]) -> Vec<ElementRef<'a>> {
