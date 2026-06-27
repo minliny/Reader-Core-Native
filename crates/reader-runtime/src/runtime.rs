@@ -18,6 +18,7 @@ use crate::remote::{
     RemoteHostContinuation, RemoteState,
 };
 use crate::sink::EventSink;
+use crate::tts::TtsState;
 
 /// C ABI version this runtime advertises via `core.info`. The authoritative
 /// value lives with the FFI; mirrored here so the pure-Rust runtime can answer
@@ -78,6 +79,8 @@ pub struct Runtime {
     host_operations: Arc<Mutex<HashMap<u64, HostOperation>>>,
     /// Shared remote-reading state (content pipeline + in-memory storage).
     remote_state: Arc<RemoteState>,
+    /// Shared TTS queue state (per-chapter playback state machine).
+    tts_state: Arc<TtsState>,
     /// Shutdown latch so the worker can stop even mid-processing.
     shutdown: Arc<AtomicBool>,
 }
@@ -103,6 +106,7 @@ impl Runtime {
         let next_operation_id = Arc::new(AtomicU64::new(1));
         let shutdown = Arc::new(AtomicBool::new(false));
         let remote_state = Arc::new(RemoteState::new());
+        let tts_state = Arc::new(TtsState::new());
 
         let worker_active = active_requests.clone();
         let worker_cancelled = cancelled.clone();
@@ -111,6 +115,7 @@ impl Runtime {
         let worker_shutdown = shutdown.clone();
         let worker_sink = sink.clone();
         let worker_remote_state = remote_state.clone();
+        let worker_tts_state = tts_state.clone();
 
         let worker = thread::Builder::new()
             .name("reader-core-worker".into())
@@ -124,6 +129,7 @@ impl Runtime {
                     worker_next_operation_id,
                     worker_shutdown,
                     worker_remote_state,
+                    worker_tts_state,
                 );
             })
             .expect("reader-core worker thread spawn failed");
@@ -137,6 +143,7 @@ impl Runtime {
             cancelled,
             host_operations,
             remote_state,
+            tts_state,
             shutdown,
         })
     }
@@ -159,6 +166,12 @@ impl Runtime {
     /// C ABI.
     pub fn remote_state(&self) -> &RemoteState {
         &self.remote_state
+    }
+
+    /// Shared TTS queue state. Exposed so tests (and hosts that embed the
+    /// pure-Rust runtime) can inspect queue snapshots. Not part of the C ABI.
+    pub fn tts_state(&self) -> &TtsState {
+        &self.tts_state
     }
 
     /// Parse and enqueue a JSON command payload.
@@ -237,6 +250,7 @@ impl Runtime {
         next_operation_id: Arc<AtomicU64>,
         shutdown: Arc<AtomicBool>,
         remote_state: Arc<RemoteState>,
+        tts_state: Arc<TtsState>,
     ) {
         for item in &rx {
             match item {
@@ -254,6 +268,7 @@ impl Runtime {
                         &next_operation_id,
                         &shutdown,
                         &remote_state,
+                        &tts_state,
                     );
                 }
                 WorkItem::ProtocolShutdown(cmd) => {
@@ -269,6 +284,7 @@ impl Runtime {
                         &next_operation_id,
                         &shutdown,
                         &remote_state,
+                        &tts_state,
                     );
                     if shutdown.load(Ordering::Acquire) {
                         drain_queued_after_protocol_shutdown(
@@ -304,6 +320,7 @@ fn dispatch_command(
     next_operation_id: &AtomicU64,
     shutdown: &AtomicBool,
     remote_state: &RemoteState,
+    tts_state: &TtsState,
 ) {
     if take_cancelled(cancelled, cmd.request_id) {
         finish_request(
@@ -365,7 +382,7 @@ fn dispatch_command(
         other => {
             // TTS vertical (pure logic, no host I/O) is tried first so that
             // tts.* commands don't fall through to unknown_method.
-            match crate::tts::dispatch_tts(other, cmd, sink, active_requests) {
+            match crate::tts::dispatch_tts(other, cmd, sink, active_requests, tts_state) {
                 crate::tts::TtsDispatch::Finished => return,
                 crate::tts::TtsDispatch::NotHandled => {}
             }

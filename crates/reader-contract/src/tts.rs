@@ -240,6 +240,135 @@ pub struct TtsChapterPlanData {
     pub transition: TtsChapterTransition,
 }
 
+// --- V1 queue control params (Gap F closure) -------------------------------
+//
+// Maps Legado `BaseReadAloudService` control actions (play / pauseReadAloud /
+// resumeReadAloud / stopSelf / nextP / prevP) into Core-owned state-machine
+// transitions. Core holds the queue state; the host drives transitions by
+// issuing these commands and vocalizes the slice at `currentSliceIndex`.
+//
+// State machine (see `reader-runtime/src/tts.rs`):
+//   Idle --play(plan)--> Playing
+//   Playing --pause--> Paused
+//   Paused --resume--> Playing
+//   Playing/Paused/Completed --stop--> Stopped
+//   Playing/Paused --next--> (index++ or Playing, or Completed at last slice)
+//   Playing/Paused --prev--> (index-- or error at first slice)
+//   Stopped/Completed --play(plan)--> Playing (restart with a fresh plan)
+
+/// Params for `tts.queue.play`. Loads a slice plan and starts playback from
+/// `startSliceIndex` (default 0). The host obtains the plan via `tts.slice`.
+///
+/// Valid from: `Idle`, `Stopped`, `Completed`. Calling `play` on an active
+/// (`Playing`/`Paused`) queue is an error — use `pause`/`resume` instead.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TtsQueuePlayParams {
+    pub plan: TtsSlicePlan,
+    /// Zero-based slice index to start at. Defaults to 0 (first slice).
+    /// Must be `< plan.slices.len()`.
+    #[serde(default)]
+    pub start_slice_index: u32,
+}
+
+/// Params for `tts.queue.pause`. Requires a loaded queue in `Playing` state.
+///
+/// Mirrors Legado `pauseReadAloud`: the current slice cursor is preserved so
+/// `resume` re-vocalizes from the same slice. Core does not signal the host
+/// audio engine — the host honors the `Paused` snapshot by stopping output.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TtsQueuePauseParams {
+    pub chapter: TtsChapterRef,
+}
+
+/// Params for `tts.queue.resume`. Requires a loaded queue in `Paused` state.
+///
+/// Mirrors Legado `resumeReadAloud` → `play()`: the host re-vocalizes the
+/// slice at `currentSliceIndex`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TtsQueueResumeParams {
+    pub chapter: TtsChapterRef,
+}
+
+/// Params for `tts.queue.stop`. Requires a loaded, non-`Idle` queue.
+///
+/// Mirrors Legado `stopSelf`: terminal state. The queue retains its slice
+/// history; restarting requires a fresh `tts.queue.play` with a new plan.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TtsQueueStopParams {
+    pub chapter: TtsChapterRef,
+}
+
+/// Params for `tts.queue.next`. Advances the cursor to the next slice.
+///
+/// Mirrors Legado `nextP`: marks the current slice `Done` and moves the cursor
+/// forward. At the last slice, the queue enters `Completed` (chapter-internal
+/// boundary). Cross-chapter advance is Gap G (`tts.chapter.plan`), out of V1
+/// scope.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TtsQueueNextParams {
+    pub chapter: TtsChapterRef,
+}
+
+/// Params for `tts.queue.prev`. Moves the cursor to the previous slice.
+///
+/// Mirrors Legado `prevP`: moves the cursor backward. At the first slice,
+/// returns an error — cross-chapter retreat is Gap G (`tts.chapter.plan`),
+/// out of V1 scope.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TtsQueuePrevParams {
+    pub chapter: TtsChapterRef,
+}
+
+// --- V1 queue control result data ------------------------------------------
+
+/// Result data for `tts.queue.play`. Returns the snapshot after loading.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TtsQueuePlayData {
+    pub snapshot: TtsQueueSnapshot,
+}
+
+/// Result data for `tts.queue.pause`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TtsQueuePauseData {
+    pub snapshot: TtsQueueSnapshot,
+}
+
+/// Result data for `tts.queue.resume`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TtsQueueResumeData {
+    pub snapshot: TtsQueueSnapshot,
+}
+
+/// Result data for `tts.queue.stop`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TtsQueueStopData {
+    pub snapshot: TtsQueueSnapshot,
+}
+
+/// Result data for `tts.queue.next`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TtsQueueNextData {
+    pub snapshot: TtsQueueSnapshot,
+}
+
+/// Result data for `tts.queue.prev`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TtsQueuePrevData {
+    pub snapshot: TtsQueueSnapshot,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -374,5 +503,184 @@ mod tests {
             serde_json::from_value(json).expect("terminal transition must round-trip");
         assert_eq!(back, no_next);
         assert!(back.next.is_none());
+    }
+
+    fn sample_plan() -> TtsSlicePlan {
+        TtsSlicePlan {
+            chapter: TtsChapterRef {
+                source_id: "src-1".into(),
+                book_id: "book-1".into(),
+                chapter_index: 2,
+                chapter_title: "第二章".into(),
+                chapter_url: String::new(),
+            },
+            strategy: TtsSlicingStrategy::Paragraph,
+            slices: vec![
+                TtsSlice {
+                    index: 0,
+                    text: "第一段。".into(),
+                    char_start: 0,
+                    char_end: 4,
+                    paragraph_index: 0,
+                },
+                TtsSlice {
+                    index: 1,
+                    text: "第二段。".into(),
+                    char_start: 4,
+                    char_end: 8,
+                    paragraph_index: 1,
+                },
+            ],
+            source_char_count: 8,
+        }
+    }
+
+    #[test]
+    fn tts_queue_play_params_round_trips_and_defaults_start_index_to_zero() {
+        let plan = sample_plan();
+        let params = TtsQueuePlayParams {
+            plan: plan.clone(),
+            start_slice_index: 0,
+        };
+        let json = serde_json::to_value(&params).expect("play params must serialize");
+        assert_eq!(json["startSliceIndex"], 0);
+        let back: TtsQueuePlayParams =
+            serde_json::from_value(json).expect("play params must round-trip");
+        assert_eq!(back, params);
+        assert_eq!(back.plan, plan);
+
+        // Omitting startSliceIndex defaults to 0.
+        let json = serde_json::json!({
+            "plan": serde_json::to_value(&plan).unwrap()
+        });
+        let back: TtsQueuePlayParams =
+            serde_json::from_value(json).expect("play params must default startSliceIndex");
+        assert_eq!(back.start_slice_index, 0);
+    }
+
+    #[test]
+    fn tts_queue_play_params_rejects_unknown_fields() {
+        let plan = sample_plan();
+        let json = serde_json::json!({
+            "plan": serde_json::to_value(&plan).unwrap(),
+            "unexpectedField": true
+        });
+        let err = serde_json::from_value::<TtsQueuePlayParams>(json);
+        assert!(
+            err.is_err(),
+            "deny_unknown_fields must reject unknown field"
+        );
+    }
+
+    #[test]
+    fn tts_queue_control_params_round_trip_with_chapter() {
+        let chapter = TtsChapterRef {
+            source_id: "src-1".into(),
+            book_id: "book-1".into(),
+            chapter_index: 2,
+            chapter_title: String::new(),
+            chapter_url: String::new(),
+        };
+        for (label, json_value) in [
+            (
+                "pause",
+                serde_json::json!({ "chapter": serde_json::to_value(&chapter).unwrap() }),
+            ),
+            (
+                "resume",
+                serde_json::json!({ "chapter": serde_json::to_value(&chapter).unwrap() }),
+            ),
+            (
+                "stop",
+                serde_json::json!({ "chapter": serde_json::to_value(&chapter).unwrap() }),
+            ),
+            (
+                "next",
+                serde_json::json!({ "chapter": serde_json::to_value(&chapter).unwrap() }),
+            ),
+            (
+                "prev",
+                serde_json::json!({ "chapter": serde_json::to_value(&chapter).unwrap() }),
+            ),
+        ] {
+            let _ = label;
+            // Each control params type parses from the chapter-only payload.
+            serde_json::from_value::<TtsQueuePauseParams>(json_value.clone())
+                .expect("pause params must parse");
+            serde_json::from_value::<TtsQueueResumeParams>(json_value.clone())
+                .expect("resume params must parse");
+            serde_json::from_value::<TtsQueueStopParams>(json_value.clone())
+                .expect("stop params must parse");
+            serde_json::from_value::<TtsQueueNextParams>(json_value.clone())
+                .expect("next params must parse");
+            serde_json::from_value::<TtsQueuePrevParams>(json_value.clone())
+                .expect("prev params must parse");
+        }
+    }
+
+    #[test]
+    fn tts_queue_control_data_types_round_trip_with_snapshot() {
+        let snapshot = TtsQueueSnapshot {
+            state: TtsQueueState::Playing,
+            current_slice_index: Some(1),
+            total_slices: 2,
+            completed_slices: 1,
+            chapter: TtsChapterRef {
+                source_id: "src-1".into(),
+                book_id: "book-1".into(),
+                chapter_index: 2,
+                chapter_title: String::new(),
+                chapter_url: String::new(),
+            },
+            slice_statuses: vec![TtsSliceStatus::Done, TtsSliceStatus::Speaking],
+        };
+        for (label, json_value) in [
+            (
+                "play",
+                serde_json::to_value(TtsQueuePlayData {
+                    snapshot: snapshot.clone(),
+                })
+                .unwrap(),
+            ),
+            (
+                "pause",
+                serde_json::to_value(TtsQueuePauseData {
+                    snapshot: snapshot.clone(),
+                })
+                .unwrap(),
+            ),
+            (
+                "resume",
+                serde_json::to_value(TtsQueueResumeData {
+                    snapshot: snapshot.clone(),
+                })
+                .unwrap(),
+            ),
+            (
+                "stop",
+                serde_json::to_value(TtsQueueStopData {
+                    snapshot: snapshot.clone(),
+                })
+                .unwrap(),
+            ),
+            (
+                "next",
+                serde_json::to_value(TtsQueueNextData {
+                    snapshot: snapshot.clone(),
+                })
+                .unwrap(),
+            ),
+            (
+                "prev",
+                serde_json::to_value(TtsQueuePrevData {
+                    snapshot: snapshot.clone(),
+                })
+                .unwrap(),
+            ),
+        ] {
+            let _ = label;
+            assert_eq!(json_value["snapshot"]["state"], "playing");
+            assert_eq!(json_value["snapshot"]["currentSliceIndex"], 1);
+        }
     }
 }

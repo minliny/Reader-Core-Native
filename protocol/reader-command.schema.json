@@ -77,6 +77,12 @@
         "tts.slice",
         "tts.queue.status",
         "tts.chapter.plan",
+        "tts.queue.play",
+        "tts.queue.pause",
+        "tts.queue.resume",
+        "tts.queue.stop",
+        "tts.queue.next",
+        "tts.queue.prev",
         "rss.parse",
         "rss.refresh",
         "sync.merge",
@@ -525,6 +531,120 @@
         "properties": {
           "params": {
             "$ref": "#/$defs/TtsChapterPlanParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "tts.queue.play"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/TtsQueuePlayParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "tts.queue.pause"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/TtsQueuePauseParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "tts.queue.resume"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/TtsQueueResumeParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "tts.queue.stop"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/TtsQueueStopParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "tts.queue.next"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/TtsQueueNextParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "tts.queue.prev"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/TtsQueuePrevParams"
           }
         }
       }
@@ -2763,6 +2883,90 @@
         "drainBehavior": {
           "$ref": "#/$defs/TtsQueueDrainBehavior",
           "default": "stop-on-boundary"
+        }
+      }
+    },
+    "TtsQueuePlayParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plan"
+      ],
+      "description": "Parameters for tts.queue.play. Loads a slice plan and starts playback. Valid from Idle/Stopped/Completed.",
+      "properties": {
+        "plan": {
+          "$ref": "#/$defs/TtsSlicePlan"
+        },
+        "startSliceIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Zero-based slice index to start at. Must be < plan.slices.length."
+        }
+      }
+    },
+    "TtsQueuePauseParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chapter"
+      ],
+      "description": "Parameters for tts.queue.pause. Requires a loaded queue in Playing state.",
+      "properties": {
+        "chapter": {
+          "$ref": "#/$defs/TtsChapterRef"
+        }
+      }
+    },
+    "TtsQueueResumeParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chapter"
+      ],
+      "description": "Parameters for tts.queue.resume. Requires a loaded queue in Paused state.",
+      "properties": {
+        "chapter": {
+          "$ref": "#/$defs/TtsChapterRef"
+        }
+      }
+    },
+    "TtsQueueStopParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chapter"
+      ],
+      "description": "Parameters for tts.queue.stop. Requires a loaded, non-Idle queue.",
+      "properties": {
+        "chapter": {
+          "$ref": "#/$defs/TtsChapterRef"
+        }
+      }
+    },
+    "TtsQueueNextParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chapter"
+      ],
+      "description": "Parameters for tts.queue.next. Advances the cursor to the next slice; at the last slice enters Completed.",
+      "properties": {
+        "chapter": {
+          "$ref": "#/$defs/TtsChapterRef"
+        }
+      }
+    },
+    "TtsQueuePrevParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chapter"
+      ],
+      "description": "Parameters for tts.queue.prev. Moves the cursor to the previous slice; errors at the first slice.",
+      "properties": {
+        "chapter": {
+          "$ref": "#/$defs/TtsChapterRef"
         }
       }
     }

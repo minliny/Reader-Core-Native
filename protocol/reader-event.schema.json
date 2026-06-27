@@ -2035,6 +2035,84 @@
           "$ref": "#/$defs/TtsChapterTransition"
         }
       }
+    },
+    "TtsQueuePlayData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot"
+      ],
+      "description": "Result data for tts.queue.play. Returns the queue snapshot after loading.",
+      "properties": {
+        "snapshot": {
+          "$ref": "#/$defs/TtsQueueSnapshot"
+        }
+      }
+    },
+    "TtsQueuePauseData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot"
+      ],
+      "description": "Result data for tts.queue.pause.",
+      "properties": {
+        "snapshot": {
+          "$ref": "#/$defs/TtsQueueSnapshot"
+        }
+      }
+    },
+    "TtsQueueResumeData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot"
+      ],
+      "description": "Result data for tts.queue.resume.",
+      "properties": {
+        "snapshot": {
+          "$ref": "#/$defs/TtsQueueSnapshot"
+        }
+      }
+    },
+    "TtsQueueStopData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot"
+      ],
+      "description": "Result data for tts.queue.stop.",
+      "properties": {
+        "snapshot": {
+          "$ref": "#/$defs/TtsQueueSnapshot"
+        }
+      }
+    },
+    "TtsQueueNextData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot"
+      ],
+      "description": "Result data for tts.queue.next.",
+      "properties": {
+        "snapshot": {
+          "$ref": "#/$defs/TtsQueueSnapshot"
+        }
+      }
+    },
+    "TtsQueuePrevData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot"
+      ],
+      "description": "Result data for tts.queue.prev.",
+      "properties": {
+        "snapshot": {
+          "$ref": "#/$defs/TtsQueueSnapshot"
+        }
+      }
     }
   }
 }

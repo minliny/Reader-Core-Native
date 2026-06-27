@@ -47,9 +47,11 @@ pub use remote::{
 };
 pub use tts::{
     TtsChapterPlanData, TtsChapterPlanParams, TtsChapterRef, TtsChapterTransition,
-    TtsQueueDrainBehavior, TtsQueueSnapshot, TtsQueueState, TtsQueueStatusData,
-    TtsQueueStatusParams, TtsSlice, TtsSliceData, TtsSliceParams, TtsSlicePlan, TtsSliceStatus,
-    TtsSlicingStrategy,
+    TtsQueueDrainBehavior, TtsQueueNextData, TtsQueueNextParams, TtsQueuePauseData,
+    TtsQueuePauseParams, TtsQueuePlayData, TtsQueuePlayParams, TtsQueuePrevData,
+    TtsQueuePrevParams, TtsQueueResumeData, TtsQueueResumeParams, TtsQueueSnapshot, TtsQueueState,
+    TtsQueueStatusData, TtsQueueStatusParams, TtsQueueStopData, TtsQueueStopParams, TtsSlice,
+    TtsSliceData, TtsSliceParams, TtsSlicePlan, TtsSliceStatus, TtsSlicingStrategy,
 };
 
 /// JSON protocol version. Bumped on non-backward-compatible schema changes.
@@ -94,6 +96,21 @@ pub mod methods {
     /// Compute the chapter boundary transition plan (current + next + drain
     /// behavior) for a given chapter.
     pub const TTS_CHAPTER_PLAN: &str = "tts.chapter.plan";
+    /// Load a slice plan and start playback. Core-owned queue state machine
+    /// (Gap F closure): `Idle/Stopped/Completed → Playing`.
+    pub const TTS_QUEUE_PLAY: &str = "tts.queue.play";
+    /// Pause the active queue. `Playing → Paused`.
+    pub const TTS_QUEUE_PAUSE: &str = "tts.queue.pause";
+    /// Resume a paused queue. `Paused → Playing`.
+    pub const TTS_QUEUE_RESUME: &str = "tts.queue.resume";
+    /// Stop the queue. `Playing/Paused/Completed → Stopped` (terminal).
+    pub const TTS_QUEUE_STOP: &str = "tts.queue.stop";
+    /// Advance the cursor to the next slice. At the last slice, enters
+    /// `Completed` (chapter-internal boundary; cross-chapter is Gap G).
+    pub const TTS_QUEUE_NEXT: &str = "tts.queue.next";
+    /// Move the cursor to the previous slice. Errors at the first slice
+    /// (cross-chapter retreat is Gap G).
+    pub const TTS_QUEUE_PREV: &str = "tts.queue.prev";
     // --- RSS vertical (V1 minimal) -----------------------------------------
     /// Parse an RSS/Atom XML feed into entries + diagnostics (pure, no network).
     pub const RSS_PARSE: &str = "rss.parse";
@@ -235,6 +252,12 @@ mod tests {
                 methods::TTS_SLICE,
                 methods::TTS_QUEUE_STATUS,
                 methods::TTS_CHAPTER_PLAN,
+                methods::TTS_QUEUE_PLAY,
+                methods::TTS_QUEUE_PAUSE,
+                methods::TTS_QUEUE_RESUME,
+                methods::TTS_QUEUE_STOP,
+                methods::TTS_QUEUE_NEXT,
+                methods::TTS_QUEUE_PREV,
                 methods::RSS_PARSE,
                 methods::RSS_REFRESH,
                 methods::SYNC_MERGE,
@@ -1393,6 +1416,12 @@ mod tests {
             (methods::TTS_SLICE, "#/$defs/TtsSliceParams"),
             (methods::TTS_QUEUE_STATUS, "#/$defs/TtsQueueStatusParams"),
             (methods::TTS_CHAPTER_PLAN, "#/$defs/TtsChapterPlanParams"),
+            (methods::TTS_QUEUE_PLAY, "#/$defs/TtsQueuePlayParams"),
+            (methods::TTS_QUEUE_PAUSE, "#/$defs/TtsQueuePauseParams"),
+            (methods::TTS_QUEUE_RESUME, "#/$defs/TtsQueueResumeParams"),
+            (methods::TTS_QUEUE_STOP, "#/$defs/TtsQueueStopParams"),
+            (methods::TTS_QUEUE_NEXT, "#/$defs/TtsQueueNextParams"),
+            (methods::TTS_QUEUE_PREV, "#/$defs/TtsQueuePrevParams"),
         ] {
             assert_eq!(
                 params_ref_for_method(&schema, method),
@@ -1451,6 +1480,50 @@ mod tests {
             plan_params["properties"]["drainBehavior"]["default"],
             serde_json::json!("stop-on-boundary")
         );
+    }
+
+    #[test]
+    fn command_schema_defines_tts_queue_control_params() {
+        let schema: Value =
+            serde_json::from_str(include_str!("../../../protocol/reader-command.schema.json"))
+                .expect("command schema must be valid JSON");
+
+        // play params: requires plan, optional startSliceIndex (default 0).
+        let play_params = &schema["$defs"]["TtsQueuePlayParams"];
+        assert_eq!(
+            play_params["additionalProperties"],
+            serde_json::json!(false)
+        );
+        assert_eq!(strings_at(play_params, "required"), vec!["plan"]);
+        assert_eq!(
+            play_params["properties"]["plan"]["$ref"],
+            serde_json::json!("#/$defs/TtsSlicePlan")
+        );
+        assert_eq!(
+            play_params["properties"]["startSliceIndex"]["default"],
+            serde_json::json!(0)
+        );
+        assert_eq!(
+            play_params["properties"]["startSliceIndex"]["minimum"],
+            serde_json::json!(0)
+        );
+
+        // pause/resume/stop/next/prev: each requires chapter only.
+        for def_name in [
+            "TtsQueuePauseParams",
+            "TtsQueueResumeParams",
+            "TtsQueueStopParams",
+            "TtsQueueNextParams",
+            "TtsQueuePrevParams",
+        ] {
+            let params = &schema["$defs"][def_name];
+            assert_eq!(params["additionalProperties"], serde_json::json!(false));
+            assert_eq!(strings_at(params, "required"), vec!["chapter"]);
+            assert_eq!(
+                params["properties"]["chapter"]["$ref"],
+                serde_json::json!("#/$defs/TtsChapterRef")
+            );
+        }
     }
 
     #[test]
@@ -1611,6 +1684,24 @@ mod tests {
             plan_data["properties"]["transition"]["$ref"],
             serde_json::json!("#/$defs/TtsChapterTransition")
         );
+
+        // Queue control result data (Gap F closure): each wraps a snapshot.
+        for def_name in [
+            "TtsQueuePlayData",
+            "TtsQueuePauseData",
+            "TtsQueueResumeData",
+            "TtsQueueStopData",
+            "TtsQueueNextData",
+            "TtsQueuePrevData",
+        ] {
+            let data = &schema["$defs"][def_name];
+            assert_eq!(data["additionalProperties"], serde_json::json!(false));
+            assert_eq!(strings_at(data, "required"), vec!["snapshot"]);
+            assert_eq!(
+                data["properties"]["snapshot"]["$ref"],
+                serde_json::json!("#/$defs/TtsQueueSnapshot")
+            );
+        }
     }
 
     fn strings_at<'a>(value: &'a Value, key: &str) -> Vec<&'a str> {

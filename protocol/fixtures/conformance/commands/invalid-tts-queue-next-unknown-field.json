@@ -1,0 +1,13 @@
+{
+  "protocolVersion": 1,
+  "requestId": 514,
+  "method": "tts.queue.next",
+  "params": {
+    "chapter": {
+      "sourceId": "src-1",
+      "bookId": "book-1",
+      "chapterIndex": 0
+    },
+    "unexpectedField": true
+  }
+}

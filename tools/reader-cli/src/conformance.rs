@@ -9,8 +9,9 @@ use reader_contract::{
     LocalBookCatalogData, LocalBookParseData, PendingHostOperationStatus,
     ReadingProgressUpdateData, RssParseData, RssRefreshData, RuntimeCancelData, RuntimeConfig,
     RuntimePingData, RuntimeShutdownData, RuntimeStatus, SourceImportData, SyncBackupData,
-    SyncMergeData, TtsChapterPlanData, TtsQueueState, TtsQueueStatusData, TtsSliceData,
-    TtsSlicingStrategy, PROTOCOL_VERSION, V1_CAPABILITIES,
+    SyncMergeData, TtsChapterPlanData, TtsQueueNextData, TtsQueuePauseData, TtsQueuePlayData,
+    TtsQueuePrevData, TtsQueueResumeData, TtsQueueState, TtsQueueStatusData, TtsQueueStopData,
+    TtsSliceData, TtsSlicingStrategy, PROTOCOL_VERSION, V1_CAPABILITIES,
 };
 use reader_runtime::{EventSink, Runtime};
 use serde_json::{json, Value};
@@ -168,12 +169,22 @@ const INVALID_LOCAL_BOOK_CATALOG_ENTRY_NOT_OBJECT: &str = include_str!(
 
 const VALID_TTS_SLICE: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-tts-slice.json");
-const VALID_TTS_QUEUE_STATUS: &str = include_str!(
-    "../../../protocol/fixtures/conformance/commands/valid-tts-queue-status.json"
-);
-const VALID_TTS_CHAPTER_PLAN: &str = include_str!(
-    "../../../protocol/fixtures/conformance/commands/valid-tts-chapter-plan.json"
-);
+const VALID_TTS_QUEUE_STATUS: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-tts-queue-status.json");
+const VALID_TTS_CHAPTER_PLAN: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-tts-chapter-plan.json");
+const VALID_TTS_QUEUE_PLAY: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-tts-queue-play.json");
+const VALID_TTS_QUEUE_PAUSE: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-tts-queue-pause.json");
+const VALID_TTS_QUEUE_RESUME: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-tts-queue-resume.json");
+const VALID_TTS_QUEUE_STOP: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-tts-queue-stop.json");
+const VALID_TTS_QUEUE_NEXT: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-tts-queue-next.json");
+const VALID_TTS_QUEUE_PREV: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-tts-queue-prev.json");
 const INVALID_TTS_SLICE_CONTENT_EMPTY: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-tts-slice-content-empty.json"
 );
@@ -185,6 +196,24 @@ const INVALID_TTS_QUEUE_STATUS_UNKNOWN_FIELD: &str = include_str!(
 );
 const INVALID_TTS_CHAPTER_PLAN_UNKNOWN_FIELD: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-tts-chapter-plan-unknown-field.json"
+);
+const INVALID_TTS_QUEUE_PLAY_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-tts-queue-play-unknown-field.json"
+);
+const INVALID_TTS_QUEUE_PAUSE_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-tts-queue-pause-unknown-field.json"
+);
+const INVALID_TTS_QUEUE_RESUME_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-tts-queue-resume-unknown-field.json"
+);
+const INVALID_TTS_QUEUE_STOP_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-tts-queue-stop-unknown-field.json"
+);
+const INVALID_TTS_QUEUE_NEXT_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-tts-queue-next-unknown-field.json"
+);
+const INVALID_TTS_QUEUE_PREV_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-tts-queue-prev-unknown-field.json"
 );
 
 const VALID_CONFIG_EMPTY: &str =
@@ -1621,9 +1650,8 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             Event::Result {
                 request_id, data, ..
             } if request_id == 421 => {
-                let data = serde_json::from_value::<TtsQueueStatusData>(data).map_err(|err| {
-                    format!("tts.queue.status data contract parse failed: {err}")
-                })?;
+                let data = serde_json::from_value::<TtsQueueStatusData>(data)
+                    .map_err(|err| format!("tts.queue.status data contract parse failed: {err}"))?;
                 if data.snapshot.state == TtsQueueState::Idle
                     && data.snapshot.total_slices == 0
                     && data.snapshot.completed_slices == 0
@@ -1645,9 +1673,8 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             Event::Result {
                 request_id, data, ..
             } if request_id == 422 => {
-                let data = serde_json::from_value::<TtsChapterPlanData>(data).map_err(|err| {
-                    format!("tts.chapter.plan data contract parse failed: {err}")
-                })?;
+                let data = serde_json::from_value::<TtsChapterPlanData>(data)
+                    .map_err(|err| format!("tts.chapter.plan data contract parse failed: {err}"))?;
                 if data.transition.next.is_none()
                     && data.transition.current.chapter_index == 2
                     && data.transition.drain_behavior
@@ -1660,6 +1687,158 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             }
             other => Err(format!("unexpected tts.chapter.plan result {other:?}")),
         }
+    });
+
+    // --- TTS queue control commands (Gap F closure) ----------------------
+    //
+    // Exercises the Core-owned queue state machine:
+    //   Idle --play--> Playing --pause--> Paused --resume--> Playing --stop--> Stopped
+    //   Playing --next--> (cursor advance) --prev--> (cursor retreat)
+    // Mirrors Legado BaseReadAloudService control actions. Pure logic; no
+    // audio. The host observes snapshots via the protocol and vocalizes.
+
+    record(&mut report, "valid-command-tts-queue-play", || {
+        let (_runtime, rx) = send_to_fresh_runtime(VALID_TTS_QUEUE_PLAY)?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 500 => {
+                let data = serde_json::from_value::<TtsQueuePlayData>(data)
+                    .map_err(|err| format!("tts.queue.play data contract parse failed: {err}"))?;
+                if data.snapshot.state == TtsQueueState::Playing
+                    && data.snapshot.current_slice_index == Some(0)
+                    && data.snapshot.total_slices == 2
+                    && data.snapshot.completed_slices == 0
+                    && data.snapshot.chapter.chapter_index == 0
+                {
+                    Ok(())
+                } else {
+                    Err(format!("unexpected tts.queue.play data {data:?}"))
+                }
+            }
+            other => Err(format!("unexpected tts.queue.play result {other:?}")),
+        }
+    });
+
+    record(
+        &mut report,
+        "valid-command-tts-queue-lifecycle-play-pause-resume-stop",
+        || {
+            // Multi-step on a single runtime: play → pause → resume → stop.
+            let (runtime, rx) = send_to_fresh_runtime(VALID_TTS_QUEUE_PLAY)?;
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 500 => {
+                    let data = serde_json::from_value::<TtsQueuePlayData>(data)
+                        .map_err(|err| format!("play data parse failed: {err}"))?;
+                    if data.snapshot.state != TtsQueueState::Playing {
+                        return Err(format!("expected Playing, got {:?}", data.snapshot.state));
+                    }
+                }
+                other => return Err(format!("unexpected play result {other:?}")),
+            }
+
+            runtime
+                .send_json(VALID_TTS_QUEUE_PAUSE.as_bytes())
+                .map_err(|err| format!("pause send_json failed: {err:?}"))?;
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 501 => {
+                    let data = serde_json::from_value::<TtsQueuePauseData>(data)
+                        .map_err(|err| format!("pause data parse failed: {err}"))?;
+                    if data.snapshot.state != TtsQueueState::Paused {
+                        return Err(format!("expected Paused, got {:?}", data.snapshot.state));
+                    }
+                }
+                other => return Err(format!("unexpected pause result {other:?}")),
+            }
+
+            runtime
+                .send_json(VALID_TTS_QUEUE_RESUME.as_bytes())
+                .map_err(|err| format!("resume send_json failed: {err:?}"))?;
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 502 => {
+                    let data = serde_json::from_value::<TtsQueueResumeData>(data)
+                        .map_err(|err| format!("resume data parse failed: {err}"))?;
+                    if data.snapshot.state != TtsQueueState::Playing {
+                        return Err(format!("expected Playing, got {:?}", data.snapshot.state));
+                    }
+                }
+                other => return Err(format!("unexpected resume result {other:?}")),
+            }
+
+            runtime
+                .send_json(VALID_TTS_QUEUE_STOP.as_bytes())
+                .map_err(|err| format!("stop send_json failed: {err:?}"))?;
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 503 => {
+                    let data = serde_json::from_value::<TtsQueueStopData>(data)
+                        .map_err(|err| format!("stop data parse failed: {err}"))?;
+                    if data.snapshot.state != TtsQueueState::Stopped {
+                        return Err(format!("expected Stopped, got {:?}", data.snapshot.state));
+                    }
+                }
+                other => return Err(format!("unexpected stop result {other:?}")),
+            }
+            Ok(())
+        },
+    );
+
+    record(
+        &mut report,
+        "valid-command-tts-queue-next-prev-cursor",
+        || {
+            // Multi-step on a single runtime: play → next → prev.
+            let (runtime, rx) = send_to_fresh_runtime(VALID_TTS_QUEUE_PLAY)?;
+            let _ = recv_event(&rx)?; // play result
+
+            runtime
+                .send_json(VALID_TTS_QUEUE_NEXT.as_bytes())
+                .map_err(|err| format!("next send_json failed: {err:?}"))?;
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 504 => {
+                    let data = serde_json::from_value::<TtsQueueNextData>(data)
+                        .map_err(|err| format!("next data parse failed: {err}"))?;
+                    if data.snapshot.current_slice_index != Some(1)
+                        || data.snapshot.completed_slices != 1
+                    {
+                        return Err(format!("next did not advance cursor: {data:?}"));
+                    }
+                }
+                other => return Err(format!("unexpected next result {other:?}")),
+            }
+
+            runtime
+                .send_json(VALID_TTS_QUEUE_PREV.as_bytes())
+                .map_err(|err| format!("prev send_json failed: {err:?}"))?;
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 505 => {
+                    let data = serde_json::from_value::<TtsQueuePrevData>(data)
+                        .map_err(|err| format!("prev data parse failed: {err}"))?;
+                    if data.snapshot.current_slice_index != Some(0) {
+                        return Err(format!("prev did not retreat cursor: {data:?}"));
+                    }
+                }
+                other => return Err(format!("unexpected prev result {other:?}")),
+            }
+            Ok(())
+        },
+    );
+
+    record(&mut report, "invalid-tts-queue-pause-no-queue", || {
+        // pause without a loaded queue → InvalidParams (state machine error).
+        let (_runtime, rx) = send_to_fresh_runtime(VALID_TTS_QUEUE_PAUSE)?;
+        expect_event_error(&rx, 501, ErrorCode::InvalidParams)
     });
 
     for (name, json, request_id) in [
@@ -1742,6 +1921,36 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             "tts-chapter-plan-rejects-unknown-params",
             INVALID_TTS_CHAPTER_PLAN_UNKNOWN_FIELD,
             426,
+        ),
+        (
+            "tts-queue-play-rejects-unknown-params",
+            INVALID_TTS_QUEUE_PLAY_UNKNOWN_FIELD,
+            510,
+        ),
+        (
+            "tts-queue-pause-rejects-unknown-params",
+            INVALID_TTS_QUEUE_PAUSE_UNKNOWN_FIELD,
+            511,
+        ),
+        (
+            "tts-queue-resume-rejects-unknown-params",
+            INVALID_TTS_QUEUE_RESUME_UNKNOWN_FIELD,
+            512,
+        ),
+        (
+            "tts-queue-stop-rejects-unknown-params",
+            INVALID_TTS_QUEUE_STOP_UNKNOWN_FIELD,
+            513,
+        ),
+        (
+            "tts-queue-next-rejects-unknown-params",
+            INVALID_TTS_QUEUE_NEXT_UNKNOWN_FIELD,
+            514,
+        ),
+        (
+            "tts-queue-prev-rejects-unknown-params",
+            INVALID_TTS_QUEUE_PREV_UNKNOWN_FIELD,
+            515,
         ),
     ] {
         record(&mut report, name, || {
