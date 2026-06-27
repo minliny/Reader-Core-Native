@@ -3310,6 +3310,223 @@ mod tests {
         }
     }
 
+    /// S5: local_book.parse binary path — EPUB via bytesBase64 + format hint.
+    /// Mirrors Legado's LocalBook dispatch by mimetype/extension, except the
+    /// wire payload is base64 over JSON (no raw bytes ever cross the boundary).
+    #[test]
+    fn local_book_parse_dispatches_epub_bytes_base64() {
+        let epub_bytes = build_minimal_epub_zip_for_test(
+            "Runtime EPUB Title",
+            "Runtime Tester",
+            &[
+                ("ch1", "Chapter One", "Hello from chapter one."),
+                ("ch2", "Chapter Two", "Hello from chapter two."),
+            ],
+        );
+        let bytes_b64 = base64_encode_for_test(&epub_bytes);
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                120,
+                methods::LOCAL_BOOK_PARSE,
+                serde_json::json!({
+                    "bookId": "rt-epub-1",
+                    "title": "Runtime EPUB Title",
+                    "author": "Runtime Tester",
+                    "format": "epub",
+                    "bytesBase64": bytes_b64,
+                }),
+            ),
+        );
+        match event {
+            Event::Result { data, .. } => {
+                assert_eq!(data["format"], "epub");
+                assert_eq!(data["byteLen"].as_u64().unwrap(), epub_bytes.len() as u64);
+                assert!(
+                    data["chapterCount"].as_u64().unwrap() >= 2,
+                    "expected at least 2 chapters, got {data}"
+                );
+                assert!(data["book"].is_object());
+            }
+            other => panic!("expected local_book.parse epub result, got {other:?}"),
+        }
+    }
+
+    /// S5: local_book.parse binary path — PDF via bytesBase64. Core detects
+    /// PDF from `%PDF-` magic and extracts text from content stream Tj/TJ
+    /// operators. No host OCR for text-bearing PDFs.
+    #[test]
+    fn local_book_parse_dispatches_pdf_bytes_base64() {
+        let pdf = b"%PDF-1.4\n\
+1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n\
+2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n\
+3 0 obj\n<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>\nendobj\n\
+4 0 obj\n<< /Length 44 >>\nstream\nBT /F1 12 Tf 72 720 Td (Runtime PDF Page One) Tj ET\nendstream\nendobj\n\
+xref\n0 5\ntrailer\n<< /Root 1 0 R >>\nstartxref\n0\n%%EOF";
+        let bytes_b64 = base64_encode_for_test(pdf);
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                121,
+                methods::LOCAL_BOOK_PARSE,
+                serde_json::json!({
+                    "bookId": "rt-pdf-1",
+                    "fileName": "rt.pdf",
+                    "bytesBase64": bytes_b64,
+                }),
+            ),
+        );
+        match event {
+            Event::Result { data, .. } => {
+                assert_eq!(data["format"], "pdf");
+                assert!(data["chapterCount"].as_u64().unwrap() >= 1);
+            }
+            other => panic!("expected local_book.parse pdf result, got {other:?}"),
+        }
+    }
+
+    /// S5: contract enforces at-least-one-of (text, bytesBase64). Sending
+    /// neither fails closed with INVALID_PARAMS before reaching the parser.
+    #[test]
+    fn local_book_parse_rejects_missing_text_and_bytes() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                122,
+                methods::LOCAL_BOOK_PARSE,
+                serde_json::json!({
+                    "bookId": "rt-empty-1",
+                    "fileName": "empty.epub",
+                }),
+            ),
+        );
+        match event {
+            Event::Error { error, .. } => assert_eq!(error.code, ErrorCode::InvalidParams),
+            other => panic!("expected invalid params, got {other:?}"),
+        }
+    }
+
+    /// S5: malformed base64 surfaces as INVALID_PARAMS, never reaches parser.
+    #[test]
+    fn local_book_parse_rejects_malformed_bytes_base64() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                123,
+                methods::LOCAL_BOOK_PARSE,
+                serde_json::json!({
+                    "bookId": "rt-bad-b64",
+                    "format": "epub",
+                    "bytesBase64": "!!!not-base64!!!",
+                }),
+            ),
+        );
+        match event {
+            Event::Error { error, .. } => assert_eq!(error.code, ErrorCode::InvalidParams),
+            other => panic!("expected invalid params, got {other:?}"),
+        }
+    }
+
+    /// Build a minimal EPUB ZIP in memory for runtime tests. Mirrors the
+    /// shape of reader-local-book's `epub3_nav_spine_resource_cover.epub`
+    /// fixture: container.xml → OPF (with nav + spine) → chapter XHTMLs.
+    fn build_minimal_epub_zip_for_test(
+        title: &str,
+        author: &str,
+        chapters: &[(&str, &str, &str)],
+    ) -> Vec<u8> {
+        use std::io::Write;
+        use zip::write::SimpleFileOptions;
+
+        let mut buf = std::io::Cursor::new(Vec::<u8>::new());
+        {
+            let mut zip = zip::ZipWriter::new(&mut buf);
+            let opts = SimpleFileOptions::default();
+
+            // mimetype must be first and stored (uncompressed) per EPUB spec.
+            zip.start_file("mimetype", opts).unwrap();
+            zip.write_all(b"application/epub+zip").unwrap();
+
+            zip.start_file("META-INF/container.xml", opts).unwrap();
+            zip.write_all(
+                br#"<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>"#,
+            )
+            .unwrap();
+
+            // OPF with metadata + manifest (nav + chapters) + spine.
+            let mut opf = String::new();
+            opf.push_str("<?xml version=\"1.0\"?>\n");
+            opf.push_str("<package xmlns=\"http://www.idpf.org/2007/opf\" version=\"3.0\" unique-identifier=\"bookid\">\n");
+            opf.push_str("  <metadata xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n");
+            opf.push_str(&format!("    <dc:title>{}</dc:title>\n", title));
+            opf.push_str(&format!("    <dc:creator>{}</dc:creator>\n", author));
+            opf.push_str("    <dc:language>en</dc:language>\n");
+            opf.push_str("    <dc:identifier id=\"bookid\">rt-epub-001</dc:identifier>\n");
+            opf.push_str("  </metadata>\n  <manifest>\n");
+            opf.push_str("    <item id=\"nav\" href=\"nav.xhtml\" media-type=\"application/xhtml+xml\" properties=\"nav\"/>\n");
+            for (id, _title, _content) in chapters {
+                opf.push_str(&format!(
+                    "    <item id=\"{id}\" href=\"{id}.xhtml\" media-type=\"application/xhtml+xml\"/>\n"
+                ));
+            }
+            opf.push_str("  </manifest>\n  <spine>\n");
+            for (id, _title, _content) in chapters {
+                opf.push_str(&format!("    <itemref idref=\"{id}\"/>\n"));
+            }
+            opf.push_str("  </spine>\n</package>");
+
+            zip.start_file("OEBPS/content.opf", opts).unwrap();
+            zip.write_all(opf.as_bytes()).unwrap();
+
+            // nav.xhtml (EPUB3 TOC)
+            let mut nav = String::from("<?xml version=\"1.0\"?>\n");
+            nav.push_str("<html xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:epub=\"http://www.idpf.org/2007/ops\">\n");
+            nav.push_str("  <body><nav epub:type=\"toc\"><ol>\n");
+            for (id, title, _content) in chapters {
+                nav.push_str(&format!(
+                    "    <li><a href=\"{id}.xhtml\">{title}</a></li>\n"
+                ));
+            }
+            nav.push_str("  </ol></nav></body></html>");
+            zip.start_file("OEBPS/nav.xhtml", opts).unwrap();
+            zip.write_all(nav.as_bytes()).unwrap();
+
+            // Chapter XHTMLs
+            for (id, title, content) in chapters {
+                let xhtml = format!(
+                    "<?xml version=\"1.0\"?>\n<html xmlns=\"http://www.w3.org/1999/xhtml\">\n  <head><title>{title}</title></head>\n  <body><h1>{title}</h1><p>{content}</p></body></html>"
+                );
+                zip.start_file(format!("OEBPS/{id}.xhtml"), opts).unwrap();
+                zip.write_all(xhtml.as_bytes()).unwrap();
+            }
+
+            zip.finish().unwrap();
+        }
+        buf.into_inner()
+    }
+
+    fn base64_encode_for_test(bytes: &[u8]) -> String {
+        use base64::Engine as _;
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    }
+
     #[test]
     fn local_book_catalog_upserts_entry() {
         let sink = Arc::new(CollectSink::new());

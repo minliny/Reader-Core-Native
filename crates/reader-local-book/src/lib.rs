@@ -12,8 +12,14 @@ use reader_domain::{Book, ReadingProgress, TocEntry};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
+pub mod epub;
+pub mod mobi;
+pub mod pdf;
 pub mod txt;
 
+pub use epub::parse_epub_book;
+pub use mobi::parse_mobi_book;
+pub use pdf::parse_pdf_book;
 pub use txt::{parse_txt, parse_txt_with_options, ParsedTxt, TxtChapter, TxtParseOptions};
 
 /// Current local-book library snapshot schema version.
@@ -178,12 +184,12 @@ pub fn local_book_format_capability(format: LocalBookFormat) -> LocalBookFormatC
             requires_platform_renderer: false,
             requires_external_decoder_for_full_parity: false,
             parser_boundary:
-                "Core indexes OPF/nav/NCX and extracts bounded text resources through configured archive adapter."
+                "Core owns EPUB ZIP container extraction, OPF metadata/manifest/spine parsing, EPUB3 nav / EPUB2 NCX / spine-fallback TOC resolution, and XHTML body text extraction with script/style stripping."
                     .into(),
             host_responsibilities: strings([
-                "archive_adapter",
                 "font_image_resource_display",
                 "reader_pagination_ui",
+                "interactive_xhtml_rendering",
             ]),
             clean_room_maintained: true,
             external_gpl_code_copied: false,
@@ -199,12 +205,12 @@ pub fn local_book_format_capability(format: LocalBookFormat) -> LocalBookFormatC
             requires_platform_renderer: true,
             requires_external_decoder_for_full_parity: false,
             parser_boundary:
-                "Core detects PDF and can expose page text boundary where platform text extraction is available; rendering stays platform-owned."
+                "Core implements clean-room PDF text extraction from content streams (BT/ET blocks, Tj/TJ operators, paren-delimited strings with escape decoding). Image-only PDFs surface text_unavailable_without_ocr; interactive rendering stays platform-owned."
                     .into(),
             host_responsibilities: strings([
-                "pdfkit_or_platform_pdf_adapter",
                 "interactive_pdf_rendering",
-                "ocr_if_required",
+                "ocr_for_image_only_pdf",
+                "encrypted_pdf_credentials",
             ]),
             clean_room_maintained: true,
             external_gpl_code_copied: false,
@@ -239,7 +245,7 @@ pub fn local_book_format_capability(format: LocalBookFormat) -> LocalBookFormatC
         ),
         LocalBookFormat::Umd => binary_text_fragment_capability(
             format,
-            "Core detects UMD signatures and accepts bounded readable text fragments; full legacy container parity is not claimed.",
+            "Core detects UMD signatures but full parser is deferred: Legado delegates UMD to third-party me.ag2s.umdlib.UmdReader (not implemented in Legado core), and Swift Reader-Core also lacks a UMD parser. UMD is a niche Chinese legacy format; deferred until product requirement materializes.",
         ),
         LocalBookFormat::Archive => LocalBookFormatCapability {
             format,
@@ -4894,6 +4900,51 @@ pub fn parse_txt_book(input: LocalBookInput<'_>) -> Result<LocalBook, LocalBookE
     parse_txt_book_with_policy(input, &ChapterSplitPolicy::default())
 }
 
+/// Dispatch a local-book parse by detected format.
+///
+/// Routes to the format-specific parser (`parse_txt_book` / `parse_epub_book`
+/// / `parse_pdf_book` / `parse_mobi_book`). Format is detected from bytes
+/// (and optionally hinted by `declared_format` on the input's file_name).
+/// Unknown / unsupported formats fail closed with `InvalidMetadata`.
+pub fn parse_local_book(input: LocalBookInput<'_>) -> Result<LocalBook, LocalBookError> {
+    let _ = normalize_required(input.book_id, "book_id")?;
+    if input.bytes.is_empty() {
+        return Err(LocalBookError::EmptyInput);
+    }
+    let declared = input
+        .file_name
+        .and_then(|n| declared_format_from_extension(n));
+    let format = detect_local_book_format_from_bytes(input.bytes, declared);
+    match format {
+        LocalBookFormat::Txt => parse_txt_book(input),
+        LocalBookFormat::Epub => crate::epub::parse_epub_book(input),
+        LocalBookFormat::Pdf => crate::pdf::parse_pdf_book(input),
+        LocalBookFormat::Mobi | LocalBookFormat::Azw => crate::mobi::parse_mobi_book(input),
+        LocalBookFormat::Html => parse_txt_book(input),
+        other => Err(LocalBookError::InvalidMetadata {
+            field: format!(
+                "local_book_format_{:?}_no_parser (UMD deferred, Archive/WebDav/Unknown unsupported by parse_local_book)",
+                other
+            ),
+        }),
+    }
+}
+
+/// Derive a declared format hint from a file extension.
+fn declared_format_from_extension(file_name: &str) -> Option<LocalBookFormat> {
+    let ext = file_name.rsplit('.').next()?.to_ascii_lowercase();
+    match ext.as_str() {
+        "txt" => Some(LocalBookFormat::Txt),
+        "epub" => Some(LocalBookFormat::Epub),
+        "pdf" => Some(LocalBookFormat::Pdf),
+        "mobi" => Some(LocalBookFormat::Mobi),
+        "azw" | "azw3" => Some(LocalBookFormat::Azw),
+        "umd" => Some(LocalBookFormat::Umd),
+        "html" | "htm" => Some(LocalBookFormat::Html),
+        _ => None,
+    }
+}
+
 /// Parse a TXT local book from bytes using an explicit chapter split policy.
 pub fn parse_txt_book_with_policy(
     input: LocalBookInput<'_>,
@@ -5323,7 +5374,7 @@ fn decode_utf16(
     Ok((text, encoding))
 }
 
-fn normalize_required(value: &str, field: &str) -> Result<String, LocalBookError> {
+pub(crate) fn normalize_required(value: &str, field: &str) -> Result<String, LocalBookError> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
         return Err(LocalBookError::InvalidMetadata {
@@ -5448,7 +5499,7 @@ fn validate_local_book(book: &LocalBook) -> Result<(), LocalBookError> {
     Ok(())
 }
 
-fn derive_title(title: Option<&str>, file_name: Option<&str>, book_id: &str) -> String {
+pub(crate) fn derive_title(title: Option<&str>, file_name: Option<&str>, book_id: &str) -> String {
     if let Some(title) = title.map(str::trim).filter(|value| !value.is_empty()) {
         return title.to_string();
     }
@@ -7443,9 +7494,11 @@ mod tests {
         assert_eq!(pdf.capability_level, LocalBookCapabilityLevel::TextBoundary);
         assert!(pdf.requires_platform_renderer);
         assert!(!pdf.can_render_natively_in_core);
+        // S5: Core now owns clean-room PDF text extraction; host retains OCR
+        // for image-only PDFs and interactive rendering.
         assert!(pdf
             .host_responsibilities
-            .contains(&"ocr_if_required".into()));
+            .contains(&"ocr_for_image_only_pdf".into()));
 
         let mobi = local_book_format_capability(LocalBookFormat::Mobi);
         assert_eq!(

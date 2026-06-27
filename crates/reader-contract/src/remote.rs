@@ -1120,8 +1120,17 @@ pub struct SyncBackupData {
 // Local-book vertical (V1 minimal)
 // ===========================================================================
 
-/// Parameters for `local_book.parse`. `text` is already-decoded UTF-8 content;
-/// GBK/GB18030 decoding is the host's responsibility in V1.
+/// Parameters for `local_book.parse`.
+///
+/// Two mutually exclusive input modes:
+/// * **text** — already-decoded UTF-8 TXT content (legacy V1 path; host owns
+///   GBK/GB18030 decoding). Routed to `parse_txt_text`.
+/// * **bytesBase64** — base64-encoded raw book bytes for binary formats
+///   (EPUB/PDF/MOBI/AZW). Routed to `parse_local_book` which detects format
+///   from magic bytes (with optional `format` / `fileName` hint).
+///
+/// At least one of `text` / `bytesBase64` must be non-empty; validated by
+/// [`LocalBookParseParams::validate_local_book_parse_params`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LocalBookParseParams {
@@ -1133,9 +1142,47 @@ pub struct LocalBookParseParams {
     pub author: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file_name: Option<String>,
-    /// Already-decoded TXT content. Must be non-empty.
-    #[serde(deserialize_with = "deserialize_non_blank_feed_xml")]
+    /// Already-decoded TXT content. Used for the legacy text path. Required
+    /// when `bytesBase64` is absent; rejected-by-validate when both are
+    /// empty/blank.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub text: String,
+    /// Base64-encoded raw book bytes for binary formats (EPUB/PDF/MOBI/AZW).
+    /// Core decodes here; host never sends raw bytes over the JSON wire.
+    /// Required when `text` is absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bytes_base64: Option<String>,
+    /// Optional format hint (e.g. `"epub"`, `"pdf"`, `"mobi"`, `"txt"`).
+    /// When present, overrides `fileName` extension for declared-format
+    /// detection. If absent, Core falls back to `fileName` extension, then
+    /// to magic-byte auto-detection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<String>,
+}
+
+impl LocalBookParseParams {
+    /// Validate that at least one of `text` / `bytesBase64` is non-empty.
+    /// Called by the runtime before dispatch; surfaces as `INVALID_PARAMS`.
+    pub fn validate_local_book_parse_params(&self) -> Result<(), CoreError> {
+        let has_text = !self.text.trim().is_empty();
+        let has_bytes = self
+            .bytes_base64
+            .as_deref()
+            .is_some_and(|s| !s.trim().is_empty());
+        if !has_text && !has_bytes {
+            return Err(CoreError::invalid_params(
+                "local_book.parse requires at least one of `text` or `bytesBase64`",
+            ));
+        }
+        Ok(())
+    }
+
+    /// True iff the binary (`bytesBase64`) path should be used.
+    pub fn prefers_binary_path(&self) -> bool {
+        self.bytes_base64
+            .as_deref()
+            .is_some_and(|s| !s.trim().is_empty())
+    }
 }
 
 /// Result data for `local_book.parse`. The parsed book is returned as a JSON
