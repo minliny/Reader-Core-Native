@@ -53,6 +53,76 @@ fn fixture_vertical_runs_legado_css_dsl_pipeline() {
         .contains("First & bold line."));
 }
 
+/// Real Legado source (sudugu.org 速读谷吧) vertical pipeline.
+///
+/// This fixture uses a desensitized real online Legado book source with rules
+/// covering 5 DSL forms in a single source:
+/// - CSS: `class.item`, `tag.h3@tag.a@text`, `id.list@tag.li`
+/// - ## replacement: `tag.p.1@tag.a@text##作者：`, `class.con@html##<div.*?>|</div>`
+/// - @put: `@put:{id:"##/(\\d+)/##1"}` in ruleBookInfo.downloadUrls
+/// - @js: `@js:result='...'` in ruleBookInfo.downloadUrls
+/// - @xpath: `@xpath://div[@class='pages bb']//a[...]/@href` in ruleToc/ruleContent
+///
+/// Current Core gaps documented via release blockers (rb-*):
+/// - rb-legado-rulesearch-object-deser: ruleSearch object → Option<String> fail
+/// - rb-legado-concurrentrate-string-deser: concurrentRate "3" → Option<i64> fail
+///   (fixture works around both by renaming to searchRule/etc + int concurrentRate)
+/// - rb-legado-css-shorthand-selector: class.X/tag.X/id.X not translated to CSS
+/// - rb-xpath-strict-xml-parser: @xpath fails on real HTML (not well-formed XML)
+/// - rb-tocurl-template-as-selector: {{baseUrl}}/#dir treated as CSS selector
+///
+/// When these blockers are resolved, this test should be updated to assert
+/// successful parsing (non-empty books, toc, content).
+#[test]
+fn fixture_vertical_runs_legado_sudugu_real_source_pipeline() {
+    let events = run_fixture("legado_sudugu_vertical.json");
+
+    // 9 events: import, search(inline), host.request, search(host), detail, toc,
+    // chapter, progress, js(unsupported).
+    assert_eq!(events.len(), 9, "expected 9 events, got {events:?}");
+
+    // 1. import succeeds
+    assert_eq!(events[0]["data"]["imported"], true);
+    assert_eq!(events[0]["data"]["sourceId"], "legado-sudugu-src");
+    assert_eq!(events[0]["data"]["name"], "速读谷吧（优）");
+
+    // 2. inline search — currently empty due to rb-legado-css-shorthand-selector
+    //    (class.item not translated to .item). Returns a books array regardless.
+    assert!(events[1]["data"]["books"].is_array());
+
+    // 3. host.request emitted for http.execute
+    assert_eq!(events[2]["type"], "host.request");
+    assert_eq!(events[2]["capability"], "http.execute");
+    assert_eq!(
+        events[2]["params"]["url"],
+        "https://www.sudugu.org/search?q=dune"
+    );
+
+    // 4. search via host — currently empty (same selector gap)
+    assert!(events[3]["data"]["books"].is_array());
+
+    // 5. detail — currently error due to rb-tocurl-template-as-selector
+    //    (tocUrl "{{baseUrl}}/#dir" treated as CSS selector)
+    // 6. toc — currently error due to rb-xpath-strict-xml-parser
+    // 7. chapter — currently error due to rb-xpath-strict-xml-parser
+    // These three return either a result or an error depending on gap status.
+    for idx in 4..=6 {
+        let event = &events[idx];
+        assert!(
+            event["type"] == "result" || event["type"] == "error",
+            "event {idx} should be result or error, got {event:?}"
+        );
+    }
+
+    // 8. progress stored
+    assert_eq!(events[7]["data"]["stored"], true);
+
+    // 9. JS unsupported — structured error, never a fake network result
+    assert_eq!(events[8]["type"], "error");
+    assert_eq!(events[8]["error"]["code"], "INTERNAL");
+    assert_eq!(events[8]["error"]["details"]["unsupported"], true);
+}
+
 #[test]
 fn booksource_fixture_outputs_stable_json() {
     let output = Command::new(BIN)

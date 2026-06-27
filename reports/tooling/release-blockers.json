@@ -1,24 +1,24 @@
 {
   "blockers": [
     {
-      "capability": "epub-\u89e3\u6790",
+      "capability": "epub-解析",
       "evidence_status": "missing",
-      "id": "rb-epub-\u89e3\u6790",
-      "mitigation": "Implement epub-\u89e3\u6790 (currently missing)",
+      "id": "rb-epub-解析",
+      "mitigation": "Implement epub-解析 (currently missing)",
       "platform": "all",
-      "reason": "epub-\u89e3\u6790 is missing with zero passing evidence",
+      "reason": "epub-解析 is missing with zero passing evidence",
       "severity": "blocker",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "txt-\u89e3\u6790",
+      "capability": "txt-解析",
       "evidence_status": "missing",
-      "id": "rb-txt-\u89e3\u6790",
-      "mitigation": "Implement txt-\u89e3\u6790 (currently missing)",
+      "id": "rb-txt-解析",
+      "mitigation": "Implement txt-解析 (currently missing)",
       "platform": "all",
-      "reason": "txt-\u89e3\u6790 is missing with zero passing evidence",
+      "reason": "txt-解析 is missing with zero passing evidence",
       "severity": "blocker",
       "sources": [
         "FEATURE_MATRIX.md"
@@ -236,132 +236,132 @@
       ]
     },
     {
-      "capability": "tls-\u5b9e\u9645\u7f51\u7edc-socket",
+      "capability": "tls-实际网络-socket",
       "evidence_status": "unknown",
-      "id": "rb-tls-\u5b9e\u9645\u7f51\u7edc-socket",
-      "mitigation": "Add passing evidence for tls-\u5b9e\u9645\u7f51\u7edc-socket on all required platforms",
+      "id": "rb-tls-实际网络-socket",
+      "mitigation": "Add passing evidence for tls-实际网络-socket on all required platforms",
       "platform": "all",
-      "reason": "tls-\u5b9e\u9645\u7f51\u7edc-socket is host-owned with zero evidence",
+      "reason": "tls-实际网络-socket is host-owned with zero evidence",
       "severity": "medium",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "ui-\u7ec4\u4ef6\u548c\u5bfc\u822a",
+      "capability": "ui-组件和导航",
       "evidence_status": "unknown",
-      "id": "rb-ui-\u7ec4\u4ef6\u548c\u5bfc\u822a",
-      "mitigation": "Add passing evidence for ui-\u7ec4\u4ef6\u548c\u5bfc\u822a on all required platforms",
+      "id": "rb-ui-组件和导航",
+      "mitigation": "Add passing evidence for ui-组件和导航 on all required platforms",
       "platform": "all",
-      "reason": "ui-\u7ec4\u4ef6\u548c\u5bfc\u822a is host-owned with zero evidence",
+      "reason": "ui-组件和导航 is host-owned with zero evidence",
       "severity": "medium",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "webview-cookie-\u83b7\u53d6",
+      "capability": "webview-cookie-获取",
       "evidence_status": "unknown",
-      "id": "rb-webview-cookie-\u83b7\u53d6",
-      "mitigation": "Add passing evidence for webview-cookie-\u83b7\u53d6 on all required platforms",
+      "id": "rb-webview-cookie-获取",
+      "mitigation": "Add passing evidence for webview-cookie-获取 on all required platforms",
       "platform": "all",
-      "reason": "webview-cookie-\u83b7\u53d6 is host-owned with zero evidence",
+      "reason": "webview-cookie-获取 is host-owned with zero evidence",
       "severity": "medium",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u4e3b\u9898\u548c\u5b57\u4f53",
+      "capability": "主题和字体",
       "evidence_status": "unknown",
-      "id": "rb-\u4e3b\u9898\u548c\u5b57\u4f53",
-      "mitigation": "Add passing evidence for \u4e3b\u9898\u548c\u5b57\u4f53 on all required platforms",
+      "id": "rb-主题和字体",
+      "mitigation": "Add passing evidence for 主题和字体 on all required platforms",
       "platform": "all",
-      "reason": "\u4e3b\u9898\u548c\u5b57\u4f53 is host-owned with zero evidence",
+      "reason": "主题和字体 is host-owned with zero evidence",
       "severity": "medium",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u5305\u4f53\u7b7e\u540d\u548c\u5206\u53d1",
+      "capability": "包体签名和分发",
       "evidence_status": "unknown",
-      "id": "rb-\u5305\u4f53\u7b7e\u540d\u548c\u5206\u53d1",
-      "mitigation": "Add passing evidence for \u5305\u4f53\u7b7e\u540d\u548c\u5206\u53d1 on all required platforms",
+      "id": "rb-包体签名和分发",
+      "mitigation": "Add passing evidence for 包体签名和分发 on all required platforms",
       "platform": "all",
-      "reason": "\u5305\u4f53\u7b7e\u540d\u548c\u5206\u53d1 is host-owned with zero evidence",
+      "reason": "包体签名和分发 is host-owned with zero evidence",
       "severity": "medium",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u540e\u53f0\u4efb\u52a1\u548c\u901a\u77e5",
+      "capability": "后台任务和通知",
       "evidence_status": "unknown",
-      "id": "rb-\u540e\u53f0\u4efb\u52a1\u548c\u901a\u77e5",
-      "mitigation": "Add passing evidence for \u540e\u53f0\u4efb\u52a1\u548c\u901a\u77e5 on all required platforms",
+      "id": "rb-后台任务和通知",
+      "mitigation": "Add passing evidence for 后台任务和通知 on all required platforms",
       "platform": "all",
-      "reason": "\u540e\u53f0\u4efb\u52a1\u548c\u901a\u77e5 is host-owned with zero evidence",
+      "reason": "后台任务和通知 is host-owned with zero evidence",
       "severity": "medium",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u5b89\u5168\u51ed\u636e\u5b58\u50a8-keychain-keystore-etc",
+      "capability": "安全凭据存储-keychain-keystore-etc",
       "evidence_status": "unknown",
-      "id": "rb-\u5b89\u5168\u51ed\u636e\u5b58\u50a8-keychain-keystore-etc",
-      "mitigation": "Add passing evidence for \u5b89\u5168\u51ed\u636e\u5b58\u50a8-keychain-keystore-etc on all required platforms",
+      "id": "rb-安全凭据存储-keychain-keystore-etc",
+      "mitigation": "Add passing evidence for 安全凭据存储-keychain-keystore-etc on all required platforms",
       "platform": "all",
-      "reason": "\u5b89\u5168\u51ed\u636e\u5b58\u50a8-keychain-keystore-etc is host-owned with zero evidence",
+      "reason": "安全凭据存储-keychain-keystore-etc is host-owned with zero evidence",
       "severity": "medium",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u6587\u4ef6\u9009\u62e9\u548c\u6c99\u7bb1\u6388\u6743",
+      "capability": "文件选择和沙箱授权",
       "evidence_status": "unknown",
-      "id": "rb-\u6587\u4ef6\u9009\u62e9\u548c\u6c99\u7bb1\u6388\u6743",
-      "mitigation": "Add passing evidence for \u6587\u4ef6\u9009\u62e9\u548c\u6c99\u7bb1\u6388\u6743 on all required platforms",
+      "id": "rb-文件选择和沙箱授权",
+      "mitigation": "Add passing evidence for 文件选择和沙箱授权 on all required platforms",
       "platform": "all",
-      "reason": "\u6587\u4ef6\u9009\u62e9\u548c\u6c99\u7bb1\u6388\u6743 is host-owned with zero evidence",
+      "reason": "文件选择和沙箱授权 is host-owned with zero evidence",
       "severity": "medium",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u767b\u5f55-webview-\u4ea4\u4e92",
+      "capability": "登录-webview-交互",
       "evidence_status": "unknown",
-      "id": "rb-\u767b\u5f55-webview-\u4ea4\u4e92",
-      "mitigation": "Add passing evidence for \u767b\u5f55-webview-\u4ea4\u4e92 on all required platforms",
+      "id": "rb-登录-webview-交互",
+      "mitigation": "Add passing evidence for 登录-webview-交互 on all required platforms",
       "platform": "all",
-      "reason": "\u767b\u5f55-webview-\u4ea4\u4e92 is host-owned with zero evidence",
+      "reason": "登录-webview-交互 is host-owned with zero evidence",
       "severity": "medium",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u7cfb\u7edf-tts-\u53d1\u58f0",
+      "capability": "系统-tts-发声",
       "evidence_status": "unknown",
-      "id": "rb-\u7cfb\u7edf-tts-\u53d1\u58f0",
-      "mitigation": "Add passing evidence for \u7cfb\u7edf-tts-\u53d1\u58f0 on all required platforms",
+      "id": "rb-系统-tts-发声",
+      "mitigation": "Add passing evidence for 系统-tts-发声 on all required platforms",
       "platform": "all",
-      "reason": "\u7cfb\u7edf-tts-\u53d1\u58f0 is host-owned with zero evidence",
+      "reason": "系统-tts-发声 is host-owned with zero evidence",
       "severity": "medium",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "book-chapter-source-\u6570\u636e\u6a21\u578b",
+      "capability": "book-chapter-source-数据模型",
       "evidence_status": "unknown",
-      "id": "rb-book-chapter-source-\u6570\u636e\u6a21\u578b",
-      "mitigation": "Clarify status of book-chapter-source-\u6570\u636e\u6a21\u578b and add evidence",
+      "id": "rb-book-chapter-source-数据模型",
+      "mitigation": "Clarify status of book-chapter-source-数据模型 and add evidence",
       "platform": "all",
-      "reason": "book-chapter-source-\u6570\u636e\u6a21\u578b has unknown status with zero evidence",
+      "reason": "book-chapter-source-数据模型 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
@@ -380,48 +380,48 @@
       ]
     },
     {
-      "capability": "cookie-session-\u6301\u4e45\u5316",
+      "capability": "cookie-session-持久化",
       "evidence_status": "unknown",
-      "id": "rb-cookie-session-\u6301\u4e45\u5316",
-      "mitigation": "Clarify status of cookie-session-\u6301\u4e45\u5316 and add evidence",
+      "id": "rb-cookie-session-持久化",
+      "mitigation": "Clarify status of cookie-session-持久化 and add evidence",
       "platform": "all",
-      "reason": "cookie-session-\u6301\u4e45\u5316 has unknown status with zero evidence",
+      "reason": "cookie-session-持久化 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "cookie-\u7b56\u7565\u63a7\u5236",
+      "capability": "cookie-策略控制",
       "evidence_status": "unknown",
-      "id": "rb-cookie-\u7b56\u7565\u63a7\u5236",
-      "mitigation": "Clarify status of cookie-\u7b56\u7565\u63a7\u5236 and add evidence",
+      "id": "rb-cookie-策略控制",
+      "mitigation": "Clarify status of cookie-策略控制 and add evidence",
       "platform": "all",
-      "reason": "cookie-\u7b56\u7565\u63a7\u5236 has unknown status with zero evidence",
+      "reason": "cookie-策略控制 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "css-selector-\u89c4\u5219",
+      "capability": "css-selector-规则",
       "evidence_status": "unknown",
-      "id": "rb-css-selector-\u89c4\u5219",
-      "mitigation": "Clarify status of css-selector-\u89c4\u5219 and add evidence",
+      "id": "rb-css-selector-规则",
+      "mitigation": "Clarify status of css-selector-规则 and add evidence",
       "platform": "all",
-      "reason": "css-selector-\u89c4\u5219 has unknown status with zero evidence",
+      "reason": "css-selector-规则 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "html-\u89e3\u6790",
+      "capability": "html-解析",
       "evidence_status": "unknown",
-      "id": "rb-html-\u89e3\u6790",
-      "mitigation": "Clarify status of html-\u89e3\u6790 and add evidence",
+      "id": "rb-html-解析",
+      "mitigation": "Clarify status of html-解析 and add evidence",
       "platform": "all",
-      "reason": "html-\u89e3\u6790 has unknown status with zero evidence",
+      "reason": "html-解析 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
@@ -440,375 +440,438 @@
       ]
     },
     {
-      "capability": "js-\u6267\u884c-quickjs",
+      "capability": "js-执行-quickjs",
       "evidence_status": "unknown",
-      "id": "rb-js-\u6267\u884c-quickjs",
-      "mitigation": "Clarify status of js-\u6267\u884c-quickjs and add evidence",
+      "id": "rb-js-执行-quickjs",
+      "mitigation": "Clarify status of js-执行-quickjs and add evidence",
       "platform": "all",
-      "reason": "js-\u6267\u884c-quickjs has unknown status with zero evidence",
+      "reason": "js-执行-quickjs has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "json-\u89e3\u6790",
+      "capability": "json-解析",
       "evidence_status": "unknown",
-      "id": "rb-json-\u89e3\u6790",
-      "mitigation": "Clarify status of json-\u89e3\u6790 and add evidence",
+      "id": "rb-json-解析",
+      "mitigation": "Clarify status of json-解析 and add evidence",
       "platform": "all",
-      "reason": "json-\u89e3\u6790 has unknown status with zero evidence",
+      "reason": "json-解析 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "jsonpath-\u89c4\u5219",
+      "capability": "jsonpath-规则",
       "evidence_status": "unknown",
-      "id": "rb-jsonpath-\u89c4\u5219",
-      "mitigation": "Clarify status of jsonpath-\u89c4\u5219 and add evidence",
+      "id": "rb-jsonpath-规则",
+      "mitigation": "Clarify status of jsonpath-规则 and add evidence",
       "platform": "all",
-      "reason": "jsonpath-\u89c4\u5219 has unknown status with zero evidence",
+      "reason": "jsonpath-规则 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "recovery-\u6821\u9a8c-diff",
+      "capability": "recovery-校验-diff",
       "evidence_status": "unknown",
-      "id": "rb-recovery-\u6821\u9a8c-diff",
-      "mitigation": "Clarify status of recovery-\u6821\u9a8c-diff and add evidence",
+      "id": "rb-recovery-校验-diff",
+      "mitigation": "Clarify status of recovery-校验-diff and add evidence",
       "platform": "all",
-      "reason": "recovery-\u6821\u9a8c-diff has unknown status with zero evidence",
+      "reason": "recovery-校验-diff has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "rss-\u89e3\u6790\u548c\u8ba2\u9605\u72b6\u6001",
+      "capability": "rss-解析和订阅状态",
       "evidence_status": "unknown",
-      "id": "rb-rss-\u89e3\u6790\u548c\u8ba2\u9605\u72b6\u6001",
-      "mitigation": "Clarify status of rss-\u89e3\u6790\u548c\u8ba2\u9605\u72b6\u6001 and add evidence",
+      "id": "rb-rss-解析和订阅状态",
+      "mitigation": "Clarify status of rss-解析和订阅状态 and add evidence",
       "platform": "all",
-      "reason": "rss-\u89e3\u6790\u548c\u8ba2\u9605\u72b6\u6001 has unknown status with zero evidence",
+      "reason": "rss-解析和订阅状态 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "sqlite-schema-\u7ba1\u7406",
+      "capability": "sqlite-schema-管理",
       "evidence_status": "unknown",
-      "id": "rb-sqlite-schema-\u7ba1\u7406",
-      "mitigation": "Clarify status of sqlite-schema-\u7ba1\u7406 and add evidence",
+      "id": "rb-sqlite-schema-管理",
+      "mitigation": "Clarify status of sqlite-schema-管理 and add evidence",
       "platform": "all",
-      "reason": "sqlite-schema-\u7ba1\u7406 has unknown status with zero evidence",
+      "reason": "sqlite-schema-管理 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "tts-\u6587\u672c\u5207\u7247\u548c\u64ad\u653e\u961f\u5217",
+      "capability": "tts-文本切片和播放队列",
       "evidence_status": "unknown",
-      "id": "rb-tts-\u6587\u672c\u5207\u7247\u548c\u64ad\u653e\u961f\u5217",
-      "mitigation": "Clarify status of tts-\u6587\u672c\u5207\u7247\u548c\u64ad\u653e\u961f\u5217 and add evidence",
+      "id": "rb-tts-文本切片和播放队列",
+      "mitigation": "Clarify status of tts-文本切片和播放队列 and add evidence",
       "platform": "all",
-      "reason": "tts-\u6587\u672c\u5207\u7247\u548c\u64ad\u653e\u961f\u5217 has unknown status with zero evidence",
+      "reason": "tts-文本切片和播放队列 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "webdav-\u534f\u8bae\u548c\u51b2\u7a81\u7b56\u7565",
+      "capability": "webdav-协议和冲突策略",
       "evidence_status": "unknown",
-      "id": "rb-webdav-\u534f\u8bae\u548c\u51b2\u7a81\u7b56\u7565",
-      "mitigation": "Clarify status of webdav-\u534f\u8bae\u548c\u51b2\u7a81\u7b56\u7565 and add evidence",
+      "id": "rb-webdav-协议和冲突策略",
+      "mitigation": "Clarify status of webdav-协议和冲突策略 and add evidence",
       "platform": "all",
-      "reason": "webdav-\u534f\u8bae\u548c\u51b2\u7a81\u7b56\u7565 has unknown status with zero evidence",
+      "reason": "webdav-协议和冲突策略 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "xml-\u89e3\u6790",
+      "capability": "xml-解析",
       "evidence_status": "unknown",
-      "id": "rb-xml-\u89e3\u6790",
-      "mitigation": "Clarify status of xml-\u89e3\u6790 and add evidence",
+      "id": "rb-xml-解析",
+      "mitigation": "Clarify status of xml-解析 and add evidence",
       "platform": "all",
-      "reason": "xml-\u89e3\u6790 has unknown status with zero evidence",
+      "reason": "xml-解析 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "xpath-\u89c4\u5219",
+      "capability": "xpath-规则",
       "evidence_status": "unknown",
-      "id": "rb-xpath-\u89c4\u5219",
-      "mitigation": "Clarify status of xpath-\u89c4\u5219 and add evidence",
+      "id": "rb-xpath-规则",
+      "mitigation": "Clarify status of xpath-规则 and add evidence",
       "platform": "all",
-      "reason": "xpath-\u89c4\u5219 has unknown status with zero evidence",
+      "reason": "xpath-规则 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u4e0b\u8f7d\u961f\u5217",
+      "capability": "下载队列",
       "evidence_status": "unknown",
-      "id": "rb-\u4e0b\u8f7d\u961f\u5217",
-      "mitigation": "Clarify status of \u4e0b\u8f7d\u961f\u5217 and add evidence",
+      "id": "rb-下载队列",
+      "mitigation": "Clarify status of 下载队列 and add evidence",
       "platform": "all",
-      "reason": "\u4e0b\u8f7d\u961f\u5217 has unknown status with zero evidence",
+      "reason": "下载队列 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u4e66\u6e90\u5bfc\u5165-\u5bfc\u51fa",
+      "capability": "书源导入-导出",
       "evidence_status": "unknown",
-      "id": "rb-\u4e66\u6e90\u5bfc\u5165-\u5bfc\u51fa",
-      "mitigation": "Clarify status of \u4e66\u6e90\u5bfc\u5165-\u5bfc\u51fa and add evidence",
+      "id": "rb-书源导入-导出",
+      "mitigation": "Clarify status of 书源导入-导出 and add evidence",
       "platform": "all",
-      "reason": "\u4e66\u6e90\u5bfc\u5165-\u5bfc\u51fa has unknown status with zero evidence",
+      "reason": "书源导入-导出 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u4e66\u7c4d\u8be6\u60c5\u89c4\u5219",
+      "capability": "书籍详情规则",
       "evidence_status": "unknown",
-      "id": "rb-\u4e66\u7c4d\u8be6\u60c5\u89c4\u5219",
-      "mitigation": "Clarify status of \u4e66\u7c4d\u8be6\u60c5\u89c4\u5219 and add evidence",
+      "id": "rb-书籍详情规则",
+      "mitigation": "Clarify status of 书籍详情规则 and add evidence",
       "platform": "all",
-      "reason": "\u4e66\u7c4d\u8be6\u60c5\u89c4\u5219 has unknown status with zero evidence",
+      "reason": "书籍详情规则 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u5185\u5bb9\u6e05\u6d17\u548c\u6807\u51c6\u5316",
+      "capability": "内容清洗和标准化",
       "evidence_status": "unknown",
-      "id": "rb-\u5185\u5bb9\u6e05\u6d17\u548c\u6807\u51c6\u5316",
-      "mitigation": "Clarify status of \u5185\u5bb9\u6e05\u6d17\u548c\u6807\u51c6\u5316 and add evidence",
+      "id": "rb-内容清洗和标准化",
+      "mitigation": "Clarify status of 内容清洗和标准化 and add evidence",
       "platform": "all",
-      "reason": "\u5185\u5bb9\u6e05\u6d17\u548c\u6807\u51c6\u5316 has unknown status with zero evidence",
+      "reason": "内容清洗和标准化 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u53d8\u91cf\u4f5c\u7528\u57df",
+      "capability": "变量作用域",
       "evidence_status": "unknown",
-      "id": "rb-\u53d8\u91cf\u4f5c\u7528\u57df",
-      "mitigation": "Clarify status of \u53d8\u91cf\u4f5c\u7528\u57df and add evidence",
+      "id": "rb-变量作用域",
+      "mitigation": "Clarify status of 变量作用域 and add evidence",
       "platform": "all",
-      "reason": "\u53d8\u91cf\u4f5c\u7528\u57df has unknown status with zero evidence",
+      "reason": "变量作用域 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u540c\u6b65-\u51b2\u7a81\u89e3\u51b3",
+      "capability": "同步-冲突解决",
       "evidence_status": "unknown",
-      "id": "rb-\u540c\u6b65-\u51b2\u7a81\u89e3\u51b3",
-      "mitigation": "Clarify status of \u540c\u6b65-\u51b2\u7a81\u89e3\u51b3 and add evidence",
+      "id": "rb-同步-冲突解决",
+      "mitigation": "Clarify status of 同步-冲突解决 and add evidence",
       "platform": "all",
-      "reason": "\u540c\u6b65-\u51b2\u7a81\u89e3\u51b3 has unknown status with zero evidence",
+      "reason": "同步-冲突解决 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u54cd\u5e94\u7f16\u7801\u68c0\u6d4b\u548c\u8f6c\u6362",
+      "capability": "响应编码检测和转换",
       "evidence_status": "unknown",
-      "id": "rb-\u54cd\u5e94\u7f16\u7801\u68c0\u6d4b\u548c\u8f6c\u6362",
-      "mitigation": "Clarify status of \u54cd\u5e94\u7f16\u7801\u68c0\u6d4b\u548c\u8f6c\u6362 and add evidence",
+      "id": "rb-响应编码检测和转换",
+      "mitigation": "Clarify status of 响应编码检测和转换 and add evidence",
       "platform": "all",
-      "reason": "\u54cd\u5e94\u7f16\u7801\u68c0\u6d4b\u548c\u8f6c\u6362 has unknown status with zero evidence",
+      "reason": "响应编码检测和转换 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u5907\u4efd-\u6062\u590d",
+      "capability": "备份-恢复",
       "evidence_status": "unknown",
-      "id": "rb-\u5907\u4efd-\u6062\u590d",
-      "mitigation": "Clarify status of \u5907\u4efd-\u6062\u590d and add evidence",
+      "id": "rb-备份-恢复",
+      "mitigation": "Clarify status of 备份-恢复 and add evidence",
       "platform": "all",
-      "reason": "\u5907\u4efd-\u6062\u590d has unknown status with zero evidence",
+      "reason": "备份-恢复 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u591a\u5b57\u6bb5\u89c4\u5219",
+      "capability": "多字段规则",
       "evidence_status": "unknown",
-      "id": "rb-\u591a\u5b57\u6bb5\u89c4\u5219",
-      "mitigation": "Clarify status of \u591a\u5b57\u6bb5\u89c4\u5219 and add evidence",
+      "id": "rb-多字段规则",
+      "mitigation": "Clarify status of 多字段规则 and add evidence",
       "platform": "all",
-      "reason": "\u591a\u5b57\u6bb5\u89c4\u5219 has unknown status with zero evidence",
+      "reason": "多字段规则 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u641c\u7d22\u89c4\u5219",
+      "capability": "搜索规则",
       "evidence_status": "unknown",
-      "id": "rb-\u641c\u7d22\u89c4\u5219",
-      "mitigation": "Clarify status of \u641c\u7d22\u89c4\u5219 and add evidence",
+      "id": "rb-搜索规则",
+      "mitigation": "Clarify status of 搜索规则 and add evidence",
       "platform": "all",
-      "reason": "\u641c\u7d22\u89c4\u5219 has unknown status with zero evidence",
+      "reason": "搜索规则 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u6570\u636e\u5e93\u8fc1\u79fb",
+      "capability": "数据库迁移",
       "evidence_status": "unknown",
-      "id": "rb-\u6570\u636e\u5e93\u8fc1\u79fb",
-      "mitigation": "Clarify status of \u6570\u636e\u5e93\u8fc1\u79fb and add evidence",
+      "id": "rb-数据库迁移",
+      "mitigation": "Clarify status of 数据库迁移 and add evidence",
       "platform": "all",
-      "reason": "\u6570\u636e\u5e93\u8fc1\u79fb has unknown status with zero evidence",
+      "reason": "数据库迁移 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u66ff\u6362\u89c4\u5219",
+      "capability": "替换规则",
       "evidence_status": "unknown",
-      "id": "rb-\u66ff\u6362\u89c4\u5219",
-      "mitigation": "Clarify status of \u66ff\u6362\u89c4\u5219 and add evidence",
+      "id": "rb-替换规则",
+      "mitigation": "Clarify status of 替换规则 and add evidence",
       "platform": "all",
-      "reason": "\u66ff\u6362\u89c4\u5219 has unknown status with zero evidence",
+      "reason": "替换规则 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u6700\u8fd1\u5386\u53f2",
+      "capability": "最近历史",
       "evidence_status": "unknown",
-      "id": "rb-\u6700\u8fd1\u5386\u53f2",
-      "mitigation": "Clarify status of \u6700\u8fd1\u5386\u53f2 and add evidence",
+      "id": "rb-最近历史",
+      "mitigation": "Clarify status of 最近历史 and add evidence",
       "platform": "all",
-      "reason": "\u6700\u8fd1\u5386\u53f2 has unknown status with zero evidence",
+      "reason": "最近历史 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u6b63\u5219\u89c4\u5219",
+      "capability": "正则规则",
       "evidence_status": "unknown",
-      "id": "rb-\u6b63\u5219\u89c4\u5219",
-      "mitigation": "Clarify status of \u6b63\u5219\u89c4\u5219 and add evidence",
+      "id": "rb-正则规则",
+      "mitigation": "Clarify status of 正则规则 and add evidence",
       "platform": "all",
-      "reason": "\u6b63\u5219\u89c4\u5219 has unknown status with zero evidence",
+      "reason": "正则规则 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u6b63\u6587\u89c4\u5219",
+      "capability": "正文规则",
       "evidence_status": "unknown",
-      "id": "rb-\u6b63\u6587\u89c4\u5219",
-      "mitigation": "Clarify status of \u6b63\u6587\u89c4\u5219 and add evidence",
+      "id": "rb-正文规则",
+      "mitigation": "Clarify status of 正文规则 and add evidence",
       "platform": "all",
-      "reason": "\u6b63\u6587\u89c4\u5219 has unknown status with zero evidence",
+      "reason": "正文规则 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u76ee\u5f55\u89c4\u5219",
+      "capability": "目录规则",
       "evidence_status": "unknown",
-      "id": "rb-\u76ee\u5f55\u89c4\u5219",
-      "mitigation": "Clarify status of \u76ee\u5f55\u89c4\u5219 and add evidence",
+      "id": "rb-目录规则",
+      "mitigation": "Clarify status of 目录规则 and add evidence",
       "platform": "all",
-      "reason": "\u76ee\u5f55\u89c4\u5219 has unknown status with zero evidence",
+      "reason": "目录规则 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u7ae0\u8282\u5185\u5bb9\u7f13\u5b58",
+      "capability": "章节内容缓存",
       "evidence_status": "unknown",
-      "id": "rb-\u7ae0\u8282\u5185\u5bb9\u7f13\u5b58",
-      "mitigation": "Clarify status of \u7ae0\u8282\u5185\u5bb9\u7f13\u5b58 and add evidence",
+      "id": "rb-章节内容缓存",
+      "mitigation": "Clarify status of 章节内容缓存 and add evidence",
       "platform": "all",
-      "reason": "\u7ae0\u8282\u5185\u5bb9\u7f13\u5b58 has unknown status with zero evidence",
+      "reason": "章节内容缓存 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u8bf7\u6c42\u53c2\u6570\u6784\u5efa",
+      "capability": "请求参数构建",
       "evidence_status": "unknown",
-      "id": "rb-\u8bf7\u6c42\u53c2\u6570\u6784\u5efa",
-      "mitigation": "Clarify status of \u8bf7\u6c42\u53c2\u6570\u6784\u5efa and add evidence",
+      "id": "rb-请求参数构建",
+      "mitigation": "Clarify status of 请求参数构建 and add evidence",
       "platform": "all",
-      "reason": "\u8bf7\u6c42\u53c2\u6570\u6784\u5efa has unknown status with zero evidence",
+      "reason": "请求参数构建 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u91cd\u5b9a\u5411\u7b56\u7565\u63a7\u5236",
+      "capability": "重定向策略控制",
       "evidence_status": "unknown",
-      "id": "rb-\u91cd\u5b9a\u5411\u7b56\u7565\u63a7\u5236",
-      "mitigation": "Clarify status of \u91cd\u5b9a\u5411\u7b56\u7565\u63a7\u5236 and add evidence",
+      "id": "rb-重定向策略控制",
+      "mitigation": "Clarify status of 重定向策略控制 and add evidence",
       "platform": "all",
-      "reason": "\u91cd\u5b9a\u5411\u7b56\u7565\u63a7\u5236 has unknown status with zero evidence",
+      "reason": "重定向策略控制 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u94fe\u89c4\u5219",
+      "capability": "链规则",
       "evidence_status": "unknown",
-      "id": "rb-\u94fe\u89c4\u5219",
-      "mitigation": "Clarify status of \u94fe\u89c4\u5219 and add evidence",
+      "id": "rb-链规则",
+      "mitigation": "Clarify status of 链规则 and add evidence",
       "platform": "all",
-      "reason": "\u94fe\u89c4\u5219 has unknown status with zero evidence",
+      "reason": "链规则 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
       ]
     },
     {
-      "capability": "\u9605\u8bfb\u8fdb\u5ea6",
+      "capability": "阅读进度",
       "evidence_status": "unknown",
-      "id": "rb-\u9605\u8bfb\u8fdb\u5ea6",
-      "mitigation": "Clarify status of \u9605\u8bfb\u8fdb\u5ea6 and add evidence",
+      "id": "rb-阅读进度",
+      "mitigation": "Clarify status of 阅读进度 and add evidence",
       "platform": "all",
-      "reason": "\u9605\u8bfb\u8fdb\u5ea6 has unknown status with zero evidence",
+      "reason": "阅读进度 has unknown status with zero evidence",
       "severity": "low",
       "sources": [
         "FEATURE_MATRIX.md"
+      ]
+    },
+    {
+      "id": "rb-legado-rulesearch-object-deser",
+      "capability": "legado.bookSource.ruleSearch-object",
+      "severity": "blocker",
+      "platform": "all",
+      "reason": "Real Legado sources use ruleSearch/ruleBookInfo/ruleToc/ruleContent as JSON objects (modern format), but LegadoBookSource types them as Option<String>. Deserialization fails silently via .ok() in legado_book_source(), producing empty results with no error.",
+      "evidence_status": "failing",
+      "mitigation": "Type rule_search/rule_book_info/rule_toc/rule_content as Option<Value> (like rule_explore_raw), or add *_raw companion fields. Remove silent .ok() swallow in legado_book_source().",
+      "sources": [
+        "tests/fixtures/remote_source/legado_sudugu_vertical.json",
+        "crates/reader-domain/src/lib.rs:136,146,150,154,329"
+      ]
+    },
+    {
+      "id": "rb-legado-concurrentrate-string-deser",
+      "capability": "legado.bookSource.concurrentRate-string",
+      "severity": "blocker",
+      "platform": "all",
+      "reason": "Real Legado sources use concurrentRate as string (e.g. \"3\", \"0.5\"), but LegadoBookSource.concurrent_rate is Option<i64>. String value fails deserialization, causing entire LegadoBookSource to fail silently.",
+      "evidence_status": "failing",
+      "mitigation": "Type concurrent_rate as Option<Value> or use custom deserializer accepting both int and string.",
+      "sources": [
+        "crates/reader-domain/src/lib.rs:100,329"
+      ]
+    },
+    {
+      "id": "rb-legado-css-shorthand-selector",
+      "capability": "legado.rule-engine.css-shorthand",
+      "severity": "blocker",
+      "platform": "all",
+      "reason": "Legado uses class.X/tag.X/id.X as CSS shorthand selectors (e.g. class.item, tag.h3, id.list). Core passes them directly to scraper::Selector::parse without translation, matching wrong elements (e.g. <class class=\"item\"> instead of <div class=\"item\">). Search returns empty results on real Legado sources.",
+      "evidence_status": "failing",
+      "mitigation": "Add translation layer in compile_legado_css_selector: class.X -> .X, tag.X -> X, id.X -> #X before Selector::parse.",
+      "sources": [
+        "crates/reader-rule/src/lib.rs:3865",
+        "tests/fixtures/remote_source/legado_sudugu_vertical.json"
+      ]
+    },
+    {
+      "id": "rb-xpath-strict-xml-parser",
+      "capability": "legado.rule-engine.xpath-html",
+      "severity": "blocker",
+      "platform": "all",
+      "reason": "@xpath: rules use sxd_document::parser::parse (strict XML) on real HTML. Real HTML has void elements (<img>, <br>), unclosed tags — not valid XML. All @xpath: rules fail on real Legado HTML responses with MismatchedElementEndName errors.",
+      "evidence_status": "failing",
+      "mitigation": "Use HTML-aware parser (scraper Html::parse_document) to build DOM, then convert to sxd DOM for XPath evaluation. Or use html5ever + sxd integration.",
+      "sources": [
+        "crates/reader-rule/src/lib.rs:5390"
+      ]
+    },
+    {
+      "id": "rb-tocurl-template-as-selector",
+      "capability": "legado.ruleBookInfo.tocUrl-template",
+      "severity": "blocker",
+      "platform": "all",
+      "reason": "tocUrl with {{baseUrl}} template (e.g. \"{{baseUrl}}/#dir\") is expanded to URL then treated as CSS selector, failing with ExpectedIdentityOnPseudoElement. Core does not distinguish URL templates from CSS selectors in tocUrl field.",
+      "evidence_status": "failing",
+      "mitigation": "After {{baseUrl}} expansion, if result starts with http/https or is a path, treat as URL not CSS selector.",
+      "sources": [
+        "crates/reader-content/src/lib.rs",
+        "tests/fixtures/remote_source/legado_sudugu_vertical.json"
       ]
     }
   ],
