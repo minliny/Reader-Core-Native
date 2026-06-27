@@ -2849,7 +2849,7 @@ pub(crate) fn sort_storage_snapshot(snapshot: &mut StorageSnapshot) {
             .cmp(&b.serial_number)
             .then_with(|| a.id.cmp(&b.id))
     });
-    snapshot.bookmarks.sort_by(|a, b| a.time.cmp(&b.time));
+    snapshot.bookmarks.sort_by_key(|a| a.time);
     snapshot
         .replace_rules
         .sort_by(|a, b| a.order.cmp(&b.order).then_with(|| a.id.cmp(&b.id)));
@@ -4443,7 +4443,7 @@ impl InMemoryStorage {
 
     pub fn list_bookmarks(&self) -> Result<Vec<Bookmark>, StorageError> {
         let mut bookmarks: Vec<Bookmark> = self.lock()?.bookmarks.values().cloned().collect();
-        bookmarks.sort_by(|a, b| a.time.cmp(&b.time));
+        bookmarks.sort_by_key(|a| a.time);
         Ok(bookmarks)
     }
 
@@ -4459,7 +4459,7 @@ impl InMemoryStorage {
             .filter(|b| b.book_name == book_name && b.book_author == book_author)
             .cloned()
             .collect();
-        bookmarks.sort_by(|a, b| a.time.cmp(&b.time));
+        bookmarks.sort_by_key(|a| a.time);
         Ok(bookmarks)
     }
 
@@ -4479,7 +4479,7 @@ impl InMemoryStorage {
             })
             .cloned()
             .collect();
-        bookmarks.sort_by(|a, b| a.time.cmp(&b.time));
+        bookmarks.sort_by_key(|a| a.time);
         Ok(bookmarks)
     }
 
