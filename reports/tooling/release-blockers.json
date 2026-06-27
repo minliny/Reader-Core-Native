@@ -647,6 +647,49 @@
       "sources": [
         "FEATURE_MATRIX.md"
       ]
+    },
+    {
+      "capability": "harmonyos-napi-binding-index-dts",
+      "evidence_status": "unknown",
+      "id": "rb-harmonyos-index-dts-stale",
+      "mitigation": "Audit 2026-06-27 found entry/src/main/cpp/types/libreader_core_napi/Index.d.ts only declares 3 exports (abiVersion / pingSmoke / sendJsonCommand) while reader_napi.cpp exports 12 (abiVersion / createRuntime / releaseRuntime / sendCommand / cancelRequest / readEvent / pendingEventCount / completeHostRequest / failHostRequest / pingSmoke / hostSmoke / lifecycleSmoke). sendJsonCommand is a stale POC residual not present in C++. Plan: docs/superpowers/plans/2026-06-27-harmonyos-rust-core-integration-s6.md Task 1 rewrites Index.d.ts to declare all 12 exports aligned with bindings/harmony/sdk/reader_core.ts NativeReaderCoreModule type. Blocks: any ArkTS code referencing completeHostRequest/failHostRequest/readEvent/pendingEventCount/hostSmoke/lifecycleSmoke will not compile or runtime-link against libreader_core_napi.so. Verification: hvigorw assembleHap + ReaderCoreNapiBridge.ets runHostSmokeClosedLoop() green on simulator.",
+      "platform": "harmony",
+      "reason": "HarmonyOS NAPI Index.d.ts severely stale (3/12 exports declared, includes non-existent sendJsonCommand); breaks NAPI smoke closed-loop validation and any host.request round-trip from ArkTS",
+      "severity": "medium",
+      "sources": [
+        "docs/superpowers/plans/2026-06-27-harmonyos-rust-core-integration-s6.md",
+        "bindings/harmony/native/reader_napi.cpp",
+        "bindings/harmony/sdk/reader_core.ts"
+      ]
+    },
+    {
+      "capability": "harmonyos-host-adapter-arkts-module",
+      "evidence_status": "unknown",
+      "id": "rb-harmonyos-host-adapter-missing",
+      "mitigation": "Audit 2026-06-27 found no ArkTS host-adapter module exists in entry/src/main/ets/. Android has bindings/android/host-adapter/src/main/java/com/reader/core/host/ (HostAdapter.java + HostTransport + HostReply + HostReplyCodec + CapabilityHandler) but HarmonyOS has no equivalent. BridgeHTTPClient.ets implements 'Strategy B: localhost:8899 dev bridge' which bypasses Core host.request protocol entirely and violates Core/Host boundary. Plan: docs/superpowers/plans/2026-06-27-harmonyos-rust-core-integration-s6.md Task 3 creates entry/src/main/ets/hostadapter/ module (10 files: HostTransport / HttpRequest / HttpResponse / HostReply / HostReplyCodec / CapabilityHandler / HostAdapter / HostBus / HttpExecuteHandler / HostRuntime) mirroring Android host-adapter. Task 4 writes OHOSHTTPHostTransport using @ohos.net.http. Blocks: any real host.request round-trip (HTTP transport, persistence, system TTS) cannot route from Core to Host capabilities. Verification: host.request('http.execute', ...) returns host.complete with real 2xx body on simulator.",
+      "platform": "harmony",
+      "reason": "HarmonyOS missing ArkTS host-adapter module; Core host.request events cannot be dispatched to platform-owned capabilities (HTTP / persistence / TTS). Current BridgeHTTPClient bypasses Core protocol entirely.",
+      "severity": "medium",
+      "sources": [
+        "docs/superpowers/plans/2026-06-27-harmonyos-rust-core-integration-s6.md",
+        "bindings/android/host-adapter/src/main/java/com/reader/core/host/HostAdapter.java",
+        "AGENTS.md"
+      ]
+    },
+    {
+      "capability": "harmonyos-business-path-rust-core-switch",
+      "evidence_status": "unknown",
+      "id": "rb-harmonyos-business-path-not-rust-core",
+      "mitigation": "Audit 2026-06-27 found all 5 ArkTS pages (Index.ets Tab container + BookshelfPage / SearchPage / ReaderPage / SettingsPage) routed through fixture-based services. HomeDashboardService uses MockBookshelfRepository(true) + FixtureReplayInterceptor + 3 fixture:// sources. SearchService uses BridgeClientWithFallback(BridgeHTTPClient, FixtureReplayInterceptor). ReaderPage uses FixtureEPUBParserAdapter + buildStoredEPUBFixture() with hardcoded content '在中国，任何超脱飞扬的思想...'. SettingsPage has no 'import source' entry. None of the 5 pages call ReaderCoreRuntime.send/request. Plan: docs/superpowers/plans/2026-06-27-harmonyos-rust-core-integration-s6.md Task 5 creates ReaderCoreClient App singleton + BookApi/SourceApi facade, Task 6 retires fixture services (strangler pattern: deprecate not delete), Task 7 modifies 5 pages' ViewModel layer to consume RustCore*Service. Blocks: HarmonyOS cannot pass Legado source search→detail→toc→content vertical via Rust Core. Verification: RustCoreEndToEndTest asserts non-fixture path + real Legado source pipeline green on simulator.",
+      "platform": "harmony",
+      "reason": "HarmonyOS 5-page UI business path completely not connected to Rust Core; all pages route through MockBookshelfRepository / FixtureReplayInterceptor / BridgeClientWithFallback / FixtureEPUBParserAdapter. Legado search→detail→toc→content cannot run via Rust Core.",
+      "severity": "low",
+      "sources": [
+        "docs/superpowers/plans/2026-06-27-harmonyos-rust-core-integration-s6.md",
+        "entry/src/main/ets/services/HomeDashboardService.ets",
+        "entry/src/main/ets/services/SearchService.ets",
+        "entry/src/main/ets/pages/ReaderPage.ets"
+      ]
     }
   ],
   "generated_at": "2026-06-27T00:00:00Z",
@@ -654,17 +697,17 @@
     "by_platform": {
       "all": 54,
       "android": 0,
-      "harmony": 0,
+      "harmony": 3,
       "ios": 0,
       "unknown": 0
     },
     "by_severity": {
       "blocker": 0,
       "high": 0,
-      "medium": 11,
-      "low": 43
+      "medium": 13,
+      "low": 44
     },
-    "total": 54
+    "total": 57
   },
   "tool": "release-blocker-register-generator",
   "version": "release-blockers/1"
