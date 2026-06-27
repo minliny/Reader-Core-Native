@@ -8,11 +8,18 @@
 - `docs/PROJECT_CHARTER.md` — 项目最高强制文档（背景、目标、架构不变量、红线）
 - `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md` — 迁移执行指令
 - `docs/MAINLINE_EXECUTION_PLAN.md` — 主线阶段（S0–S7）顺序
+- `docs/LEGADO_CAPABILITY_INVENTORY.md` — Legado 全部能力清单（97 项）与 Reader 对标状态，
+  是"能力底线 = Legado"的验收基准。任何"能力已完成"的判断必须对照本清单逐项验证。
+- `docs/CAPABILITY_GAP_PLAN.md` — 能力缺口补齐方案（45 项未实现 + 16 项待验证），
+  按优先级排序。补齐后必须更新清单状态并用测试工具链验证。
 
 ## 不可偏离的红线
 
 1. **能力底线 = Legado**：验收以"能跑通对应 Legado 能力 / 真实 Legado 书源与 RSS"
    为标尺，不用代码量 / 测试数 / 单端 fixture 自证完成。
+   **必须对照 `docs/LEGADO_CAPABILITY_INVENTORY.md` 逐项验证**，不得凭 agent
+   自报或零散测试声称完成。97 项能力中 45 项未实现、16 项部分实现从未用真实
+   Legado 数据验证。
 2. **Core、平台、UI 三方均开发中**：不得武断声称任何能力已完全建立。
 3. **迁移保真 + 补齐**：Rust 迁移 Swift Core 已验证实现；Swift Core 也缺的能力
    对照 Legado 新建，不得跳过。
