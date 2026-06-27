@@ -120,14 +120,17 @@ pub struct LegadoBookSource {
     pub search_url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub explore_url: Option<String>,
+    // rule_explore/rule_review 接受两种形态(与 rule_search 同模式):
+    // - 字符串(legacy/混合格式)
+    // - 对象(真实 Legado 导出格式,见 BookSource.kt ruleExplore: ExploreRule)
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rule_explore: Option<String>,
+    pub rule_explore: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rule_explore_raw: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub explore_rule: Option<ExploreRule>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rule_review: Option<String>,
+    pub rule_review: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rule_review_raw: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -651,12 +654,17 @@ fn normalize_search_semantics(source: &LegadoBookSource) -> BookSourceSearchSema
 }
 
 fn normalize_explore_semantics(source: &LegadoBookSource) -> BookSourceExploreSemantics {
-    let structured = source.explore_rule.as_ref();
+    let structured_owned = source
+        .explore_rule
+        .clone()
+        .or_else(|| rule_value_as_structured::<ExploreRule>(&source.rule_explore));
+    let structured = structured_owned.as_ref();
+    let raw_str = rule_value_as_string(&source.rule_explore);
     BookSourceExploreSemantics {
-        raw: clean_string(source.rule_explore.as_deref()),
+        raw: clean_string(raw_str),
         list: structured
             .and_then(|rule| clean_string(rule.book_list.as_deref()))
-            .or_else(|| clean_string(source.rule_explore.as_deref())),
+            .or_else(|| clean_string(raw_str)),
         name: structured.and_then(|rule| clean_string(rule.name.as_deref())),
         author: structured.and_then(|rule| clean_string(rule.author.as_deref())),
         intro: structured.and_then(|rule| clean_string(rule.intro.as_deref())),

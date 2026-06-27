@@ -1612,6 +1612,18 @@ fn slug_part(value: &str) -> String {
 }
 
 fn legado_rule_has_extraction(rule: &str) -> bool {
+    // JSONPath rules ($. / $[ / @json:) and @xpath: rules carry their own
+    // extraction semantics — the path itself selects the value. Appending
+    // `@html` (the CSS extraction suffix) to them produces invalid paths
+    // like `$..chapters[*]@html` (rb-legado-jsonpath-html-suffix).
+    let lower = rule.to_lowercase();
+    if rule.starts_with("$.")
+        || rule.starts_with("$[")
+        || lower.starts_with("@json:")
+        || lower.starts_with("@xpath:")
+    {
+        return true;
+    }
     rule.contains('@')
 }
 

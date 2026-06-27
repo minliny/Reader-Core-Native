@@ -177,6 +177,34 @@
       ]
     },
     {
+      "capability": "jsonpath-booklist-array-iterate",
+      "evidence_status": "missing",
+      "id": "rb-legado-json-booklist-array-iterate",
+      "mitigation": "In crates/reader-content/src/lib.rs `extract_rule_items`, when the list_rule is a JSONPath (mode Json) and `run_raw_legado_rule` returns a single value that is a JSON array string, iterate each array element as a separate item string instead of returning the whole array as one item. Mirrors Legado AnalyzeRule.getElements (line ~830): when getStringList returns a JSONArray, each element becomes a separate element for per-item rule scoping. Verified by fixture_vertical_runs_legado_zhuishu_json_real_source_pipeline (currently #[ignore]).",
+      "platform": "all",
+      "reason": "When bookList is a JSONPath returning an array (e.g. `$.books`), Core's extract_rule_items returns the whole array as a SINGLE string instead of iterating each element as a separate item. Per-item field rules ($.bookName, $.author, ...) then run against the array string and return empty. Real Legado source js.jsxsapp.com (追书小说) returns ~20 books; Core currently returns 1 book with empty title/author. The existing test search_book_source_scopes_per_item_with_json_booklist only covers `@Json:$.books[*]` (explicit wildcard) and does not catch this gap. Legado getElements iterates array elements — Core must match.",
+      "severity": "blocker",
+      "sources": [
+        "crates/reader-content/src/lib.rs",
+        "tools/reader-cli/tests/fixture_vertical.rs",
+        "tests/fixtures/remote_source/legado_zhuishu_json_vertical.json"
+      ]
+    },
+    {
+      "capability": "jsonpath-url-template-expansion",
+      "evidence_status": "missing",
+      "id": "rb-legado-json-url-template-jsonpath",
+      "mitigation": "In crates/reader-content/src/lib.rs `expand_template`, support `{{$.field}}` JSONPath templates evaluated against the current item (not just `{{key}}` from context.variables). Mirrors Legado AnalyzeRule.replaceSource: `{{$.path}}` evaluates the JSONPath against the current element's JSON value. Verified by fixture_vertical_runs_legado_zhuishu_json_real_source_pipeline (currently #[ignore]).",
+      "platform": "all",
+      "reason": "expand_template in crates/reader-content/src/lib.rs only handles `{{key}}` substitution from context.variables (a BTreeMap<String,String>), not `{{$.field}}` JSONPath templates evaluated against the current item. Legado AnalyzeRule evaluates `{{$.field}}` against the current element. This breaks: (1) search bookUrl `https://js.jsxsapp.com/info/{{$._id}}?language=zh_cn` — {{$._id}} stays literal; (2) toc chapterUrl `https://yd.jsxsapp.com//@get:{bid}/{{$.l}}` — {{$.l}} stays literal. Real Legado source js.jsxsapp.com (追书小说) uses both patterns. Core produces unexpanded URLs that 404 or return wrong content.",
+      "severity": "blocker",
+      "sources": [
+        "crates/reader-content/src/lib.rs",
+        "tools/reader-cli/tests/fixture_vertical.rs",
+        "tests/fixtures/remote_source/legado_zhuishu_json_vertical.json"
+      ]
+    },
+    {
       "capability": "reading.progress.update",
       "evidence_status": "missing",
       "id": "rb-reading.progress.update",
@@ -830,19 +858,19 @@
   "generated_at": "2026-06-25T07:40:32Z",
   "summary": {
     "by_platform": {
-      "all": 68,
+      "all": 70,
       "android": 0,
       "harmony": 0,
       "ios": 0,
       "unknown": 0
     },
     "by_severity": {
-      "blocker": 2,
+      "blocker": 4,
       "high": 0,
       "low": 38,
       "medium": 28
     },
-    "total": 68
+    "total": 70
   },
   "tool": "release-blocker-register-generator",
   "version": "release-blockers/1"
