@@ -27,8 +27,8 @@ use reader_domain::{
 };
 use reader_js::{JsError, JsErrorKind, JsEvaluation, JsSandbox as JsSandboxTrait, QuickJsSandbox};
 use reader_rule::{
-    CaptureGroup, NoopVariableScope, RuleEngine, RuleError, RuleJsEvaluator, RuleOutput, RuleStep,
-    RuleVariableScope,
+    auto_complete_rule, CaptureGroup, NoopVariableScope, RuleEngine, RuleError, RuleJsEvaluator,
+    RuleOutput, RuleStep, RuleVariableScope,
 };
 use serde::{Deserialize, Serialize};
 
@@ -298,6 +298,128 @@ pub struct BookSourceExploreResult {
     pub next_page_url: Option<String>,
 }
 
+/// A discovery category parsed from a source's `exploreUrl` field.
+///
+/// Mirrors Legado `BookSourceExtensions.getExploreUrl` (Kotlin) which
+/// returns `List<Pair<String, String>>` — a category title + URL pair.
+/// Legado accepts three `exploreUrl` formats:
+/// - JSON array: `[{"title":"...","url":"..."}, ...]` (with optional
+///   nested `children` arrays, and `name`/`label` as title aliases)
+/// - Plain text: `title::url` pairs joined by `&&` or newlines
+/// - JS-wrapped: `@js:...` or `<js>...</js>` returning a JSON array
+///
+/// See [`parse_explore_kinds`] for the pure parser and
+/// [`RemoteContentPipeline::parse_explore_kinds_with_js`] for the JS path.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ExploreKind {
+    #[serde(default)]
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+}
+
+/// Parse a Legado `exploreUrl` field into discovery categories (pure, no JS).
+///
+/// Handles the JSON-array and plain-text formats. JS-wrapped inputs
+/// (`@js:`/`<js>`) return an empty vector — use
+/// [`RemoteContentPipeline::parse_explore_kinds_with_js`] for those.
+///
+/// Mirrors Legado `BookSourceExtensions.getExploreUrl` (Kotlin):
+/// `if (exploreUrl.isJson()) exploreUrl.fromJsonArray() else exploreUrl.split("&&"|"\\n")`.
+pub fn parse_explore_kinds(explore_url: &str) -> Vec<ExploreKind> {
+    let trimmed = explore_url.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+    // JS-wrapped inputs are handled by parse_explore_kinds_with_js.
+    let lower = trimmed.to_ascii_lowercase();
+    if lower.starts_with("@js:") || lower.starts_with("<js>") {
+        return Vec::new();
+    }
+    // Try JSON first (Legado checks `exploreUrl.isJson()`).
+    if trimmed.starts_with('[') {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(trimmed) {
+            let mut kinds = Vec::new();
+            collect_explore_kinds_from_json(&value, &mut kinds);
+            return kinds;
+        }
+    }
+    parse_explore_kinds_from_str(trimmed)
+}
+
+/// Split a plain-text `exploreUrl` into kinds on `&&` and newlines, then on
+/// `::` for the title/url split. Mirrors Legado's text-split fallback.
+fn parse_explore_kinds_from_str(text: &str) -> Vec<ExploreKind> {
+    let mut kinds = Vec::new();
+    for segment in text.split("&&").flat_map(|s| s.split('\n')) {
+        let segment = segment.trim();
+        if segment.is_empty() {
+            continue;
+        }
+        let (title, url) = match segment.find("::") {
+            Some(idx) => (
+                segment[..idx].trim().to_string(),
+                segment[idx + 2..].trim().to_string(),
+            ),
+            None => (segment.to_string(), String::new()),
+        };
+        if title.is_empty() {
+            continue;
+        }
+        kinds.push(ExploreKind {
+            title,
+            url: if url.is_empty() { None } else { Some(url) },
+        });
+    }
+    kinds
+}
+
+/// Recursively collect explore kinds from a JSON value (array or object with
+/// `children`). Accepts `title`/`name`/`label` as the title field alias.
+fn collect_explore_kinds_from_json(value: &serde_json::Value, out: &mut Vec<ExploreKind>) {
+    match value {
+        serde_json::Value::Array(items) => {
+            for item in items {
+                collect_explore_kinds_from_json_inner(item, out);
+            }
+        }
+        serde_json::Value::Object(_) => {
+            collect_explore_kinds_from_json_inner(value, out);
+        }
+        _ => {}
+    }
+}
+
+fn collect_explore_kinds_from_json_inner(value: &serde_json::Value, out: &mut Vec<ExploreKind>) {
+    let serde_json::Value::Object(map) = value else {
+        return;
+    };
+    // When an entry has `children`, it's a Legado group header: skip the
+    // header itself and only collect the leaf children (Legado
+    // `BookSourceExtensions.getExploreUrl` flattens groups into a single
+    // list of titled URL pairs).
+    if let Some(children) = map.get("children") {
+        collect_explore_kinds_from_json(children, out);
+        return;
+    }
+    let title = map
+        .get("title")
+        .or_else(|| map.get("name"))
+        .or_else(|| map.get("label"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    if title.is_empty() {
+        return;
+    }
+    let url = map
+        .get("url")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    out.push(ExploreKind { title, url });
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BookSourceContent {
@@ -565,10 +687,17 @@ impl ContentDocumentLibrary {
 ///
 /// Holds a [`RuleEngine`] and an optional JS sandbox. The JS sandbox is shared
 /// via `Arc` so the pipeline is cheap to clone per request.
+pub mod chinese;
+pub use chinese::{convert_chinese, ChineseConverterType};
+
+pub mod content_processor;
+pub use content_processor::ContentProcessor;
+
 #[derive(Clone)]
 pub struct RemoteContentPipeline {
     engine: RuleEngine,
     js: Arc<QuickJsSandbox>,
+    chinese_converter_type: ChineseConverterType,
 }
 
 impl Default for RemoteContentPipeline {
@@ -607,6 +736,7 @@ impl RemoteContentPipeline {
         Self {
             engine: RuleEngine::new(),
             js: Arc::new(QuickJsSandbox::default()),
+            chinese_converter_type: ChineseConverterType::None,
         }
     }
 
@@ -616,7 +746,19 @@ impl RemoteContentPipeline {
         Self {
             engine: RuleEngine::new(),
             js: Arc::new(js),
+            chinese_converter_type: ChineseConverterType::None,
         }
+    }
+
+    /// Set the Legado `chineseConverterType` for chapter body conversion
+    /// (ContentProcessor.kt:135-145).
+    pub fn with_chinese_converter(mut self, converter: ChineseConverterType) -> Self {
+        self.chinese_converter_type = converter;
+        self
+    }
+
+    pub fn chinese_converter_type(&self) -> ChineseConverterType {
+        self.chinese_converter_type
     }
 
     /// Execute a raw Legado DSL rule string through the multi-engine dispatcher
@@ -680,6 +822,85 @@ impl RemoteContentPipeline {
             books.push(parse_book_value(value));
         }
         Ok(books)
+    }
+
+    /// Extract a list of books from a discovery (explore) response.
+    ///
+    /// Mirrors Legado `WebBook.getBookInfo` explore path: when the source
+    /// carries Legado book-source semantics, delegates to
+    /// [`explore_book_source`](Self::explore_book_source) (which uses
+    /// `ruleExplore`, falling back to `ruleSearch` when the explore
+    /// `bookList` rule is blank — Legado `BookList.analyzeBookList(
+    /// isSearch = false)`). Otherwise runs the rule chain over
+    /// `source.rules.explore`.
+    pub fn explore(
+        &self,
+        source: &Source,
+        explore_response: &str,
+    ) -> Result<Vec<Book>, ContentError> {
+        if !has_rule_spec(&source.rules.explore) {
+            if let Some(semantics) = source.book_source_semantics() {
+                let context = BookSourceRequestContext::for_semantics(&semantics);
+                let result = self.explore_book_source(&semantics, explore_response, &context)?;
+                return Ok(result.books);
+            }
+        }
+        let out = self.run_chain(explore_response, &source.rules.explore)?;
+        let mut books = Vec::new();
+        for value in out.values() {
+            books.push(parse_book_value(value));
+        }
+        Ok(books)
+    }
+
+    /// Parse a Legado `exploreUrl` field into discovery categories, with JS
+    /// support. Handles `@js:`/`<js>...</js>` expressions by evaluating them
+    /// in the QuickJS sandbox with `baseUrl` bound from `context`, then
+    /// feeding the result through [`parse_explore_kinds`]'s JSON collector.
+    ///
+    /// For non-JS inputs, delegates to the pure [`parse_explore_kinds`].
+    /// Mirrors Legado `BookSourceExtensions.getExploreUrl` JS branch.
+    pub fn parse_explore_kinds_with_js(
+        &self,
+        explore_url: &str,
+        context: &serde_json::Value,
+    ) -> Vec<ExploreKind> {
+        let trimmed = explore_url.trim();
+        let lower = trimmed.to_ascii_lowercase();
+        let js_body = if lower.starts_with("@js:") {
+            Some(trimmed[4..].trim())
+        } else if lower.starts_with("<js>") {
+            let start = 4;
+            if let Some(end_rel) = lower.rfind("</js>") {
+                if end_rel >= start {
+                    Some(trimmed[start..end_rel].trim())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let Some(js_body) = js_body else {
+            return parse_explore_kinds(explore_url);
+        };
+        let base_url = context
+            .get("baseUrl")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .replace('\\', "\\\\")
+            .replace('\'', "\\'");
+        let script = format!("var baseUrl = '{base_url}';\n{js_body}");
+        match self.js.evaluate(&script) {
+            Ok(evaluation) => {
+                let mut kinds = Vec::new();
+                collect_explore_kinds_from_json(&evaluation.value, &mut kinds);
+                kinds
+            }
+            Err(_) => Vec::new(),
+        }
     }
 
     /// Merge detail metadata into a base book. Detail extraction yields key/value
@@ -798,9 +1019,11 @@ impl RemoteContentPipeline {
             }
         }
         let out = self.run_chain(chapter_response, &source.rules.chapter)?;
-        Ok(normalization::normalize_extracted_content(
-            &out.values().join("\n"),
-        ))
+        let joined = out.values().join("\n");
+        // V1 path mirrors Legado ContentProcessor.kt:135-145: chineseConvert
+        // runs before normalization.
+        let converted = convert_chinese(&joined, self.chinese_converter_type);
+        Ok(normalization::normalize_extracted_content(&converted))
     }
 
     pub fn search_book_source(
@@ -855,58 +1078,100 @@ impl RemoteContentPipeline {
     ) -> Result<BookSourceDetail, ContentError> {
         let context = context.with_source_defaults(semantics);
         let rules = &semantics.rules.detail;
+        let pre_rule = rules.init.as_deref();
         let mut book = base.clone();
         if book.book_id.trim().is_empty() {
             book.book_id = non_empty_string(context.book_url.as_str()).unwrap_or_default();
         }
-        if let Some(value) =
-            extract_rule_value(self, detail_response, rules.name.as_deref(), &context)?
-        {
+        if let Some(value) = extract_rule_value(
+            self,
+            detail_response,
+            rules.name.as_deref(),
+            1,
+            pre_rule,
+            &context,
+        )? {
             book.title = value;
         }
-        if let Some(value) =
-            extract_rule_value(self, detail_response, rules.author.as_deref(), &context)?
-        {
+        if let Some(value) = extract_rule_value(
+            self,
+            detail_response,
+            rules.author.as_deref(),
+            1,
+            pre_rule,
+            &context,
+        )? {
             book.author = value;
         }
-        if let Some(value) =
-            extract_rule_value(self, detail_response, rules.cover_url.as_deref(), &context)?
-        {
+        if let Some(value) = extract_rule_value(
+            self,
+            detail_response,
+            rules.cover_url.as_deref(),
+            3,
+            pre_rule,
+            &context,
+        )? {
             book.cover_url = Some(resolve_url(
                 &context.base_url,
                 &context.current_url,
                 value.as_str(),
             ));
         }
-        if let Some(value) =
-            extract_rule_value(self, detail_response, rules.intro.as_deref(), &context)?
-        {
+        if let Some(value) = extract_rule_value(
+            self,
+            detail_response,
+            rules.intro.as_deref(),
+            1,
+            pre_rule,
+            &context,
+        )? {
             book.intro = Some(value);
         }
-        if let Some(value) =
-            extract_rule_value(self, detail_response, rules.kind.as_deref(), &context)?
-        {
+        if let Some(value) = extract_rule_value(
+            self,
+            detail_response,
+            rules.kind.as_deref(),
+            1,
+            pre_rule,
+            &context,
+        )? {
             book.kind = Some(value);
         }
         if let Some(value) = extract_rule_value(
             self,
             detail_response,
             rules.last_chapter.as_deref(),
+            1,
+            pre_rule,
             &context,
         )? {
             book.last_chapter = Some(value);
         }
-        let toc_url =
-            extract_rule_value(self, detail_response, rules.toc_url.as_deref(), &context)?
-                .map(|value| resolve_url(&context.base_url, &context.current_url, value.as_str()));
+        let toc_url = extract_rule_value(
+            self,
+            detail_response,
+            rules.toc_url.as_deref(),
+            2,
+            pre_rule,
+            &context,
+        )?
+        .map(|value| resolve_url(&context.base_url, &context.current_url, value.as_str()));
         let update_time = extract_rule_value(
             self,
             detail_response,
             rules.update_time.as_deref(),
+            1,
+            pre_rule,
             &context,
         )?;
-        let word_count =
-            extract_rule_value(self, detail_response, rules.word_count.as_deref(), &context)?;
+        let word_count = extract_rule_value(
+            self,
+            detail_response,
+            rules.word_count.as_deref(),
+            1,
+            pre_rule,
+            &context,
+        )?;
         Ok(BookSourceDetail {
             book,
             toc_url,
@@ -923,15 +1188,18 @@ impl RemoteContentPipeline {
     ) -> Result<BookSourceToc, ContentError> {
         let context = context.with_source_defaults(semantics);
         let rules = &semantics.rules.toc;
+        let pre_rule = rules.list.as_deref();
         let chapters = if rules.name.is_some() || rules.url.is_some() {
             let items = extract_rule_items(self, toc_response, rules.list.as_deref(), &context)?;
             let mut chapters = Vec::new();
             for (index, item) in items.iter().enumerate() {
-                let title = extract_rule_value(self, item, rules.name.as_deref(), &context)?
-                    .unwrap_or_default();
-                let url = extract_rule_value(self, item, rules.url.as_deref(), &context)?
-                    .map(|value| resolve_url(&context.base_url, &context.current_url, &value))
-                    .unwrap_or_default();
+                let title =
+                    extract_rule_value(self, item, rules.name.as_deref(), 1, pre_rule, &context)?
+                        .unwrap_or_default();
+                let url =
+                    extract_rule_value(self, item, rules.url.as_deref(), 2, pre_rule, &context)?
+                        .map(|value| resolve_url(&context.base_url, &context.current_url, &value))
+                        .unwrap_or_default();
                 if !title.trim().is_empty() || !url.trim().is_empty() {
                     chapters.push(TocEntry {
                         index: index as u32,
@@ -947,9 +1215,15 @@ impl RemoteContentPipeline {
         } else {
             Vec::new()
         };
-        let next_toc_url =
-            extract_rule_value(self, toc_response, rules.next_url.as_deref(), &context)?
-                .map(|value| resolve_url(&context.base_url, &context.current_url, value.as_str()));
+        let next_toc_url = extract_rule_value(
+            self,
+            toc_response,
+            rules.next_url.as_deref(),
+            2,
+            pre_rule,
+            &context,
+        )?
+        .map(|value| resolve_url(&context.base_url, &context.current_url, value.as_str()));
         Ok(BookSourceToc {
             chapters,
             next_toc_url,
@@ -964,28 +1238,50 @@ impl RemoteContentPipeline {
     ) -> Result<BookSourceContent, ContentError> {
         let context = context.with_source_defaults(semantics);
         let rules = &semantics.rules.content;
-        let title = extract_rule_value(self, chapter_response, rules.title.as_deref(), &context)?;
-        let raw_content =
-            extract_rule_value(self, chapter_response, rules.content.as_deref(), &context)?
-                .or_else(|| {
-                    rules.raw.as_deref().and_then(|raw| {
-                        self.run_raw_legado_rule(chapter_response, raw)
-                            .ok()
-                            .map(|out| out.values().join("\n"))
-                    })
-                })
-                .unwrap_or_default();
+        let title = extract_rule_value(
+            self,
+            chapter_response,
+            rules.title.as_deref(),
+            1,
+            None,
+            &context,
+        )?;
+        let raw_content = extract_rule_value(
+            self,
+            chapter_response,
+            rules.content.as_deref(),
+            1,
+            None,
+            &context,
+        )?
+        .or_else(|| {
+            rules.raw.as_deref().and_then(|raw| {
+                self.run_raw_legado_rule(chapter_response, raw)
+                    .ok()
+                    .map(|out| out.values().join("\n"))
+            })
+        })
+        .unwrap_or_default();
+        // Legado ContentProcessor.kt:135-145: chineseConvert runs *before*
+        // the useReplace branch so replace rules operate on converted text.
+        let converted = convert_chinese(&raw_content, self.chinese_converter_type);
         let replaced = apply_content_replacement(
             self,
-            raw_content.as_str(),
+            converted.as_str(),
             rules.source_regex.as_deref(),
             rules.replace_regex.as_deref(),
             &context,
         )?;
         let content = normalization::normalize_extracted_content(&replaced);
-        let next_content_url =
-            extract_rule_value(self, chapter_response, rules.next_url.as_deref(), &context)?
-                .map(|value| resolve_url(&context.base_url, &context.current_url, value.as_str()));
+        let next_content_url = extract_rule_value(
+            self,
+            chapter_response,
+            rules.next_url.as_deref(),
+            2,
+            None,
+            &context,
+        )?
+        .map(|value| resolve_url(&context.base_url, &context.current_url, value.as_str()));
         Ok(BookSourceContent {
             title,
             content,
@@ -1137,21 +1433,51 @@ fn extract_books_from_semantic_rule(
         return extract_books_from_raw_rule(pipeline, rules.raw.as_deref(), input, context);
     }
 
+    let pre_rule = rules.list.as_deref();
     let items = extract_rule_items(pipeline, input, rules.list.as_deref(), context)?;
     let mut books = Vec::new();
     for (index, item) in items.iter().enumerate() {
         let title =
-            extract_rule_value(pipeline, item, rules.name.as_deref(), context)?.unwrap_or_default();
-        let author = extract_rule_value(pipeline, item, rules.author.as_deref(), context)?
-            .unwrap_or_default();
-        let detail_url = extract_rule_value(pipeline, item, rules.detail_url.as_deref(), context)?
-            .map(|value| resolve_url(&context.base_url, &context.current_url, &value));
-        let cover_url = extract_rule_value(pipeline, item, rules.cover_url.as_deref(), context)?
-            .map(|value| resolve_url(&context.base_url, &context.current_url, &value));
-        let intro = extract_rule_value(pipeline, item, rules.intro.as_deref(), context)?;
-        let kind = extract_rule_value(pipeline, item, rules.kind.as_deref(), context)?;
-        let last_chapter =
-            extract_rule_value(pipeline, item, rules.last_chapter.as_deref(), context)?;
+            extract_rule_value(pipeline, item, rules.name.as_deref(), 1, pre_rule, context)?
+                .unwrap_or_default();
+        let author = extract_rule_value(
+            pipeline,
+            item,
+            rules.author.as_deref(),
+            1,
+            pre_rule,
+            context,
+        )?
+        .unwrap_or_default();
+        let detail_url = extract_rule_value(
+            pipeline,
+            item,
+            rules.detail_url.as_deref(),
+            2,
+            pre_rule,
+            context,
+        )?
+        .map(|value| resolve_url(&context.base_url, &context.current_url, &value));
+        let cover_url = extract_rule_value(
+            pipeline,
+            item,
+            rules.cover_url.as_deref(),
+            3,
+            pre_rule,
+            context,
+        )?
+        .map(|value| resolve_url(&context.base_url, &context.current_url, &value));
+        let intro =
+            extract_rule_value(pipeline, item, rules.intro.as_deref(), 1, pre_rule, context)?;
+        let kind = extract_rule_value(pipeline, item, rules.kind.as_deref(), 1, pre_rule, context)?;
+        let last_chapter = extract_rule_value(
+            pipeline,
+            item,
+            rules.last_chapter.as_deref(),
+            1,
+            pre_rule,
+            context,
+        )?;
         let book_id = detail_url
             .clone()
             .or_else(|| stable_fallback_book_id(&title, &author, index))
@@ -1192,21 +1518,51 @@ fn extract_books_from_explore_rule(
         return extract_books_from_raw_rule(pipeline, rules.raw.as_deref(), input, context);
     }
 
+    let pre_rule = rules.list.as_deref();
     let items = extract_rule_items(pipeline, input, rules.list.as_deref(), context)?;
     let mut books = Vec::new();
     for (index, item) in items.iter().enumerate() {
         let title =
-            extract_rule_value(pipeline, item, rules.name.as_deref(), context)?.unwrap_or_default();
-        let author = extract_rule_value(pipeline, item, rules.author.as_deref(), context)?
-            .unwrap_or_default();
-        let detail_url = extract_rule_value(pipeline, item, rules.detail_url.as_deref(), context)?
-            .map(|value| resolve_url(&context.base_url, &context.current_url, &value));
-        let cover_url = extract_rule_value(pipeline, item, rules.cover_url.as_deref(), context)?
-            .map(|value| resolve_url(&context.base_url, &context.current_url, &value));
-        let intro = extract_rule_value(pipeline, item, rules.intro.as_deref(), context)?;
-        let kind = extract_rule_value(pipeline, item, rules.kind.as_deref(), context)?;
-        let last_chapter =
-            extract_rule_value(pipeline, item, rules.last_chapter.as_deref(), context)?;
+            extract_rule_value(pipeline, item, rules.name.as_deref(), 1, pre_rule, context)?
+                .unwrap_or_default();
+        let author = extract_rule_value(
+            pipeline,
+            item,
+            rules.author.as_deref(),
+            1,
+            pre_rule,
+            context,
+        )?
+        .unwrap_or_default();
+        let detail_url = extract_rule_value(
+            pipeline,
+            item,
+            rules.detail_url.as_deref(),
+            2,
+            pre_rule,
+            context,
+        )?
+        .map(|value| resolve_url(&context.base_url, &context.current_url, &value));
+        let cover_url = extract_rule_value(
+            pipeline,
+            item,
+            rules.cover_url.as_deref(),
+            3,
+            pre_rule,
+            context,
+        )?
+        .map(|value| resolve_url(&context.base_url, &context.current_url, &value));
+        let intro =
+            extract_rule_value(pipeline, item, rules.intro.as_deref(), 1, pre_rule, context)?;
+        let kind = extract_rule_value(pipeline, item, rules.kind.as_deref(), 1, pre_rule, context)?;
+        let last_chapter = extract_rule_value(
+            pipeline,
+            item,
+            rules.last_chapter.as_deref(),
+            1,
+            pre_rule,
+            context,
+        )?;
         let book_id = detail_url
             .clone()
             .or_else(|| stable_fallback_book_id(&title, &author, index))
@@ -1266,6 +1622,10 @@ fn extract_rule_items(
     let Some(rule) = list_rule.and_then(non_empty_string) else {
         return Ok(vec![input.to_string()]);
     };
+    // Legado `AnalyzeRule.getElements` (bookList/chapterList) does NOT call
+    // `RuleComplete.autoComplete` — list rules are element selectors, not
+    // value extractors. Adding `@text` to `div.result` would break element
+    // selection. Only `getString`/`getUrl` (field rules) call autoComplete.
     let rule = expand_template(&rule, context, pipeline, Some(input));
     let item_rule = if legado_rule_has_extraction(&rule) {
         rule.clone()
@@ -1310,11 +1670,14 @@ fn extract_rule_value(
     pipeline: &RemoteContentPipeline,
     input: &str,
     rule: Option<&str>,
+    rule_type: u8,
+    pre_rule: Option<&str>,
     context: &BookSourceRequestContext,
 ) -> Result<Option<String>, ContentError> {
     let Some(rule) = rule.and_then(non_empty_string) else {
         return Ok(None);
     };
+    let rule = auto_complete_rule(&rule, pre_rule, rule_type);
     if rule.starts_with("@js") {
         return Ok(None);
     }
@@ -2900,6 +3263,8 @@ mod tests {
             &pipeline,
             "<html><body></body></html>",
             Some("{{baseUrl}}/#dir"),
+            2,
+            None,
             &context,
         )
         .unwrap();
@@ -2910,6 +3275,8 @@ mod tests {
             &pipeline,
             "<html></html>",
             Some("{{baseUrl}}/toc/list"),
+            2,
+            None,
             &context,
         )
         .unwrap();
@@ -2921,7 +3288,7 @@ mod tests {
         // 普通选择器 (无 {{}}) 仍走 CSS 解析
         let html = r#"<div class="toc"><a href="/toc">chapter list</a></div>"#;
         let selector_val =
-            extract_rule_value(&pipeline, html, Some("div.toc@text"), &context).unwrap();
+            extract_rule_value(&pipeline, html, Some("div.toc@text"), 1, None, &context).unwrap();
         assert_eq!(selector_val.as_deref(), Some("chapter list"));
     }
 
