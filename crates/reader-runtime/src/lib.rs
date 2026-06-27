@@ -12,6 +12,7 @@
 pub mod remote;
 pub mod runtime;
 pub mod sink;
+pub mod webdav_bridge;
 
 pub use reader_contract::CoreError;
 pub use remote::RemoteState;
