@@ -1,0 +1,14 @@
+{
+  "protocolVersion": 1,
+  "requestId": 420,
+  "method": "source.import",
+  "params": {
+    "sourceId": "missing-name-src",
+    "baseUrl": "https://books.example.test",
+    "rules": {},
+    "bookSource": {
+      "bookSourceUrl": "https://books.example.test",
+      "searchUrl": "/search?q={{key}}"
+    }
+  }
+}

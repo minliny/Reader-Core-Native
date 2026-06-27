@@ -2506,6 +2506,91 @@ mod tests {
         }
     }
 
+    /// Legado native BookSource JSON carries `bookSourceName` (not a top-level
+    /// `name`). `source.import` must accept this form verbatim and derive the
+    /// source name from `bookSource.bookSourceName`. Mirrors Legado
+    /// `BookSource.kt` (red line 3: migrate against Legado, no skipping).
+    #[test]
+    fn source_import_derives_name_from_book_source_book_source_name() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                7,
+                methods::SOURCE_IMPORT,
+                serde_json::json!({
+                    "sourceId": "legado-native-src",
+                    "baseUrl": "https://books.example.test",
+                    "bookSource": {
+                        "bookSourceName": "Legado Native Source",
+                        "bookSourceUrl": "https://books.example.test",
+                        "searchUrl": "/search?q={{key}}",
+                        "ruleSearch": "div.list&&div.item"
+                    }
+                }),
+            ),
+        );
+        match event {
+            Event::Result { data, .. } => {
+                assert_eq!(data["imported"], true);
+                assert_eq!(data["sourceId"], "legado-native-src");
+                assert_eq!(data["name"], "Legado Native Source");
+            }
+            other => panic!("expected result, got {other:?}"),
+        }
+        let stored = rt
+            .remote_state()
+            .storage()
+            .get_source("legado-native-src")
+            .unwrap()
+            .expect("legado native source stored");
+        assert_eq!(stored.name, "Legado Native Source");
+        assert_eq!(
+            stored.book_source["bookSourceName"],
+            serde_json::json!("Legado Native Source")
+        );
+        assert_eq!(
+            stored.book_source["ruleSearch"],
+            serde_json::json!("div.list&&div.item")
+        );
+    }
+
+    #[test]
+    fn source_import_rejects_missing_name_and_book_source_name() {
+        let sink = Arc::new(CollectSink::new());
+        let rt = Runtime::new(sink.clone());
+        // No `name` and `bookSource` without `bookSourceName`: neither path
+        // can derive a name → InvalidParams.
+        let event = send_and_wait(
+            &rt,
+            &sink,
+            Command::new(
+                8,
+                methods::SOURCE_IMPORT,
+                serde_json::json!({
+                    "sourceId": "no-name-src",
+                    "baseUrl": "https://books.example.test",
+                    "bookSource": {
+                        "bookSourceUrl": "https://books.example.test"
+                    }
+                }),
+            ),
+        );
+        match event {
+            Event::Error { error, .. } => {
+                assert_eq!(error.code, ErrorCode::InvalidParams);
+                assert!(
+                    error.message.contains("name"),
+                    "error should mention name fallback: {:?}",
+                    error
+                );
+            }
+            other => panic!("expected error, got {other:?}"),
+        }
+    }
+
     #[test]
     fn book_search_returns_books() {
         let sink = Arc::new(CollectSink::new());

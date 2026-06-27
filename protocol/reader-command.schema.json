@@ -18,7 +18,8 @@
     "remote.reading.v1",
     "rss.v1",
     "sync.v1",
-    "local_book.v1"
+    "local_book.v1",
+    "bookshelf.v1"
   ],
   "x-reader-core-v1-host-capabilities": [
     "host.smoke.echo",
@@ -88,7 +89,9 @@
         "sync.merge",
         "sync.backup",
         "local_book.parse",
-        "local_book.catalog"
+        "local_book.catalog",
+        "bookshelf.list",
+        "bookshelf.get"
       ]
     },
     "params": {
@@ -474,6 +477,44 @@
         "properties": {
           "params": {
             "$ref": "#/$defs/LocalBookCatalogParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "bookshelf.list"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/BookshelfListParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "bookshelf.get"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/BookshelfGetParams"
           }
         }
       }
@@ -2167,10 +2208,26 @@
     "SourceImportParams": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "name"
+      "description": "Parameters for source.import. Imports one remote-reading source definition into Core runtime state. Accepts either V1 canonical form (`name` + `rules`) or a raw Legado BookSource JSON payload. When `name` is omitted, Core derives it from `bookSource.bookSourceName` (Legado native source-name field). At least one of `name` or `bookSource.bookSourceName` must be present; runtime rejects otherwise.",
+      "anyOf": [
+        {
+          "required": [
+            "name"
+          ]
+        },
+        {
+          "required": [
+            "bookSource"
+          ],
+          "properties": {
+            "bookSource": {
+              "required": [
+                "bookSourceName"
+              ]
+            }
+          }
+        }
       ],
-      "description": "Parameters for source.import. Imports one remote-reading source definition into Core runtime state.",
       "properties": {
         "sourceId": {
           "type": "string",
@@ -2181,7 +2238,7 @@
           "type": "string",
           "minLength": 1,
           "pattern": "\\S",
-          "description": "Human-readable source name. Runtime validation rejects blank or whitespace-only names."
+          "description": "Human-readable source name. Optional: when omitted, Core falls back to `bookSource.bookSourceName`. If present, runtime validation rejects blank or whitespace-only values."
         },
         "baseUrl": {
           "type": "string",
@@ -2202,7 +2259,7 @@
             "null"
           ],
           "default": null,
-          "description": "Optional raw Legado BookSource object preserved separately from V1 rules."
+          "description": "Optional raw Legado BookSource object preserved separately from V1 rules. When `name` is absent, `bookSource.bookSourceName` is used as the source name."
         }
       }
     },
@@ -2604,6 +2661,80 @@
           "items": {
             "type": "object"
           }
+        }
+      }
+    },
+    "BookshelfListParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Parameters for bookshelf.list. Pure read over the in-memory BookshelfStore; no host callback. Mirrors Legado BookDao.getAllBooks + group/keyword filter.",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Filter by source identifier (Legado origin). Omit for all sources."
+        },
+        "bookId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Filter by source-relative book id (Legado bookUrl). Omit for all books."
+        },
+        "group": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Filter by user-defined group name (Legado group)."
+        },
+        "keyword": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Case-insensitive substring match over title/author/bookId."
+        },
+        "sortBy": {
+          "type": "string",
+          "enum": ["manual", "addedAt", "lastReadAt", "title", "author"],
+          "default": "manual",
+          "description": "Sort field. `manual` = sortIndex asc then addedAt desc."
+        },
+        "sortDirection": {
+          "type": "string",
+          "enum": ["ascending", "descending"],
+          "default": "ascending",
+          "description": "Sort direction."
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Pagination offset (0-based)."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional page size cap."
+        }
+      }
+    },
+    "BookshelfGetParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "bookId"],
+      "description": "Parameters for bookshelf.get. Looks up a single shelf entry by the composite (sourceId, bookId) key, mirroring Legado (origin, bookUrl).",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Source identifier (Legado origin)."
+        },
+        "bookId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Source-relative book id (Legado bookUrl)."
         }
       }
     },

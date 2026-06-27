@@ -12,4 +12,5 @@ reader-contract = { path = "../../crates/reader-contract" }
 reader-content = { path = "../../crates/reader-content" }
 reader-domain = { path = "../../crates/reader-domain" }
 reader-runtime = { path = "../../crates/reader-runtime" }
+reader-storage = { path = "../../crates/reader-storage" }
 serde_json.workspace = true

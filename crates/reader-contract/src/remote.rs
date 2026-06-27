@@ -105,6 +105,24 @@ where
     Ok(value)
 }
 
+/// Deserialize an optional `name` for `source.import`. When the field is
+/// absent, returns `None` (Core then falls back to `bookSource.bookSourceName`).
+/// When present, the value must be non-blank — a blank `name` is rejected
+/// rather than silently treated as absent, so callers get a clear error
+/// instead of an accidental fallback.
+fn deserialize_optional_non_blank_source_name<'de, D>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<String>::deserialize(deserializer)?;
+    if let Some(ref v) = value {
+        validate_source_name_scalar(v).map_err(de::Error::custom)?;
+    }
+    Ok(value)
+}
+
 fn validate_source_name_scalar(value: &str) -> Result<(), &'static str> {
     if value.trim().is_empty() {
         Err("source.import name must be non-empty")
@@ -681,14 +699,26 @@ impl HostHttpResponse {
 }
 
 /// Parameters for `source.import`.
+///
+/// Accepts either the V1 canonical form (`name` + `rules`) or a raw Legado
+/// BookSource JSON payload (`bookSource` with `bookSourceName`). When `name`
+/// is omitted, Core derives it from `bookSource.bookSourceName` (mirroring
+/// Legado `BookSource.bookSourceName`, the canonical source-name field — see
+/// `legado/app/src/main/java/io/legado/app/data/entities/BookSource.kt`).
+/// At least one of `name` or `bookSource.bookSourceName` must be present.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SourceImportParams {
     /// Stable source identifier. If omitted, one is assigned.
     #[serde(default = "empty_string")]
     pub source_id: String,
-    #[serde(deserialize_with = "deserialize_non_blank_source_name")]
-    pub name: String,
+    /// Human-readable source name. Optional: when omitted, Core falls back to
+    /// `bookSource.bookSourceName`. If present, must be non-blank.
+    #[serde(
+        default,
+        deserialize_with = "deserialize_optional_non_blank_source_name"
+    )]
+    pub name: Option<String>,
     #[serde(default = "empty_string")]
     pub base_url: String,
     /// Extraction rules keyed by stage (`search`/`detail`/`toc`/`chapter`).
@@ -698,6 +728,8 @@ pub struct SourceImportParams {
     pub rules: Value,
     /// Optional raw Legado BookSource payload. Core preserves this separately
     /// from V1 `rules` so DSL migration can happen without losing source data.
+    /// When `name` is absent, `bookSource.bookSourceName` is used as the
+    /// source name (Legado native field).
     #[serde(
         default,
         rename = "bookSource",
@@ -1246,6 +1278,146 @@ pub struct LocalBookCatalogData {
     pub catalog: Value,
 }
 
+// ===========================================================================
+// Bookshelf vertical (V1 minimal) — pure read, no host callback
+// ===========================================================================
+
+fn deserialize_optional_non_blank_shelf_field<'de, D>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<String>::deserialize(deserializer)?;
+    if let Some(s) = &value {
+        if s.trim().is_empty() {
+            return Err(de::Error::custom(
+                "bookshelf field must be non-blank when present",
+            ));
+        }
+    }
+    Ok(value)
+}
+
+/// Parameters for `bookshelf.list`. All fields optional; an empty params
+/// object lists the entire shelf using the default sort (manual → added_at
+/// desc). Mirrors Legado's `BookDao.getAllBooks` + group/keyword filter path.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookshelfListParams {
+    /// Filter by source identifier (`origin` in Legado). `None` = all sources.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(deserialize_with = "deserialize_optional_non_blank_shelf_field")]
+    pub source_id: Option<String>,
+    /// Filter by source-relative book id (`bookUrl` in Legado). `None` = all.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(deserialize_with = "deserialize_optional_non_blank_shelf_field")]
+    pub book_id: Option<String>,
+    /// Filter by user-defined group name (Legado `group`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(deserialize_with = "deserialize_optional_non_blank_shelf_field")]
+    pub group: Option<String>,
+    /// Case-insensitive substring match over title/author/bookId.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(deserialize_with = "deserialize_optional_non_blank_shelf_field")]
+    pub keyword: Option<String>,
+    /// Sort field. Defaults to `manual` (sortIndex asc, addedAt desc).
+    /// Accepted values: `manual`, `addedAt`, `lastReadAt`, `title`, `author`.
+    #[serde(default = "default_bookshelf_sort_by")]
+    pub sort_by: String,
+    /// `ascending` (default) or `descending`.
+    #[serde(default = "default_bookshelf_sort_direction")]
+    pub sort_direction: String,
+    /// Pagination offset (0-based). Defaults to 0.
+    #[serde(default)]
+    pub offset: usize,
+    /// Optional page size cap.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<usize>,
+}
+
+fn default_bookshelf_sort_by() -> String {
+    "manual".to_string()
+}
+
+fn default_bookshelf_sort_direction() -> String {
+    "ascending".to_string()
+}
+
+impl Default for BookshelfListParams {
+    fn default() -> Self {
+        Self {
+            source_id: None,
+            book_id: None,
+            group: None,
+            keyword: None,
+            sort_by: default_bookshelf_sort_by(),
+            sort_direction: default_bookshelf_sort_direction(),
+            offset: 0,
+            limit: None,
+        }
+    }
+}
+
+/// Parameters for `bookshelf.get`. Looks up a single shelf entry by the
+/// composite `(sourceId, bookId)` key, mirroring Legado's
+/// `(origin, bookUrl)` primary lookup.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookshelfGetParams {
+    #[serde(deserialize_with = "deserialize_non_blank_source_id")]
+    pub source_id: String,
+    #[serde(deserialize_with = "deserialize_non_blank_book_id")]
+    pub book_id: String,
+}
+
+/// Wire shape of a shelf entry. Mirrors `reader_storage::BookshelfEntry`
+/// (which itself mirrors the Legado `Book` subset that the shelf needs).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookshelfEntryData {
+    pub source_id: String,
+    pub book_id: String,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub author: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intro: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_chapter: Option<String>,
+    /// Unix timestamp (seconds) when the book was added to the shelf.
+    pub added_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_read_at: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    #[serde(default)]
+    pub sort_index: i32,
+}
+
+/// Result data for `bookshelf.list`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookshelfListData {
+    pub books: Vec<BookshelfEntryData>,
+    /// Total entries matched by the filter before pagination.
+    pub total: usize,
+}
+
+/// Result data for `bookshelf.get`. `book` is `None` when the composite key
+/// is not on the shelf (the command still succeeds; hosts treat `None` as
+/// "not on shelf").
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookshelfGetData {
+    pub book: Option<BookshelfEntryData>,
+}
+
 /// Helper: parse a typed params object from a `Command`'s free-form params,
 /// producing a structured `INVALID_PARAMS` error on failure.
 pub fn parse_params<T: for<'de> Deserialize<'de>>(
@@ -1488,7 +1660,7 @@ mod tests {
             parse_params(crate::methods::SOURCE_IMPORT, &command.params)
                 .expect("valid source.import params should parse");
         assert_eq!(params.source_id, "conformance-source");
-        assert_eq!(params.name, "Conformance Source");
+        assert_eq!(params.name.as_deref(), Some("Conformance Source"));
         assert_eq!(params.base_url, "https://books.example.test");
         assert_eq!(params.rules, serde_json::json!({}));
         assert_eq!(params.book_source, serde_json::Value::Null);
@@ -1598,6 +1770,46 @@ mod tests {
                 .is_some_and(|source| source.contains("bookSource")),
             "unexpected source detail: {}",
             err.details["source"]
+        );
+    }
+
+    #[test]
+    fn source_import_params_accepts_legado_native_form_without_name() {
+        // Legado native BookSource JSON uses `bookSourceName` and does NOT
+        // carry a top-level `name`. Core must accept this form at the contract
+        // layer; the runtime derives `name` from `bookSource.bookSourceName`.
+        // Mirrors Legado `BookSource.kt` where `bookSourceName` is the source
+        // name field (red line 3: migrate against Legado, no skipping).
+        let params: SourceImportParams = serde_json::from_value(serde_json::json!({
+            "sourceId": "legado-native-src",
+            "baseUrl": "https://books.example.test",
+            "bookSource": {
+                "bookSourceName": "Legado Native Source",
+                "bookSourceUrl": "https://books.example.test",
+                "searchUrl": "/search?q={{key}}"
+            }
+        }))
+        .expect("Legado native source.import (no top-level name) should parse");
+        assert_eq!(params.source_id, "legado-native-src");
+        assert_eq!(params.name, None);
+        assert_eq!(
+            params.book_source["bookSourceName"],
+            serde_json::json!("Legado Native Source")
+        );
+
+        // A present-but-blank `name` is still rejected (not silently treated
+        // as absent), preserving the strict-whitespace contract.
+        let err = serde_json::from_value::<SourceImportParams>(serde_json::json!({
+            "sourceId": "bad",
+            "name": "   ",
+            "bookSource": {
+                "bookSourceName": "Fallback Ignored"
+            }
+        }))
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("name"),
+            "blank name must be rejected at contract layer: {err}"
         );
     }
 

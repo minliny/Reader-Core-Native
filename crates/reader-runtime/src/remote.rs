@@ -17,16 +17,19 @@ use reader_content::{JsOutcome, RemoteContentPipeline};
 use reader_contract::{
     self as contract,
     remote::{
-        parse_params, BookDetailParams, BookSearchParams, BookTocParams, ChapterContentParams,
-        HostHttpRequest, HostHttpResponse, LocalBookCatalogData, LocalBookCatalogParams,
-        LocalBookParseData, LocalBookParseParams, ReadingProgressUpdateParams, RssParseData,
-        RssParseEntryData, RssParseParams, RssRefreshData, RssRefreshParams, SourceImportParams,
-        SyncBackupData, SyncBackupParams, SyncMergeData, SyncMergeParams,
+        parse_params, BookDetailParams, BookSearchParams, BookTocParams, BookshelfEntryData,
+        BookshelfGetData, BookshelfGetParams, BookshelfListData, BookshelfListParams,
+        ChapterContentParams, HostHttpRequest, HostHttpResponse, LocalBookCatalogData,
+        LocalBookCatalogParams, LocalBookParseData, LocalBookParseParams,
+        ReadingProgressUpdateParams, RssParseData, RssParseEntryData, RssParseParams,
+        RssRefreshData, RssRefreshParams, SourceImportParams, SyncBackupData, SyncBackupParams,
+        SyncMergeData, SyncMergeParams,
     },
     CoreError, Event, HostCapability,
 };
 use reader_domain::{Book, ReadingProgress, Source, SourceRules};
-use reader_storage::InMemoryStorage;
+use reader_storage::{BookshelfEntry, BookshelfQuery, BookshelfSortBy, BookshelfSortDirection};
+use reader_storage::{BookshelfStore, InMemoryStorage};
 
 use crate::sink::EventSink;
 
@@ -185,6 +188,12 @@ pub fn dispatch_remote(
         }
         contract::methods::LOCAL_BOOK_CATALOG => {
             local_book_catalog(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::BOOKSHELF_LIST => {
+            bookshelf_list(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::BOOKSHELF_GET => {
+            bookshelf_get(cmd, state).map(RemoteCommandResult::Complete)
         }
         _ => return RemoteDispatch::NotHandled,
     };
@@ -375,11 +384,26 @@ fn source_import(
     state: &RemoteState,
 ) -> Result<serde_json::Value, CoreError> {
     let params: SourceImportParams = parse_params(contract::methods::SOURCE_IMPORT, &cmd.params)?;
-    if params.name.trim().is_empty() {
-        return Err(CoreError::invalid_params(
-            "source.import requires a non-empty name",
-        ));
-    }
+    // `name` is optional at the contract layer: Legado native BookSource JSON
+    // carries `bookSourceName` (not a top-level `name`). Fall back to
+    // `bookSource.bookSourceName` so callers can import a raw Legado BookSource
+    // verbatim. Mirrors Legado `BookSource.bookSourceName` (BookSource.kt).
+    let name = params.name.or_else(|| {
+        params
+            .book_source
+            .get("bookSourceName")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.trim().is_empty())
+            .map(|s| s.to_string())
+    });
+    let name = match name {
+        Some(value) if !value.trim().is_empty() => value,
+        _ => {
+            return Err(CoreError::invalid_params(
+                "source.import requires a non-empty name: provide `name` or `bookSource.bookSourceName`",
+            ));
+        }
+    };
     let source_id = if params.source_id.trim().is_empty() {
         format!("source-{}", cmd.request_id)
     } else {
@@ -395,7 +419,7 @@ fn source_import(
     };
     let source = Source {
         source_id: source_id.clone(),
-        name: params.name,
+        name,
         base_url: params.base_url,
         rules,
         book_source: params.book_source,
@@ -1043,6 +1067,116 @@ fn local_book_internal(err: reader_local_book::LocalBookError) -> CoreError {
 fn local_book_invalid(field: &str, err: serde_json::Error) -> CoreError {
     CoreError::invalid_params(format!("local_book command invalid {field}"))
         .with_details(serde_json::json!({ "source": err.to_string() }))
+}
+
+// ===========================================================================
+// Bookshelf vertical (V1 minimal) — pure read over BookshelfStore, no host
+// ===========================================================================
+
+fn bookshelf_list(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: BookshelfListParams = parse_params(contract::methods::BOOKSHELF_LIST, &cmd.params)?;
+    let sort_by = parse_sort_by(&params.sort_by)?;
+    let sort_direction = parse_sort_direction(&params.sort_direction)?;
+
+    // Query the full match set (offset=0, limit=None) so `total` reflects
+    // the unpaginated count; apply offset/limit on the result. The in-memory
+    // store makes this cheap and keeps the protocol shape forward-compatible
+    // with a future SQLite backend that could return COUNT(*) separately.
+    let query = BookshelfQuery {
+        source_id: params.source_id.clone(),
+        group: params.group.clone(),
+        keyword: params.keyword.clone(),
+        has_reading_progress: None,
+        sort_by,
+        sort_direction,
+        offset: 0,
+        limit: None,
+    };
+    let mut matched = state
+        .storage()
+        .query_shelf(query)
+        .map_err(storage_internal)?;
+    // The store keys by (sourceId, bookId) but does not expose a bookId-only
+    // filter; narrow here when only bookId is requested.
+    if let Some(book_id) = &params.book_id {
+        matched.retain(|entry| &entry.book_id == book_id);
+    }
+    let total = matched.len();
+    let books = matched
+        .into_iter()
+        .skip(params.offset)
+        .take(params.limit.unwrap_or(usize::MAX))
+        .map(|entry| BookshelfEntryData {
+            source_id: entry.source_id,
+            book_id: entry.book_id,
+            title: entry.title,
+            author: entry.author,
+            cover_url: entry.cover_url,
+            intro: entry.intro,
+            kind: entry.kind,
+            last_chapter: entry.last_chapter,
+            added_at: entry.added_at,
+            last_read_at: entry.last_read_at,
+            group: entry.group,
+            sort_index: entry.sort_index,
+        })
+        .collect::<Vec<_>>();
+    let data = BookshelfListData { books, total };
+    serde_json::to_value(&data).map_err(serde_internal)
+}
+
+fn bookshelf_get(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: BookshelfGetParams = parse_params(contract::methods::BOOKSHELF_GET, &cmd.params)?;
+    let entry = state
+        .storage()
+        .get_shelf_entry(&params.source_id, &params.book_id)
+        .map_err(storage_internal)?;
+    let book = entry.map(entry_to_data);
+    let data = BookshelfGetData { book };
+    serde_json::to_value(&data).map_err(serde_internal)
+}
+
+fn parse_sort_by(value: &str) -> Result<BookshelfSortBy, CoreError> {
+    serde_json::from_value::<BookshelfSortBy>(serde_json::Value::String(value.to_string()))
+        .map_err(|_| {
+            CoreError::invalid_params(format!(
+                "bookshelf.list sortBy must be one of manual/addedAt/lastReadAt/title/author, got: {value:?}"
+            ))
+            .with_details(serde_json::json!({ "sortBy": value }))
+        })
+}
+
+fn parse_sort_direction(value: &str) -> Result<BookshelfSortDirection, CoreError> {
+    serde_json::from_value::<BookshelfSortDirection>(serde_json::Value::String(value.to_string()))
+        .map_err(|_| {
+            CoreError::invalid_params(format!(
+                "bookshelf.list sortDirection must be ascending/descending, got: {value:?}"
+            ))
+            .with_details(serde_json::json!({ "sortDirection": value }))
+        })
+}
+
+fn entry_to_data(entry: BookshelfEntry) -> BookshelfEntryData {
+    BookshelfEntryData {
+        source_id: entry.source_id,
+        book_id: entry.book_id,
+        title: entry.title,
+        author: entry.author,
+        cover_url: entry.cover_url,
+        intro: entry.intro,
+        kind: entry.kind,
+        last_chapter: entry.last_chapter,
+        added_at: entry.added_at,
+        last_read_at: entry.last_read_at,
+        group: entry.group,
+        sort_index: entry.sort_index,
+    }
 }
 
 fn serde_internal(err: serde_json::Error) -> CoreError {

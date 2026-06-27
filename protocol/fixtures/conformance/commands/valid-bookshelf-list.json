@@ -1,0 +1,6 @@
+{
+  "protocolVersion": 1,
+  "requestId": 700,
+  "method": "bookshelf.list",
+  "params": {}
+}

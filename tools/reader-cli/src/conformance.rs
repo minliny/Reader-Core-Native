@@ -3,9 +3,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use reader_contract::{
-    methods, BookDetailData, BookSearchData, BookTocData, ChapterContentData, ChapterContentVia,
-    Command, CoreError, CoreInfoData, ErrorCode, Event, HostCapability,
-    HostWebViewEvaluateJavaScriptRequest, HostWebViewEvaluateJavaScriptResponse,
+    methods, BookDetailData, BookSearchData, BookTocData, BookshelfGetData, BookshelfListData,
+    ChapterContentData, ChapterContentVia, Command, CoreError, CoreInfoData, ErrorCode, Event,
+    HostCapability, HostWebViewEvaluateJavaScriptRequest, HostWebViewEvaluateJavaScriptResponse,
     LocalBookCatalogData, LocalBookParseData, PendingHostOperationStatus,
     ReadingProgressUpdateData, RssParseData, RssRefreshData, RuntimeCancelData, RuntimeConfig,
     RuntimePingData, RuntimeShutdownData, RuntimeStatus, SourceImportData, SyncBackupData,
@@ -14,6 +14,7 @@ use reader_contract::{
     TtsSliceData, TtsSlicingStrategy, PROTOCOL_VERSION, V1_CAPABILITIES,
 };
 use reader_runtime::{EventSink, Runtime};
+use reader_storage::{BookshelfEntry, BookshelfStore};
 use serde_json::{json, Value};
 
 const EVENT_TIMEOUT: Duration = Duration::from_secs(2);
@@ -27,6 +28,9 @@ const VALID_SOURCE_IMPORT: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-source-import.json");
 const VALID_SOURCE_IMPORT_LEGADO_BOOKSOURCE: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/valid-source-import-legado-booksource.json"
+);
+const VALID_SOURCE_IMPORT_LEGADO_BOOKSOURCE_NAME_ONLY: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/valid-source-import-legado-booksource-name-only.json"
 );
 const VALID_BOOK_SEARCH: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-book-search.json");
@@ -59,6 +63,9 @@ const INVALID_SOURCE_IMPORT_RULES_NOT_OBJECT: &str = include_str!(
 );
 const INVALID_SOURCE_IMPORT_BOOKSOURCE_NOT_OBJECT: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-source-import-booksource-not-object.json"
+);
+const INVALID_SOURCE_IMPORT_MISSING_NAME_AND_BOOKSOURCE_NAME: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-source-import-missing-name-and-booksource-name.json"
 );
 const INVALID_BOOK_SEARCH_UNKNOWN_FIELD: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-book-search-unknown-field.json"
@@ -165,6 +172,25 @@ const INVALID_LOCAL_BOOK_CATALOG_UNKNOWN_FIELD: &str = include_str!(
 );
 const INVALID_LOCAL_BOOK_CATALOG_ENTRY_NOT_OBJECT: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-local-book-catalog-entry-not-object.json"
+);
+const VALID_BOOKSHELF_LIST: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-bookshelf-list.json");
+const VALID_BOOKSHELF_GET: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-bookshelf-get.json");
+const INVALID_BOOKSHELF_LIST_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-bookshelf-list-unknown-field.json"
+);
+const INVALID_BOOKSHELF_LIST_BLANK_SOURCE_ID: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-bookshelf-list-blank-source-id.json"
+);
+const INVALID_BOOKSHELF_LIST_INVALID_SORT_BY: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-bookshelf-list-invalid-sort-by.json"
+);
+const INVALID_BOOKSHELF_GET_MISSING_BOOK_ID: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-bookshelf-get-missing-book-id.json"
+);
+const INVALID_BOOKSHELF_GET_BLANK_SOURCE_ID: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-bookshelf-get-blank-source-id.json"
 );
 
 const VALID_TTS_SLICE: &str =
@@ -657,6 +683,61 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         },
     );
 
+    // Legado native form: no top-level `name`, only `bookSource.bookSourceName`.
+    // Core must derive the source name from `bookSource.bookSourceName`,
+    // mirroring Legado `BookSource.bookSourceName` (BookSource.kt). This is the
+    // form Android/iOS import when forwarding a raw Legado BookSource JSON.
+    record(
+        &mut report,
+        "valid-command-source-import-legado-booksource-name-only",
+        || {
+            let (runtime, rx) =
+                send_to_fresh_runtime(VALID_SOURCE_IMPORT_LEGADO_BOOKSOURCE_NAME_ONLY)?;
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 419 => {
+                    let data = serde_json::from_value::<SourceImportData>(data).map_err(|err| {
+                        format!("source.import Legado name-only data parse failed: {err}")
+                    })?;
+                    if data.source_id == "legado-native-name-only"
+                        && data.name == "Legado Native Name Only"
+                        && data.imported
+                    {
+                        Ok(())
+                    } else {
+                        Err(format!(
+                            "unexpected Legado name-only source.import data {data:?}"
+                        ))
+                    }
+                }
+                other => Err(format!(
+                    "unexpected Legado name-only source.import result {other:?}"
+                )),
+            }?;
+
+            let stored = runtime
+                .remote_state()
+                .storage()
+                .get_source("legado-native-name-only")
+                .map_err(|err| format!("source.import storage read failed: {err}"))?
+                .ok_or_else(|| "Legado name-only source.import did not store source".to_string())?;
+            if stored.name != "Legado Native Name Only" {
+                return Err(format!(
+                    "Legado name-only source.import did not derive name: {}",
+                    stored.name
+                ));
+            }
+            if stored.book_source["bookSourceName"] != json!("Legado Native Name Only") {
+                return Err(format!(
+                    "Legado name-only source.import dropped bookSourceName: {}",
+                    stored.book_source["bookSourceName"]
+                ));
+            }
+            Ok(())
+        },
+    );
+
     record(
         &mut report,
         "source-import-data-rejects-invalid-result-shape",
@@ -739,6 +820,16 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             let (_runtime, rx) =
                 send_to_fresh_runtime(INVALID_SOURCE_IMPORT_BOOKSOURCE_NOT_OBJECT)?;
             expect_event_error(&rx, 321, ErrorCode::InvalidParams)
+        },
+    );
+
+    record(
+        &mut report,
+        "source-import-rejects-missing-name-and-booksource-name",
+        || {
+            let (_runtime, rx) =
+                send_to_fresh_runtime(INVALID_SOURCE_IMPORT_MISSING_NAME_AND_BOOKSOURCE_NAME)?;
+            expect_event_error(&rx, 420, ErrorCode::InvalidParams)
         },
     );
 
@@ -1619,6 +1710,125 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         }
     });
 
+    record(&mut report, "valid-command-bookshelf-list-empty", || {
+        let (_runtime, rx) = send_to_fresh_runtime(VALID_BOOKSHELF_LIST)?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 700 => {
+                let data = serde_json::from_value::<BookshelfListData>(data)
+                    .map_err(|err| format!("bookshelf.list data contract parse failed: {err}"))?;
+                if data.books.is_empty() && data.total == 0 {
+                    Ok(())
+                } else {
+                    Err(format!("expected empty shelf, got {data:?}"))
+                }
+            }
+            other => Err(format!("unexpected bookshelf.list result {other:?}")),
+        }
+    });
+
+    record(
+        &mut report,
+        "valid-command-bookshelf-list-with-preset",
+        || {
+            let (runtime, rx) = fresh_runtime();
+            let entry: BookshelfEntry = serde_json::from_value(json!({
+                "sourceId": "src-1",
+                "bookId": "book-1",
+                "title": "Conformance Book",
+                "author": "Conformance Author",
+                "addedAt": 1000,
+                "sortIndex": 0
+            }))
+            .map_err(|err| format!("shelf entry construction failed: {err}"))?;
+            runtime
+                .remote_state()
+                .storage()
+                .add_to_shelf(entry)
+                .map_err(|err| format!("add_to_shelf failed: {err}"))?;
+            runtime
+                .send_json(VALID_BOOKSHELF_LIST.as_bytes())
+                .map_err(|err| format!("send_json failed: {err:?}"))?;
+            match recv_event(&rx)? {
+                Event::Result {
+                    request_id, data, ..
+                } if request_id == 700 => {
+                    let data =
+                        serde_json::from_value::<BookshelfListData>(data).map_err(|err| {
+                            format!("bookshelf.list data contract parse failed: {err}")
+                        })?;
+                    if data.books.len() == 1
+                        && data.total == 1
+                        && data.books[0].source_id == "src-1"
+                        && data.books[0].book_id == "book-1"
+                    {
+                        Ok(())
+                    } else {
+                        Err(format!("unexpected bookshelf.list data {data:?}"))
+                    }
+                }
+                other => Err(format!("unexpected bookshelf.list result {other:?}")),
+            }
+        },
+    );
+
+    record(&mut report, "valid-command-bookshelf-get-not-found", || {
+        let (_runtime, rx) = send_to_fresh_runtime(VALID_BOOKSHELF_GET)?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 701 => {
+                let data = serde_json::from_value::<BookshelfGetData>(data)
+                    .map_err(|err| format!("bookshelf.get data contract parse failed: {err}"))?;
+                if data.book.is_none() {
+                    Ok(())
+                } else {
+                    Err(format!("expected null book, got {data:?}"))
+                }
+            }
+            other => Err(format!("unexpected bookshelf.get result {other:?}")),
+        }
+    });
+
+    record(&mut report, "valid-command-bookshelf-get-found", || {
+        let (runtime, rx) = fresh_runtime();
+        let entry: BookshelfEntry = serde_json::from_value(json!({
+            "sourceId": "src-1",
+            "bookId": "book-1",
+            "title": "Conformance Book",
+            "author": "Conformance Author",
+            "addedAt": 1000,
+            "sortIndex": 0
+        }))
+        .map_err(|err| format!("shelf entry construction failed: {err}"))?;
+        runtime
+            .remote_state()
+            .storage()
+            .add_to_shelf(entry)
+            .map_err(|err| format!("add_to_shelf failed: {err}"))?;
+        runtime
+            .send_json(VALID_BOOKSHELF_GET.as_bytes())
+            .map_err(|err| format!("send_json failed: {err:?}"))?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 701 => {
+                let data = serde_json::from_value::<BookshelfGetData>(data)
+                    .map_err(|err| format!("bookshelf.get data contract parse failed: {err}"))?;
+                let book = data
+                    .book
+                    .ok_or_else(|| "expected non-null book".to_string())?;
+                if book.source_id == "src-1" && book.book_id == "book-1" {
+                    Ok(())
+                } else {
+                    Err(format!("unexpected bookshelf.get data {book:?}"))
+                }
+            }
+            other => Err(format!("unexpected bookshelf.get result {other:?}")),
+        }
+    });
+
     record(&mut report, "valid-command-tts-slice", || {
         let (_runtime, rx) = send_to_fresh_runtime(VALID_TTS_SLICE)?;
         match recv_event(&rx)? {
@@ -1901,6 +2111,31 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             "local-book-catalog-rejects-entry-not-object",
             INVALID_LOCAL_BOOK_CATALOG_ENTRY_NOT_OBJECT,
             618,
+        ),
+        (
+            "bookshelf-list-rejects-unknown-params",
+            INVALID_BOOKSHELF_LIST_UNKNOWN_FIELD,
+            702,
+        ),
+        (
+            "bookshelf-list-rejects-blank-source-id",
+            INVALID_BOOKSHELF_LIST_BLANK_SOURCE_ID,
+            703,
+        ),
+        (
+            "bookshelf-list-rejects-invalid-sort-by",
+            INVALID_BOOKSHELF_LIST_INVALID_SORT_BY,
+            704,
+        ),
+        (
+            "bookshelf-get-rejects-missing-book-id",
+            INVALID_BOOKSHELF_GET_MISSING_BOOK_ID,
+            705,
+        ),
+        (
+            "bookshelf-get-rejects-blank-source-id",
+            INVALID_BOOKSHELF_GET_BLANK_SOURCE_ID,
+            706,
         ),
         (
             "tts-slice-rejects-content-empty",

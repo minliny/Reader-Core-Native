@@ -1,0 +1,9 @@
+{
+  "protocolVersion": 1,
+  "requestId": 701,
+  "method": "bookshelf.get",
+  "params": {
+    "sourceId": "src-1",
+    "bookId": "book-1"
+  }
+}

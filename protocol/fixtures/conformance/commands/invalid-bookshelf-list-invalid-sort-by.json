@@ -1,0 +1,8 @@
+{
+  "protocolVersion": 1,
+  "requestId": 704,
+  "method": "bookshelf.list",
+  "params": {
+    "sortBy": "bogus"
+  }
+}

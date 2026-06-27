@@ -1,0 +1,9 @@
+{
+  "protocolVersion": 1,
+  "requestId": 702,
+  "method": "bookshelf.list",
+  "params": {
+    "sourceId": "src-1",
+    "unexpectedField": true
+  }
+}

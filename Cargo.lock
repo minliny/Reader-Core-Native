@@ -829,6 +829,7 @@ dependencies = [
  "reader-contract",
  "reader-domain",
  "reader-runtime",
+ "reader-storage",
  "serde_json",
 ]
 

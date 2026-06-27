@@ -1,0 +1,21 @@
+{
+  "protocolVersion": 1,
+  "requestId": 419,
+  "method": "source.import",
+  "params": {
+    "sourceId": "legado-native-name-only",
+    "baseUrl": "https://books.example.test",
+    "rules": {},
+    "bookSource": {
+      "bookSourceName": "Legado Native Name Only",
+      "bookSourceUrl": "https://books.example.test",
+      "searchUrl": "/search?q={{key}}",
+      "ruleSearch": "div.list&&div.item;div.name&&a@text",
+      "enabled": true,
+      "enabledExplore": false,
+      "header": {
+        "User-Agent": "ReaderCoreTest"
+      }
+    }
+  }
+}

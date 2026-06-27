@@ -37,13 +37,14 @@ pub use host::{
 };
 pub use remote::{
     BookDetailBookData, BookDetailData, BookDetailParams, BookSearchBookData, BookSearchData,
-    BookSearchParams, BookTocData, BookTocEntryData, BookTocParams, ChapterContentData,
-    ChapterContentParams, ChapterContentVia, HostHttpCookie, HostHttpRedirect, HostHttpRequest,
-    HostHttpResponse, LocalBookCatalogData, LocalBookCatalogParams, LocalBookParseData,
-    LocalBookParseParams, ReadingProgressUpdateData, ReadingProgressUpdateParams,
-    RemoteHttpDiagnosticsData, RssParseData, RssParseEntryData, RssParseParams, RssRefreshData,
-    RssRefreshParams, SourceImportData, SourceImportParams, SyncBackupData, SyncBackupParams,
-    SyncMergeData, SyncMergeParams,
+    BookSearchParams, BookTocData, BookTocEntryData, BookTocParams, BookshelfEntryData,
+    BookshelfGetData, BookshelfGetParams, BookshelfListData, BookshelfListParams,
+    ChapterContentData, ChapterContentParams, ChapterContentVia, HostHttpCookie, HostHttpRedirect,
+    HostHttpRequest, HostHttpResponse, LocalBookCatalogData, LocalBookCatalogParams,
+    LocalBookParseData, LocalBookParseParams, ReadingProgressUpdateData,
+    ReadingProgressUpdateParams, RemoteHttpDiagnosticsData, RssParseData, RssParseEntryData,
+    RssParseParams, RssRefreshData, RssRefreshParams, SourceImportData, SourceImportParams,
+    SyncBackupData, SyncBackupParams, SyncMergeData, SyncMergeParams,
 };
 pub use tts::{
     TtsChapterPlanData, TtsChapterPlanParams, TtsChapterRef, TtsChapterTransition,
@@ -128,6 +129,15 @@ pub mod methods {
     pub const LOCAL_BOOK_PARSE: &str = "local_book.parse";
     /// Upsert a local-book catalog entry (fingerprint + chapters, pure).
     pub const LOCAL_BOOK_CATALOG: &str = "local_book.catalog";
+
+    // --- Bookshelf vertical (V1 minimal) ----------------------------------
+    /// List shelf entries with optional filter/sort/pagination (pure read,
+    /// no host callback). Mirrors Legado's books table read path.
+    pub const BOOKSHELF_LIST: &str = "bookshelf.list";
+    /// Look up a single shelf entry by composite `(sourceId, bookId)` key
+    /// (pure read, no host callback). Mirrors Legado's `Book` lookup by
+    /// `(origin, bookUrl)`.
+    pub const BOOKSHELF_GET: &str = "bookshelf.get";
 }
 
 /// Non-method capability names advertised by `core.info` in v1.
@@ -144,6 +154,9 @@ pub mod capabilities {
     pub const SYNC_V1: &str = "sync.v1";
     /// Local-book vertical (V1 minimal): TXT parsing + catalog bookkeeping.
     pub const LOCAL_BOOK_V1: &str = "local_book.v1";
+    /// Bookshelf vertical (V1 minimal): shelf list/get reads over the
+    /// in-memory `BookshelfStore`. Mirrors Legado's books table reads.
+    pub const BOOKSHELF_V1: &str = "bookshelf.v1";
 }
 
 /// Capabilities advertised by `core.info` in v1.
@@ -163,6 +176,7 @@ pub const V1_CAPABILITIES: &[&str] = &[
     capabilities::RSS_V1,
     capabilities::SYNC_V1,
     capabilities::LOCAL_BOOK_V1,
+    capabilities::BOOKSHELF_V1,
 ];
 
 /// Host-owned capabilities Core may request in v1.
@@ -264,6 +278,8 @@ mod tests {
                 methods::SYNC_BACKUP,
                 methods::LOCAL_BOOK_PARSE,
                 methods::LOCAL_BOOK_CATALOG,
+                methods::BOOKSHELF_LIST,
+                methods::BOOKSHELF_GET,
             ]
         );
         assert!(!schema_examples.contains(&methods::LEGACY_CORE_PING));

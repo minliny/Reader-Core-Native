@@ -957,8 +957,8 @@
         },
         "capabilities": {
           "type": "array",
-          "minItems": 15,
-          "maxItems": 15,
+          "minItems": 16,
+          "maxItems": 16,
           "prefixItems": [
             {
               "type": "string",
@@ -1019,6 +1019,10 @@
             {
               "type": "string",
               "const": "local_book.v1"
+            },
+            {
+              "type": "string",
+              "const": "bookshelf.v1"
             }
           ],
           "description": "Ordered V1 capability list advertised to hosts."
@@ -1741,6 +1745,110 @@
         "catalog": {
           "type": "object",
           "description": "Updated catalog snapshot (shape owned by reader_local_book::LocalBookCatalogSnapshot)."
+        }
+      }
+    },
+    "BookshelfEntryData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId",
+        "bookId",
+        "title",
+        "author",
+        "addedAt",
+        "sortIndex"
+      ],
+      "description": "One book on the user's shelf. Mirrors reader_storage::BookshelfEntry (Legado Book subset).",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Source the book came from. `local` for local books (Legado origin)."
+        },
+        "bookId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Source-relative book identifier (Legado bookUrl)."
+        },
+        "title": {
+          "type": "string",
+          "description": "Book title (Legado name)."
+        },
+        "author": {
+          "type": "string",
+          "description": "Author (Legado author)."
+        },
+        "coverUrl": {
+          "type": "string",
+          "description": "Optional cover URL (Legado coverUrl)."
+        },
+        "intro": {
+          "type": "string",
+          "description": "Optional intro/blurb (Legado intro)."
+        },
+        "kind": {
+          "type": "string",
+          "description": "Optional classification (Legado kind)."
+        },
+        "lastChapter": {
+          "type": "string",
+          "description": "Optional latest chapter title (Legado latestChapterTitle)."
+        },
+        "addedAt": {
+          "type": "integer",
+          "description": "Unix timestamp (seconds) when the book was added to the shelf."
+        },
+        "lastReadAt": {
+          "type": "integer",
+          "description": "Optional Unix timestamp (seconds) of the last read (Legado durChapterTime)."
+        },
+        "group": {
+          "type": "string",
+          "description": "Optional user-defined group name (Legado group)."
+        },
+        "sortIndex": {
+          "type": "integer",
+          "description": "Manual sort order within the shelf. Lower comes first (Legado order)."
+        }
+      }
+    },
+    "BookshelfListData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "books",
+        "total"
+      ],
+      "description": "Result data for bookshelf.list. Pure read; no host callback.",
+      "properties": {
+        "books": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BookshelfEntryData"
+          },
+          "description": "Shelf entries matching the filter, after pagination."
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total entries matched by the filter before pagination."
+        }
+      }
+    },
+    "BookshelfGetData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "book"
+      ],
+      "description": "Result data for bookshelf.get. `book` is null when the composite key is not on the shelf.",
+      "properties": {
+        "book": {
+          "type": ["object", "null"],
+          "description": "Shelf entry, or null if not found."
         }
       }
     },

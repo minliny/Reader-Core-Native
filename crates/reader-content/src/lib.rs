@@ -1236,7 +1236,7 @@ fn extract_books_from_raw_rule(
     let Some(raw_rule) = raw_rule.and_then(non_empty_string) else {
         return Ok(Vec::new());
     };
-    let rule = expand_template(&raw_rule, context);
+    let rule = expand_template(&raw_rule, context, pipeline, Some(input));
     let out = pipeline.run_raw_legado_rule(input, &rule)?;
     Ok(out
         .values()
@@ -1266,7 +1266,7 @@ fn extract_rule_items(
     let Some(rule) = list_rule.and_then(non_empty_string) else {
         return Ok(vec![input.to_string()]);
     };
-    let rule = expand_template(&rule, context);
+    let rule = expand_template(&rule, context, pipeline, Some(input));
     let item_rule = if legado_rule_has_extraction(&rule) {
         rule.clone()
     } else {
@@ -1274,9 +1274,36 @@ fn extract_rule_items(
     };
     let out = pipeline.run_raw_legado_rule(input, &item_rule)?;
     if !out.is_empty() {
-        return Ok(out.into_values());
+        return Ok(expand_json_array_items(out.into_values()));
     }
-    Ok(pipeline.run_raw_legado_rule(input, &rule)?.into_values())
+    Ok(expand_json_array_items(
+        pipeline.run_raw_legado_rule(input, &rule)?.into_values(),
+    ))
+}
+
+/// Mirror Legado `AnalyzeRule.getElements` (Mode.Json → `AnalyzeByJSonPath.getList`):
+/// when the list rule is a JSONPath that resolves to a single JSON array, each
+/// array element becomes a separate scope for downstream per-item rules
+/// (`$.bookName` / `$.author` / ...). Without this, a `$.books` bookList
+/// returns the whole array as one string and per-item rules run against the
+/// array string, returning empty (rb-legado-json-booklist-array-iterate).
+///
+/// When the result is already multiple values (e.g. `$.books[*]` expanded by
+/// the JSONPath engine) or a single non-array value (object / primitive), the
+/// input is returned unchanged. CSS/XPath list rules never produce a single
+/// JSON array string, so they are unaffected.
+fn expand_json_array_items(values: Vec<String>) -> Vec<String> {
+    if values.len() == 1 {
+        if let Ok(serde_json::Value::Array(items)) =
+            serde_json::from_str::<serde_json::Value>(&values[0])
+        {
+            return items
+                .iter()
+                .map(|item| serde_json::to_string(item).unwrap_or_default())
+                .collect();
+        }
+    }
+    values
 }
 
 fn extract_rule_value(
@@ -1292,32 +1319,24 @@ fn extract_rule_value(
         return Ok(None);
     }
     let has_template = rule.contains("{{");
-    let rule = expand_template(&rule, context);
+    let rule = expand_template(&rule, context, pipeline, Some(input));
     // Legado `AnalyzeRule.kt` SourceRule init (line 587-593): 规则含 `{{...}}`
-    // 模板且 `{{` 在开头时 mode 自动变 Regex，`getString` 的 `else -> rule` 分支
-    // 直接返回展开后字符串，不跑 CSS/XPath 选择器。tocUrl 等字段规则如
-    // `{{baseUrl}}/#dir` 展开成 URL，应直接作为值返回，否则会被当 CSS 选择器
-    // 解析失败（rb-tocurl-template-as-selector）。
-    if has_template && looks_like_url_or_path(&rule) {
-        return Ok(non_empty_string(&rule));
+    // 模板(且 `{{` 前无 `##`)时 mode 自动变 Regex，`getString` 的 `else -> rule`
+    // 分支直接返回展开后字符串，不跑 CSS/XPath/JSONPath 选择器。makeUpRule 在
+    // 模板展开后会按 `##` 拆分(line 708):首段为值，可选二三段为正则替换。
+    // 追书小说 ruleBookInfo.kind = `{{$..lastTime}}\n{{$..bigClass}}\n{{$..subClass}}`
+    // 展开后是 `2024-11-24 14:17:01\n玄幻\n东方玄幻`，应直接作为 kind 值返回，
+    // 而非当 CSS 选择器解析(会报 EmptySelector)。tocUrl `{{baseUrl}}/#dir`
+    // 同理。模板规则中的 `##regex##replacement` 正则替换暂未接线(无 fixture 需要)。
+    if has_template {
+        let value = rule.split("##").next().unwrap_or("").trim();
+        return Ok(non_empty_string(value));
     }
     let out = pipeline.run_raw_legado_rule(input, &rule)?;
     Ok(out
         .values()
         .iter()
         .find_map(|value| non_empty_string(value)))
-}
-
-/// 判断展开后的规则值是否像 URL 或绝对路径，应直接当 URL 而非 CSS 选择器。
-fn looks_like_url_or_path(value: &str) -> bool {
-    let value = value.trim();
-    if value.is_empty() {
-        return false;
-    }
-    value.starts_with("http://")
-        || value.starts_with("https://")
-        || value.starts_with("//")
-        || value.starts_with('/')
 }
 
 fn parse_toc_output(values: &[String], context: &BookSourceRequestContext) -> Vec<TocEntry> {
@@ -1507,7 +1526,7 @@ fn apply_content_replacement(
     };
     let replacement = replace_regex
         .and_then(non_empty_string)
-        .map(|value| expand_template(&value, context))
+        .map(|value| expand_template(&value, context, pipeline, Some(input)))
         .unwrap_or_default();
     let step = RuleStep::regex_replace(pattern, replacement);
     Ok(pipeline
@@ -1518,11 +1537,74 @@ fn apply_content_replacement(
         .to_string())
 }
 
-fn expand_template(template: &str, context: &BookSourceRequestContext) -> String {
-    let mut output = template.to_string();
-    for (key, value) in &context.variables {
-        output = output.replace(&format!("{{{{{key}}}}}"), value);
+/// Expand `{{...}}` templates against both the request context variables and
+/// the current rule scope (per-item JSON).
+///
+/// Mirrors Legado `AnalyzeRule.kt` `SourceRule.makeUpRule` (line 659): the
+/// inner content of `{{...}}` is classified by its prefix —
+/// * `{{$.field}}` / `{{$..field}}` / `{{$[...}}` — a sub-rule (JSONPath),
+///   evaluated via `getString` against the current element. We dispatch through
+///   `pipeline.run_raw_legado_rule(item, path)` and take the first value.
+/// * `{{key}}` — a plain variable lookup from `context.variables`
+///   (`baseUrl` / `bookUrl` / `chapterUrl` / `key` / `page` etc., mirroring
+///   Legado's JS variable scope exposed by `evalJS`).
+///
+/// When `item` is `None` (no per-scope element, e.g. list-extraction rules
+/// running against the whole response) or the JSONPath yields no match, the
+/// `{{$.field}}` placeholder is replaced with an empty string — matching
+/// Legado's `getString` returning `""` when the scope is null or the path
+/// misses. `{{key}}` whose key is not in `context.variables` is left literal
+/// (preserves the prior behavior for unknown variables).
+fn expand_template(
+    template: &str,
+    context: &BookSourceRequestContext,
+    pipeline: &RemoteContentPipeline,
+    item: Option<&str>,
+) -> String {
+    let mut output = String::with_capacity(template.len());
+    let mut rest = template;
+    while let Some(open) = rest.find("{{") {
+        output.push_str(&rest[..open]);
+        let after_open = &rest[open + 2..];
+        match after_open.find("}}") {
+            Some(close) => {
+                let inner = &after_open[..close];
+                let replacement = if inner.starts_with("$.") || inner.starts_with("$[") {
+                    // JSONPath sub-rule evaluated against the current item scope.
+                    match item {
+                        Some(item_str) => pipeline
+                            .run_raw_legado_rule(item_str, inner)
+                            .ok()
+                            .and_then(|out| out.values().first().cloned())
+                            .filter(|value| !value.is_empty())
+                            .unwrap_or_default(),
+                        None => String::new(),
+                    }
+                } else {
+                    // Plain variable lookup; leave literal if not found (preserves
+                    // prior behavior for unknown variables).
+                    match context.variables.get(inner) {
+                        Some(value) => value.clone(),
+                        None => {
+                            output.push_str("{{");
+                            output.push_str(inner);
+                            output.push_str("}}");
+                            rest = &after_open[close + 2..];
+                            continue;
+                        }
+                    }
+                };
+                output.push_str(&replacement);
+                rest = &after_open[close + 2..];
+            }
+            None => {
+                // No closing }} — emit the rest verbatim.
+                output.push_str(&rest[open..]);
+                rest = "";
+            }
+        }
     }
+    output.push_str(rest);
     output
 }
 
@@ -2460,6 +2542,68 @@ mod tests {
     }
 
     #[test]
+    fn search_json_booklist_iterates_array_returned_by_bare_jsonpath() {
+        // Closes rb-legado-json-booklist-array-iterate.
+        //
+        // Legado `AnalyzeRule.getElements` (Mode.Json → `AnalyzeByJSonPath.getList`)
+        // calls `ctx.read<ArrayList<Any>>("$.books")`, which returns each array
+        // element as a separate item — the path resolves to the whole array and
+        // getList unfolds it. The existing `search_book_source_scopes_per_item
+        // _with_json_booklist` test only covers `@Json:$.books[*]` (explicit
+        // wildcard, already unfolded by the JSONPath engine) and so misses the
+        // bare `$.books` form used by the real 追书小说 source.
+        //
+        // Before the fix, `extract_rule_items` returned the whole array as a
+        // single JSON string, per-item `$.title`/`$.author` ran against that
+        // array string and returned empty, so search yielded 1 book with empty
+        // metadata instead of ~20.
+        let mut search = reader_domain::BookSourceSearchSemantics::default();
+        search.list = Some("$.books".into());
+        search.name = Some("$.title".into());
+        search.author = Some("$.author".into());
+        search.detail_url = Some("$.url".into());
+
+        let semantics = BookSourceSemantics {
+            source_id: "json-array-src".into(),
+            name: "JSON Array BookList Source".into(),
+            base_url: "https://json.example.test".into(),
+            search_url: None,
+            explore_url: None,
+            enabled: true,
+            enabled_explore: false,
+            rules: reader_domain::BookSourcePipelineRules {
+                search,
+                explore: reader_domain::BookSourceExploreSemantics::default(),
+                detail: reader_domain::BookSourceDetailSemantics::default(),
+                toc: reader_domain::BookSourceTocSemantics::default(),
+                content: reader_domain::BookSourceContentSemantics::default(),
+            },
+        };
+        let context = BookSourceRequestContext::for_semantics(&semantics);
+        let pipeline = RemoteContentPipeline::new();
+
+        let resp = r#"{"books":[
+            {"title":"Dune","author":"Herbert","url":"/book/dune"},
+            {"title":"Foundation","author":"Asimov","url":"/book/foundation"}
+        ]}"#;
+
+        let books = pipeline
+            .search_book_source(&semantics, resp, &context)
+            .unwrap();
+
+        assert_eq!(books.len(), 2);
+        assert_eq!(books[0].title, "Dune");
+        assert_eq!(books[0].author, "Herbert");
+        assert_eq!(books[0].book_id, "https://json.example.test/book/dune");
+        assert_eq!(books[1].title, "Foundation");
+        assert_eq!(books[1].author, "Asimov");
+        assert_eq!(
+            books[1].book_id,
+            "https://json.example.test/book/foundation"
+        );
+    }
+
+    #[test]
     fn detail_merges_metadata_from_json_object() {
         let mut source = sample_source();
         source.rules.detail = serde_json::json!([{ "kind": "cssText", "selector": "meta.detail" }]);
@@ -2779,6 +2923,129 @@ mod tests {
         let selector_val =
             extract_rule_value(&pipeline, html, Some("div.toc@text"), &context).unwrap();
         assert_eq!(selector_val.as_deref(), Some("chapter list"));
+    }
+
+    #[test]
+    fn expand_template_expands_jsonpath_against_item_scope() {
+        // rb-legado-json-url-template-jsonpath: {{$.field}} must be evaluated as
+        // a JSONPath against the current per-item scope, mirroring Legado
+        // AnalyzeRule.kt SourceRule.makeUpRule (line 659): inner content
+        // starting with `$.` / `$[` is a sub-rule dispatched to getString
+        // against the current element.
+        let pipeline = RemoteContentPipeline::new();
+        let context = BookSourceRequestContext {
+            base_url: "https://api.example.com".into(),
+            current_url: "https://api.example.com".into(),
+            book_url: String::new(),
+            chapter_url: String::new(),
+            variables: BTreeMap::new(),
+        };
+
+        // 追书小说 search bookUrl pattern: {{$._id}} against per-book scope.
+        let book_scope = r#"{"_id":"50865988d7a545903b000009","bookName":"斗破苍穹"}"#;
+        let url = expand_template(
+            "https://api.example.com/book/{{$._id}}?language=zh_cn",
+            &context,
+            &pipeline,
+            Some(book_scope),
+        );
+        assert_eq!(
+            url,
+            "https://api.example.com/book/50865988d7a545903b000009?language=zh_cn"
+        );
+
+        // Numeric field: 追书小说 toc chapterUrl pattern: {{$.l}} (chapter index).
+        let chapter_scope = r#"{"t":"1.第一章 陨落的天才","l":1}"#;
+        let url = expand_template(
+            "https://yd.jsxsapp.com/142108/{{$.l}}",
+            &context,
+            &pipeline,
+            Some(chapter_scope),
+        );
+        assert_eq!(url, "https://yd.jsxsapp.com/142108/1");
+
+        // Recursive descent: {{$..bookName}} against nested object.
+        let nested = r#"{"data":{"bookName":"斗破苍穹","author":"天蚕土豆"}}"#;
+        let name = expand_template("book={{$..bookName}}", &context, &pipeline, Some(nested));
+        assert_eq!(name, "book=斗破苍穹");
+    }
+
+    #[test]
+    fn expand_template_supports_mixed_jsonpath_and_variable_lookups() {
+        // {{baseUrl}} (variable) + {{$.l}} (JSONPath) in one template.
+        let pipeline = RemoteContentPipeline::new();
+        let mut variables = BTreeMap::new();
+        variables.insert("baseUrl".into(), "https://yd.jsxsapp.com".into());
+        let context = BookSourceRequestContext {
+            base_url: "https://yd.jsxsapp.com".into(),
+            current_url: "https://yd.jsxsapp.com".into(),
+            book_url: String::new(),
+            chapter_url: String::new(),
+            variables,
+        };
+        let chapter_scope = r#"{"t":"第一章","l":42}"#;
+        let url = expand_template(
+            "{{baseUrl}}/chapter/{{$.l}}",
+            &context,
+            &pipeline,
+            Some(chapter_scope),
+        );
+        assert_eq!(url, "https://yd.jsxsapp.com/chapter/42");
+    }
+
+    #[test]
+    fn expand_template_jsonpath_no_match_returns_empty_string() {
+        // Legado getString returns "" when the JSONPath misses or the scope is
+        // null. We mirror that: unmatched {{$.field}} → empty string.
+        let pipeline = RemoteContentPipeline::new();
+        let context = BookSourceRequestContext {
+            base_url: String::new(),
+            current_url: String::new(),
+            book_url: String::new(),
+            chapter_url: String::new(),
+            variables: BTreeMap::new(),
+        };
+
+        // Missing field in scope → empty replacement.
+        let scope = r#"{"other":"x"}"#;
+        let url = expand_template(
+            "https://host.test/book/{{$._id}}",
+            &context,
+            &pipeline,
+            Some(scope),
+        );
+        assert_eq!(url, "https://host.test/book/");
+
+        // No item scope at all (list-extraction context) → empty replacement,
+        // not a literal {{$._id}}.
+        let url_no_scope = expand_template(
+            "https://host.test/book/{{$._id}}",
+            &context,
+            &pipeline,
+            None,
+        );
+        assert_eq!(url_no_scope, "https://host.test/book/");
+    }
+
+    #[test]
+    fn expand_template_preserves_unknown_variable_as_literal() {
+        // {{key}} whose key is not in context.variables stays literal (existing
+        // behavior preserved by the single-pass scanner).
+        let pipeline = RemoteContentPipeline::new();
+        let context = BookSourceRequestContext {
+            base_url: String::new(),
+            current_url: String::new(),
+            book_url: String::new(),
+            chapter_url: String::new(),
+            variables: BTreeMap::new(),
+        };
+        let out = expand_template(
+            "https://host.test/{{unknown}}/path",
+            &context,
+            &pipeline,
+            None,
+        );
+        assert_eq!(out, "https://host.test/{{unknown}}/path");
     }
 
     #[test]

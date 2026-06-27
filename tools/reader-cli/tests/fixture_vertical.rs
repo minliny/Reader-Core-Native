@@ -192,25 +192,22 @@ fn fixture_vertical_runs_legado_sudugu_real_source_pipeline() {
 ///   true for JSONPath (`$.`/`$[`/`@json:`) and XPath (`@xpath:`) prefixes,
 ///   preventing extract_rule_items from appending `@html` to JSONPath rules
 ///   like `$..chapters[*]` (which produced invalid `$..chapters[*]@html`).
+/// - rb-legado-json-booklist-array-iterate: extract_rule_items now unfolds a
+///   single JSON-array value into one scope per element (mirrors Legado
+///   `AnalyzeRule.getElements` → `AnalyzeByJSonPath.getList`). Search returns
+///   >1 book with non-empty title/author.
 ///
 /// Open blockers (this fixture EXPOSES the gaps; test is #[ignore] until
-/// both are fixed — do not weaken assertions to bypass):
-/// - rb-legado-json-booklist-array-iterate: when bookList is a JSONPath
-///   returning an array (e.g. `$.books`), Core's `extract_rule_items` returns
-///   the whole array as a SINGLE string instead of iterating each element as
-///   a separate item. Per-item field rules (`$.bookName`, `$.author`, ...)
-///   then run against the array string and return empty. The real API returns
-///   ~20 books; Core currently returns 1 book with empty title/author and
-///   unexpanded `{{$._id}}` template as bookId. Legado `getElements` iterates
-///   array elements — Core must match.
-/// - rb-legado-json-url-template-jsonpath: `expand_template` only handles
-///   `{{key}}` from `context.variables`, not `{{$.field}}` JSONPath templates
-///   evaluated against the current item. Legado `AnalyzeRule` evaluates
-///   `{{$.field}}` against the current element. This breaks:
-///   * search bookUrl `https://js.jsxsapp.com/info/{{$._id}}?language=zh_cn`
-///     ({{$._id}} stays literal)
-///   * toc chapterUrl `https://yd.jsxsapp.com//@get:{bid}/{{$.l}}`
-///     ({{$.l}} stays literal)
+/// fixed — do not weaken assertions to bypass):
+/// - rb-legado-json-url-template-jsonpath (FIXED): `expand_template` now
+///   handles `{{$.field}}` JSONPath templates evaluated against the current
+///   per-item scope, mirroring Legado `AnalyzeRule.makeUpRule` (line 659).
+///   search bookUrl `https://js.jsxsapp.com/info/{{$._id}}?language=zh_cn`
+///   and toc chapterUrl `https://yd.jsxsapp.com//@get:{bid}/{{$.l}}` now
+///   expand correctly. Template rules also short-circuit selector parsing
+///   (Legado mode=Regex → `else -> rule`), fixing `kind` =
+///   `{{$..lastTime}}\n{{$..bigClass}}\n{{$..subClass}}` which was being fed
+///   to the CSS engine as an invalid selector.
 ///
 /// What currently works (proven by manual `--fixture-vertical` run):
 /// - import: source deserialized (after rb-legado-ruleexplore-object-deser)
@@ -224,7 +221,6 @@ fn fixture_vertical_runs_legado_sudugu_real_source_pipeline() {
 /// - progress: stored
 /// - js unsupported: structured error for `java.get` host callback
 #[test]
-#[ignore = "blocked by rb-legado-json-booklist-array-iterate + rb-legado-json-url-template-jsonpath; unignore after both fixed"]
 fn fixture_vertical_runs_legado_zhuishu_json_real_source_pipeline() {
     let events = run_fixture("legado_zhuishu_json_vertical.json");
 
