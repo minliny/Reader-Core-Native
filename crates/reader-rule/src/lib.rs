@@ -4010,6 +4010,227 @@ fn translate_legado_css_shorthand(selector: &str) -> String {
     selector.to_string()
 }
 
+/// Legado `RuleComplete.autoComplete(rules, preRule, type)` — 对省略尾操作符的
+/// 简单规则自动补全 `@text`/`@href`/`@src`。
+///
+/// - `rule_type=1`(文字):补 `@text`(XPath 补 `//text()`),并修正 `img@text` → `img@alt`
+/// - `rule_type=2`(链接):补 `@href`(XPath 补 `//@href`)
+/// - `rule_type=3`(图片):补 `@src`(XPath 补 `//@src`)
+///
+/// 复杂规则(`{{}}`/`@js:`/`<js>`/`@Json:`/`$.`/`:` 开头/`##` 开头)不补全。
+/// 尾部 `##regex` 或 `,{params}` 分离后只补全主体。
+pub fn auto_complete_rule(rule: &str, pre_rule: Option<&str>, rule_type: u8) -> String {
+    if rule.is_empty() {
+        return rule.to_string();
+    }
+    if matches_not_complete(rule) {
+        return rule.to_string();
+    }
+    if let Some(pre) = pre_rule {
+        if !pre.is_empty() && matches_not_complete(pre) {
+            return rule.to_string();
+        }
+    }
+    let (cleaned_rule, tail_str) = split_rule_tail(rule);
+    let is_xpath = is_xpath_rule(&cleaned_rule);
+    let insertion = match rule_type {
+        1 if is_xpath => "//text()",
+        2 if is_xpath => "//@href",
+        3 if is_xpath => "//@src",
+        1 => "@text",
+        2 => "@href",
+        3 => "@src",
+        _ => return rule.to_string(),
+    };
+    let completed = apply_need_complete(&cleaned_rule, insertion);
+    let completed = if rule_type == 1 {
+        apply_fix_img_info(&completed, is_xpath)
+    } else {
+        completed
+    };
+    format!("{completed}{tail_str}")
+}
+
+fn matches_not_complete(rule: &str) -> bool {
+    rule.starts_with(':')
+        || rule.starts_with("##")
+        || rule.contains("{{")
+        || rule.contains("@js:")
+        || rule.contains("<js>")
+        || rule.contains("@Json:")
+        || rule.contains("$.")
+}
+
+fn is_xpath_rule(rule: &str) -> bool {
+    rule.starts_with("//") || rule.starts_with("@Xpath:")
+}
+
+fn split_rule_tail(rule: &str) -> (String, String) {
+    let mut earliest: Option<(usize, &str)> = None;
+    if let Some(pos) = rule.find("##") {
+        earliest = Some((pos, "##"));
+    }
+    if let Some(pos) = rule.find(",{") {
+        if earliest.is_none() || pos < earliest.unwrap().0 {
+            earliest = Some((pos, ",{"));
+        }
+    }
+    if let Some((pos, delim)) = earliest {
+        let cleaned = rule[..pos].to_string();
+        let tail = format!("{delim}{}", &rule[pos + delim.len()..]);
+        (cleaned, tail)
+    } else {
+        (rule.to_string(), String::new())
+    }
+}
+
+fn apply_need_complete(cleaned_rule: &str, insertion: &str) -> String {
+    if cleaned_rule.is_empty() {
+        return String::new();
+    }
+    let mut result = String::with_capacity(cleaned_rule.len() + insertion.len());
+    let mut last_segment_start = 0usize;
+    let mut pos = 0usize;
+    while pos < cleaned_rule.len() {
+        let sep_len = if cleaned_rule[pos..].starts_with("&&")
+            || cleaned_rule[pos..].starts_with("%%")
+            || cleaned_rule[pos..].starts_with("||")
+        {
+            2
+        } else {
+            0
+        };
+        if sep_len > 0 {
+            let segment = &cleaned_rule[last_segment_start..pos];
+            result.push_str(segment);
+            if !segment_has_extraction(segment) {
+                result.push_str(insertion);
+            }
+            result.push_str(&cleaned_rule[pos..pos + sep_len]);
+            pos += sep_len;
+            last_segment_start = pos;
+        } else {
+            let next = cleaned_rule[pos..]
+                .char_indices()
+                .nth(1)
+                .map(|(i, _)| pos + i)
+                .unwrap_or(cleaned_rule.len());
+            pos = next;
+        }
+    }
+    let segment = &cleaned_rule[last_segment_start..];
+    result.push_str(segment);
+    if !segment.is_empty() && !segment_has_extraction(segment) {
+        result.push_str(insertion);
+    }
+    result
+}
+
+fn segment_has_extraction(segment: &str) -> bool {
+    const KEYWORDS: &[&str] = &[
+        "attr",
+        "text",
+        "ownText",
+        "textNodes",
+        "href",
+        "content",
+        "html",
+        "alt",
+        "all",
+        "value",
+        "src",
+    ];
+    for kw in KEYWORDS {
+        let with_parens = format!("{kw}()");
+        if let Some(before) = segment.strip_suffix(&with_parens) {
+            if has_extraction_prefix(before) {
+                return true;
+            }
+        }
+        if let Some(before) = segment.strip_suffix(kw) {
+            if has_extraction_prefix(before) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn has_extraction_prefix(before: &str) -> bool {
+    if before.is_empty() {
+        return true;
+    }
+    if before.ends_with('@') || before.ends_with('/') {
+        return true;
+    }
+    before.ends_with("&&") || before.ends_with("%%") || before.ends_with("||")
+}
+
+fn apply_fix_img_info(cleaned_rule: &str, is_xpath: bool) -> String {
+    if is_xpath {
+        let re = match Regex::new(r"img(\[@?.+\]|\.[-\w]+)?[/]+text(\(\))?(&&|%%|\|\||$)") {
+            Ok(r) => r,
+            Err(_) => return cleaned_rule.to_string(),
+        };
+        let mut result = String::new();
+        let mut last_end = 0usize;
+        for mat in re.find_iter(cleaned_rule) {
+            let img_start = mat.start();
+            if !is_valid_img_prefix(cleaned_rule, img_start) {
+                continue;
+            }
+            result.push_str(&cleaned_rule[last_end..img_start]);
+            let captures = re.captures(mat.as_str()).unwrap();
+            let at_group = captures.get(1).map(|m| m.as_str()).unwrap_or("");
+            let sep = captures.get(3).map(|m| m.as_str()).unwrap_or("");
+            result.push_str("img");
+            result.push_str(at_group);
+            result.push_str("/@alt");
+            result.push_str(sep);
+            last_end = mat.end();
+        }
+        result.push_str(&cleaned_rule[last_end..]);
+        return result;
+    }
+    let re = match Regex::new(r"img(\[@?.+\]|\.[-\w]+)?[@/]+text(\(\))?(&&|%%|\|\||$)") {
+        Ok(r) => r,
+        Err(_) => return cleaned_rule.to_string(),
+    };
+    let mut result = String::new();
+    let mut last_end = 0usize;
+    for mat in re.find_iter(cleaned_rule) {
+        let img_start = mat.start();
+        if !is_valid_img_prefix(cleaned_rule, img_start) {
+            continue;
+        }
+        result.push_str(&cleaned_rule[last_end..img_start]);
+        let captures = re.captures(mat.as_str()).unwrap();
+        let at_group = captures.get(1).map(|m| m.as_str()).unwrap_or("");
+        let sep = captures.get(3).map(|m| m.as_str()).unwrap_or("");
+        result.push_str("img");
+        result.push_str(at_group);
+        result.push_str("@alt");
+        result.push_str(sep);
+        last_end = mat.end();
+    }
+    result.push_str(&cleaned_rule[last_end..]);
+    result
+}
+
+fn is_valid_img_prefix(rule: &str, img_start: usize) -> bool {
+    if img_start == 0 {
+        return true;
+    }
+    if img_start >= 4 && &rule[img_start - 4..img_start] == "tag." {
+        return true;
+    }
+    let prev_byte = rule.as_bytes()[img_start - 1];
+    matches!(
+        prev_byte,
+        b'+' | b'/' | b'@' | b'>' | b'~' | b'|' | b' ' | b'&'
+    )
+}
+
 fn legado_css_context_elements<'a>(contexts: &[LegadoCssContext<'a>]) -> Vec<ElementRef<'a>> {
     contexts
         .iter()
