@@ -329,14 +329,16 @@ fn invalid_xpath_expression_produces_xpath_syntax_error() {
 }
 
 #[test]
-fn xpath_on_non_xml_input_produces_input_parse_error() {
+fn xpath_on_non_xml_input_uses_html_parser_and_returns_empty() {
+    // 对齐 Legado `AnalyzeByXPath.strToJXDocument`: 非 `<?xml` 输入走 HTML
+    // 解析器（Jsoup/html5ever，容错），不抛解析错误。无匹配节点时返回空。
     let engine = RuleEngine::new();
 
-    let error = engine
+    let out = engine
         .execute_step("not xml at all", &RuleStep::xpath("//book"))
-        .unwrap_err();
+        .unwrap();
 
-    assert!(matches!(error, RuleError::XPathInputParse { .. }));
+    assert!(out.values().is_empty());
 }
 
 #[test]

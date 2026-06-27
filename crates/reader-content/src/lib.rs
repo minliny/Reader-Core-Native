@@ -1291,12 +1291,33 @@ fn extract_rule_value(
     if rule.starts_with("@js") {
         return Ok(None);
     }
+    let has_template = rule.contains("{{");
     let rule = expand_template(&rule, context);
+    // Legado `AnalyzeRule.kt` SourceRule init (line 587-593): 规则含 `{{...}}`
+    // 模板且 `{{` 在开头时 mode 自动变 Regex，`getString` 的 `else -> rule` 分支
+    // 直接返回展开后字符串，不跑 CSS/XPath 选择器。tocUrl 等字段规则如
+    // `{{baseUrl}}/#dir` 展开成 URL，应直接作为值返回，否则会被当 CSS 选择器
+    // 解析失败（rb-tocurl-template-as-selector）。
+    if has_template && looks_like_url_or_path(&rule) {
+        return Ok(non_empty_string(&rule));
+    }
     let out = pipeline.run_raw_legado_rule(input, &rule)?;
     Ok(out
         .values()
         .iter()
         .find_map(|value| non_empty_string(value)))
+}
+
+/// 判断展开后的规则值是否像 URL 或绝对路径，应直接当 URL 而非 CSS 选择器。
+fn looks_like_url_or_path(value: &str) -> bool {
+    let value = value.trim();
+    if value.is_empty() {
+        return false;
+    }
+    value.starts_with("http://")
+        || value.starts_with("https://")
+        || value.starts_with("//")
+        || value.starts_with('/')
 }
 
 fn parse_toc_output(values: &[String], context: &BookSourceRequestContext) -> Vec<TocEntry> {
@@ -2698,6 +2719,54 @@ mod tests {
             Some("https://books.example.test/book/dune/chapter/2")
         );
         assert_eq!(content.variables["key"], "dune");
+    }
+
+    #[test]
+    fn toc_url_template_expands_to_url_not_selector() {
+        // rb-tocurl-template-as-selector: tocUrl 含 {{baseUrl}} 模板 (如
+        // "{{baseUrl}}/#dir"),展开成 URL 后被当 CSS 选择器解析失败。
+        // 对齐 Legado AnalyzeRule.kt SourceRule init: 规则含 `{{...}}` 模板时
+        // mode 变 Regex,getString 的 `else -> rule` 直接返回展开后字符串。
+        // 修复:展开后若像 URL/路径,直接作为值返回,不跑选择器。
+        let pipeline = RemoteContentPipeline::new();
+        let mut variables = BTreeMap::new();
+        variables.insert("baseUrl".into(), "https://host.example.test".into());
+        let context = BookSourceRequestContext {
+            base_url: "https://host.example.test".into(),
+            current_url: "https://host.example.test/detail".into(),
+            book_url: "https://host.example.test/book/1".into(),
+            chapter_url: String::new(),
+            variables,
+        };
+
+        // {{baseUrl}}/#dir 展开成 https://host.example.test/#dir -> 当 URL 返回
+        let toc_url = extract_rule_value(
+            &pipeline,
+            "<html><body></body></html>",
+            Some("{{baseUrl}}/#dir"),
+            &context,
+        )
+        .unwrap();
+        assert_eq!(toc_url.as_deref(), Some("https://host.example.test/#dir"));
+
+        // 绝对 URL 模板也当 URL
+        let abs_url = extract_rule_value(
+            &pipeline,
+            "<html></html>",
+            Some("{{baseUrl}}/toc/list"),
+            &context,
+        )
+        .unwrap();
+        assert_eq!(
+            abs_url.as_deref(),
+            Some("https://host.example.test/toc/list")
+        );
+
+        // 普通选择器 (无 {{}}) 仍走 CSS 解析
+        let html = r#"<div class="toc"><a href="/toc">chapter list</a></div>"#;
+        let selector_val =
+            extract_rule_value(&pipeline, html, Some("div.toc@text"), &context).unwrap();
+        assert_eq!(selector_val.as_deref(), Some("chapter list"));
     }
 
     #[test]

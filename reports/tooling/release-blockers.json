@@ -810,49 +810,24 @@
       "sources": [
         "FEATURE_MATRIX.md"
       ]
-    },
-    {
-      "id": "rb-xpath-strict-xml-parser",
-      "capability": "legado.rule-engine.xpath-html",
-      "severity": "blocker",
-      "platform": "all",
-      "reason": "@xpath: rules use sxd_document::parser::parse (strict XML) on real HTML. Real HTML has void elements (<img>, <br>), unclosed tags — not valid XML. All @xpath: rules fail on real Legado HTML responses with MismatchedElementEndName errors.",
-      "evidence_status": "failing",
-      "mitigation": "Use HTML-aware parser (scraper Html::parse_document) to build DOM, then convert to sxd DOM for XPath evaluation. Or use html5ever + sxd integration.",
-      "sources": [
-        "crates/reader-rule/src/lib.rs:5390"
-      ]
-    },
-    {
-      "id": "rb-tocurl-template-as-selector",
-      "capability": "legado.ruleBookInfo.tocUrl-template",
-      "severity": "blocker",
-      "platform": "all",
-      "reason": "tocUrl with {{baseUrl}} template (e.g. \"{{baseUrl}}/#dir\") is expanded to URL then treated as CSS selector, failing with ExpectedIdentityOnPseudoElement. Core does not distinguish URL templates from CSS selectors in tocUrl field.",
-      "evidence_status": "failing",
-      "mitigation": "After {{baseUrl}} expansion, if result starts with http/https or is a path, treat as URL not CSS selector.",
-      "sources": [
-        "crates/reader-content/src/lib.rs",
-        "tests/fixtures/remote_source/legado_sudugu_vertical.json"
-      ]
     }
   ],
   "generated_at": "2026-06-25T07:40:32Z",
   "summary": {
     "by_platform": {
-      "all": 69,
+      "all": 67,
       "android": 0,
       "harmony": 0,
       "ios": 0,
       "unknown": 0
     },
     "by_severity": {
-      "blocker": 4,
+      "blocker": 2,
       "high": 0,
       "low": 38,
       "medium": 27
     },
-    "total": 69
+    "total": 67
   },
   "tool": "release-blocker-register-generator",
   "version": "release-blockers/1"

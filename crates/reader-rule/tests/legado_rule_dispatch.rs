@@ -70,6 +70,49 @@ fn dispatches_at_xpath_prefix() {
 }
 
 #[test]
+fn xpath_parses_real_html_with_void_elements_and_unclosed_tags() {
+    // rb-xpath-strict-xml-parser: 真实书源响应是 HTML,含 void 元素 (<img>/<br>)
+    // 和未闭合标签 (<p>),严格 XML 解析 (sxd_document::parser::parse) 会全部失败。
+    // 对齐 Legado AnalyzeByXPath.strToJXDocument: 非 `<?xml` 输入走 HTML 容错解析。
+    let html = r#"<!doctype html>
+<html><body>
+  <div class="book">
+    <img src="/cover/1.jpg">
+    <h3>Title One</h3>
+    <p>para one<br>line two
+    <a href="/book/1">link1</a>
+  </div>
+  <div class="book">
+    <img src="/cover/2.jpg">
+    <h3>Title Two</h3>
+    <a href="/book/2">link2</a>
+  </div>
+</body></html>"#;
+
+    let titles = RuleEngine::new()
+        .execute_legado_rule(
+            html,
+            "@XPath://div[@class='book']/h3/text()",
+            &mut NoopVariableScope,
+            None,
+        )
+        .unwrap();
+    assert_eq!(titles.values(), &["Title One", "Title Two"]);
+
+    // void 元素 <img> 的属性也能被 XPath 访问
+    let covers = RuleEngine::new()
+        .execute_legado_rule(html, "@XPath://img/@src", &mut NoopVariableScope, None)
+        .unwrap();
+    assert_eq!(covers.values(), &["/cover/1.jpg", "/cover/2.jpg"]);
+
+    // 未闭合的 <p> 不会让解析失败,XPath 仍能取到 <a> 链接
+    let links = RuleEngine::new()
+        .execute_legado_rule(html, "@XPath://a/@href", &mut NoopVariableScope, None)
+        .unwrap();
+    assert_eq!(links.values(), &["/book/1", "/book/2"]);
+}
+
+#[test]
 fn empty_rule_yields_empty_output() {
     let out = RuleEngine::new()
         .execute_legado_rule(HTML, "   ", &mut NoopVariableScope, None)

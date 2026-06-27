@@ -75,12 +75,17 @@ fn fixture_vertical_runs_legado_css_dsl_pipeline() {
 ///   with correct title/author/kind/lastChapter/coverUrl/bookUrl extracted via
 ///   `tag.h3@tag.a@text`, `tag.p.1@tag.a@text##作者：`, `tag.p.0@tag.span.1@text`,
 ///   `tag.ul@tag.li.0@tag.a@text`, `tag.img@src`, `tag.h3@tag.a@href`.
-/// Remaining open blockers (detail/toc/chapter still error):
-/// - rb-xpath-strict-xml-parser: @xpath fails on real HTML (not well-formed XML)
-/// - rb-tocurl-template-as-selector: {{baseUrl}}/#dir treated as CSS selector
-///
-/// When these remaining blockers are resolved, this test should be updated to
-/// assert successful parsing (non-empty toc, content).
+/// - rb-xpath-strict-xml-parser: @xpath now uses html5ever (scraper) to parse
+///   real HTML into sxd DOM before XPath evaluation. chapter content extracts
+///   successfully via `@xpath` rules on real (non-XML) HTML.
+/// - rb-tocurl-template-as-selector: tocUrl `{{baseUrl}}/#dir` template now
+///   expands to URL and is returned directly (not treated as CSS selector).
+///   detail succeeds with full book metadata.
+/// Remaining open issue (not a release blocker for this task):
+/// - toc list `id.list@tag.li` (2-segment CSS shorthand pipeline where the
+///   last segment is a selector `tag.li`, not an extraction like `text`)
+///   returns empty. `id.list@tag.li@text` (3-segment) works. This is a CSS
+///   shorthand pipeline edge case, tracked separately.
 #[test]
 fn fixture_vertical_runs_legado_sudugu_real_source_pipeline() {
     let events = run_fixture("legado_sudugu_vertical.json");
@@ -122,18 +127,40 @@ fn fixture_vertical_runs_legado_sudugu_real_source_pipeline() {
         "host search should return non-empty books after rb-legado-css-shorthand-selector fix"
     );
 
-    // 5. detail — currently error due to rb-tocurl-template-as-selector
-    //    (tocUrl "{{baseUrl}}/#dir" treated as CSS selector)
-    // 6. toc — currently error due to rb-xpath-strict-xml-parser
-    // 7. chapter — currently error due to rb-xpath-strict-xml-parser
-    // These three return either a result or an error depending on gap status.
-    for idx in 4..=6 {
-        let event = &events[idx];
-        assert!(
-            event["type"] == "result" || event["type"] == "error",
-            "event {idx} should be result or error, got {event:?}"
-        );
-    }
+    // 5. detail — rb-tocurl-template-as-selector resolved: tocUrl
+    //    `{{baseUrl}}/#dir` expands to URL and is returned directly, not run
+    //    as a CSS selector. detail now succeeds with full book metadata.
+    assert_eq!(
+        events[4]["type"], "result",
+        "detail should succeed after rb-tocurl-template-as-selector fix, got {:?}",
+        events[4]
+    );
+    assert_eq!(events[4]["data"]["book"]["title"], "诡秘：善魔女");
+    assert_eq!(events[4]["data"]["book"]["author"], "作者：囧囧哟");
+    assert_eq!(events[4]["data"]["book"]["kind"], "奇幻小说");
+
+    // 6. toc — rb-xpath-strict-xml-parser resolved: nextTocUrl `@xpath:...`
+    //    no longer fails on real HTML, so toc is a result (not an error).
+    //    The chapter list is empty due to the separate `id.list@tag.li`
+    //    2-segment CSS shorthand pipeline edge case (not this task's blocker).
+    assert_eq!(
+        events[5]["type"], "result",
+        "toc should be a result (not error) after rb-xpath-strict-xml-parser fix, got {:?}",
+        events[5]
+    );
+
+    // 7. chapter — rb-xpath-strict-xml-parser resolved: @xpath rules now parse
+    //    real HTML via html5ever. chapter content extracts successfully.
+    assert_eq!(
+        events[6]["type"], "result",
+        "chapter should succeed after rb-xpath-strict-xml-parser fix, got {:?}",
+        events[6]
+    );
+    assert_eq!(events[6]["data"]["chapterTitle"], "第1章 序章 醒来");
+    assert!(events[6]["data"]["content"]
+        .as_str()
+        .unwrap()
+        .contains("昏暗的地下室"));
 
     // 8. progress stored
     assert_eq!(events[7]["data"]["stored"], true);

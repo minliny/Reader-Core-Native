@@ -94,7 +94,10 @@ fn at_pipeline_with_shorthand_selectors_and_attr_extraction() {
     let hrefs = engine
         .execute_legado_css(HTML, "tag.h3@tag.a@href")
         .unwrap();
-    assert_eq!(hrefs.values(), &["/first".to_string(), "/second".to_string()]);
+    assert_eq!(
+        hrefs.values(),
+        &["/first".to_string(), "/second".to_string()]
+    );
 }
 
 #[test]
@@ -105,7 +108,10 @@ fn mixed_shorthand_and_plain_css_in_at_pipeline() {
     let hrefs = engine
         .execute_legado_css(HTML, "class.item@tag.a@href")
         .unwrap();
-    assert_eq!(hrefs.values(), &["/first".to_string(), "/second".to_string()]);
+    assert_eq!(
+        hrefs.values(),
+        &["/first".to_string(), "/second".to_string()]
+    );
 }
 
 #[test]
@@ -164,7 +170,10 @@ fn shorthand_does_not_swallow_plain_css_selectors() {
 
     // a@href 仍是单 selector+attr 抽取。
     let hrefs = engine.execute_legado_css(HTML, "a@href").unwrap();
-    assert_eq!(hrefs.values(), &["/first".to_string(), "/second".to_string()]);
+    assert_eq!(
+        hrefs.values(),
+        &["/first".to_string(), "/second".to_string()]
+    );
 }
 
 const INDEX_HTML: &str = r#"
@@ -190,15 +199,21 @@ fn legado_dot_index_selects_nth_element() {
 
     // tag.p.1 -> select all <p>, take index 1 (second <p>)
     // 真实 Legado 书源 search.author 规则: "tag.p.1@tag.a@text##作者："
-    let author = engine.execute_legado_css(INDEX_HTML, "tag.p.1@tag.a@text").unwrap();
+    let author = engine
+        .execute_legado_css(INDEX_HTML, "tag.p.1@tag.a@text")
+        .unwrap();
     assert_eq!(author.values(), &["AuthorName".to_string()]);
 
     // tag.p.0 -> first <p>
-    let kind = engine.execute_legado_css(INDEX_HTML, "tag.p.0@tag.span@text").unwrap();
+    let kind = engine
+        .execute_legado_css(INDEX_HTML, "tag.p.0@tag.span@text")
+        .unwrap();
     assert_eq!(kind.values(), &["Adventure".to_string()]);
 
     // tag.li.0 -> first <li>
-    let first_chapter = engine.execute_legado_css(INDEX_HTML, "tag.li.0@tag.a@text").unwrap();
+    let first_chapter = engine
+        .execute_legado_css(INDEX_HTML, "tag.li.0@tag.a@text")
+        .unwrap();
     assert_eq!(first_chapter.values(), &["Chapter 1".to_string()]);
 }
 
@@ -207,11 +222,15 @@ fn legado_dot_index_supports_negative_indices() {
     let engine = RuleEngine::new();
 
     // tag.p.-1 -> last <p>
-    let status = engine.execute_legado_css(INDEX_HTML, "tag.p.-1@text").unwrap();
+    let status = engine
+        .execute_legado_css(INDEX_HTML, "tag.p.-1@text")
+        .unwrap();
     assert_eq!(status.values(), &["Ongoing".to_string()]);
 
     // tag.li.-1 -> last <li>
-    let last_chapter = engine.execute_legado_css(INDEX_HTML, "tag.li.-1@tag.a@text").unwrap();
+    let last_chapter = engine
+        .execute_legado_css(INDEX_HTML, "tag.li.-1@tag.a@text")
+        .unwrap();
     assert_eq!(last_chapter.values(), &["Chapter 3".to_string()]);
 }
 
@@ -220,7 +239,9 @@ fn legado_dot_index_out_of_range_returns_empty() {
     let engine = RuleEngine::new();
 
     // tag.p.10 -> index 10 out of range (only 3 <p> elements)
-    let missing = engine.execute_legado_css(INDEX_HTML, "tag.p.10@text").unwrap();
+    let missing = engine
+        .execute_legado_css(INDEX_HTML, "tag.p.10@text")
+        .unwrap();
     assert!(missing.values().is_empty());
 }
 

@@ -8,6 +8,7 @@ authors.workspace = true
 
 [dependencies]
 reader-domain = { path = "../reader-domain" }
+ego-tree = "0.6"
 regex = "1"
 scraper = "0.19"
 serde_json.workspace = true

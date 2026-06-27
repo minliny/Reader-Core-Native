@@ -5,11 +5,13 @@
 //! callers provide source text and a list of rule steps, and receive a flat list
 //! of string results.
 
+use ego_tree::NodeRef;
 use regex::{Regex, RegexBuilder};
-use scraper::{ElementRef, Html, Selector};
+use scraper::{ElementRef, Html, Node as ScraperNode, Selector};
 use serde_json::Value as JsonValue;
 use std::error::Error;
 use std::fmt;
+use sxd_document::Package;
 use sxd_xpath::{Context, Factory, Value as XPathValue};
 
 pub type RuleResult<T> = Result<T, RuleError>;
@@ -3740,7 +3742,10 @@ fn parse_legado_css_step(part: &str) -> Result<Vec<LegadoCssStep>, String> {
     }
     let extraction = parse_legado_css_extraction(extraction_str);
 
-    steps.push(LegadoCssStep::Extract { selector, extraction });
+    steps.push(LegadoCssStep::Extract {
+        selector,
+        extraction,
+    });
 
     Ok(steps)
 }
@@ -3952,20 +3957,13 @@ fn parse_legado_css_index(selector: &str) -> (&str, Option<i64>) {
 /// Mirrors Legado `AnalyzeByJSoup.kt` `ElementsSingle.getElementsSingle`
 /// (line 324-402): positive index selects the Nth element; negative index
 /// counts from the end. Out-of-range indices return an empty set.
-fn apply_legado_css_index<'a>(
-    elements: Vec<ElementRef<'a>>,
-    index: i64,
-) -> Vec<ElementRef<'a>> {
+fn apply_legado_css_index<'a>(elements: Vec<ElementRef<'a>>, index: i64) -> Vec<ElementRef<'a>> {
     let len = elements.len() as i64;
     if len == 0 {
         return Vec::new();
     }
 
-    let resolved = if index >= 0 {
-        index
-    } else {
-        index + len
-    };
+    let resolved = if index >= 0 { index } else { index + len };
 
     if (0..len).contains(&resolved) {
         vec![elements[resolved as usize]]
@@ -5530,9 +5528,21 @@ fn normalize_text(text: &str) -> String {
 fn apply_xpath(input: &str, rule: &XPathRule) -> RuleResult<Vec<String>> {
     validate_xpath_namespaces(rule)?;
 
-    let package = sxd_document::parser::parse(input).map_err(|err| RuleError::XPathInputParse {
-        message: err.to_string(),
-    })?;
+    // Legado `AnalyzeByXPath.strToJXDocument` (line 35-39): 输入以 `<?xml` 开头
+    // 时用 Jsoup `Parser.xmlParser()`（XML 模式，保留命名空间），否则用默认
+    // HTML 解析（容错 void 元素/未闭合标签）。真实书源响应是 HTML，严格 XML
+    // 解析（`sxd_document::parser::parse`）会全部失败（rb-xpath-strict-xml-parser）。
+    //
+    // 对齐 Legado：`<?xml` 开头走 `sxd_document::parser::parse`（XML，保留命名空间），
+    // 否则走 `parse_html_to_sxd_package`（html5ever 容错解析后重建 sxd DOM）。
+    let trimmed = input.trim_start();
+    let package = if trimmed.to_ascii_lowercase().starts_with("<?xml") {
+        sxd_document::parser::parse(input).map_err(|err| RuleError::XPathInputParse {
+            message: err.to_string(),
+        })?
+    } else {
+        parse_html_to_sxd_package(input)
+    };
     let document = package.as_document();
     let factory = Factory::new();
     let xpath = factory
@@ -5565,6 +5575,82 @@ fn apply_xpath(input: &str, rule: &XPathRule) -> RuleResult<Vec<String>> {
         XPathValue::Number(value) => Ok(vec![value.to_string()]),
         XPathValue::Boolean(value) => Ok(vec![value.to_string()]),
     }
+}
+
+/// 把 HTML 文本解析成 sxd_document::Package，供 sxd-xpath 评估。
+///
+/// 对应 Legado `AnalyzeByXPath.strToJXDocument` → `JXDocument.create(Jsoup.parse(html))`：
+/// 先用 html5ever（`scraper::Html::parse_document`）容错解析 HTML 成 DOM，再把
+/// scraper 节点树重建为 sxd DOM。元素名取 local 部分（忽略 XHTML 命名空间），
+/// 与 Jsoup 无命名空间语义一致，使 `//div` 等 XPath 能匹配 HTML 元素。
+fn parse_html_to_sxd_package(input: &str) -> Package {
+    let html = Html::parse_document(input);
+    let package = Package::new();
+    let document = package.as_document();
+    let root = document.root();
+
+    for node_ref in html.tree.root().children() {
+        append_scraper_node_to_root(node_ref, &document, &root);
+    }
+
+    package
+}
+
+/// 顶层节点挂到 sxd Root。Root 只接受 Element/Comment/ProcessingInstruction
+/// 子节点（`ChildOfRoot`），不接受 Text，所以顶层 Text 被跳过——这与 HTML
+/// 文档根不会有裸 Text 的实际情况一致。
+fn append_scraper_node_to_root(
+    node: NodeRef<ScraperNode>,
+    document: &sxd_document::dom::Document<'_>,
+    parent: &sxd_document::dom::Root<'_>,
+) {
+    match node.value() {
+        ScraperNode::Element(el) => {
+            let sxd_el = create_sxd_element(document, el);
+            parent.append_child(sxd_el);
+            append_scraper_children(node, document, &sxd_el);
+        }
+        ScraperNode::Comment(comment) => {
+            parent.append_child(document.create_comment(comment));
+        }
+        _ => {}
+    }
+}
+
+/// 递归把 scraper 子节点挂到 sxd Element。Element 接受 Element/Text/Comment
+/// /ProcessingInstruction 子节点。
+fn append_scraper_children(
+    node: NodeRef<ScraperNode>,
+    document: &sxd_document::dom::Document<'_>,
+    parent: &sxd_document::dom::Element<'_>,
+) {
+    for child in node.children() {
+        match child.value() {
+            ScraperNode::Element(el) => {
+                let sxd_el = create_sxd_element(document, el);
+                parent.append_child(sxd_el);
+                append_scraper_children(child, document, &sxd_el);
+            }
+            ScraperNode::Text(text) => {
+                parent.append_child(document.create_text(text));
+            }
+            ScraperNode::Comment(comment) => {
+                parent.append_child(document.create_comment(comment));
+            }
+            _ => {}
+        }
+    }
+}
+
+fn create_sxd_element<'d>(
+    document: &sxd_document::dom::Document<'d>,
+    el: &scraper::node::Element,
+) -> sxd_document::dom::Element<'d> {
+    let sxd_el = document.create_element(el.name());
+    for (name, value) in el.attrs() {
+        sxd_el.set_attribute_value(name, value);
+    }
+    sxd_el
 }
 
 fn validate_xpath_namespaces(rule: &XPathRule) -> RuleResult<()> {

@@ -625,7 +625,13 @@ fn normalize_search_semantics(source: &LegadoBookSource) -> BookSourceSearchSema
         raw: clean_string(raw_str),
         list: structured
             .and_then(|rule| clean_string(rule.book_list.as_deref()))
-            .or_else(|| if legacy_fields { clean_string(raw_str) } else { None }),
+            .or_else(|| {
+                if legacy_fields {
+                    clean_string(raw_str)
+                } else {
+                    None
+                }
+            }),
         name: structured
             .and_then(|rule| clean_string(rule.name.as_deref()))
             .or_else(|| clean_string(source.rule_search_name.as_deref())),
@@ -707,7 +713,13 @@ fn normalize_toc_semantics(source: &LegadoBookSource) -> BookSourceTocSemantics 
         raw: clean_string(raw_str),
         list: structured
             .and_then(|rule| clean_string(rule.chapter_list.as_deref()))
-            .or_else(|| if structured_fields { clean_string(raw_str) } else { None }),
+            .or_else(|| {
+                if structured_fields {
+                    clean_string(raw_str)
+                } else {
+                    None
+                }
+            }),
         name: structured.and_then(|rule| clean_string(rule.chapter_name.as_deref())),
         url: structured.and_then(|rule| clean_string(rule.chapter_url.as_deref())),
         next_url: structured.and_then(|rule| clean_string(rule.next_toc_url.as_deref())),
@@ -748,7 +760,13 @@ fn rule_value_as_string(v: &Option<Value>) -> Option<&str> {
 /// 字符串形态或解析失败返回 None。
 fn rule_value_as_structured<T: serde::de::DeserializeOwned>(v: &Option<Value>) -> Option<T> {
     v.as_ref()
-        .and_then(|val| if val.is_object() { Some(val.clone()) } else { None })
+        .and_then(|val| {
+            if val.is_object() {
+                Some(val.clone())
+            } else {
+                None
+            }
+        })
         .and_then(|val| serde_json::from_value(val).ok())
 }
 
@@ -1027,10 +1045,7 @@ mod tests {
             Some("Legado Compat Source")
         );
         assert_eq!(
-            source
-                .rule_search
-                .as_ref()
-                .and_then(|v| v.as_str()),
+            source.rule_search.as_ref().and_then(|v| v.as_str()),
             Some("div.list&&div.item;div.name&&a@text")
         );
         assert_eq!(
@@ -1221,10 +1236,7 @@ mod tests {
             semantics.rules.detail.init.as_deref(),
             Some("@js:java.ajax(source.bookSourceUrl)")
         );
-        assert_eq!(
-            semantics.rules.toc.list.as_deref(),
-            Some("id.list@tag.li")
-        );
+        assert_eq!(semantics.rules.toc.list.as_deref(), Some("id.list@tag.li"));
         assert_eq!(
             semantics.rules.content.content.as_deref(),
             Some("class.con@html##<div.*?>|</div>")

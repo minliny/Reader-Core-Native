@@ -896,6 +896,7 @@ dependencies = [
 name = "reader-rule"
 version = "0.1.0"
 dependencies = [
+ "ego-tree",
  "reader-domain",
  "regex",
  "scraper",
