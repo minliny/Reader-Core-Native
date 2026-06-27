@@ -19,7 +19,7 @@
 
 ## P0-blocker：阻断真实书源的能力
 
-### 1. MultiRule 操作符拆分（&&/||/%%）
+### 1. MultiRule 操作符拆分（&&/||/%%） ✅ 已完成
 
 | 项 | 值 |
 |----|-----|
@@ -28,11 +28,9 @@
 | 影响 | 459 源中 292 源含 MultiRule（64%），不补则大面积 L2-search 失败 |
 | 方案 | reader-rule 中 `splitSourceRule` 实现：按 &&/\|\|/%% 拆分为 SourceRule 列表，每条独立解析后合并结果 |
 | 验收 | 含 MultiRule 的 P0 源 L2-search 通过率 ≥80% |
-| 状态 | 已有 release blocker `rb-legado-css-multirule-operator`。Agent 正在修，
-         reader-rule +391 行未提交，15 multirule tests pass (&&/||/%% CSS+XPath 拆分)。
-         等待 agent 完成后提交 + 跑 459 源批量验证 |
+| 状态 | ✅ 已完成。reader-rule split_legado_combined_rule 统一分割，15+4 tests pass。待提交后重跑 459 源批量验证 |
 
-### 2. 多页加载（nextTocUrl / nextContentUrl）
+### 2. 多页加载（nextTocUrl / nextContentUrl） ✅ 已完成
 
 | 项 | 值 |
 |----|-----|
@@ -42,8 +40,9 @@
 | 影响 | 大量源目录分页、正文分页，不补则 L4-toc / L5-content 只能取第一页 |
 | 方案 | reader-runtime/remote.rs 中 `book_toc` / `chapter_content` 完成后检查 nextUrl，循环发 http.execute 直到无下一页，合并结果 |
 | 验收 | 有 nextTocUrl 的源能取完整目录；有 nextContentUrl 的源能取完整正文 |
+| 状态 | ✅ 已完成。8 tests pagination(reader-runtime 循环翻页，环检测 HashSet，MAX_NEXT_PAGES=50) |
 
-### 3. 规则补全（RuleComplete）
+### 3. 规则补全（RuleComplete） ✅ 已完成
 
 | 项 | 值 |
 |----|-----|
@@ -53,8 +52,9 @@
 | 影响 | 大量源规则省略尾部操作符（如 `div.class&&` 后无 @text），不补则解析返回空 |
 | 方案 | reader-rule 中实现 `RuleComplete::auto_complete()`：正则识别缺尾操作符的规则，按 type(文字/链接/图片) 补全 |
 | 验收 | 省略尾操作符的源能正确解析 |
+| 状态 | ✅ 已完成。32 tests，1:1 对齐 Legado RuleComplete.kt autoComplete() |
 
-### 4. URL JS 执行（java.get/post host callback）— 批量测试新发现
+### 4. URL JS 执行（java.get/post host callback）— 批量测试新发现 ✅ 已完成
 
 | 项 | 值 |
 |----|-----|
@@ -64,13 +64,13 @@
 | 根因 | reader-js 有 79 个 java.* 方法单元测试，但 runtime 中 JS → host callback → http.execute 链路未通 |
 | 方案 | 在 reader-runtime 中接通 JS sandbox 的 java.get/post → 发 http.execute host request → Host 执行 → 返回响应给 JS |
 | 验收 | @js: searchUrl 的源能正确执行 JS 构造搜索 URL |
-| 状态 | ❌ 未实现，批量测试首次暴露 |
+| 状态 | ✅ 已完成。方案B(同步阻塞+send-time拦截)，140 tests(含 8 端到端 bridge tests)，643行 host_callback_bridge.rs |
 
 ---
 
 ## P1-core：Legado 核心能力
 
-### 4. 替换规则（ReplaceRule）
+### 4. 替换规则（ReplaceRule） ✅ 已完成
 
 | 项 | 值 |
 |----|-----|
@@ -83,7 +83,7 @@
 4) chapter.content 返回前过 ContentProcessor |
 | 验收 | 导入 Legado 替换规则 JSON → 对正文执行替换 → 结果正确 |
 
-### 5. 繁简转换（ChineseConverter）
+### 5. 繁简转换（ChineseConverter） ✅ 已完成
 
 | 项 | 值 |
 |----|-----|
@@ -143,7 +143,7 @@
 3) reading.progress.update 时累计 readTime |
 | 验收 | 阅读 → 累计时长 → 查询统计 |
 
-### 10. 发现（Explore）
+### 10. 发现（Explore） ✅ 已完成
 
 | 项 | 值 |
 |----|-----|
@@ -300,17 +300,13 @@
 ## 实施顺序
 
 ```
-Phase A (P0-blocker, 阻断测试):
-  1. MultiRule 拆分 ← Agent 正在修
-  2. 多页加载 (nextTocUrl/nextContentUrl)
-  3. 规则补全 (RuleComplete)
+# 本轮已完成
+Phase A (P0-blocker): 1.MultiRule拆分 ✅ 2.多页加载 ✅ 3.规则补全 ✅
+Phase B (P1-core): 4.替换规则 ✅ 5.繁简转换 ✅ 6.TXT目录规则 ✅ 7.书签 ✅ 10.发现 ✅
 
-Phase B (P1-core, 基础能力):
-  4. 替换规则 (ReplaceRule)
-  5. 繁简转换
-  6. TXT 目录规则
-  7-9. 书签/书架分组/阅读记录 (数据实体批量)
-  10. 发现 (Explore)
+# 剩余缺口
+Phase B (P1-core): 8.书架分组(BookGroup) 9.阅读记录(ReadRecord)
+Phase C (P2): 11.段评 12.字体反混淆 13.封面解密 14.全文搜索 15.换源 16.去重标题 17.智能分段 18-22.数据实体批量补齐
 
 Phase C (P2, 进阶能力):
   11-17. 段评/字体反混淆/封面解密/全文搜索/换源/去重标题/智能分段

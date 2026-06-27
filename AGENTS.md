@@ -10,7 +10,7 @@
 - `docs/MAINLINE_EXECUTION_PLAN.md` — 主线阶段（S0–S7）顺序
 - `docs/LEGADO_CAPABILITY_INVENTORY.md` — Legado 全部能力清单（97 项）与 Reader 对标状态，
   是"能力底线 = Legado"的验收基准。任何"能力已完成"的判断必须对照本清单逐项验证。
-- `docs/CAPABILITY_GAP_PLAN.md` — 能力缺口补齐方案（45 项未实现 + 16 项待验证），
+- `docs/CAPABILITY_GAP_PLAN.md` — 能力缺口补齐方案（35 项未实现 + 16 项待验证 — 本轮已补齐 10 项），
   按优先级排序。补齐后必须更新清单状态并用测试工具链验证。
 - `docs/STATUS_SNAPSHOT_2026-28.md` — 2026-06-28 项目状态快照（7个能力缺口 agent 完成 + 全量459源批量测试）（仓库状态 + S 阶段
   修正进度 + release blockers + 能力对标 + 测试工具链 + 平台侧状态）。时间点快照，

@@ -14,7 +14,7 @@
 
 | 能力 | Legado 实现 | Reader Core 状态 | 证据 |
 |------|------------|-----------------|------|
-| CSS 选择器 (@css:/@text/@href/&&/;/\|\|) | AnalyzeByJSoup | ⚠️ 部分（MultiRule blocker 未闭环） | fixture_vertical 3 源 |
+| CSS 选择器 (@css:/@text/@href/&&/;/\|\|) | AnalyzeByJSoup | ⚠️ 部分（MultiRule 已修，待批量验证） | fixture_vertical 3 源 |
 | XPath (@xpath:/@@) | AnalyzeByXPath | ✅ 有实现 | conformance |
 | JSONPath ($./$[) | AnalyzeByJSonPath | ✅ 有实现 | conformance |
 | 正则 (regex) | AnalyzeByRegex | ⚠️ 有 regex-suffix 但未完整验证 | 0 真实源 |
@@ -23,7 +23,7 @@
 | <js> 内联 JS | evalJS | ⚠️ 有沙箱但 java.* 方法未全验证 | reader-js 79 方法 |
 | @js: 规则前缀 | evalJS | ⚠️ 同上 | |
 | MultiRule (&&/\|\|/%%) | splitSourceRule | ❌ blocker（CSS 路径未拆分） | release-blockers.json |
-| 规则补全 (RuleComplete) | RuleComplete.kt | ❌ 未实现 | 0 代码 |
+| 规则补全 (RuleComplete) | RuleComplete.kt | ✅ 已实现 | 32 tests + reader-rule auto_complete_rule |
 | 规则缓存 | splitSourceRuleCacheString | ❌ 未实现 | |
 
 ### 1.2 URL 构造（AnalyzeUrl.kt, 30+ 方法）
@@ -50,7 +50,7 @@
 | 目录 (WebBook.getChapterList) | BookChapterList.kt | ✅ protocol book.toc | 3 源 fixture |
 | 正文 (WebBook.getBookContent) | BookContent.kt | ✅ protocol chapter.content | 3 源 fixture |
 | 发现 (WebBook.exploreBook) | BookList.kt (explore) | ✅ protocol source.exploreKinds + source.explore | 0 真实源 (待批量验证) |
-| 多页加载 (nextPage/nextTocUrl) | BookList/BookChapterList | ❌ 未实现 | 0 代码 |
+| 多页加载 (nextPage/nextTocUrl) | BookList/BookChapterList | ✅ 已实现 | 8 tests pagination(reader-runtime 循环翻页) |
 | 段评 (ReviewRule) | ruleReview | ❌ 未实现 | 0 代码 |
 | 书源校验 (CheckSource) | CheckSource.kt + Service | ❌ 未实现 | 0 代码 |
 | 书源调试 (Debug) | Debug.kt + WebSocket | ❌ 未实现 | 0 代码 |
@@ -65,7 +65,7 @@
 | 编码 (base64/hex/encodeURI/bytesToStr) | 12 | ✅ 大部分已实现 | reader-js 单元测试 |
 | Cookie (getCookie) | 2 | ⚠️ 有协议 cookie.get/set 但 JS 内调用未验证 | |
 | 字体反混淆 (queryTTF/replaceFont) | 4 | ❌ 未实现 | 0 代码 |
-| 繁简转换 (t2s/s2t) | 2 | ❌ 未实现 | 0 代码 |
+| 繁简转换 (t2s/s2t) | 2 | ✅ 已实现 | 98 reader-js + 53 reader-content tests |
 | 时间格式化 (timeFormat/timeFormatUTC) | 2 | ✅ | |
 | 其他 (toast/log/randomUUID/androidId/openUrl) | 6 | ⚠️ 部分 | |
 | 缓存 (cacheFile/downloadFile) | 4 | ❌ 未实现 | 0 代码 |
@@ -133,7 +133,7 @@
 | BookSource | BookSource.kt | ✅ reader-domain | |
 | BookGroup (书架分组) | BookGroup.kt | ❌ 未实现 | 0 代码 |
 | Bookmark (书签) | Bookmark.kt | ❌ 未实现 | 0 代码 |
-| ReplaceRule (替换规则) | ReplaceRule.kt | ❌ 未实现 | 0 代码 |
+| ReplaceRule (替换规则) | ReplaceRule.kt | ✅ 已实现 | ContentProcessor + 15+9 tests |
 | TxtTocRule | TxtTocRule.kt | ✅ reader-domain + storage CRUD + txt-toc-rule.* protocol | 6 单元测试 |
 | DictRule (字典规则) | DictRule.kt | ❌ 未实现 | 0 代码 |
 | HttpTTS | HttpTTS.kt | ❌ 未实现 | 0 代码 |
@@ -153,10 +153,10 @@
 
 | 能力 | Legado 实现 | Reader Core 状态 | 证据 |
 |------|------------|-----------------|------|
-| 替换规则 (ContentProcessor) | ContentProcessor.kt | ❌ 未实现 | 0 代码 |
-| 替换规则分析 (ReplaceAnalyzer) | ReplaceAnalyzer.kt | ❌ 未实现 | 0 代码 |
+| 替换规则 (ContentProcessor) | ContentProcessor.kt | ✅ 已实现 | reader-content/content_processor.rs |
+| 替换规则分析 (ReplaceAnalyzer) | ReplaceAnalyzer.kt | ⚠️ 部分实现（分析逻辑内嵌在 ContentProcessor 中） |
 | 内容净化 | ContentHelp.kt | ❌ 未实现 | 0 代码 |
-| 繁简转换 | ChineseUtils.kt | ❌ 未实现 | 0 代码 |
+| 繁简转换 | ChineseUtils.kt | ✅ 已实现 | reader-content/chinese.rs + ContentProcessor |
 | 去除同名标题 | ContentProcessor.upRemoveSameTitle | ❌ 未实现 | 0 代码 |
 | 智能段落修正 | ContentHelp.kt | ❌ 未实现 | 0 代码 |
 
@@ -224,9 +224,9 @@
 
 ### 诚实评估
 
-- **Core 侧实际完成度: ~25%**（22/83 非Host能力 + MultiRule 已修，但批量测试 30 源 0% 完全通过）
+- **Core 侧实际完成度: ~33%**（32/83 非Host能力 + MultiRule 已修，但批量测试 30 源 0% 完全通过）
 - **部分实现 16 项中，大部分从未用真实 Legado 数据验证过**
-- **45 项完全未实现**（替换规则/繁简/TXT目录/书签/书架分组/段评/多页/发现/换源/封面规则/字体反混淆/规则补全/规则订阅/阅读记录/搜索历史等）
+- **35 项完全未实现**（书架分组/段评/换源/封面规则/字体反混淆/规则订阅/阅读记录/搜索历史/内容净化/去重标题等）
 - **之前声称的 "S1/S3/S5 100%" 严重高估** — 没有对照 Legado 全部能力清单做过系统验证
 - **459 源集合真实通过率: P0 抽样 30 源 = 0% 完全通过**（L1 100%, L2 3.3%, L3-L5 全 skip）
   - L2 失败原因: no_search_results 34% / URL JS 失败 28% / 其他 38%

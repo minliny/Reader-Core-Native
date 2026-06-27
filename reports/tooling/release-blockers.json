@@ -620,11 +620,11 @@
     },
     {
       "capability": "legado.rule-engine.css-multirule",
-      "evidence_status": "failing",
+      "evidence_status": "resolved",
       "id": "rb-legado-css-multirule-operator",
       "mitigation": "Split CSS/shorthand rules on &&/||/%% operators before feeding to scraper::Selector::parse (mirror evaluate_json_path_expression split logic). Legado AnalyzeRule.splitSourceRule does cross-type splitting.",
       "platform": "all",
-      "reason": "Core only splits &&/||/%% in evaluate_json_path_expression (JSONPath layer). CSS/shorthand path feeds combined selectors (e.g. class.ser-ret@li||class.j_bookList@li) directly to scraper::Selector::parse which fails. Affects search/detail/toc for sources using MultiRule operators on CSS rules.",
+      "reason": "Core only splits &&/||/%% in evaluate_json_path_expression (JSONPath layer). CSS/shorthand path feeds combined selectors (e.g. class.ser-ret@li||class.j_bookList@li) directly to scraper::Selector::parse which fails. Affects search/detail/toc for sources using MultiRule operators on CSS rules. (已修复: reader-rule split_legado_combined_rule 统一分割 &&/||/%%, 15+4 tests pass)",
       "severity": "blocker",
       "sources": [
         "crates/reader-rule/src/lib.rs:1275-1305",
@@ -635,20 +635,17 @@
   ],
   "generated_at": "2026-06-27T00:00:00Z",
   "summary": {
-    "by_platform": {
-      "all": 47,
-      "android": 2,
-      "harmony": 2,
-      "ios": 0,
-      "unknown": 0
-    },
+    "total": 50,
+    "resolved": 1,
     "by_severity": {
-      "blocker": 1,
-      "high": 0,
-      "medium": 6,
-      "low": 44
+      "low": 44,
+      "medium": 6
     },
-    "total": 51
+    "by_platform": {
+      "all": 46,
+      "android": 2,
+      "harmony": 2
+    }
   },
   "tool": "release-blocker-register-generator",
   "version": "release-blockers/1"

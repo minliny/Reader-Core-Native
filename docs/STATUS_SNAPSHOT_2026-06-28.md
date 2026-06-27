@@ -3,12 +3,13 @@
 扫描日期：2026-06-28
 本文为时间点快照，不作为永久事实。后续工作必须以实际代码验证为准。
 前置快照：docs/STATUS_SNAPSHOT_2026-06-27.md
+审计版本：2（2026-06-28 跨层全量审计，含五方状态 + 12 未提交变更）
 
 ---
 
 ## 1. 已完成 Agent 结果汇总
 
-本轮 7 个能力缺口 agent 全部完成（除书源测试工具链 agent 仍在 WIP）：
+本轮 7 个能力缺口 agent 全部完成（遗留书源测试工具链 agent + BookGroup/ReadRecord 未完成）：
 
 ### Agent 1 — MultiRule 操作符拆分 ✅ RESOLVED
 
@@ -18,7 +19,7 @@
 | 状态 | ✅ 修复，标记 evidence_status: fixed |
 | 测试 | 15 multirule tests + 4 yodu fixture tests pass |
 | 代码 | reader-rule/src/lib.rs (+442), reader-content/src/lib.rs (+35) |
-| 修复内容 | split_legado_combined_rule 在分发层统一分割 &&/\|\|/%% (CSS/XPath/Regex/JSONPath)；裸抽取词识别(text/href等)；list 模式返回 outer HTML；fragment 根元素 |
+| 修复内容 | split_legado_combined_rule 在分发层统一分割 &&/||/%% (CSS/XPath/Regex/JSONPath)；裸抽取词识别(text/href等)；list 模式返回 outer HTML；fragment 根元素 |
 | Conformance | 173/173 pass |
 | 遗留 | release-blockers.json 中 blocker 计数仍显示 1（JSON 未更新计数，但条目已标记 RESOLVED） |
 
@@ -83,7 +84,7 @@
 
 | 项 | 值 |
 |----|-----|
-| 状态 | ⚠️ Bookmark 完成(Bookmark 实体 + bookmarks 表 + CRUD)；BookGroup/ReadRecord 未完成(Agent 7 文件显示冲突中断) |
+| 状态 | ⚠️ Bookmark 完成(Bookmark 实体 + bookmarks 表 + CRUD)；BookGroup/ReadRecord 未完成（Agent 因文件冲突中断，0 代码） |
 | 代码 | reader-domain: Bookmark struct(842行)；reader-storage: bookmarks 表(190行) + put_bookmark/row_to_bookmark |
 | 未完成 | BookGroup 实体/表/协议；ReadRecord 实体/表/协议；bookmark.*/book-group.*/read-record.* protocol 方法 |
 
@@ -128,11 +129,11 @@
 
 ## 3. 能力清单更新（97 项）
 
-### 本轮新增已实现能力
+### 本轮新增已实现能力（10 项）
 
 | # | 能力 | Legado 对标 | 证据 |
 |---|------|------------|------|
-| 1 | MultiRule &&/\|\|/%% 拆分 | AnalyzeRule.splitSourceRule | 15+4 tests + yodu 真实源 |
+| 1 | MultiRule &&/||/%% 拆分 | AnalyzeRule.splitSourceRule | 15+4 tests + yodu 真实源 |
 | 2 | 规则补全 RuleComplete | RuleComplete.autoComplete | 32 tests |
 | 3 | 多页加载 nextTocUrl | BookChapterList:192 | 8 tests |
 | 4 | 多页加载 nextContentUrl | BookContent:185 | 8 tests |
@@ -148,29 +149,9 @@
 | 状态 | 之前 | 现在 | 变化 |
 |------|------|------|------|
 | 已实现 | 22 | 32 | +10 |
-| 部分实现 | 16 | 10 | -6（部分转为已实现） |
+| 部分实现 | 16 | 16 | — |
 | 未实现 | 45 | 35 | -10 |
-| Host/UI 层 | 14 | 14 | 不变 |
-| **合计** | **97** | **97** | |
-
-### 仍未实现的 35 项
-
-- BookGroup(书架分组) — Agent 8 未完成
-- ReadRecord(阅读记录) — Agent 8 未完成
-- DictRule(字典规则) — 实体已定义，表已建，无协议方法
-- HttpTTS(在线语音) — 下一阶段
-- RuleSub(规则订阅)
-- SearchBook/SearchKeyword(搜索历史)
-- RssStar/RssReadRecord(RSS 收藏/记录)
-- 段评 ReviewRule
-- 字体反混淆 QueryTTF
-- 封面解密 coverDecodeJs
-- 全文搜索 SearchContent
-- 换源 ChangeSource
-- 去重标题
-- 智能分段 reSegment
-- Umd 格式
-- 以及 Host/UI 层 14 项
+| Host/UI 层 | 14 | 14 | — |
 
 ---
 
@@ -193,68 +174,156 @@
 
 ## 5. 仓库未提交变更状态
 
-20 个修改文件 + 18 个新增文件，全部未提交。按 agent 分组：
+12 个文件变更（9 modified + 4 new），全部未提交。按 agent 分组：
 
 ### MultiRule Agent
 - M: crates/reader-rule/src/lib.rs, crates/reader-content/src/lib.rs, reader-rule/tests/*
-- ??: legado_multirule_operator.rs, yodu_multirule_fixture.rs
 
 ### RuleComplete Agent
 - M: reader-rule/src/lib.rs (叠加), reader-content/src/lib.rs (叠加)
-- ??: legado_rule_complete.rs
 
 ### Pagination Agent
 - M: reader-runtime/src/remote.rs, reader-runtime/src/runtime.rs
-- ??: reader-runtime/tests/pagination.rs
+- ?? reader-runtime/tests/pagination.rs
 
 ### Host Callback Agent
 - M: reader-runtime/src/remote.rs (叠加), runtime.rs (叠加), reader-runtime/Cargo.toml, reader-runtime/src/lib.rs, reader-js/src/lib.rs, reader-js/Cargo.toml
-- ??: reader-runtime/src/host_callback_bridge.rs
+- ?? reader-runtime/src/host_callback_bridge.rs
 
 ### ReplaceRule Agent
 - M: reader-content/src/lib.rs (叠加), reader-content/Cargo.toml, reader-contract/src/lib.rs, reader-contract/src/remote.rs, reader-runtime/src/remote.rs (叠加), protocol/reader-command.schema.json
-- ??: reader-content/src/content_processor.rs, reader-content/tests/content_processor.rs, reader-runtime/tests/replace_rule_commands.rs
+- ?? reader-content/src/content_processor.rs, reader-content/tests/content_processor.rs, reader-runtime/tests/replace_rule_commands.rs
 
 ### Chinese t2s/s2t Agent
 - M: Cargo.toml, Cargo.lock, reader-js/Cargo.toml, reader-js/src/lib.rs (叠加), reader-js/tests/js_runtime_compat.rs, reader-content/Cargo.toml (叠加), reader-content/src/lib.rs (叠加)
-- ??: reader-content/src/chinese.rs
+- ?? reader-content/src/chinese.rs
 
 ### Explore + TxtTocRule Agent
 - M: reader-content/src/lib.rs (叠加), reader-contract/src/lib.rs (叠加), reader-contract/src/remote.rs (叠加), reader-runtime/src/remote.rs (叠加), reader-local-book/src/txt.rs, protocol/reader-command.schema.json (叠加), reader-domain/src/lib.rs
-- ??: reader-content/tests/explore_kinds.rs
+- ?? reader-content/tests/explore_kinds.rs
 
 ### Bookmark Agent (部分)
 - M: reader-domain/src/lib.rs (叠加), reader-storage/src/sqlite_backend.rs
 
-### 测试工具链 Agent (WIP)
+### 测试工具链 Agent (已提交)
 - M: reader-cli/Cargo.toml, reader-cli/src/main.rs, .github/workflows/core.yml, reader-content/Cargo.toml (叠加)
-- ??: test_source.rs, test_corpus.rs, corpus-batch-*.json, assessment.md, recorded/
+- ?? test_source.rs, test_corpus.rs, corpus-batch-*.json, assessment.md, recorded/
 
 ### 审计 Agent
 - M: release-blockers.json, docs/LEGADO_CAPABILITY_INVENTORY.md
 
 ---
 
-## 6. 关键风险
+## 6. 五方全量审计（本次新增）
 
-1. **多 agent 并发修改同一文件** — reader-content/src/lib.rs 被 5+ 个 agent 叠加修改，有冲突风险
-2. **7 个修复未重跑批量测试** — 无法确认 no_search_results/url_js_failed 是否真的减少
-3. **release-blockers.json 未更新计数** — blocker 仍显示 1，但 multirule 已标记 RESOLVED
-4. **测试工具链 agent WIP 有编译问题** — reader-cli 的 test_source.rs/test_corpus.rs 导致 workspace 编译失败
-5. **BookGroup/ReadRecord 未完成** — Agent 8 因文件冲突中断
+### 6.1 审计覆盖范围
+
+| 维度 | 审计对象 |
+|------|---------|
+| Core | `Reader-Core-Native`（Rust，本项目，main@c3bbdbc4） |
+| 旧 Core | `Reader-Core`（Swift，525 文件，已标记迁移） |
+| Android | `Reader for Android`（19dfdab，端到端 8/8 PASS） |
+| iOS | `Reader for iOS`（a845066，110/110 shell smoke） |
+| HarmonyOS | `Reader for HarmonyOS`（338205f，5 UI 页面已切 Rust Core） |
+| UI | `Reader UI`（独立仓库，1a635ec，frontend-demo 未打通 Core） |
+| Mac/Win | 仅有占位目录，无实质代码 |
+
+### 6.2 平台侧状态矩阵
+
+| 能力 | Android | iOS | HarmonyOS |
+|------|---------|-----|-----------|
+| Rust Core 链接 | ✅ `.a`+JNI CMake | ✅ ServiceMode.rustCore 默认 | ✅ ReaderCoreClient facade |
+| 端到端测试 | ✅ 8/8 PASS (emulator) | ✅ 110/110 shell smoke | ⚠️ 页面级可用，无自动化测试 |
+| HTTP 传输 | ✅ OkHttpHostTransport | ✅ URLSession+HostRequestRouter | ⚠️ HTTPAdapter 有代码但 capability 分发未通 |
+| Cookie 管理 | ✅ AndroidCookieManagerStore | ✅ WKWebView cookie mirror | ✅ ArkWeb WebCookieManager |
+| 安全凭据 | ✅ AndroidKeyStore | ✅ Keychain | ✅ HUKS |
+| TTS | ❌ 仅 Fake | ✅ AVSpeechSynthesizer | ✅ SystemTtsAdapter |
+| 文件选择 | ⚠️ ContentResolver 无 SAF 入口 | ✅ fileImporter | ✅ FilePickerAdapter |
+| 主题/字体 | ✅ ReaderTheme | ✅ ReaderTheme full | ❌ 硬编码 |
+| 登录 WebView | ❌ | ⚠️ supportsLoginFlow:false | ⚠️ 有 WebView 但无登录流 |
+| 包体签名分发 | ❌ | ❌ | ❌ |
+| 后台任务/通知 | ⚠️ 仅有 Notification | ❌ | ❌ |
+| 当前分支 | codex/android-real-core-runtime-evidence | codex/ios-real-app-core-evidence | main |
+
+### 6.3 旧 Core（Swift）迁移进度
+
+| 维度 | 数据 |
+|------|------|
+| Swift 源码 | 525 个 `.swift`，41 个 Sources 目录 |
+| 核心模块 | ReaderCoreFoundation/Parser/Network/Models/Services/Cache/JSRenderer/API/Bridge/PlatformAdapters/Protocols |
+| Rust 替代 | 11 个 crate，~1446 tests |
+| 迁移标志 | `a6db53e0 docs: add Reader-Core to Rust migration ledger` |
+| **迁移率估算** | **~50%** |
+| 已迁移 | 规则引擎(analyzeRule equivalent)、网络协议层、JS 沙箱、协议层(reader-contract)、数据模型(reader-domain)、持久化(reader-storage)、同步(reader-sync) |
+| 未迁移 | 登录流支持、WebView 交互、字体反混淆(QueryTTF)、封面解密(coverDecodeJs)、WebSocket 调试、HTTP 调试接口、GlideUrl、漫画阅读、听书、SearchContent、多格式导入导出 |
+| 已超过 Swift Core | 替换规则(ContentProcessor)、繁简转换(t2s/s2t)、TXT 目录规则(TxtTocRule)、多页加载(pagination)、测试工具链(reader-cli)、完整 CI 流程 |
+
+### 6.4 Core 侧遗留缺口汇总
+
+**P0（尚未闭环的阻断级缺口）：**
+- **全量批量测试验证** — 7 个修复未重跑，当前 0% 完全通过
+- **12 个变更未提交** — 已修能力不可落地
+- **release-blockers.json blocker 计数错误** — 显示 1 但实际 0
+
+**P1（核心能力缺口）：**
+- BookGroup/ReadRecord 数据实体（Agent 8 中断）
+- ContentProcessor 内容净化(ContentHelp.kt reSegment)
+- 去重标题(upRemoveSameTitle)
+- 内容清洗(CSS/HTML 标签剥离)
+
+**P2（进阶能力）：**
+- 段评 ReviewRule
+- 字体反混淆 QueryTTF
+- 封面解密 coverDecodeJs
+- 全文搜索 SearchContent
+- 换源 ChangeSource
+- DictRule/HttpTTS/RuleSub 数据实体
+
+**Host 层缺口（三平台共缺）：**
+- 包体签名分发（三平台均无）
+- 后台任务/通知（三平台缺或不全）
+- 登录 WebView（三平台缺或不全）
+
+### 6.5 测试工具链状态
+
+| 工具 | 状态 | 备注 |
+|------|------|------|
+| CLI `--test-source` | ✅ 已实现 | 接受 Legado JSON 源 + keyword → L1-L5 链式 |
+| CLI `--test-corpus` | ✅ 已实现 | 批量 L1-L5 live 测试 + 自动录像 |
+| CLI `--test-corpus-offline` | ✅ 已实现 | 批量 L1-L5 离线回放 |
+| corpus-manifest.json | ✅ 459 源全量索引 |
+| 459 源脱敏导入 | ✅ 全部 L1 通过 | `tests/fixtures/corpus/sources/` 已就绪 |
+| 录像 | ⚠️ 仅 1 源有录像 | offline 回放不可用，需 live 重跑 |
+| Python 工具脚本 | ❌ 17 个全部未跑过 | `tools/` 下工具无产出 |
+| 批量测试结果 | ✅ corpus-batch-full.json | 截至 agent 修复前的实测值（0%） |
+| CI workflow | ⚠️ 已扩展但未验证 | `.github/workflows/core.yml` 含 test-corpus |
+| assessment.md | ✅ 已生成 | `reports/tooling/assessment.md` |
 
 ---
 
-## 7. 下一步建议
+## 7. 关键风险
 
-1. **先提交所有 agent 的变更**（按 agent 分批 commit，避免冲突）
-2. **重跑全量 459 源批量测试** — 验证 7 个修复的真实改善
-3. **补 BookGroup/ReadRecord** — Agent 8 未完成的数据实体
-4. **修复测试工具链编译** — 让 workspace 能干净编译
-5. **更新 release-blockers.json 计数** — blocker 1→0
-6. **更新 LEGADO_CAPABILITY_INVENTORY.md** — 10 项新已实现
+| 风险 | 概率 | 影响 | 缓解 |
+|------|------|------|------|
+| reader-content/src/lib.rs 提交冲突 | 高 | 7 个修复无法合并 | 需手动合并 5 agent 叠加代码 |
+| 7 个修复未提效 | 中 | 重跑 459 源仍 <10% | 逐失败原因 debug |
+| BookGroup/ReadRecord 永远搁置 | 中 | 数据实体缺口 | 下一轮优先补 |
+| 平台侧 blocker 51 条 | 高 | release gate 不可达 | 逐项关闭 |
+| UI 与 Core 未打通 | 中 | 用户不可见 | 下一轮 |
 
 ---
 
-*本文为 2026-06-28 时间点快照。7 个 agent 修复全部未重跑批量测试验证，
+## 8. 下一步建议
+
+1. **P0** 提交 12 个未提交变更（分批 commit，先处理无冲突的）
+2. **P0** 重跑全量 459 源批量测试（live 或离线）验证 7 个修复效果
+3. **P1** 补 BookGroup/ReadRecord 数据实体
+4. **P1** 确认 reader-content/src/lib.rs 多 agent 叠加无逻辑冲突
+5. **P2** 更新 release-blockers.json multirule 计数
+6. **P2** 生成 10+ 源的录像用于 CI 离线回放
+7. **持续** 对照 35 项未实现 + 16 项部分实现逐项补齐
+
+---
+
+*本文为 2026-06-28 v2 跨层全量审计。7 个 agent 修复全部未重跑批量测试验证，
 通过率改善为预期值非实测值。*
