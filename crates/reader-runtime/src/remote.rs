@@ -915,14 +915,32 @@ fn local_book_parse(
 ) -> Result<serde_json::Value, CoreError> {
     let params: LocalBookParseParams =
         parse_params(contract::methods::LOCAL_BOOK_PARSE, &cmd.params)?;
-    let book = reader_local_book::parse_txt_text(
-        &params.book_id,
-        params.title.as_deref(),
-        params.author.as_deref(),
-        params.file_name.as_deref(),
-        &params.text,
-    )
-    .map_err(local_book_internal)?;
+    params.validate_local_book_parse_params()?;
+    let book = if params.prefers_binary_path() {
+        // S5 binary path: route through parse_local_book which auto-detects
+        // EPUB/PDF/MOBI/AZW from magic bytes (with optional fileName/format
+        // hint). Mirrors Legado's LocalBook dispatch by extension+mimetype.
+        let bytes = decode_local_book_bytes(params.bytes_base64.as_deref().unwrap_or(""))?;
+        let file_name = resolve_local_book_file_name(&params);
+        let input = reader_local_book::LocalBookInput {
+            book_id: &params.book_id,
+            file_name: file_name.as_deref(),
+            title: params.title.as_deref(),
+            author: params.author.as_deref(),
+            bytes: &bytes,
+        };
+        reader_local_book::parse_local_book(input).map_err(local_book_internal)?
+    } else {
+        // Legacy V1 text path: host already decoded GBK/GB18030 to UTF-8.
+        reader_local_book::parse_txt_text(
+            &params.book_id,
+            params.title.as_deref(),
+            params.author.as_deref(),
+            params.file_name.as_deref(),
+            &params.text,
+        )
+        .map_err(local_book_internal)?
+    };
     let chapter_count = book.chapters.len() as u32;
     let full = serde_json::to_value(&book).map_err(serde_internal)?;
     let book_obj = full.get("book").cloned().unwrap_or(serde_json::Value::Null);
@@ -953,6 +971,37 @@ fn local_book_parse(
         chapter_count,
     };
     serde_json::to_value(&data).map_err(serde_internal)
+}
+
+/// Decode base64-encoded local book bytes. Surfaces decode failures as
+/// `INVALID_PARAMS` so a malformed wire payload never reaches the parser.
+fn decode_local_book_bytes(bytes_base64: &str) -> Result<Vec<u8>, CoreError> {
+    use base64::Engine as _;
+    base64::engine::general_purpose::STANDARD
+        .decode(bytes_base64.trim())
+        .map_err(|err| {
+            CoreError::invalid_params(format!(
+                "local_book.parse bytesBase64 must be valid standard base64: {err}"
+            ))
+        })
+}
+
+/// Resolve the file_name hint passed to `parse_local_book`. When `format` is
+/// set and `fileName` is absent, synthesize `<format>.<format>` so the
+/// extension-based declared-format detector picks it up. When both are set,
+/// `fileName` wins (it may carry a real extension that differs from the
+/// hint, e.g. an `.azw3` file hinted as `mobi`).
+fn resolve_local_book_file_name(params: &LocalBookParseParams) -> Option<String> {
+    if let Some(name) = params.file_name.as_deref() {
+        if !name.trim().is_empty() {
+            return Some(name.to_string());
+        }
+    }
+    params
+        .format
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .map(|fmt| format!("{fmt}.{fmt}"))
 }
 
 fn local_book_catalog(

@@ -17,3 +17,9 @@ reader-sync = { path = "../reader-sync" }
 reader-local-book = { path = "../reader-local-book" }
 serde_json.workspace = true
 serde.workspace = true
+# S5: base64 decode for local_book.parse binary path (EPUB/PDF/MOBI bytes).
+base64 = "0.22"
+
+[dev-dependencies]
+# S5 tests: build a minimal EPUB ZIP in-memory to exercise binary dispatch.
+zip = { version = "2", default-features = false, features = ["deflate"] }

@@ -11,3 +11,6 @@ reader-domain = { path = "../reader-domain" }
 regex = "1"
 serde.workspace = true
 serde_json.workspace = true
+# EPUB container is a ZIP archive; Core owns text extraction per S5 closure
+# (matching Legado's in-app epublib behavior). Pure-Rust, no system deps.
+zip = { version = "2", default-features = false, features = ["deflate"] }
