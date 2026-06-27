@@ -1,0 +1,28 @@
+{
+  "protocolVersion": 1,
+  "requestId": 440,
+  "method": "book.search",
+  "params": {
+    "sourceId": "conformance-auto-build-src",
+    "keyword": "dune",
+    "page": 2,
+    "source": {
+      "sourceId": "conformance-auto-build-src",
+      "name": "Conformance Auto-Build Source",
+      "baseUrl": "https://auto-build.example.test",
+      "rules": {
+        "search": [
+          {
+            "kind": "jsonPath",
+            "path": "$.books[*]"
+          }
+        ]
+      },
+      "bookSource": {
+        "bookSourceName": "Conformance Auto-Build Source",
+        "bookSourceUrl": "https://auto-build.example.test",
+        "searchUrl": "https://auto-build.example.test/search?q={{key}}&p={{page}}"
+      }
+    }
+  }
+}

@@ -1,0 +1,216 @@
+{
+  "suite_name": "AnalyzeUrl Build Suite",
+  "description": "Desensitized Legado book source URL patterns covering the AnalyzeUrl field matrix. Each case is replayed through AnalyzeUrl::build_request / build_request_with_js to validate the Rust port against Legado AnalyzeUrl.kt semantics. Domains use IETF-reserved example.test TLD.",
+  "legado_reference": "app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt",
+  "field_coverage_notes": [
+    "Supported JSON fields: method, charset, headers, body, retry, js, (follow_redirects is non-Legado).",
+    "Silently dropped fields (host responsibility / future work): type, webView, webJs, webViewDelayTime, origin, serverID.",
+    "Inline URL features: @js:, <js>...</js>, {{key}}/{{page}}/{{pageMinus}}/{{pagePlus}}, <a,b,c> page-list, legacy METHOD,url prefix."
+  ],
+  "cases": [
+    {
+      "id": "alpha-plain-get",
+      "description": "Plain GET with {{key}}/{{page}} static templates. Baseline case.",
+      "search_url": "https://alpha.example.test/search.php?q={{key}}&p={{page}}",
+      "keyword": "斗破苍穹",
+      "page": 2,
+      "base_url": "https://alpha.example.test",
+      "source_headers": {},
+      "expected": {
+        "url_contains": ["q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9", "p=2"],
+        "url_starts_with": "https://alpha.example.test/search.php?q=",
+        "method": "GET",
+        "body": null,
+        "charset": "utf-8"
+      }
+    },
+    {
+      "id": "beta-post-form-body",
+      "description": "POST with form-encoded body. Auto Content-Type should be set.",
+      "search_url": "https://beta.example.test/search,{\"method\":\"POST\",\"body\":\"keyword={{key}}&page={{page}}\"}",
+      "keyword": "test",
+      "page": 1,
+      "base_url": "https://beta.example.test",
+      "source_headers": {},
+      "expected": {
+        "url": "https://beta.example.test/search",
+        "method": "POST",
+        "body": "keyword=test&page=1",
+        "content_type_contains": "application/x-www-form-urlencoded"
+      }
+    },
+    {
+      "id": "gamma-post-gbk-charset",
+      "description": "POST with GBK charset (legacy Chinese site). Auto Content-Type should include charset=gbk. Note: body {{key}} uses UTF-8 percent-encoding (charset-aware body encoding is future work).",
+      "search_url": "https://gamma.example.test/search,{\"method\":\"POST\",\"charset\":\"gbk\",\"body\":\"searchkey={{key}}\"}",
+      "keyword": "斗罗大陆",
+      "page": 1,
+      "base_url": "https://gamma.example.test",
+      "source_headers": {},
+      "expected": {
+        "url": "https://gamma.example.test/search",
+        "method": "POST",
+        "body_contains": "searchkey=",
+        "charset": "gbk",
+        "content_type_contains": "charset=gbk"
+      }
+    },
+    {
+      "id": "delta-get-custom-headers",
+      "description": "GET with custom headers (User-Agent, Referer). Source-level headers are merged.",
+      "search_url": "https://delta.example.test/search?q={{key}}",
+      "keyword": "test",
+      "page": 1,
+      "base_url": "https://delta.example.test",
+      "source_headers": { "Referer": "https://delta.example.test/" },
+      "expected": {
+        "url_starts_with": "https://delta.example.test/search?q=",
+        "method": "GET",
+        "header_contains": {
+          "Referer": "https://delta.example.test/"
+        },
+        "header_present": ["User-Agent"]
+      }
+    },
+    {
+      "id": "epsilon-dsl-headers-override",
+      "description": "DSL headers override source-level headers (DSL wins on key collision).",
+      "search_url": "https://epsilon.example.test/search,{\"method\":\"GET\",\"headers\":{\"User-Agent\":\"Legado/1.0\"}}",
+      "keyword": "",
+      "page": 1,
+      "base_url": "https://epsilon.example.test",
+      "source_headers": { "User-Agent": "Default/0.1" },
+      "expected": {
+        "url": "https://epsilon.example.test/search",
+        "method": "GET",
+        "header_equals": {
+          "User-Agent": "Legado/1.0"
+        }
+      }
+    },
+    {
+      "id": "zeta-at-js-inline",
+      "description": "@js: inline JS expression. JS sandbox evaluates the expression with key/page/baseUrl in scope.",
+      "search_url": "@js:\"https://zeta.example.test/search?q=\" + key + \"&p=\" + page",
+      "keyword": "凡人修仙",
+      "page": 3,
+      "base_url": "https://zeta.example.test",
+      "source_headers": {},
+      "requires_js": true,
+      "expected": {
+        "url": "https://zeta.example.test/search?q=凡人修仙&p=3",
+        "method": "GET"
+      }
+    },
+    {
+      "id": "eta-js-tag-block",
+      "description": "<js>...</js> block JS. Returns a URL built from page variable.",
+      "search_url": "<js>\"https://eta.example.test/page/\" + page + \".html\"</js>",
+      "keyword": "",
+      "page": 5,
+      "base_url": "https://eta.example.test",
+      "source_headers": {},
+      "requires_js": true,
+      "expected": {
+        "url": "https://eta.example.test/page/5.html",
+        "method": "GET"
+      }
+    },
+    {
+      "id": "theta-page-list-single",
+      "description": "Page-list <1,2,3> pattern — picks first value for single-request build.",
+      "search_url": "https://theta.example.test/list/<1,2,3>.html?q={{key}}",
+      "keyword": "test",
+      "page": 1,
+      "base_url": "https://theta.example.test",
+      "source_headers": {},
+      "expected": {
+        "url": "https://theta.example.test/list/1.html?q=test",
+        "method": "GET"
+      }
+    },
+    {
+      "id": "iota-page-list-range",
+      "description": "Page-list <1-5> range pattern — picks first value (range low bound).",
+      "search_url": "https://iota.example.test/list/<1-5>.html?q={{key}}",
+      "keyword": "test",
+      "page": 1,
+      "base_url": "https://iota.example.test",
+      "source_headers": {},
+      "expected": {
+        "url": "https://iota.example.test/list/1.html?q=test",
+        "method": "GET"
+      }
+    },
+    {
+      "id": "kappa-post-retry",
+      "description": "POST with retry=3. HostHttpRetryPolicy should be set with max_attempts=3.",
+      "search_url": "https://kappa.example.test/api,{\"method\":\"POST\",\"body\":\"q={{key}}\",\"retry\":3}",
+      "keyword": "test",
+      "page": 1,
+      "base_url": "https://kappa.example.test",
+      "source_headers": {},
+      "expected": {
+        "url": "https://kappa.example.test/api",
+        "method": "POST",
+        "body": "q=test",
+        "retry_max_attempts": 3
+      }
+    },
+    {
+      "id": "lambda-dsl-js-option",
+      "description": "DSL js option (post-parse JS). JS result replaces URL.",
+      "search_url": "https://placeholder.example.test,{\"js\":\"\\\"https://lambda.example.test/k=\\\" + key\"}",
+      "keyword": "test",
+      "page": 1,
+      "base_url": "https://lambda.example.test",
+      "source_headers": {},
+      "requires_js": true,
+      "expected": {
+        "url": "https://lambda.example.test/k=test",
+        "method": "GET"
+      }
+    },
+    {
+      "id": "mu-relative-url",
+      "description": "Relative URL resolved against base_url.",
+      "search_url": "/search?q={{key}}",
+      "keyword": "test",
+      "page": 1,
+      "base_url": "https://mu.example.test",
+      "source_headers": {},
+      "expected": {
+        "url_starts_with": "https://mu.example.test/search?q=",
+        "method": "GET"
+      }
+    },
+    {
+      "id": "xi-page-minus-plus",
+      "description": "{{pageMinus}} and {{pagePlus}} templates for offset pagination.",
+      "search_url": "https://xi.example.test/search?p={{pageMinus}}&next={{pagePlus}}",
+      "keyword": "",
+      "page": 5,
+      "base_url": "https://xi.example.test",
+      "source_headers": {},
+      "expected": {
+        "url_contains": ["p=4", "next=6"],
+        "method": "GET"
+      }
+    },
+    {
+      "id": "omicron-at-js-with-retry",
+      "description": "@js: inline JS whose result is a complete DSL string with retry option. Per Legado analyzeJs() → analyzeUrl() flow, the JS result replaces ruleUrl and is then re-parsed for options.",
+      "search_url": "@js:'https://omicron.example.test/s=' + key + ',{\"retry\":2}'",
+      "keyword": "test",
+      "page": 1,
+      "base_url": "https://omicron.example.test",
+      "source_headers": {},
+      "requires_js": true,
+      "expected": {
+        "url": "https://omicron.example.test/s=test",
+        "method": "GET",
+        "retry_max_attempts": 2
+      }
+    }
+  ]
+}

@@ -28,6 +28,9 @@ const VALID_SOURCE_IMPORT_LEGADO_BOOKSOURCE: &str = include_str!(
 );
 const VALID_BOOK_SEARCH: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-book-search.json");
+const VALID_BOOK_SEARCH_AUTO_BUILD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/valid-book-search-auto-build.json"
+);
 const VALID_BOOK_DETAIL: &str =
     include_str!("../../../protocol/fixtures/conformance/commands/valid-book-detail.json");
 const VALID_BOOK_TOC: &str =
@@ -711,6 +714,56 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             other => Err(format!("unexpected book.search result {other:?}")),
         }
     });
+
+    // S3/S4 closure: when `searchResponse` and `searchRequest` are both
+    // absent but `keyword` is present, Core auto-builds the HTTP request
+    // from the source's Legado `searchUrl` template (AnalyzeUrl parity).
+    record(
+        &mut report,
+        "valid-command-book-search-auto-build-emits-http-host-request",
+        || {
+            let (_runtime, rx) = send_to_fresh_runtime(VALID_BOOK_SEARCH_AUTO_BUILD)?;
+            match recv_event(&rx)? {
+                Event::HostRequest {
+                    request_id,
+                    operation_id,
+                    capability,
+                    params,
+                    ..
+                } if request_id == 440
+                    && operation_id == 1
+                    && capability == HostCapability::HttpExecute =>
+                {
+                    let url = params
+                        .get("url")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| "host.request missing url".to_string())?;
+                    let method = params
+                        .get("method")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| "host.request missing method".to_string())?;
+                    if method != "GET" {
+                        return Err(format!("expected GET, got {method}"));
+                    }
+                    if !url.starts_with("https://auto-build.example.test/search?q=") {
+                        return Err(format!("unexpected url: {url}"));
+                    }
+                    if !url.contains("q=dune") {
+                        return Err(format!(
+                            "url should contain raw keyword 'dune' (ASCII safe), got: {url}"
+                        ));
+                    }
+                    if !url.contains("p=2") {
+                        return Err(format!("url should contain p=2, got: {url}"));
+                    }
+                    Ok(())
+                }
+                other => Err(format!(
+                    "expected HostRequest(HttpExecute) for auto-build, got {other:?}"
+                )),
+            }
+        },
+    );
 
     record(
         &mut report,
