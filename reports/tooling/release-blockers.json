@@ -645,24 +645,38 @@
         "entry/src/main/ets/platform/SystemTtsAdapter.ets",
         "AGENTS.md"
       ]
+    },
+    {
+      "capability": "legado.rule-engine.css-multirule",
+      "evidence_status": "failing",
+      "id": "rb-legado-css-multirule-operator",
+      "mitigation": "Split CSS/shorthand rules on &&/||/%% operators before feeding to scraper::Selector::parse (mirror evaluate_json_path_expression split logic). Legado AnalyzeRule.splitSourceRule does cross-type splitting.",
+      "platform": "all",
+      "reason": "Core only splits &&/||/%% in evaluate_json_path_expression (JSONPath layer). CSS/shorthand path feeds combined selectors (e.g. class.ser-ret@li||class.j_bookList@li) directly to scraper::Selector::parse which fails. Affects search/detail/toc for sources using MultiRule operators on CSS rules.",
+      "severity": "blocker",
+      "sources": [
+        "crates/reader-rule/src/lib.rs:1275-1305",
+        "tests/fixtures/remote_source/legado_yodu_multirule_vertical.json",
+        "tools/reader-cli/tests/fixture_vertical.rs:343"
+      ]
     }
   ],
   "generated_at": "2026-06-27T00:00:00Z",
   "summary": {
     "by_platform": {
-      "all": 46,
+      "all": 53,
       "android": 2,
       "harmony": 4,
       "ios": 0,
       "unknown": 0
     },
     "by_severity": {
-      "blocker": 0,
+      "blocker": 1,
       "high": 0,
-      "low": 44,
-      "medium": 8
+      "medium": 8,
+      "low": 44
     },
-    "total": 52
+    "total": 53
   },
   "tool": "release-blocker-register-generator",
   "version": "release-blockers/1"
