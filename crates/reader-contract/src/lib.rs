@@ -42,9 +42,15 @@ pub use remote::{
     ChapterContentData, ChapterContentParams, ChapterContentVia, HostHttpCookie, HostHttpRedirect,
     HostHttpRequest, HostHttpResponse, LocalBookCatalogData, LocalBookCatalogParams,
     LocalBookParseData, LocalBookParseParams, ReadingProgressUpdateData,
-    ReadingProgressUpdateParams, RemoteHttpDiagnosticsData, RssParseData, RssParseEntryData,
-    RssParseParams, RssRefreshData, RssRefreshParams, SourceImportData, SourceImportParams,
-    SyncBackupData, SyncBackupParams, SyncMergeData, SyncMergeParams,
+    ReadingProgressUpdateParams, RemoteHttpDiagnosticsData, ReplaceRuleCreateData,
+    ReplaceRuleCreateParams, ReplaceRuleData, ReplaceRuleDeleteData, ReplaceRuleDeleteParams,
+    ReplaceRuleListData, ReplaceRuleListParams, ReplaceRuleUpdateData, ReplaceRuleUpdateParams,
+    RssParseData, RssParseEntryData, RssParseParams, RssRefreshData, RssRefreshParams,
+    SourceExploreData, SourceExploreKindEntry, SourceExploreKindsData, SourceExploreKindsParams,
+    SourceExploreParams, SourceImportData, SourceImportParams, SyncBackupData, SyncBackupParams,
+    SyncMergeData, SyncMergeParams, TxtTocRuleCreateData, TxtTocRuleCreateParams, TxtTocRuleData,
+    TxtTocRuleDeleteData, TxtTocRuleDeleteParams, TxtTocRuleListData, TxtTocRuleListParams,
+    TxtTocRuleUpdateData, TxtTocRuleUpdateParams,
 };
 pub use tts::{
     TtsChapterPlanData, TtsChapterPlanParams, TtsChapterRef, TtsChapterTransition,
@@ -138,6 +144,38 @@ pub mod methods {
     /// (pure read, no host callback). Mirrors Legado's `Book` lookup by
     /// `(origin, bookUrl)`.
     pub const BOOKSHELF_GET: &str = "bookshelf.get";
+
+    // --- Explore vertical (V1 minimal) ------------------------------------
+    /// List discovery categories for a source (parses `exploreUrl`).
+    /// Mirrors Legado `BookSourceExtensions.getExploreUrl` +
+    /// `WebBook.getBookInfo` explore-kind split.
+    pub const SOURCE_EXPLORE_KINDS: &str = "source.exploreKinds";
+    /// Fetch a discovery category book list from a source. Core emits
+    /// `http.execute` for the category URL; host returns the response; Core
+    /// parses via `ruleExplore` (falls back to `ruleSearch` per Legado).
+    pub const SOURCE_EXPLORE: &str = "source.explore";
+
+    // --- TxtTocRule vertical (V1 minimal) ---------------------------------
+    /// Create a TXT-to-contents regex rule. Mirrors Legado `TxtTocRule.kt`
+    /// + `TextFile.kt:440-461` chapter-split algorithm.
+    pub const TXT_TOC_RULE_CREATE: &str = "txt-toc-rule.create";
+    /// List TXT-to-contents rules (optionally enabled-only).
+    pub const TXT_TOC_RULE_LIST: &str = "txt-toc-rule.list";
+    /// Update a TXT-to-contents rule (partial update by `id`).
+    pub const TXT_TOC_RULE_UPDATE: &str = "txt-toc-rule.update";
+    /// Delete a TXT-to-contents rule by `id`.
+    pub const TXT_TOC_RULE_DELETE: &str = "txt-toc-rule.delete";
+
+    // --- ReplaceRule vertical (V1 minimal) --------------------------------
+    /// Create a content replace rule. Mirrors Legado `ReplaceRule.kt` +
+    /// `ContentProcessor.kt:91` getContent() replace pipeline.
+    pub const REPLACE_RULE_CREATE: &str = "replace-rule.create";
+    /// List replace rules (optionally enabled-only).
+    pub const REPLACE_RULE_LIST: &str = "replace-rule.list";
+    /// Update a replace rule (partial update by `id`).
+    pub const REPLACE_RULE_UPDATE: &str = "replace-rule.update";
+    /// Delete a replace rule by `id` (idempotent).
+    pub const REPLACE_RULE_DELETE: &str = "replace-rule.delete";
 }
 
 /// Non-method capability names advertised by `core.info` in v1.
@@ -280,6 +318,16 @@ mod tests {
                 methods::LOCAL_BOOK_CATALOG,
                 methods::BOOKSHELF_LIST,
                 methods::BOOKSHELF_GET,
+                methods::REPLACE_RULE_CREATE,
+                methods::REPLACE_RULE_LIST,
+                methods::REPLACE_RULE_UPDATE,
+                methods::REPLACE_RULE_DELETE,
+                methods::SOURCE_EXPLORE_KINDS,
+                methods::SOURCE_EXPLORE,
+                methods::TXT_TOC_RULE_CREATE,
+                methods::TXT_TOC_RULE_LIST,
+                methods::TXT_TOC_RULE_UPDATE,
+                methods::TXT_TOC_RULE_DELETE,
             ]
         );
         assert!(!schema_examples.contains(&methods::LEGACY_CORE_PING));

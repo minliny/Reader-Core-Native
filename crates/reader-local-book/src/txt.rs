@@ -21,7 +21,8 @@
 //! implementation; callers must supply already-decoded `&str`. See the gap note
 //! in [`crate`] docs.
 
-use reader_domain::{Book, TocEntry};
+use reader_domain::{Book, TocEntry, TxtTocRule};
+use regex::Regex;
 
 /// Kind label stamped onto parsed books.
 const TXT_KIND: &str = "TXT";
@@ -401,6 +402,104 @@ fn strip_wrapping_brackets(s: &str) -> Option<&str> {
     None
 }
 
+/// Minimum body length (in `char`s) for a regex-matched segment to stand on
+/// its own as a chapter. Mirrors Legado's 1000-char de-dup heuristic
+/// (`TextFile.kt:440-461`): matches shorter than this are merged into the
+/// previous chapter to absorb false-positive heading detections.
+const MIN_CHAPTER_GAP_CHARS: usize = 1000;
+
+/// Split a TXT full-text into chapters using a Legado `TxtTocRule` regex.
+///
+/// Mirrors Legado `TextFile.kt:440-461`:
+/// 1. Compile `rule.rule` as a regex with multiline mode.
+/// 2. Scan the text with `find()` (not `is_match`) to capture heading text.
+/// 3. Each match starts a new chapter; the body is the text up to the next
+///    match (or end of document).
+/// 4. Segments shorter than [`MIN_CHAPTER_GAP_CHARS`] chars are merged into
+///    the previous chapter to avoid false-positive splits.
+/// 5. Empty/blank regex falls back to a single-chapter result.
+pub fn split_chapters(content: &str, rule: &TxtTocRule) -> Vec<TocEntry> {
+    split_chapters_with_body(content, rule)
+        .into_iter()
+        .map(|chapter| TocEntry {
+            index: chapter.index,
+            title: chapter.title,
+            url: String::new(),
+        })
+        .collect()
+}
+
+/// A single chapter produced by [`split_chapters_with_body`], carrying the
+/// body text alongside the title. Named to avoid collision with [`TxtChapter`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TxtTocSplitChapter {
+    pub index: u32,
+    pub title: String,
+    pub content: String,
+}
+
+/// Split a TXT full-text into titled chapters with their body text, using a
+/// Legado `TxtTocRule` regex. See [`split_chapters`] for the high-level
+/// contract and Legado parity rationale.
+pub fn split_chapters_with_body(content: &str, rule: &TxtTocRule) -> Vec<TxtTocSplitChapter> {
+    let pattern = rule.rule.trim();
+    if pattern.is_empty() {
+        return fallback_single_chapter(content);
+    }
+    let regex = match Regex::new(&format!("(?m){}", pattern)) {
+        Ok(re) => re,
+        Err(_) => return fallback_single_chapter(content),
+    };
+    let mut matches: Vec<_> = regex.find_iter(content).collect();
+    if matches.is_empty() {
+        return fallback_single_chapter(content);
+    }
+    // De-dup consecutive matches that are too close (Legado 1000-char gap).
+    let mut filtered: Vec<regex::Match<'_>> = Vec::new();
+    let mut last_end = 0usize;
+    for m in matches.drain(..) {
+        if filtered.is_empty() {
+            filtered.push(m);
+            last_end = m.end();
+            continue;
+        }
+        let gap = m.start().saturating_sub(last_end);
+        if gap < MIN_CHAPTER_GAP_CHARS {
+            // Too close to previous match — skip (treat as false positive).
+            continue;
+        }
+        filtered.push(m);
+        last_end = m.end();
+    }
+    if filtered.is_empty() {
+        return fallback_single_chapter(content);
+    }
+    let mut chapters = Vec::new();
+    for (i, m) in filtered.iter().enumerate() {
+        let title = m.as_str().trim().to_string();
+        let body_start = m.end();
+        let body_end = filtered
+            .get(i + 1)
+            .map(|next| next.start())
+            .unwrap_or(content.len());
+        let body = content[body_start..body_end].trim().to_string();
+        chapters.push(TxtTocSplitChapter {
+            index: i as u32,
+            title,
+            content: body,
+        });
+    }
+    chapters
+}
+
+fn fallback_single_chapter(content: &str) -> Vec<TxtTocSplitChapter> {
+    vec![TxtTocSplitChapter {
+        index: 0,
+        title: "正文".to_string(),
+        content: content.trim().to_string(),
+    }]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -488,5 +587,93 @@ mod tests {
         assert_eq!(parsed.chapter_body(0), Some("body-a"));
         assert_eq!(parsed.chapter_body(1), Some("body-b"));
         assert_eq!(parsed.chapter_body(99), None);
+    }
+
+    fn make_rule(pattern: &str) -> TxtTocRule {
+        TxtTocRule {
+            id: 1,
+            name: "test-rule".into(),
+            rule: pattern.into(),
+            example: None,
+            serial_number: -1,
+            enable: true,
+        }
+    }
+
+    fn pad(s: &str, target_chars: usize) -> String {
+        let mut out = s.to_string();
+        while out.chars().count() < target_chars {
+            out.push('x');
+        }
+        out
+    }
+
+    #[test]
+    fn split_chapters_empty_rule_falls_back_to_single_chapter() {
+        let rule = make_rule("");
+        let toc = split_chapters("hello world", &rule);
+        assert_eq!(toc.len(), 1);
+        assert_eq!(toc[0].index, 0);
+        assert_eq!(toc[0].title, "正文");
+    }
+
+    #[test]
+    fn split_chapters_invalid_regex_falls_back() {
+        let rule = make_rule("[unclosed");
+        let toc = split_chapters("anything", &rule);
+        assert_eq!(toc.len(), 1);
+        assert_eq!(toc[0].title, "正文");
+    }
+
+    #[test]
+    fn split_chapters_no_match_returns_single_chapter() {
+        let rule = make_rule(r"^第\d+章");
+        let toc = split_chapters("no chapter headings here", &rule);
+        assert_eq!(toc.len(), 1);
+        assert_eq!(toc[0].title, "正文");
+    }
+
+    #[test]
+    fn split_chapters_splits_on_regex_matches_with_gap() {
+        // Build content with two chapter headings separated by >=1000 chars
+        // so the gap heuristic doesn't merge them.
+        let body_a = pad("body-a-", MIN_CHAPTER_GAP_CHARS);
+        let body_b = pad("body-b-", MIN_CHAPTER_GAP_CHARS);
+        let content = format!("第一章 A\n{}\n第二章 B\n{}\n", body_a, body_b);
+        let rule = make_rule(r"^第[一二三四五六七八九十百千零\d]+章[^\n]*");
+        let toc = split_chapters(&content, &rule);
+        assert_eq!(toc.len(), 2);
+        assert_eq!(toc[0].index, 0);
+        assert_eq!(toc[0].title, "第一章 A");
+        assert_eq!(toc[1].index, 1);
+        assert_eq!(toc[1].title, "第二章 B");
+    }
+
+    #[test]
+    fn split_chapters_merges_close_matches_via_gap_heuristic() {
+        // Two matches closer than MIN_CHAPTER_GAP_CHARS should be de-duped:
+        // only the first becomes a chapter.
+        let short_body = "short body";
+        let content = format!("第一章 A\n{}\n第二章 B\nmore\n", short_body);
+        let rule = make_rule(r"^第[一二三四五六七八九十百千零\d]+章[^\n]*");
+        let toc = split_chapters(&content, &rule);
+        assert_eq!(toc.len(), 1, "close matches should merge into one chapter");
+        assert_eq!(toc[0].title, "第一章 A");
+    }
+
+    #[test]
+    fn split_chapters_with_body_returns_body_text() {
+        let body_a = pad("body-a-", MIN_CHAPTER_GAP_CHARS);
+        let body_b = pad("body-b-", MIN_CHAPTER_GAP_CHARS);
+        let content = format!("第一章 A\n{}\n第二章 B\n{}\n", body_a, body_b);
+        let rule = make_rule(r"^第[一二三四五六七八九十百千零\d]+章[^\n]*");
+        let chapters = split_chapters_with_body(&content, &rule);
+        assert_eq!(chapters.len(), 2);
+        assert_eq!(chapters[0].index, 0);
+        assert_eq!(chapters[0].title, "第一章 A");
+        assert!(chapters[0].content.starts_with("body-a-"));
+        assert_eq!(chapters[1].index, 1);
+        assert_eq!(chapters[1].title, "第二章 B");
+        assert!(chapters[1].content.starts_with("body-b-"));
     }
 }

@@ -1418,6 +1418,371 @@ pub struct BookshelfGetData {
     pub book: Option<BookshelfEntryData>,
 }
 
+// ===========================================================================
+// Source explore vertical (V1 minimal)
+// ===========================================================================
+//
+// Mirrors Legado `BookSourceExtensions.kt:44 getExploreKinds` +
+// `WebBook.kt:93 exploreBookAwait`. `source.exploreKinds` is a pure parse of
+// the `exploreUrl` field (no host callback); `source.explore` reuses the
+// `BookListRule` extraction pipeline and emits `http.execute` when no
+// prefetched response is supplied.
+
+/// One discovery category parsed from a Legado source's `exploreUrl` field.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SourceExploreKindEntry {
+    #[serde(default)]
+    pub title: String,
+    /// Absolute or source-relative URL. `None` is valid for category headers
+    /// that group children in Legado's UI.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+}
+
+/// Parameters for `source.exploreKinds`.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SourceExploreKindsParams {
+    /// Optional inline source definition. When omitted, Core looks up the
+    /// source by `sourceId` in storage.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<Value>,
+    /// Required when `source` is omitted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_id: Option<String>,
+    /// Optional explicit `exploreUrl` override. When omitted, Core reads
+    /// `bookSource.exploreUrl` from the resolved source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub explore_url: Option<String>,
+}
+
+/// Result data for `source.exploreKinds`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SourceExploreKindsData {
+    pub kinds: Vec<SourceExploreKindEntry>,
+}
+
+/// Parameters for `source.explore`.
+///
+/// Three modes (mirrors `book.search` ergonomics):
+/// 1. Prefetched: caller supplies `exploreResponse` — Core parses directly.
+/// 2. Pre-built request: caller supplies `exploreRequest` (URL/headers/body)
+///    — Core emits `http.execute` and resumes.
+/// 3. Auto-build: caller supplies only `url` (+ optional `page`) — Core
+///    runs `AnalyzeUrl` to build the request, emits `http.execute`, resumes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SourceExploreParams {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_id: Option<String>,
+    /// Discovery category URL (from `source.exploreKinds`). Required for
+    /// modes 2 and 3.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    /// 1-based page index (Legado default). Used by `AnalyzeUrl` for
+    /// `{{page}}` template expansion.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page: Option<u32>,
+    /// Prefetched response body. When present, Core parses directly and
+    /// does not emit `http.execute`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub explore_response: Option<String>,
+    /// Pre-built HTTP request descriptor. When present, Core emits
+    /// `http.execute` with these params and resumes on `host.complete`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub explore_request: Option<HostHttpRequest>,
+}
+
+/// Result data for `source.explore`. Mirrors `BookSearchData` shape.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SourceExploreData {
+    #[serde(default)]
+    pub source_id: String,
+    #[serde(default)]
+    pub books: Vec<BookSearchBookData>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub http: Option<RemoteHttpDiagnosticsData>,
+}
+
+// ===========================================================================
+// TxtTocRule vertical (V1 minimal) — pure CRUD, no host callback
+// ===========================================================================
+//
+// Mirrors Legado `TxtTocRule.kt` (entity) + `TxtTocRuleDao.kt` (CRUD).
+// Core owns the `txt_toc_rules` table; `reader-local-book` consumes the
+// stored rules during TXT chapter splitting (Legado `TextFile.kt:440-461`).
+
+fn default_txt_toc_rule_serial_number() -> i32 {
+    -1
+}
+
+/// Wire shape of a TXT chapter-rule. Mirrors `reader_domain::TxtTocRule`
+/// (which itself mirrors Legado `TxtTocRule.kt`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TxtTocRuleData {
+    pub id: i64,
+    #[serde(default)]
+    pub name: String,
+    /// Regex pattern string (Legado `rule` column).
+    #[serde(default)]
+    pub rule: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub example: Option<String>,
+    #[serde(default = "default_txt_toc_rule_serial_number")]
+    pub serial_number: i32,
+    #[serde(default = "default_true")]
+    pub enable: bool,
+}
+
+/// Parameters for `txt-toc-rule.create`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TxtTocRuleCreateParams {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub rule: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub example: Option<String>,
+    #[serde(default = "default_txt_toc_rule_serial_number")]
+    pub serial_number: i32,
+    #[serde(default = "default_true")]
+    pub enable: bool,
+    /// Optional caller-supplied id. When omitted, Core assigns a
+    /// monotonically increasing id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<i64>,
+}
+
+/// Result data for `txt-toc-rule.create`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TxtTocRuleCreateData {
+    pub rule: TxtTocRuleData,
+}
+
+/// Parameters for `txt-toc-rule.list`. All filters optional.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TxtTocRuleListParams {
+    /// When `true`, returns only rules with `enable = true`.
+    #[serde(default)]
+    pub enabled_only: Option<bool>,
+}
+
+/// Result data for `txt-toc-rule.list`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TxtTocRuleListData {
+    pub rules: Vec<TxtTocRuleData>,
+}
+
+/// Parameters for `txt-toc-rule.update`. `id` identifies the rule to update;
+/// all other fields are optional partial updates.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TxtTocRuleUpdateParams {
+    pub id: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rule: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub example: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub serial_number: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enable: Option<bool>,
+}
+
+/// Result data for `txt-toc-rule.update`. Returns the updated rule.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TxtTocRuleUpdateData {
+    pub rule: TxtTocRuleData,
+}
+
+/// Parameters for `txt-toc-rule.delete`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TxtTocRuleDeleteParams {
+    pub id: i64,
+}
+
+/// Result data for `txt-toc-rule.delete`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TxtTocRuleDeleteData {
+    pub id: i64,
+    /// `true` when a rule was actually removed; `false` when the id was
+    /// not present (idempotent delete).
+    pub deleted: bool,
+}
+
+// ===========================================================================
+// ReplaceRule vertical (V1 minimal) — pure CRUD, no host callback
+// ===========================================================================
+//
+// Mirrors Legado `ReplaceRule.kt` (entity) + `ReplaceRuleDao.kt` (CRUD) +
+// `ContentProcessor.kt:91` (getContent replace pipeline). Core owns the
+// `replace_rules` table; `reader-content::ContentProcessor` consumes stored
+// rules during chapter content processing.
+
+fn default_replace_rule_timeout_ms() -> i64 {
+    3000
+}
+
+/// Wire shape of a replace rule. Mirrors `reader_domain::ReplaceRule`
+/// (which itself mirrors Legado `ReplaceRule.kt`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReplaceRuleData {
+    pub id: i64,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    #[serde(default)]
+    pub pattern: String,
+    #[serde(default)]
+    pub replacement: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+    #[serde(default)]
+    pub scope_title: bool,
+    #[serde(default = "default_true")]
+    pub scope_content: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exclude_scope: Option<String>,
+    #[serde(default = "default_true")]
+    pub is_enabled: bool,
+    #[serde(default = "default_true")]
+    pub is_regex: bool,
+    #[serde(default = "default_replace_rule_timeout_ms")]
+    pub timeout_millisecond: i64,
+    #[serde(default)]
+    pub order: i32,
+}
+
+/// Parameters for `replace-rule.create`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReplaceRuleCreateParams {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    #[serde(default)]
+    pub pattern: String,
+    #[serde(default)]
+    pub replacement: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+    #[serde(default)]
+    pub scope_title: bool,
+    #[serde(default = "default_true")]
+    pub scope_content: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exclude_scope: Option<String>,
+    #[serde(default = "default_true")]
+    pub is_enabled: bool,
+    #[serde(default = "default_true")]
+    pub is_regex: bool,
+    #[serde(default = "default_replace_rule_timeout_ms")]
+    pub timeout_millisecond: i64,
+    #[serde(default)]
+    pub order: i32,
+    /// Optional caller-supplied id. When omitted, Core assigns a
+    /// monotonically increasing id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<i64>,
+}
+
+/// Result data for `replace-rule.create`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReplaceRuleCreateData {
+    pub rule: ReplaceRuleData,
+}
+
+/// Parameters for `replace-rule.list`. All filters optional.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReplaceRuleListParams {
+    /// When `true`, returns only rules with `isEnabled = true`.
+    #[serde(default)]
+    pub enabled_only: Option<bool>,
+}
+
+/// Result data for `replace-rule.list`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReplaceRuleListData {
+    pub rules: Vec<ReplaceRuleData>,
+}
+
+/// Parameters for `replace-rule.update`. `id` identifies the rule to update;
+/// all other fields are optional partial updates.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReplaceRuleUpdateParams {
+    pub id: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replacement: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope_title: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope_content: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exclude_scope: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_regex: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_millisecond: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub order: Option<i32>,
+}
+
+/// Result data for `replace-rule.update`. Returns the updated rule.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReplaceRuleUpdateData {
+    pub rule: ReplaceRuleData,
+}
+
+/// Parameters for `replace-rule.delete`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReplaceRuleDeleteParams {
+    pub id: i64,
+}
+
+/// Result data for `replace-rule.delete`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReplaceRuleDeleteData {
+    pub id: i64,
+    /// `true` when a rule was actually removed; `false` when the id was
+    /// not present (idempotent delete).
+    pub deleted: bool,
+}
+
 /// Helper: parse a typed params object from a `Command`'s free-form params,
 /// producing a structured `INVALID_PARAMS` error on failure.
 pub fn parse_params<T: for<'de> Deserialize<'de>>(
