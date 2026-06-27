@@ -1,0 +1,31 @@
+{
+  "source_id": "corpus-5ba6c58f3dd3",
+  "source_name": "起点读书（优+++）",
+  "recorded_at": "1970-01-01T00:00:1782579780Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://api-x.shrtxs.cn/qd/{{source.key}}/search.php?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "accept-ranges": "bytes",
+        "connection": "keep-alive",
+        "content-length": "856",
+        "content-type": "text/html",
+        "date": "Sat, 27 Jun 2026 17:03:01 GMT",
+        "etag": "\"6a3e0c27-358\"",
+        "last-modified": "Fri, 26 Jun 2026 05:20:39 GMT",
+        "server": "nginx",
+        "x-cache-status": "EXPIRED"
+      },
+      "response_body": "<!DOCTYPE html>\r\n<html lang=\"zh-CN\">\r\n<head>\r\n<meta charset=\"utf-8\">\r\n<title>正在打开,请稍等一下...</title>\r\n<script>\r\nvar _hmt = _hmt || [];\r\n(function() {\r\n  var hm = document.createElement(\"script\");\r\n  hm.src = \"https://hm.baidu.com/hm.js?f737e74c1cdd86131444d6da2e1b6e06\";\r\n  var s = document.getElementsByTagName(\"script\")[0]; \r\n  s.parentNode.insertBefore(hm, s);\r\n})();\r\n</script>\r\n<script>\r\nvar _czc = _czc || [];\r\n(function () {\r\n\tvar um = document.createElement(\"script\");\r\n\tum.src = \"https://v1.cnzz.com/z.js?id=1281486522&async=1\";\r\n\tvar s = document.getElementsByTagName(\"script\")[0];\r\n\ts.parentNode.insertBefore(um, s);\r\n})();\r\n</script>\r\n<script>\r\n// 页面加载后立即跳转\r\nwindow.location.href = \"http://tzdlyyhdfgtuirb-thjhsyiod-1022447470.ap-northeast-1.elb.amazonaws.com/?shareName=165dd1900\";\r\n</script>\r\n</head>\r\n<body>",
+      "final_url": "https://v2ke.veryrich178.xyz/news.html"
+    }
+  ]
+}

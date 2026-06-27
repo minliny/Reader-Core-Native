@@ -1,0 +1,33 @@
+{
+  "source_id": "corpus-3e017746ca49",
+  "source_name": "篱笆文学（优+++）",
+  "recorded_at": "1970-01-01T00:00:1782579827Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://www.baidu.com/s?wd=site%3Awww.libahao.com + %20%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&pn={{(page - 1) * 10}}",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86 64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "connection": "keep-alive",
+        "content-length": "1488",
+        "content-type": "text/html",
+        "date": "Sat, 27 Jun 2026 17:03:47 GMT",
+        "etag": "W/\"6a16600d-5d0\"",
+        "last-modified": "Wed, 27 May 2026 03:07:57 GMT",
+        "server": "BWS",
+        "set-cookie": "BAIDUID=3AB68888E436C7026936D8B93E5C7DDF:FG=1; Path=/; Domain=baidu.com; Max-Age=31536000",
+        "strict-transport-security": "max-age=31536000",
+        "tracecode": "16559304860367322122062801",
+        "vary": "Accept-Encoding"
+      },
+      "response_body": "<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n    <meta charset=\"utf-8\">\n    <title>百度安全验证</title>\n    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n    <meta name=\"apple-mobile-web-app-capable\" content=\"yes\">\n    <meta name=\"apple-mobile-web-app-status-bar-style\" content=\"black\">\n    <meta name=\"viewport\" content=\"width=device-width, user-scalable=no, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0\">\n    <meta name=\"format-detection\" content=\"telephone=no, email=no\">\n    <link rel=\"shortcut icon\" href=\"https://www.baidu.com/favicon.ico\" type=\"image/x-icon\">\n    <link rel=\"icon\" sizes=\"any\" mask href=\"https://www.baidu.com/img/baidu.svg\">\n    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=Edge\">\n    <meta http-equiv=\"Content-Security-Policy\" content=\"upgrade-insecure-requests\">\n    <link rel=\"stylesheet\" href=\"https://ppui-static-wap.cdn.bcebos.com/static/touch/css/api/mkdjump_aac6df1.css\" />\n</head>\n<body>\n    <div class=\"timeout hide-callback\">\n        <div class=\"timeout-img\"></div>\n        <div class=\"timeout-title\">网络不给力，请稍后重试</div>\n        <button type=\"button\" class=\"timeout-button\">返回首页</button>\n    </div>\n    <div class=\"timeout-feedback hide-callback\">\n        <div class=\"timeout-feedback-icon\"></div>\n        <p class=\"timeout-feedback-title\">问题反馈</p>\n    </div>\n\n<script src=\"https://ppui-static-wap.cdn.bcebos.com/static/touch/js/mkdjump_v2_21d1ae1.js\"></script>\n</body>\n</html>\n",
+      "final_url": "https://wappass.baidu.com/static/captcha/tuxing_v2.html?&logid=13220612299248269267&ak=c27bbc89afca0463650ac9bde68ebe06&backurl=https%3A%2F%2Fwww.baidu.com%2Fs%3Fwd%3Dsite%253Awww.libahao.com%2520%2B%2520%2520%25E6%2596%2597%25E7%25A0%25B4%25E8%258B%258D%25E7%25A9%25B9%26pn%3D%7B%7B%28page%2520-%25201%29%2520%2A%252010%7D%7D&ext=x9G9QDmMXq%2FNo87gjGO0PwbPXBFZd1Qq8b6GH06rhaxSIPuPx9h9pmFSYtnJpM3nUgqUK9LXd1cIlztrhMwiv%2BgoIgx4QnrePuUoCytc7MGffrQ75%2FiuCREDQw5HK7ojSCAe1EQ3IsG%2BFn2u6CQ8X2RK9zh4MEdXtvb0YKrBLGhxVau99LtSYCIfwtv7By0w&signature=bbac9b87fb329aca41e547a4887021ea&timestamp=1782579827"
+    }
+  ]
+}

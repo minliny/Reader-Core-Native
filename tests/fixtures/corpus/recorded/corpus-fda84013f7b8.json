@@ -1,0 +1,30 @@
+{
+  "source_id": "corpus-fda84013f7b8",
+  "source_name": "八零小说（优++）",
+  "recorded_at": "1970-01-01T00:00:1782580214Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "http://wap.80zw.la/modules/article/search.php",
+      "method": "POST",
+      "request_headers": {
+        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": "searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "response_status": 200,
+      "response_headers": {
+        "cache-control": "max-age=600",
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=UTF-8",
+        "date": "Sat, 27 Jun 2026 17:10:13 GMT",
+        "server": "nginx",
+        "transfer-encoding": "chunked",
+        "x-cache-status": "HIT"
+      },
+      "response_body": "<!DOCTYPE html PUBLIC \"-//WAPFORUM//DTD XHTML Mobile 1.0//EN\" \"http://www.wapforum.org/DTD/xhtml-mobile10.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head>\n<title>与”“的小说_八零TXT电子书手机版(wap.80ge.info)</title>\n<meta charset=\"utf-8\" />\n<meta name=\"MobileOptimized\" content=\"240\"/>\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0\" />\n<link rel=\"shortcut icon\" href=\"/favicon.ico\" />\n<meta http-equiv=\"Cache-Control\" content=\"max-age=0\" />\n<meta http-equiv=\"Cache-Control\" content=\"no-transform \" />\n<link rel=\"stylesheet\" type=\"text/css\" href=\"/css/style.css\" />\n<script type=\"text/javascript\" src=\"https://libs.baidu.com/jquery/1.4.2/jquery.min.js\"></script>\n<script src=\"/js/80geinfo.js\"></script>\n<script src=\"/js/denglu.js\"></script>\n</head>\n<body>\n<div class=\"header\" id=\"bqgmb_head\">\n    <div class=\"back\"><a href=\"javascript:history.go(-1);\">返回</a></div>\n    <h1 id=\"bqgmb_h1\"></h1>\n    <div class=\"back_r\"><a href=\"/\">首页</a></div>\n</div>\n<div class=\"nav\">\n    <ul>\n        <li><a href=\"/\">首页</a></li>\n        <li><a href=\"/type.html\">分类</a></li>\n        <li><a href=\"/top/full-1.html\">全本</a></li>\n        <li><a href=\"/top.html\">排行</a></li>\n        <li><a href=\"/bookcase.php\">书架</a></li>\n        <div class=\"cc\"></div>\n    </ul>\n</div>\n<script>search();</script>\n<div class=\"cover\">\n</div>\n<div class=\"footer\">\n  <ul>\n    <li><a href=\"/\">首页</a></li>\n    <li><a href=\"http://www.80ge.info/\">电脑版</a></li>\n    <li><a href=\"/bookcase.php\">书架</a></li>\n  </ul>\n</div>\n</body>\n</html>",
+      "final_url": "http://wap.80ge.info/modules/article/search.php"
+    }
+  ]
+}

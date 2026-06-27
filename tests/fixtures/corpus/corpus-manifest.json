@@ -9445,5 +9445,168 @@
     "P0": 299,
     "P1": 160,
     "P2": 0
+  },
+  "recorded_sources": {
+    "count": 15,
+    "recorded_at": "2026-06-27T17:12:54Z",
+    "record_dir": "tests/fixtures/corpus/recorded",
+    "offline_report": "reports/tooling/corpus-batch-offline-v2.json",
+    "keyword": "斗破苍穹",
+    "sources": [
+      {
+        "id": "corpus-234953cc1630",
+        "file": "corpus-234953cc1630.json",
+        "name": "鲸云轻说（优++）",
+        "levels_recorded": [
+          "L2-search"
+        ],
+        "step_count": 1,
+        "keyword": "斗破苍穹"
+      },
+      {
+        "id": "corpus-2871a068d407",
+        "file": "corpus-2871a068d407.json",
+        "name": "幻梦轻说（优++）",
+        "levels_recorded": [
+          "L2-search"
+        ],
+        "step_count": 1,
+        "keyword": "斗破苍穹"
+      },
+      {
+        "id": "corpus-3e017746ca49",
+        "file": "corpus-3e017746ca49.json",
+        "name": "篱笆文学（优+++）",
+        "levels_recorded": [
+          "L2-search"
+        ],
+        "step_count": 1,
+        "keyword": "斗破苍穹"
+      },
+      {
+        "id": "corpus-43a001180a2b",
+        "file": "corpus-43a001180a2b.json",
+        "name": "猫眼看书（优++）",
+        "levels_recorded": [
+          "L2-search",
+          "L3-detail",
+          "L4-toc"
+        ],
+        "step_count": 3,
+        "keyword": "斗破苍穹"
+      },
+      {
+        "id": "corpus-55bbc61d2c40",
+        "file": "corpus-55bbc61d2c40.json",
+        "name": "阅读书库（优）",
+        "levels_recorded": [
+          "L2-search"
+        ],
+        "step_count": 1,
+        "keyword": "斗破苍穹"
+      },
+      {
+        "id": "corpus-5ba6c58f3dd3",
+        "file": "corpus-5ba6c58f3dd3.json",
+        "name": "起点读书（优+++）",
+        "levels_recorded": [
+          "L2-search"
+        ],
+        "step_count": 1,
+        "keyword": "斗破苍穹"
+      },
+      {
+        "id": "corpus-907e8dac7c35",
+        "file": "corpus-907e8dac7c35.json",
+        "name": "神凑轻说（优++）",
+        "levels_recorded": [
+          "L2-search"
+        ],
+        "step_count": 1,
+        "keyword": "斗破苍穹"
+      },
+      {
+        "id": "corpus-9526efd2765c",
+        "file": "corpus-9526efd2765c.json",
+        "name": "速读谷吧（优）",
+        "levels_recorded": [
+          "L2-search",
+          "L3-detail",
+          "L4-toc"
+        ],
+        "step_count": 3,
+        "keyword": "斗破苍穹"
+      },
+      {
+        "id": "corpus-9b6374dee03c",
+        "file": "corpus-9b6374dee03c.json",
+        "name": "镇魂小说（优++）",
+        "levels_recorded": [
+          "L2-search"
+        ],
+        "step_count": 1,
+        "keyword": "斗破苍穹"
+      },
+      {
+        "id": "corpus-a5f6fb83e3ff",
+        "file": "corpus-a5f6fb83e3ff.json",
+        "name": "异轻纵然（优++）",
+        "levels_recorded": [
+          "L2-search"
+        ],
+        "step_count": 1,
+        "keyword": "斗破苍穹"
+      },
+      {
+        "id": "corpus-b31668f7c67c",
+        "file": "corpus-b31668f7c67c.json",
+        "name": "话本小说（优++）",
+        "levels_recorded": [
+          "L2-search"
+        ],
+        "step_count": 1,
+        "keyword": "斗破苍穹"
+      },
+      {
+        "id": "corpus-c4837d6b6896",
+        "file": "corpus-c4837d6b6896.json",
+        "name": "天天看书（优+++）",
+        "levels_recorded": [
+          "L2-search"
+        ],
+        "step_count": 1,
+        "keyword": "斗破苍穹"
+      },
+      {
+        "id": "corpus-ce0638ede7d7",
+        "file": "corpus-ce0638ede7d7.json",
+        "name": "五丁音乐（优+）",
+        "levels_recorded": [
+          "L2-search"
+        ],
+        "step_count": 1,
+        "keyword": "斗破苍穹"
+      },
+      {
+        "id": "corpus-d677bb837f20",
+        "file": "corpus-d677bb837f20.json",
+        "name": "全英文学（英）",
+        "levels_recorded": [
+          "L2-search"
+        ],
+        "step_count": 1,
+        "keyword": "斗破苍穹"
+      },
+      {
+        "id": "corpus-fda84013f7b8",
+        "file": "corpus-fda84013f7b8.json",
+        "name": "八零小说（优++）",
+        "levels_recorded": [
+          "L2-search"
+        ],
+        "step_count": 1,
+        "keyword": "斗破苍穹"
+      }
+    ]
   }
 }
