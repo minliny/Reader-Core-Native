@@ -114,7 +114,7 @@ pub fn parse_epub_book(input: LocalBookInput<'_>) -> Result<LocalBook, LocalBook
             title,
             author,
             cover_url: None,
-            intro: None,
+            intro: opf.description.clone(),
             kind: Some(EPUB_KIND.to_string()),
             last_chapter: chapters.last().map(|c| c.title.clone()),
         },
@@ -176,6 +176,9 @@ fn extract_rootfile_path(container_xml: &str) -> Option<String> {
 struct OpfPackage {
     title: Option<String>,
     author: Option<String>,
+    /// Book description / summary from `<dc:description>` (Legado's
+    /// `upBookInfo` populates `book.intro` from `metadata.descriptions[0]`).
+    description: Option<String>,
     /// id → href (relative to OPF directory)
     manifest: Vec<(String, String)>,
     /// Ordered list of manifest ids from spine
@@ -196,6 +199,14 @@ fn parse_opf(xml: &str) -> Result<OpfPackage, LocalBookError> {
     // Author
     if let Some(text) = extract_xml_text(xml, "dc:creator") {
         pkg.author = Some(text.trim().to_string()).filter(|s| !s.is_empty());
+    }
+    // Description (Legado parity: `upBookInfo` reads `metadata.descriptions[0]`
+    // and runs it through Jsoup.parse(...).text() to strip XML/HTML wrappers
+    // and decode entities. We mirror that via strip_html_tags +
+    // decode_html_entities + collapse_whitespace.)
+    if let Some(text) = extract_xml_text(xml, "dc:description") {
+        let stripped = collapse_whitespace(&decode_html_entities(&strip_html_tags(&text)));
+        pkg.description = Some(stripped).filter(|s| !s.is_empty());
     }
 
     // Manifest items: <item id="..." href="..." media-type="..." [properties="..."]/>
@@ -558,6 +569,31 @@ mod tests {
         assert_eq!(pkg.manifest.len(), 2);
         assert_eq!(pkg.spine, vec!["ch1".to_string()]);
         assert_eq!(pkg.nav_href.as_deref(), Some("nav.xhtml"));
+    }
+
+    #[test]
+    fn parse_opf_extracts_description_stripping_html() {
+        // Legado's upBookInfo reads metadata.descriptions[0] and runs it
+        // through Jsoup.parse(...).text() to strip XML/HTML wrappers and
+        // decode entities. We mirror that by stripping tags and decoding
+        // entities inside <dc:description>.
+        let opf = r#"<package version="3.0"><metadata><dc:title>With Desc</dc:title><dc:description><p>A brief intro.</p></dc:description></metadata><manifest><item id="ch1" href="ch1.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="ch1"/></spine></package>"#;
+        let pkg = parse_opf(opf).unwrap();
+        assert_eq!(pkg.description.as_deref(), Some("A brief intro."));
+    }
+
+    #[test]
+    fn parse_opf_description_decodes_entities() {
+        let opf = r#"<package version="3.0"><metadata><dc:title>Ent</dc:title><dc:description>A &amp; B &lt;tag&gt;</dc:description></metadata><manifest><item id="ch1" href="ch1.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="ch1"/></spine></package>"#;
+        let pkg = parse_opf(opf).unwrap();
+        assert_eq!(pkg.description.as_deref(), Some("A & B <tag>"));
+    }
+
+    #[test]
+    fn parse_opf_description_blank_when_missing() {
+        let opf = r#"<package version="3.0"><metadata><dc:title>No Desc</dc:title></metadata><manifest><item id="ch1" href="ch1.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="ch1"/></spine></package>"#;
+        let pkg = parse_opf(opf).unwrap();
+        assert!(pkg.description.is_none());
     }
 
     #[test]

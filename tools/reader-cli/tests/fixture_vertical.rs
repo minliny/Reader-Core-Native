@@ -297,10 +297,7 @@ fn fixture_vertical_runs_legado_zhuishu_json_real_source_pipeline() {
     );
     assert_eq!(events[4]["data"]["book"]["title"], "斗破苍穹");
     assert_eq!(events[4]["data"]["book"]["author"], "天蚕土豆");
-    assert_eq!(
-        events[4]["data"]["book"]["lastChapter"],
-        "第一章 五帝破空"
-    );
+    assert_eq!(events[4]["data"]["book"]["lastChapter"], "第一章 五帝破空");
 
     // 6. toc — succeeds after rb-legado-jsonpath-html-suffix fix
     assert_eq!(
@@ -309,13 +306,9 @@ fn fixture_vertical_runs_legado_zhuishu_json_real_source_pipeline() {
         events[5]
     );
     let chapters = events[5]["data"]["toc"].as_array().unwrap();
-    assert!(
-        !chapters.is_empty(),
-        "toc should return non-empty chapters"
-    );
+    assert!(!chapters.is_empty(), "toc should return non-empty chapters");
     assert_eq!(
-        chapters[0]["title"],
-        "1.第一章 陨落的天才",
+        chapters[0]["title"], "1.第一章 陨落的天才",
         "first chapter title should be extracted via $.t"
     );
     // rb-legado-json-url-template-jsonpath: chapterUrl {{$.l}} must expand.
@@ -333,12 +326,12 @@ fn fixture_vertical_runs_legado_zhuishu_json_real_source_pipeline() {
         "chapter should succeed, got {:?}",
         events[6]
     );
-    assert_eq!(
-        events[6]["data"]["chapterTitle"],
-        "1.第一章 陨落的天才"
-    );
+    assert_eq!(events[6]["data"]["chapterTitle"], "1.第一章 陨落的天才");
     assert!(
-        !events[6]["data"]["content"].as_str().unwrap_or("").is_empty(),
+        !events[6]["data"]["content"]
+            .as_str()
+            .unwrap_or("")
+            .is_empty(),
         "chapter content should be non-empty"
     );
 

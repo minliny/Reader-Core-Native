@@ -3,8 +3,8 @@
 //! Builds the EPUB parser against Legado `EpubFile.kt` semantics:
 //! ZIP container + META-INF/container.xml + OPF (metadata/manifest/spine)
 //! + EPUB3 nav / EPUB2 NCX / spine fallback + XHTML body extraction with
-//! script/style stripping. Fixtures are the sanitized samples from
-//! Reader-Core's `format_differential` manifest.
+//!   script/style stripping. Fixtures are the sanitized samples from
+//!   Reader-Core's `format_differential` manifest.
 
 use reader_local_book::{parse_epub_book, LocalBookFormat, LocalBookInput};
 

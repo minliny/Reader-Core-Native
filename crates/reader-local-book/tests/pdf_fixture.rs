@@ -31,7 +31,7 @@ fn parses_pdf_text_page_pdfkit() {
     assert_eq!(book.format, LocalBookFormat::Pdf);
     // Manifest: minimumChapterCount=1, expectedChapterTitles=["Page 1"].
     assert!(
-        book.chapters.len() >= 1,
+        !book.chapters.is_empty(),
         "expected >=1 chapter, got {}",
         book.chapters.len()
     );
@@ -55,7 +55,7 @@ fn pdf_empty_text_yields_ocr_unavailable_chapter() {
 
     assert_eq!(book.format, LocalBookFormat::Pdf);
     assert!(
-        book.chapters.len() >= 1,
+        !book.chapters.is_empty(),
         "expected >=1 chapter even when text is unavailable, got {}",
         book.chapters.len()
     );

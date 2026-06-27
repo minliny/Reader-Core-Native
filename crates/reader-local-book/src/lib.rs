@@ -817,19 +817,14 @@ pub enum LocalBookEncoding {
 }
 
 /// Chapter split strategy labels from the legacy Reader-Core local-book model.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ChapterSplitPattern {
     Regex,
     Size,
     Marker,
+    #[default]
     Auto,
-}
-
-impl Default for ChapterSplitPattern {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 /// Portable TXT chapter split policy.
@@ -3903,7 +3898,7 @@ pub fn parse_webdav_descriptor_artifact(
         identifier: source_identifier.or(etag),
         remote_path,
         resource,
-        input_byte_count: request.descriptor_json.as_bytes().len() as u64,
+        input_byte_count: request.descriptor_json.len() as u64,
         content_checksum_count: 1,
         full_content_persisted_count: 0,
         diagnostic: diagnostic.clone(),
@@ -4917,9 +4912,7 @@ pub fn parse_local_book(input: LocalBookInput<'_>) -> Result<LocalBook, LocalBoo
     if input.bytes.is_empty() {
         return Err(LocalBookError::EmptyInput);
     }
-    let declared = input
-        .file_name
-        .and_then(|n| declared_format_from_extension(n));
+    let declared = input.file_name.and_then(declared_format_from_extension);
     let format = detect_local_book_format_from_bytes(input.bytes, declared);
     match format {
         LocalBookFormat::Txt => parse_txt_book(input),
@@ -8356,8 +8349,8 @@ mod tests {
         let snapshot = build_local_book_library_store_snapshot(
             1_700_000_000,
             &catalog,
-            &[progress.clone()],
-            &[cache.clone()],
+            std::slice::from_ref(&progress),
+            std::slice::from_ref(&cache),
         )
         .unwrap();
 
@@ -9110,7 +9103,8 @@ mod tests {
         let entry = catalog_entry(&existing);
 
         let exact =
-            decide_local_book_duplicate(&existing, Some("same.txt"), &[entry.clone()]).unwrap();
+            decide_local_book_duplicate(&existing, Some("same.txt"), std::slice::from_ref(&entry))
+                .unwrap();
         assert_eq!(
             exact,
             LocalBookDuplicateResult {
@@ -9152,9 +9146,12 @@ mod tests {
         let entry = catalog_entry(&existing);
 
         let same_semantic = fingerprint("full-b", "title", Some("author"), 2);
-        let result =
-            decide_local_book_duplicate(&same_semantic, Some("other.txt"), &[entry.clone()])
-                .unwrap();
+        let result = decide_local_book_duplicate(
+            &same_semantic,
+            Some("other.txt"),
+            std::slice::from_ref(&entry),
+        )
+        .unwrap();
         assert_eq!(
             result.decision,
             LocalBookDuplicateDecision::SameSemanticBook
@@ -9170,13 +9167,15 @@ mod tests {
 
         let different_author = fingerprint("full-c", "title", Some("other-author"), 2);
         let result =
-            decide_local_book_duplicate(&different_author, None, &[entry.clone()]).unwrap();
+            decide_local_book_duplicate(&different_author, None, std::slice::from_ref(&entry))
+                .unwrap();
         assert_eq!(result.decision, LocalBookDuplicateDecision::Unrelated);
         assert_eq!(result.reason_codes, vec!["same_title_different_author"]);
 
         let different_edition = fingerprint("full-d", "title", Some("author"), 3);
         let result =
-            decide_local_book_duplicate(&different_edition, None, &[entry.clone()]).unwrap();
+            decide_local_book_duplicate(&different_edition, None, std::slice::from_ref(&entry))
+                .unwrap();
         assert_eq!(
             result.decision,
             LocalBookDuplicateDecision::DifferentEdition
@@ -10418,6 +10417,97 @@ mod tests {
         let err = parse_txt_book(input("bad", &[0xff, 0x00, 0x80])).unwrap_err();
 
         assert_eq!(err, LocalBookError::UnsupportedEncoding);
+    }
+
+    #[test]
+    fn gbk_encoded_chinese_txt_is_decoded() {
+        // "第一章 开始\n正文" encoded in GBK (the dominant non-UTF-8 Chinese
+        // encoding that Legado's EncodingDetect returns). Bytes verified
+        // against the GBK code page: 第=B5DA 一=D2BB 章=D5C2 SP=20
+        // 开=BFAA 始=CABC LF=0A 正=D5FD 文=CEC4.
+        let gbk_bytes: &[u8] = &[
+            0xB5, 0xDA, 0xD2, 0xBB, 0xD5, 0xC2, 0x20, 0xBF, 0xAA, 0xCA, 0xBC, 0x0A, 0xD5, 0xFD,
+            0xCE, 0xC4,
+        ];
+
+        let book = parse_txt_book(input("gbk", gbk_bytes)).unwrap();
+
+        assert_eq!(book.encoding, LocalBookEncoding::Gbk);
+        assert_eq!(book.toc[0].title, "第一章 开始");
+        assert_eq!(book.chapters[0].content, "正文");
+    }
+
+    #[test]
+    fn gb18030_label_is_assigned_when_gbk_path_is_not_clean() {
+        // encoding_rs::GBK is itself a GB18030-compatible superset decoder,
+        // so in practice the GBK path accepts most GB18030 content and gets
+        // labeled `Gbk`. The `Gb18030` fallback exists for edge cases where
+        // GBK emits replacements but GB18030 decodes cleanly. We verify the
+        // decode succeeds and produces either label (both are valid for
+        // Legado parity — both decode the same Chinese text).
+        let text = "第一章 测试\n正文";
+        let (bytes, _encoding, _had_errors) = encoding_rs::GBK.encode(text);
+        let book = parse_txt_book(input("gb-label", bytes.as_ref())).unwrap();
+        assert!(
+            book.encoding == LocalBookEncoding::Gbk || book.encoding == LocalBookEncoding::Gb18030,
+            "expected GBK or GB18030 label, got {:?}",
+            book.encoding
+        );
+        assert_eq!(book.toc[0].title, "第一章 测试");
+        assert_eq!(book.chapters[0].content, "正文");
+    }
+
+    #[test]
+    fn long_no_heading_txt_splits_into_size_chunks() {
+        // Build a >10 KiB body with no chapter headings. Legado's
+        // `analyze()` no-pattern path splits this into ~10 KiB chunks at
+        // newline boundaries; we mirror that.
+        let paragraph = "这是一段没有章节标题的正文内容，用于测试无标题长文本的分块逻辑。\n";
+        let mut text = String::new();
+        // ~500 paragraphs * ~30 chars * 3 bytes/char ≈ 45 KiB > 10 KiB.
+        for _ in 0..500 {
+            text.push_str(paragraph);
+        }
+
+        let book = parse_txt_text("long-no-heading", None, None, None, &text).unwrap();
+
+        // Must split into multiple chapters (not single "正文").
+        assert!(
+            book.chapters.len() > 1,
+            "expected multiple size-split chapters, got {}",
+            book.chapters.len()
+        );
+        // Titles follow Legado's `第{block}章({n})` format.
+        assert!(
+            book.chapters[0].title.starts_with("第1章("),
+            "first chapter title should follow Legado format, got: {}",
+            book.chapters[0].title
+        );
+        // Concatenated chapter bodies must reconstruct the original text
+        // (no content lost at boundaries).
+        let mut reconstructed = String::new();
+        for chapter in &book.chapters {
+            reconstructed.push_str(&chapter.content);
+            reconstructed.push('\n');
+        }
+        // The reconstruction has trailing newlines from each chapter; trim
+        // before comparing to the trimmed original.
+        let original_trimmed = text.trim_end();
+        let reconstructed_trimmed = reconstructed.trim_end();
+        assert_eq!(reconstructed_trimmed, original_trimmed);
+    }
+
+    #[test]
+    fn short_no_heading_txt_still_single_chapter() {
+        // Short no-heading text must keep the single "正文" chapter behavior
+        // (Legado's analyze() also produces one chapter for <10 KiB input).
+        let text = "第一行不是章节标题\n第二行仍然是正文";
+
+        let book = parse_txt_text("short", Some("Plain Book"), None, None, text).unwrap();
+
+        assert_eq!(book.toc.len(), 1);
+        assert_eq!(book.toc[0].title, "正文");
+        assert_eq!(book.chapters[0].content, text);
     }
 
     #[test]

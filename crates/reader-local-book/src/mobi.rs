@@ -482,7 +482,7 @@ fn decompress_palm_doc(data: &[u8]) -> Vec<u8> {
         if c == 0 {
             output.push(0x00);
             i += 1;
-        } else if c >= 1 && c <= 8 {
+        } else if (1..=8).contains(&c) {
             let count = c as usize;
             let src_start = i + 1;
             let src_end = (src_start + count).min(data.len());
@@ -490,13 +490,13 @@ fn decompress_palm_doc(data: &[u8]) -> Vec<u8> {
                 output.extend_from_slice(&data[src_start..src_end]);
             }
             i = src_end;
-        } else if c >= 9 && c <= 0x4A {
+        } else if (9..=0x4A).contains(&c) {
             output.push(c - 9 + 0x20);
             i += 1;
-        } else if c >= 0x4B && c <= 0x7F {
+        } else if (0x4B..=0x7F).contains(&c) {
             // Unused range — skip.
             i += 1;
-        } else if c >= 0x80 && c <= 0xBF {
+        } else if (0x80..=0xBF).contains(&c) {
             i += 1;
             if i >= data.len() {
                 break;
@@ -657,7 +657,7 @@ fn split_mobi_text_fragment(book_id: &str, text: &str) -> (Vec<LocalBookChapter>
                 .get(idx + 1)
                 .map(|(_, e)| *e)
                 .unwrap_or(lines.len());
-            let body = if *start + 1 <= end {
+            let body = if *start < end {
                 join_trimmed(&lines[*start + 1..end])
             } else {
                 String::new()

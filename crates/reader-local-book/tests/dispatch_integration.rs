@@ -43,7 +43,7 @@ fn dispatch_routes_pdf_to_pdf_parser() {
     let book = parse_local_book(input("disp-pdf", "fixture.pdf", PDF_FIXTURE))
         .expect("PDF dispatch must succeed");
     assert_eq!(book.format, LocalBookFormat::Pdf);
-    assert!(book.chapters.len() >= 1);
+    assert!(!book.chapters.is_empty());
     assert!(book.chapters[0]
         .content
         .contains("Recovery 31 PDF Page One"));

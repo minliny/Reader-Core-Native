@@ -1,30 +1,6 @@
 {
   "blockers": [
     {
-      "capability": "epub-解析",
-      "evidence_status": "missing",
-      "id": "rb-epub-解析",
-      "mitigation": "Implement epub-解析 (currently missing)",
-      "platform": "all",
-      "reason": "epub-解析 is missing with zero passing evidence",
-      "severity": "blocker",
-      "sources": [
-        "FEATURE_MATRIX.md"
-      ]
-    },
-    {
-      "capability": "txt-解析",
-      "evidence_status": "missing",
-      "id": "rb-txt-解析",
-      "mitigation": "Implement txt-解析 (currently missing)",
-      "platform": "all",
-      "reason": "txt-解析 is missing with zero passing evidence",
-      "severity": "blocker",
-      "sources": [
-        "FEATURE_MATRIX.md"
-      ]
-    },
-    {
       "capability": "book.detail",
       "evidence_status": "missing",
       "id": "rb-book.detail",
@@ -858,19 +834,19 @@
   "generated_at": "2026-06-25T07:40:32Z",
   "summary": {
     "by_platform": {
-      "all": 70,
+      "all": 68,
       "android": 0,
       "harmony": 0,
       "ios": 0,
       "unknown": 0
     },
     "by_severity": {
-      "blocker": 4,
+      "blocker": 2,
       "high": 0,
       "low": 38,
       "medium": 28
     },
-    "total": 70
+    "total": 68
   },
   "tool": "release-blocker-register-generator",
   "version": "release-blockers/1"

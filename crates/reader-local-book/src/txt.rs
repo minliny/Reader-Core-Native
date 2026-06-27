@@ -186,7 +186,7 @@ pub fn parse_txt_with_options(text: &str, options: &TxtParseOptions) -> ParsedTx
             } else {
                 lines.len()
             };
-            let body = if *start + 1 <= end {
+            let body = if *start < end {
                 join_and_trim(&lines[*start + 1..end])
             } else {
                 String::new()
