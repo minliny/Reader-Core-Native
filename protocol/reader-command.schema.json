@@ -91,7 +91,17 @@
         "local_book.parse",
         "local_book.catalog",
         "bookshelf.list",
-        "bookshelf.get"
+        "bookshelf.get",
+        "replace-rule.create",
+        "replace-rule.list",
+        "replace-rule.update",
+        "replace-rule.delete",
+        "source.exploreKinds",
+        "source.explore",
+        "txt-toc-rule.create",
+        "txt-toc-rule.list",
+        "txt-toc-rule.update",
+        "txt-toc-rule.delete"
       ]
     },
     "params": {
@@ -686,6 +696,196 @@
         "properties": {
           "params": {
             "$ref": "#/$defs/TtsQueuePrevParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "replace-rule.create"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/ReplaceRuleCreateParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "replace-rule.list"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/ReplaceRuleListParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "replace-rule.update"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/ReplaceRuleUpdateParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "replace-rule.delete"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/ReplaceRuleDeleteParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "source.exploreKinds"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/SourceExploreKindsParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "source.explore"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/SourceExploreParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "txt-toc-rule.create"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/TxtTocRuleCreateParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "txt-toc-rule.list"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/TxtTocRuleListParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "txt-toc-rule.update"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/TxtTocRuleUpdateParams"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "txt-toc-rule.delete"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/TxtTocRuleDeleteParams"
           }
         }
       }
@@ -3099,6 +3299,186 @@
         "chapter": {
           "$ref": "#/$defs/TtsChapterRef"
         }
+      }
+    },
+    "ReplaceRuleData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "pattern",
+        "replacement",
+        "scopeTitle",
+        "scopeContent",
+        "isEnabled",
+        "isRegex",
+        "timeoutMillisecond",
+        "order"
+      ],
+      "description": "Wire shape of a replace rule. Mirrors reader_domain::ReplaceRule (Legado ReplaceRule.kt).",
+      "properties": {
+        "id": { "type": "integer", "format": "int64" },
+        "name": { "type": "string" },
+        "group": { "type": "string" },
+        "pattern": { "type": "string" },
+        "replacement": { "type": "string" },
+        "scope": { "type": "string" },
+        "scopeTitle": { "type": "boolean" },
+        "scopeContent": { "type": "boolean" },
+        "excludeScope": { "type": "string" },
+        "isEnabled": { "type": "boolean" },
+        "isRegex": { "type": "boolean" },
+        "timeoutMillisecond": { "type": "integer", "format": "int64" },
+        "order": { "type": "integer", "format": "int32" }
+      }
+    },
+    "ReplaceRuleCreateParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "pattern",
+        "replacement",
+        "scopeTitle",
+        "scopeContent",
+        "isEnabled",
+        "isRegex",
+        "timeoutMillisecond",
+        "order"
+      ],
+      "description": "Parameters for replace-rule.create. Optional id; Core assigns when omitted.",
+      "properties": {
+        "id": { "type": "integer", "format": "int64" },
+        "name": { "type": "string" },
+        "group": { "type": "string" },
+        "pattern": { "type": "string" },
+        "replacement": { "type": "string" },
+        "scope": { "type": "string" },
+        "scopeTitle": { "type": "boolean" },
+        "scopeContent": { "type": "boolean" },
+        "excludeScope": { "type": "string" },
+        "isEnabled": { "type": "boolean" },
+        "isRegex": { "type": "boolean" },
+        "timeoutMillisecond": { "type": "integer", "format": "int64" },
+        "order": { "type": "integer", "format": "int32" }
+      }
+    },
+    "ReplaceRuleListParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Parameters for replace-rule.list. All filters optional.",
+      "properties": {
+        "enabledOnly": { "type": "boolean" }
+      }
+    },
+    "ReplaceRuleUpdateParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id"
+      ],
+      "description": "Parameters for replace-rule.update. Partial update by id; all other fields optional.",
+      "properties": {
+        "id": { "type": "integer", "format": "int64" },
+        "name": { "type": "string" },
+        "group": { "type": "string" },
+        "pattern": { "type": "string" },
+        "replacement": { "type": "string" },
+        "scope": { "type": "string" },
+        "scopeTitle": { "type": "boolean" },
+        "scopeContent": { "type": "boolean" },
+        "excludeScope": { "type": "string" },
+        "isEnabled": { "type": "boolean" },
+        "isRegex": { "type": "boolean" },
+        "timeoutMillisecond": { "type": "integer", "format": "int64" },
+        "order": { "type": "integer", "format": "int32" }
+      }
+    },
+    "ReplaceRuleDeleteParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id"
+      ],
+      "description": "Parameters for replace-rule.delete. Idempotent: returns deleted=false when id not present.",
+      "properties": {
+        "id": { "type": "integer", "format": "int64" }
+      }
+    },
+    "SourceExploreKindsParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Parameters for source.exploreKinds. Parses a source's exploreUrl field into discovery categories (Legado BookSourceExtensions.getExploreUrl). Pure: no network. Either source (inline) or sourceId must be present; exploreUrl overrides the source's field when provided.",
+      "properties": {
+        "source": { "type": "object" },
+        "sourceId": { "type": "string" },
+        "exploreUrl": { "type": "string" }
+      }
+    },
+    "SourceExploreParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Parameters for source.explore. Three modes (mirrors book.search): (1) prefetched exploreResponse, (2) pre-built exploreRequest, (3) auto-build from url + source header. When exploreResponse is absent, Core emits http.execute and resumes on host.complete.",
+      "properties": {
+        "source": { "type": "object" },
+        "sourceId": { "type": "string" },
+        "url": { "type": "string" },
+        "page": { "type": "integer", "format": "int32", "minimum": 1 },
+        "exploreResponse": { "type": "string" },
+        "exploreRequest": { "$ref": "#/$defs/HostHttpRequest" }
+      }
+    },
+    "TxtTocRuleCreateParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "rule"
+      ],
+      "description": "Parameters for txt-toc-rule.create. Mirrors Legado TxtTocRule.kt. When id is omitted, Core assigns a monotonically increasing id.",
+      "properties": {
+        "id": { "type": "integer", "format": "int64" },
+        "name": { "type": "string" },
+        "rule": { "type": "string" },
+        "example": { "type": "string" },
+        "serialNumber": { "type": "integer", "format": "int32", "default": -1 },
+        "enable": { "type": "boolean", "default": true }
+      }
+    },
+    "TxtTocRuleListParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Parameters for txt-toc-rule.list. When enabledOnly=true, only enabled rules are returned.",
+      "properties": {
+        "enabledOnly": { "type": "boolean" }
+      }
+    },
+    "TxtTocRuleUpdateParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id"
+      ],
+      "description": "Parameters for txt-toc-rule.update. Partial update by id; omitted fields retain their existing values.",
+      "properties": {
+        "id": { "type": "integer", "format": "int64" },
+        "name": { "type": "string" },
+        "rule": { "type": "string" },
+        "example": { "type": "string" },
+        "serialNumber": { "type": "integer", "format": "int32" },
+        "enable": { "type": "boolean" }
+      }
+    },
+    "TxtTocRuleDeleteParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id"
+      ],
+      "description": "Parameters for txt-toc-rule.delete. Idempotent: returns deleted=false when id not present.",
+      "properties": {
+        "id": { "type": "integer", "format": "int64" }
       }
     }
   }
