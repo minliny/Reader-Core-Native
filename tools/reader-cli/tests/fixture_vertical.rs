@@ -340,6 +340,163 @@ fn fixture_vertical_runs_legado_zhuishu_json_real_source_pipeline() {
     assert_eq!(events[8]["error"]["details"]["unsupported"], true);
 }
 
+/// Real Legado source (yodu.org 有度轻说) vertical pipeline — MultiRule operator
+/// coverage (`||` / `&&` / `%%`), the DSL form neither sudugu (CSS + ## + @put +
+/// @js + @xpath) nor zhuishu (pure JSONPath) exercises.
+///
+/// This fixture uses a desensitized real online Legado book source whose rules
+/// use the three Legado MultiRule combination operators on **CSS/shorthand**
+/// paths (not JSONPath):
+/// - `||` OR-fallback: `ruleSearch.bookList = "class.ser-ret@li||class.j_bookList@li"`,
+///   `ruleSearch.author = "class.vam mr10.1@text||class.c_small mb5 mr15 ell ttc fs16.0@text"`,
+///   `ruleSearch.name = "h3@text||h2@text"`
+/// - `&&` AND-merge (3 segments): `ruleSearch.kind = "class.vam mr10.0@text&&tag.span.2@text&&class.c_small mb5 mr15 ell ttc fs16.1@text"`
+/// - `%%` parallel zip: `ruleSearch.kind` form (same operator family)
+/// - `##` replacement: `ruleContent.content = "id.TextContent@html##（本章未完）"`
+/// - CSS shorthand: `class.X` / `tag.X` / `id.X` (incl. multi-class `class.vam mr10`)
+///
+/// Source: 墨辰 459-source set `临时导入书源-墨辰.txt` (有度轻说（优+),
+/// bookSourceUrl `https://www.yodu.org/qingxiaoshuo`). All four responses
+/// (search/detail+toc/chapter) are real HTML captured anonymously from
+/// `https://www.yodu.org/sa/all-斗破-1.html`, `https://www.yodu.org/book/17551/`,
+/// `https://www.yodu.org/book/17551/4027180.html` (TOC trimmed to first 10
+/// chapters). No user token/cookie — the site is publicly readable; the
+/// source's `loginUrl` field is carried verbatim to exercise import deser.
+///
+/// Legado baseline: `AnalyzeRule.splitSourceRule` (AnalyzeRule.kt:485) splits a
+/// rule into `SourceRule`s, and each `AnalyzeBy*` evaluator (CSS/XPath/Regex/
+/// JSONPath) splits its rule string on top-level `&&` / `||` / `%%` — this is a
+/// cross-type combination semantic, NOT a JSONPath-only feature.
+///
+/// OPEN RELEASE BLOCKER (this fixture EXPOSES the gap; assertions below mirror
+/// the current真实 behavior — they are NOT weakened to bypass the gap):
+/// - rb-legado-css-multirule-operator: Core only splits `&&` / `||` / `%%` inside
+///   `evaluate_json_path_expression` (crates/reader-rule/src/lib.rs:1275-1305),
+///   i.e. the JSONPath evaluator. CSS/shorthand rule paths are fed straight to
+///   `scraper::Selector::parse` without splitting on these operators, so
+///   `class.ser-ret@li||class.j_bookList@li` is parsed as one CSS selector
+///   `li||class.j_bookList` and fails with
+///   `UnexpectedSelectorParseError(ExpectedNamespace("li"))`. Impact: search
+///   returns a structured INTERNAL error (both inline and host paths);
+///   `ruleSearch.name = "h3@text||h2@text"` yields empty title in detail;
+///   `ruleToc.chapterList` path also degrades. Fix: lift MultiRule operator
+///   splitting to the shared rule-segment layer (mirror Legado
+///   `splitSourceRule` + per-evaluator split) so CSS/XPath/Regex paths get the
+///   same `||`/`&&`/`%%` treatment JSONPath already has.
+///
+/// What currently works (proven by this fixture's real responses):
+/// - import: source deserialized incl. `loginUrl` field (no login field gap)
+/// - host.request: correct URL/method/headers emitted
+/// - detail: `coverUrl = class.g_thumb@img@src` (single-class CSS shorthand)
+///   extracts the real cover URL; `bookId` echoed
+/// - chapter: `content = id.TextContent@html##（本章未完）` extracts real body
+///   text (萧炎... 斗破苍穹19) via `#TextContent@html` + `##` replacement
+/// - progress: stored
+/// - JS unsupported: structured error for `java.get` host callback
+#[test]
+fn fixture_vertical_runs_legado_yodu_multirule_real_source_pipeline() {
+    let events = run_fixture("legado_yodu_multirule_vertical.json");
+
+    // 9 events: import, search(inline), host.request, search(host), detail, toc,
+    // chapter, progress, js(unsupported). Same shape as sudugu/zhuishu.
+    assert_eq!(events.len(), 9, "expected 9 events, got {events:?}");
+
+    // 1. import succeeds — loginUrl field deserialized without error.
+    assert_eq!(events[0]["data"]["imported"], true);
+    assert_eq!(events[0]["data"]["sourceId"], "legado-yodu-multirule-src");
+    assert_eq!(events[0]["data"]["name"], "有度轻说（MultiRule）");
+
+    // 2. inline search — rb-legado-css-multirule-operator EXPOSED: `||` not
+    //    split on CSS paths, so `class.ser-ret@li||class.j_bookList@li` is fed
+    //    to scraper as `li||class.j_bookList` and rejected. Structured error,
+    //    never a silent empty/fake result.
+    assert_eq!(events[1]["type"], "error");
+    assert_eq!(events[1]["error"]["code"], "INTERNAL");
+    let msg = events[1]["error"]["message"].as_str().unwrap();
+    assert!(
+        msg.contains("li||class.j_bookList"),
+        "search error should name the unsplit `||` CSS selector, got: {msg}"
+    );
+
+    // 3. host.request emitted for http.execute
+    assert_eq!(events[2]["type"], "host.request");
+    assert_eq!(events[2]["capability"], "http.execute");
+    assert_eq!(
+        events[2]["params"]["url"],
+        "https://www.yodu.org/search?q=dune"
+    );
+
+    // 4. search via host — same `||` CSS MultiRule gap surfaces as the inline
+    //    path. Not bypassed; asserted as the真实 current behavior.
+    assert_eq!(events[3]["type"], "error");
+    assert_eq!(events[3]["error"]["code"], "INTERNAL");
+    assert!(
+        events[3]["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("li||class.j_bookList"),
+        "host search error should name the unsplit `||` CSS selector"
+    );
+
+    // 5. detail — single-class CSS shorthand works: coverUrl extracted from
+    //    real HTML. `name = "h3@text||h2@text"` returns empty (|| gap). The
+    //    step is a result (not error): coverUrl proves the page parsed.
+    assert_eq!(
+        events[4]["type"], "result",
+        "detail should be a result (coverUrl proves page parsed), got {:?}",
+        events[4]
+    );
+    assert_eq!(
+        events[4]["data"]["book"]["coverUrl"],
+        "https://www.yodu.org/files/article/image/17/17551/17551s.jpg"
+    );
+    assert_eq!(
+        events[4]["data"]["book"]["bookId"],
+        "https://www.yodu.org/book/17551/"
+    );
+    // rb-legado-css-multirule-operator impact: `h3@text||h2@text` → empty title.
+    assert_eq!(
+        events[4]["data"]["book"]["title"], "",
+        "title should be empty until rb-legado-css-multirule-operator is fixed (|| on CSS path)"
+    );
+
+    // 6. toc — rb-legado-css-multirule-operator impact: the chapterList path
+    //    degrades to an empty list (result, not error). Tracked by the same
+    //    blocker; not bypassed.
+    assert_eq!(
+        events[5]["type"], "result",
+        "toc should be a result (not error), got {:?}",
+        events[5]
+    );
+    assert_eq!(
+        events[5]["data"]["toc"].as_array().unwrap().len(),
+        0,
+        "toc is empty until rb-legado-css-multirule-operator is fixed"
+    );
+
+    // 7. chapter — `id.TextContent@html##（本章未完）` works: real body extracted
+    //    from #TextContent (no MultiRule operator on this path).
+    assert_eq!(
+        events[6]["type"], "result",
+        "chapter should succeed, got {:?}",
+        events[6]
+    );
+    assert_eq!(events[6]["data"]["chapterTitle"], "第一章 天山台");
+    let content = events[6]["data"]["content"].as_str().unwrap_or("");
+    assert!(
+        content.contains("萧炎"),
+        "chapter content should contain real body text (萧炎), got: {content}"
+    );
+
+    // 8. progress stored
+    assert_eq!(events[7]["data"]["stored"], true);
+
+    // 9. JS unsupported — structured error, never a fake network result
+    assert_eq!(events[8]["type"], "error");
+    assert_eq!(events[8]["error"]["code"], "INTERNAL");
+    assert_eq!(events[8]["error"]["details"]["unsupported"], true);
+}
+
 #[test]
 fn booksource_fixture_outputs_stable_json() {
     let output = Command::new(BIN)
