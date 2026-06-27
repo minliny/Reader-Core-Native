@@ -5,6 +5,8 @@
 //! command and print emitted events as one JSON object per line.
 
 mod conformance;
+mod test_corpus;
+mod test_source;
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -57,6 +59,34 @@ enum Mode {
     /// Execute a host replay suite input and print a normalized suite fixture
     /// with recorded expectations.
     HostRecordSuite(PathBuf),
+    /// Run a single Legado book source through L1-L5 (import → search → detail
+    /// → toc → content) with real HTTP executed by the CLI acting as Host.
+    TestSource(TestSourceArgs),
+    /// Batch-run all sources in a corpus-manifest.json through L1-L5.
+    TestCorpus(TestCorpusArgs),
+    /// Batch-run corpus using pre-recorded HTTP responses (no network).
+    TestCorpusOffline(TestCorpusArgs),
+}
+
+#[derive(Clone, Debug)]
+struct TestSourceArgs {
+    source_path: PathBuf,
+    keyword: String,
+    timeout: std::time::Duration,
+    record_dir: Option<PathBuf>,
+}
+
+#[derive(Clone, Debug)]
+struct TestCorpusArgs {
+    manifest_path: PathBuf,
+    keyword: String,
+    out_path: Option<PathBuf>,
+    max_sources: Option<usize>,
+    timeout: std::time::Duration,
+    priority: Option<String>,
+    concurrency: usize,
+    record_dir: Option<PathBuf>,
+    recorded_dir: Option<PathBuf>,
 }
 
 fn main() {
@@ -123,6 +153,9 @@ fn run() -> Result<(), CoreError> {
         Mode::HostReplaySuite(path) => run_host_replay_suite(&runtime, &rx, &path),
         Mode::HostRecord(path) => run_host_record(&runtime, &rx, &path),
         Mode::HostRecordSuite(path) => run_host_record_suite(&runtime, &rx, &path),
+        Mode::TestSource(args) => run_test_source(args),
+        Mode::TestCorpus(args) => run_test_corpus_cmd(args, false),
+        Mode::TestCorpusOffline(args) => run_test_corpus_cmd(args, true),
     }
 }
 
@@ -190,6 +223,33 @@ where
                 };
                 set_mode(&mut mode, Mode::HostRecordSuite(PathBuf::from(path)))?;
             }
+            "--test-source" => {
+                let Some(path) = iter.next() else {
+                    return Err(CoreError::invalid_message(
+                        "--test-source requires a path to a Legado source JSON file",
+                    ));
+                };
+                let args = parse_test_source_args(PathBuf::from(path), &mut iter)?;
+                set_mode(&mut mode, Mode::TestSource(args))?;
+            }
+            "--test-corpus" => {
+                let Some(path) = iter.next() else {
+                    return Err(CoreError::invalid_message(
+                        "--test-corpus requires a path to a corpus-manifest.json",
+                    ));
+                };
+                let args = parse_test_corpus_args(PathBuf::from(path), &mut iter)?;
+                set_mode(&mut mode, Mode::TestCorpus(args))?;
+            }
+            "--test-corpus-offline" => {
+                let Some(path) = iter.next() else {
+                    return Err(CoreError::invalid_message(
+                        "--test-corpus-offline requires a path to a corpus-manifest.json",
+                    ));
+                };
+                let args = parse_test_corpus_args(PathBuf::from(path), &mut iter)?;
+                set_mode(&mut mode, Mode::TestCorpusOffline(args))?;
+            }
             "--json" => {
                 let Some(json) = iter.next() else {
                     return Err(CoreError::invalid_message(
@@ -224,10 +284,214 @@ where
 fn set_mode(slot: &mut Option<Mode>, mode: Mode) -> Result<(), CoreError> {
     if slot.is_some() {
         return Err(CoreError::invalid_message(
-            "only one of --info, --ping, --status, --host-smoke, --conformance, --json, --stdin, --fixture-vertical, --booksource-fixture, --host-replay, --host-replay-suite, --host-record, or --host-record-suite may be used",
+            "only one of --info, --ping, --status, --host-smoke, --conformance, --json, --stdin, --fixture-vertical, --booksource-fixture, --host-replay, --host-replay-suite, --host-record, --host-record-suite, --test-source, --test-corpus, or --test-corpus-offline may be used",
         ));
     }
     *slot = Some(mode);
+    Ok(())
+}
+
+fn parse_test_source_args<I>(
+    source_path: PathBuf,
+    iter: &mut I,
+) -> Result<TestSourceArgs, CoreError>
+where
+    I: Iterator<Item = String>,
+{
+    let mut args = TestSourceArgs {
+        source_path,
+        keyword: String::new(),
+        timeout: std::time::Duration::from_secs(15),
+        record_dir: None,
+    };
+    while let Some(opt) = iter.next() {
+        match opt.as_str() {
+            "--keyword" => {
+                let Some(kw) = iter.next() else {
+                    return Err(CoreError::invalid_message("--keyword requires a value"));
+                };
+                args.keyword = kw;
+            }
+            "--timeout" => {
+                let Some(secs) = iter.next() else {
+                    return Err(CoreError::invalid_message(
+                        "--timeout requires a seconds value",
+                    ));
+                };
+                let secs: u64 = secs.parse().map_err(|_| {
+                    CoreError::invalid_message("--timeout value must be a positive integer")
+                })?;
+                args.timeout = std::time::Duration::from_secs(secs);
+            }
+            "--record" => {
+                let Some(dir) = iter.next() else {
+                    return Err(CoreError::invalid_message(
+                        "--record requires a directory path",
+                    ));
+                };
+                args.record_dir = Some(PathBuf::from(dir));
+            }
+            other => {
+                return Err(CoreError::invalid_message(format!(
+                    "unknown --test-source option: {other}"
+                )));
+            }
+        }
+    }
+    if args.keyword.is_empty() {
+        return Err(CoreError::invalid_message(
+            "--test-source requires --keyword <text>",
+        ));
+    }
+    Ok(args)
+}
+
+fn parse_test_corpus_args<I>(
+    manifest_path: PathBuf,
+    iter: &mut I,
+) -> Result<TestCorpusArgs, CoreError>
+where
+    I: Iterator<Item = String>,
+{
+    let mut args = TestCorpusArgs {
+        manifest_path,
+        keyword: String::new(),
+        out_path: None,
+        max_sources: None,
+        timeout: std::time::Duration::from_secs(15),
+        priority: None,
+        concurrency: 1,
+        record_dir: None,
+        recorded_dir: None,
+    };
+    while let Some(opt) = iter.next() {
+        match opt.as_str() {
+            "--keyword" => {
+                let Some(kw) = iter.next() else {
+                    return Err(CoreError::invalid_message("--keyword requires a value"));
+                };
+                args.keyword = kw;
+            }
+            "--out" => {
+                let Some(path) = iter.next() else {
+                    return Err(CoreError::invalid_message("--out requires a path"));
+                };
+                args.out_path = Some(PathBuf::from(path));
+            }
+            "--max-sources" => {
+                let Some(n) = iter.next() else {
+                    return Err(CoreError::invalid_message(
+                        "--max-sources requires a number",
+                    ));
+                };
+                let n: usize = n.parse().map_err(|_| {
+                    CoreError::invalid_message("--max-sources value must be a positive integer")
+                })?;
+                args.max_sources = Some(n);
+            }
+            "--timeout" => {
+                let Some(secs) = iter.next() else {
+                    return Err(CoreError::invalid_message(
+                        "--timeout requires a seconds value",
+                    ));
+                };
+                let secs: u64 = secs.parse().map_err(|_| {
+                    CoreError::invalid_message("--timeout value must be a positive integer")
+                })?;
+                args.timeout = std::time::Duration::from_secs(secs);
+            }
+            "--priority" => {
+                let Some(p) = iter.next() else {
+                    return Err(CoreError::invalid_message("--priority requires P0|P1|P2"));
+                };
+                if !matches!(p.as_str(), "P0" | "P1" | "P2") {
+                    return Err(CoreError::invalid_message(
+                        "--priority must be one of P0, P1, P2",
+                    ));
+                }
+                args.priority = Some(p);
+            }
+            "--concurrency" => {
+                let Some(n) = iter.next() else {
+                    return Err(CoreError::invalid_message(
+                        "--concurrency requires a number",
+                    ));
+                };
+                let n: usize = n.parse().map_err(|_| {
+                    CoreError::invalid_message("--concurrency value must be a positive integer")
+                })?;
+                args.concurrency = n;
+            }
+            "--record" => {
+                let Some(dir) = iter.next() else {
+                    return Err(CoreError::invalid_message(
+                        "--record requires a directory path",
+                    ));
+                };
+                args.record_dir = Some(PathBuf::from(dir));
+            }
+            "--recorded-dir" => {
+                let Some(dir) = iter.next() else {
+                    return Err(CoreError::invalid_message(
+                        "--recorded-dir requires a directory path",
+                    ));
+                };
+                args.recorded_dir = Some(PathBuf::from(dir));
+            }
+            other => {
+                return Err(CoreError::invalid_message(format!(
+                    "unknown --test-corpus option: {other}"
+                )));
+            }
+        }
+    }
+    Ok(args)
+}
+
+fn run_test_source(args: TestSourceArgs) -> Result<(), CoreError> {
+    let config = test_source::TestSourceConfig {
+        source_path: args.source_path,
+        keyword: args.keyword,
+        timeout: args.timeout,
+        record_dir: args.record_dir,
+        offline_dir: None,
+        quiet: false,
+    };
+    let result = test_source::test_source(&config);
+    let json = serde_json::to_string_pretty(&result)
+        .unwrap_or_else(|err| format!("{{\"error\": \"serialize failed: {err}\"}}"));
+    println!("{json}");
+    // 单源模式:有任何 fail 就返回非零(便于脚本判断)
+    let any_fail = result
+        .levels
+        .values()
+        .any(|lr| lr.status == test_source::StepStatus::Fail);
+    if any_fail {
+        // 仍然打印了结果,返回 1 让 CI 能感知
+        std::process::exit(1);
+    }
+    Ok(())
+}
+
+fn run_test_corpus_cmd(args: TestCorpusArgs, offline: bool) -> Result<(), CoreError> {
+    let config = test_corpus::TestCorpusConfig {
+        manifest_path: args.manifest_path,
+        keyword: args.keyword,
+        out_path: args.out_path,
+        max_sources: args.max_sources,
+        timeout: args.timeout,
+        priority: args.priority,
+        concurrency: args.concurrency,
+        record_dir: args.record_dir,
+        offline_dir: if offline { args.recorded_dir } else { None },
+    };
+    let batch = test_corpus::run_test_corpus(&config).map_err(CoreError::internal)?;
+    // 如果指定了 --out,结果已写入文件;否则打印到 stdout
+    if config.out_path.is_none() {
+        let json = serde_json::to_string_pretty(&batch)
+            .unwrap_or_else(|err| format!("{{\"error\": \"serialize failed: {err}\"}}"));
+        println!("{json}");
+    }
     Ok(())
 }
 
@@ -363,9 +627,9 @@ fn run_fixture_vertical(
     let operation_id = match host_request {
         Event::HostRequest {
             operation_id,
-            capability,
+            capability: HostCapability::HttpExecute,
             ..
-        } if capability == HostCapability::HttpExecute => operation_id,
+        } => operation_id,
         other => {
             return Err(CoreError::internal(format!(
                 "expected http.execute host.request event, got {other:?}"

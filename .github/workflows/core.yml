@@ -6,31 +6,252 @@ on:
       - main
       - "codex/**"
   pull_request:
+  schedule:
+    # 每天 02:00 UTC(北京时间 10:00)跑 nightly live 全量
+    - cron: "0 2 * * *"
 
 jobs:
-  rust:
-    name: Rust workspace
+  # ──────────────────────────────────────────────────────────────────────────
+  # pr-gate: 每个 PR / push 必须通过. 只跑离线回放(稳定, 不触网).
+  # ──────────────────────────────────────────────────────────────────────────
+  pr-gate:
+    name: PR gate (offline)
     runs-on: macos-15
+    if: github.event_name != 'schedule'
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
 
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Check and test
-        run: ./scripts/check-local.sh
+      - name: Format check
+        run: cargo fmt --check
+
+      - name: Clippy (deny warnings)
+        run: cargo clippy --workspace -- -D warnings
+
+      - name: Workspace tests
+        run: cargo test --workspace
+
+      - name: Protocol conformance
+        run: cargo run -p reader-cli -- --conformance
+
+      - name: Protocol schema lint
+        run: |
+          if [ -f tools/protocol-schema-lint/protocol_schema_lint.py ]; then
+            python3 tools/protocol-schema-lint/protocol_schema_lint.py
+          else
+            echo "schema-lint tool not present, skipping"
+          fi
 
       - name: Build and ABI smoke
         run: ./scripts/build-local.sh
-
-      - name: Protocol conformance smoke
-        run: cargo run -p reader-cli -- --conformance
 
       - name: Install iOS Rust targets
         run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 
       - name: Check iOS Swift wrapper smoke
         run: ./scripts/check-ios-swift-wrapper.sh
+
+      - name: Offline corpus replay (P0, max 10)
+        # 只跑 10 个有录像的 P0 源,快速验证不回归.
+        # 录像目录不存在(首次)时 skip 而非 fail.
+        run: |
+          if [ -d tests/fixtures/corpus/recorded/ ] && [ -n "$(ls -A tests/fixtures/corpus/recorded/ 2>/dev/null)" ]; then
+            cargo run -p reader-cli -- --test-corpus-offline \
+              tests/fixtures/corpus/corpus-manifest.json \
+              --recorded-dir tests/fixtures/corpus/recorded/ \
+              --priority P0 --max-sources 10 \
+              --out pr-corpus-result.json
+            python3 -m json.tool pr-corpus-result.json > /dev/null
+          else
+            echo "tests/fixtures/corpus/recorded/ 不存在或为空,跳过离线回放(首次运行)"
+          fi
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # main-gate: 合并 main 时跑. 包含 pr-gate 全部 + 扩大离线回放到 30 个 P0 +
+  # 生成 evidence/capability 索引并作为 artifact 上传.
+  # ──────────────────────────────────────────────────────────────────────────
+  main-gate:
+    name: Main gate (offline + reports)
+    runs-on: macos-15
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: pr-gate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Format check
+        run: cargo fmt --check
+
+      - name: Clippy (deny warnings)
+        run: cargo clippy --workspace -- -D warnings
+
+      - name: Workspace tests
+        run: cargo test --workspace
+
+      - name: Protocol conformance
+        run: cargo run -p reader-cli -- --conformance
+
+      - name: Build and ABI smoke
+        run: ./scripts/build-local.sh
+
+      - name: Install iOS Rust targets
+        run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+
+      - name: Check iOS Swift wrapper smoke
+        run: ./scripts/check-ios-swift-wrapper.sh
+
+      - name: Offline corpus replay (P0, max 30)
+        run: |
+          mkdir -p reports/tooling
+          if [ -d tests/fixtures/corpus/recorded/ ] && [ -n "$(ls -A tests/fixtures/corpus/recorded/ 2>/dev/null)" ]; then
+            cargo run -p reader-cli -- --test-corpus-offline \
+              tests/fixtures/corpus/corpus-manifest.json \
+              --recorded-dir tests/fixtures/corpus/recorded/ \
+              --priority P0 --max-sources 30 \
+              --out reports/tooling/corpus-batch-p0.json
+            python3 -m json.tool reports/tooling/corpus-batch-p0.json > /dev/null
+          else
+            echo "tests/fixtures/corpus/recorded/ 不存在,跳过离线回放"
+            echo '{"version":"corpus-batch-result/1","mode":"offline","total":0,"summary":{},"sources":[]}' > reports/tooling/corpus-batch-p0.json
+          fi
+
+      - name: Evidence index
+        run: |
+          mkdir -p reports/tooling
+          python3 tools/evidence-indexer/evidence_indexer.py . --out reports/tooling/evidence-index.json || \
+            echo "evidence-indexer failed (non-fatal)"
+
+      - name: Capability catalog
+        run: |
+          mkdir -p reports/tooling
+          python3 tools/capability-catalog/capability_catalog.py . --out reports/tooling/capability-catalog.json || \
+            echo "capability-catalog failed (non-fatal)"
+
+      - name: Upload reports artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-${{ github.sha }}
+          path: reports/
+          retention-days: 30
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # nightly: 每天 02:00 UTC. 跑 main-gate 全部 + live 真实网络全量 459 +
+  # 全量离线回放. live 步骤因网络可能不稳定,用 continue-on-error.
+  # ──────────────────────────────────────────────────────────────────────────
+  nightly:
+    name: Nightly (live + full offline)
+    runs-on: macos-15
+    if: github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Format check
+        run: cargo fmt --check
+
+      - name: Clippy (deny warnings)
+        run: cargo clippy --workspace -- -D warnings
+
+      - name: Workspace tests
+        run: cargo test --workspace
+
+      - name: Protocol conformance
+        run: cargo run -p reader-cli -- --conformance
+
+      - name: Build and ABI smoke
+        run: ./scripts/build-local.sh
+
+      - name: Live corpus batch (full 459, with record)
+        # live 真实网络,可能因站点限流/下线失败,不阻断 nightly
+        continue-on-error: true
+        run: |
+          mkdir -p reports/tooling tests/fixtures/corpus/recorded
+          cargo run -p reader-cli -- --test-corpus \
+            tests/fixtures/corpus/corpus-manifest.json \
+            --keyword "斗破苍穹" --timeout 15 \
+            --record tests/fixtures/corpus/recorded/ \
+            --out reports/tooling/corpus-batch-live.json || \
+            echo "live batch failed (non-fatal for nightly)"
+          if [ -f reports/tooling/corpus-batch-live.json ]; then
+            python3 -m json.tool reports/tooling/corpus-batch-live.json > /dev/null
+          fi
+
+      - name: Full offline corpus replay (all 459)
+        # 用 nightly 刚录的 + 已有录像跑全量离线回放
+        run: |
+          if [ -d tests/fixtures/corpus/recorded/ ] && [ -n "$(ls -A tests/fixtures/corpus/recorded/ 2>/dev/null)" ]; then
+            cargo run -p reader-cli -- --test-corpus-offline \
+              tests/fixtures/corpus/corpus-manifest.json \
+              --recorded-dir tests/fixtures/corpus/recorded/ \
+              --out reports/tooling/corpus-batch-full.json
+            python3 -m json.tool reports/tooling/corpus-batch-full.json > /dev/null
+          else
+            echo "no recordings available, skipping full offline replay"
+          fi
+
+      - name: Evidence index
+        run: |
+          mkdir -p reports/tooling
+          python3 tools/evidence-indexer/evidence_indexer.py . --out reports/tooling/evidence-index.json || \
+            echo "evidence-indexer failed (non-fatal)"
+
+      - name: Capability catalog
+        run: |
+          mkdir -p reports/tooling
+          python3 tools/capability-catalog/capability_catalog.py . --out reports/tooling/capability-catalog.json || \
+            echo "capability-catalog failed (non-fatal)"
+
+      - name: Assessment dashboard
+        run: |
+          mkdir -p reports/tooling
+          if [ -f reports/tooling/corpus-batch-full.json ]; then
+            python3 tools/corpus-manager/corpus_manager.py report \
+              --batch reports/tooling/corpus-batch-full.json \
+              --blockers reports/tooling/release-blockers.json \
+              --out reports/tooling/assessment.md || \
+              echo "assessment report generation failed (non-fatal)"
+          fi
+
+      - name: Upload reports artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-reports-${{ github.run_id }}
+          path: |
+            reports/
+            tests/fixtures/corpus/recorded/
+          retention-days: 60
+
+      - name: Create issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Nightly CI failed: ${new Date().toISOString().slice(0, 10)}`,
+              body: `Nightly CI run failed.\n\nRun: ${runUrl}\nBranch: nightly\nPlease investigate.`,
+              labels: ['ci-failure', 'nightly']
+            });

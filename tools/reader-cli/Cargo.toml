@@ -13,4 +13,11 @@ reader-content = { path = "../../crates/reader-content" }
 reader-domain = { path = "../../crates/reader-domain" }
 reader-runtime = { path = "../../crates/reader-runtime" }
 reader-storage = { path = "../../crates/reader-storage" }
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+ureq = { version = "2.12", features = ["tls"] }
+
+[dependencies.rustls]
+version = "0.23"
+default-features = false
+features = ["ring", "std"]
