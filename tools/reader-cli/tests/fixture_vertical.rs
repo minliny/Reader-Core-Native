@@ -171,6 +171,186 @@ fn fixture_vertical_runs_legado_sudugu_real_source_pipeline() {
     assert_eq!(events[8]["error"]["details"]["unsupported"], true);
 }
 
+/// Real Legado source (js.jsxsapp.com 追书小说) vertical pipeline — pure JSON API.
+///
+/// This fixture uses a desensitized real online Legado book source whose
+/// ruleSearch/ruleBookInfo/ruleToc/ruleContent are ALL JSONPath rules
+/// (`$.books`, `$.bookName`, `$..chapters[*]`, `$..body##...`). It covers the
+/// `@json:` / `$.` DSL form which the sudugu fixture (CSS + ## + @put + @js +
+/// @xpath) does not exercise.
+///
+/// Source: chao921125/source `yd.json.txt` index 29 (追书小说). All four API
+/// responses (search/info/catalog/chapter) are real JSON captured with
+/// `okhttp/3.14.9` UA, then trimmed (TOC to 30 chapters) to keep fixture size
+/// reasonable. No user token/cookie — the source is a public JSON API.
+///
+/// Resolved blockers (this fixture confirms the fixes work end-to-end):
+/// - rb-legado-ruleexplore-object-deser: rule_explore/rule_review now
+///   Option<Value>, accepts both string and object forms (real Legado export
+///   has ruleExplore as object).
+/// - rb-legado-jsonpath-html-suffix: legado_rule_has_extraction now returns
+///   true for JSONPath (`$.`/`$[`/`@json:`) and XPath (`@xpath:`) prefixes,
+///   preventing extract_rule_items from appending `@html` to JSONPath rules
+///   like `$..chapters[*]` (which produced invalid `$..chapters[*]@html`).
+///
+/// Open blockers (this fixture EXPOSES the gaps; test is #[ignore] until
+/// both are fixed — do not weaken assertions to bypass):
+/// - rb-legado-json-booklist-array-iterate: when bookList is a JSONPath
+///   returning an array (e.g. `$.books`), Core's `extract_rule_items` returns
+///   the whole array as a SINGLE string instead of iterating each element as
+///   a separate item. Per-item field rules (`$.bookName`, `$.author`, ...)
+///   then run against the array string and return empty. The real API returns
+///   ~20 books; Core currently returns 1 book with empty title/author and
+///   unexpanded `{{$._id}}` template as bookId. Legado `getElements` iterates
+///   array elements — Core must match.
+/// - rb-legado-json-url-template-jsonpath: `expand_template` only handles
+///   `{{key}}` from `context.variables`, not `{{$.field}}` JSONPath templates
+///   evaluated against the current item. Legado `AnalyzeRule` evaluates
+///   `{{$.field}}` against the current element. This breaks:
+///   * search bookUrl `https://js.jsxsapp.com/info/{{$._id}}?language=zh_cn`
+///     ({{$._id}} stays literal)
+///   * toc chapterUrl `https://yd.jsxsapp.com//@get:{bid}/{{$.l}}`
+///     ({{$.l}} stays literal)
+///
+/// What currently works (proven by manual `--fixture-vertical` run):
+/// - import: source deserialized (after rb-legado-ruleexplore-object-deser)
+/// - host.request: correct URL/method/headers emitted
+/// - detail: full metadata (斗破苍穹 / 天蚕土豆 / cover / intro / lastChapter)
+///   — uses fixture's hardcoded bookId, not search result, so unaffected by
+///   rb-legado-json-booklist-array-iterate
+/// - toc: 30 chapters with correct titles (after rb-legado-jsonpath-html-suffix)
+///   — chapterUrl still has unexpanded {{$.l}} (rb-legado-json-url-template-jsonpath)
+/// - chapter: real API's version-too-low message extracted via `$..body##...`
+/// - progress: stored
+/// - js unsupported: structured error for `java.get` host callback
+#[test]
+#[ignore = "blocked by rb-legado-json-booklist-array-iterate + rb-legado-json-url-template-jsonpath; unignore after both fixed"]
+fn fixture_vertical_runs_legado_zhuishu_json_real_source_pipeline() {
+    let events = run_fixture("legado_zhuishu_json_vertical.json");
+
+    // 9 events: import, search(inline), host.request, search(host), detail, toc,
+    // chapter, progress, js(unsupported).
+    assert_eq!(events.len(), 9, "expected 9 events, got {events:?}");
+
+    // 1. import succeeds
+    assert_eq!(events[0]["data"]["imported"], true);
+    assert_eq!(events[0]["data"]["sourceId"], "legado-zhuishu-json-src");
+    assert_eq!(events[0]["data"]["name"], "追书小说（JSON）");
+
+    // 2. inline search — rb-legado-json-booklist-array-iterate: $.books must
+    //    return each array element as a separate item. rb-legado-json-url-
+    //    template-jsonpath: {{$._id}} must expand to the item's _id field.
+    let inline_books = events[1]["data"]["books"].as_array().unwrap();
+    assert!(
+        !inline_books.is_empty(),
+        "inline search should return non-empty books"
+    );
+    // After rb-legado-json-booklist-array-iterate: real API returns ~20 books,
+    // not 1 (the whole array as a single string).
+    assert!(
+        inline_books.len() > 1,
+        "inline search should return multiple books after rb-legado-json-booklist-array-iterate fix, got {}",
+        inline_books.len()
+    );
+    let first = &inline_books[0];
+    assert!(
+        !first["title"].as_str().unwrap_or("").is_empty(),
+        "first book title should be non-empty after rb-legado-json-booklist-array-iterate fix"
+    );
+    assert!(
+        !first["author"].as_str().unwrap_or("").is_empty(),
+        "first book author should be non-empty after rb-legado-json-booklist-array-iterate fix"
+    );
+    assert!(
+        !first["bookId"]
+            .as_str()
+            .unwrap_or("")
+            .contains("{{"),
+        "bookId should have {{$._id}} expanded after rb-legado-json-url-template-jsonpath fix, got {:?}",
+        first["bookId"]
+    );
+
+    // 3. host.request emitted for http.execute
+    assert_eq!(events[2]["type"], "host.request");
+    assert_eq!(events[2]["capability"], "http.execute");
+    assert_eq!(
+        events[2]["params"]["url"],
+        "https://js.jsxsapp.com/search?q=dune"
+    );
+
+    // 4. search via host — same assertions as inline search
+    let host_books = events[3]["data"]["books"].as_array().unwrap();
+    assert!(
+        !host_books.is_empty(),
+        "host search should return non-empty books"
+    );
+    assert!(
+        host_books.len() > 1,
+        "host search should return multiple books after rb-legado-json-booklist-array-iterate fix"
+    );
+
+    // 5. detail — succeeds (uses fixture's hardcoded bookId, not search result)
+    assert_eq!(
+        events[4]["type"], "result",
+        "detail should succeed, got {:?}",
+        events[4]
+    );
+    assert_eq!(events[4]["data"]["book"]["title"], "斗破苍穹");
+    assert_eq!(events[4]["data"]["book"]["author"], "天蚕土豆");
+    assert_eq!(
+        events[4]["data"]["book"]["lastChapter"],
+        "第一章 五帝破空"
+    );
+
+    // 6. toc — succeeds after rb-legado-jsonpath-html-suffix fix
+    assert_eq!(
+        events[5]["type"], "result",
+        "toc should be a result (not error) after rb-legado-jsonpath-html-suffix fix, got {:?}",
+        events[5]
+    );
+    let chapters = events[5]["data"]["toc"].as_array().unwrap();
+    assert!(
+        !chapters.is_empty(),
+        "toc should return non-empty chapters"
+    );
+    assert_eq!(
+        chapters[0]["title"],
+        "1.第一章 陨落的天才",
+        "first chapter title should be extracted via $.t"
+    );
+    // rb-legado-json-url-template-jsonpath: chapterUrl {{$.l}} must expand.
+    let first_chapter_url = chapters[0]["url"].as_str().unwrap_or("");
+    assert!(
+        !first_chapter_url.contains("{{"),
+        "chapterUrl should have {{$.l}} expanded after rb-legado-json-url-template-jsonpath fix, got {:?}",
+        first_chapter_url
+    );
+
+    // 7. chapter — content extracted via $..body##... (real API returns
+    //    version-too-low message for this deprecated endpoint)
+    assert_eq!(
+        events[6]["type"], "result",
+        "chapter should succeed, got {:?}",
+        events[6]
+    );
+    assert_eq!(
+        events[6]["data"]["chapterTitle"],
+        "1.第一章 陨落的天才"
+    );
+    assert!(
+        !events[6]["data"]["content"].as_str().unwrap_or("").is_empty(),
+        "chapter content should be non-empty"
+    );
+
+    // 8. progress stored
+    assert_eq!(events[7]["data"]["stored"], true);
+
+    // 9. JS unsupported — structured error, never a fake network result
+    assert_eq!(events[8]["type"], "error");
+    assert_eq!(events[8]["error"]["code"], "INTERNAL");
+    assert_eq!(events[8]["error"]["details"]["unsupported"], true);
+}
+
 #[test]
 fn booksource_fixture_outputs_stable_json() {
     let output = Command::new(BIN)
