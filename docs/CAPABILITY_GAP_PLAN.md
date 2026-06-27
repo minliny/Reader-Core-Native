@@ -28,7 +28,9 @@
 | 影响 | 459 源中 292 源含 MultiRule（64%），不补则大面积 L2-search 失败 |
 | 方案 | reader-rule 中 `splitSourceRule` 实现：按 &&/\|\|/%% 拆分为 SourceRule 列表，每条独立解析后合并结果 |
 | 验收 | 含 MultiRule 的 P0 源 L2-search 通过率 ≥80% |
-| 状态 | 已有 release blocker `rb-legado-css-multirule-operator`，Agent 正在修 |
+| 状态 | 已有 release blocker `rb-legado-css-multirule-operator`。Agent 正在修，
+         reader-rule +391 行未提交，15 multirule tests pass (&&/||/%% CSS+XPath 拆分)。
+         等待 agent 完成后提交 + 跑 459 源批量验证 |
 
 ### 2. 多页加载（nextTocUrl / nextContentUrl）
 
