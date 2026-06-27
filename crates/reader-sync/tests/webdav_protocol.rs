@@ -262,3 +262,47 @@ fn webdav_resource_serde_roundtrip() {
     let back: WebDavResource = serde_json::from_value(v).unwrap();
     assert_eq!(back, r);
 }
+
+// ---------------------------------------------------------------------------
+// SyncCollection v2 variants (S5 B8) — verifies the four Legado independent
+// entities round-trip through as_str/parse and serde.
+// ---------------------------------------------------------------------------
+
+use reader_sync::SyncCollection;
+
+#[test]
+fn sync_collection_v2_entity_variants_round_trip() {
+    for (variant, expected) in [
+        (SyncCollection::ReplaceRule, "replaceRule"),
+        (SyncCollection::DictRule, "dictRule"),
+        (SyncCollection::TxtTocRule, "txtTocRule"),
+        (SyncCollection::Bookmark, "bookmark"),
+    ] {
+        assert_eq!(variant.as_str(), expected);
+        let parsed = SyncCollection::parse(expected).unwrap();
+        assert_eq!(parsed, variant);
+    }
+}
+
+#[test]
+fn sync_collection_v2_entity_variants_serde_round_trip() {
+    for variant in [
+        SyncCollection::ReplaceRule,
+        SyncCollection::DictRule,
+        SyncCollection::TxtTocRule,
+        SyncCollection::Bookmark,
+    ] {
+        let json = serde_json::to_string(&variant).unwrap();
+        let back: SyncCollection = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, variant);
+    }
+}
+
+#[test]
+fn sync_collection_parse_rejects_unknown_as_custom() {
+    // Existing behavior: unknown strings become Custom. Verify v2 names are
+    // NOT treated as Custom.
+    let custom = SyncCollection::parse("replaceRuleCustom").unwrap();
+    assert!(matches!(custom, SyncCollection::Custom(_)));
+    assert_eq!(custom.as_str(), "replaceRuleCustom");
+}

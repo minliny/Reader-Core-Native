@@ -32,6 +32,12 @@ pub enum SyncCollection {
     ChapterCache,
     RssSubscription,
     RssEntry,
+    // v2 independent entities (Legado data/entities). These are configurable
+    // rows that back up / sync independently of the bookshelf.
+    ReplaceRule,
+    DictRule,
+    TxtTocRule,
+    Bookmark,
     Custom(String),
 }
 
@@ -44,6 +50,10 @@ impl SyncCollection {
             SyncCollection::ChapterCache => "chapterCache",
             SyncCollection::RssSubscription => "rssSubscription",
             SyncCollection::RssEntry => "rssEntry",
+            SyncCollection::ReplaceRule => "replaceRule",
+            SyncCollection::DictRule => "dictRule",
+            SyncCollection::TxtTocRule => "txtTocRule",
+            SyncCollection::Bookmark => "bookmark",
             SyncCollection::Custom(value) => value.as_str(),
         }
     }
@@ -62,6 +72,10 @@ impl SyncCollection {
             "chapterCache" => SyncCollection::ChapterCache,
             "rssSubscription" => SyncCollection::RssSubscription,
             "rssEntry" => SyncCollection::RssEntry,
+            "replaceRule" => SyncCollection::ReplaceRule,
+            "dictRule" => SyncCollection::DictRule,
+            "txtTocRule" => SyncCollection::TxtTocRule,
+            "bookmark" => SyncCollection::Bookmark,
             _ => SyncCollection::Custom(value),
         })
     }
