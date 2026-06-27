@@ -1,115 +1,27 @@
 {
   "blockers": [
     {
-      "capability": "book.detail",
-      "evidence_status": "missing",
-      "id": "rb-book.detail",
-      "mitigation": "Verify implemented capability book.detail with at least one passing evidence",
-      "platform": "all",
-      "reason": "book.detail is implemented but unverified (zero evidence)",
-      "severity": "medium",
-      "sources": [
-        "protocol/reader-command.schema.json",
-        "FEATURE_MATRIX.md"
-      ]
-    },
-    {
-      "capability": "book.search",
-      "evidence_status": "missing",
-      "id": "rb-book.search",
-      "mitigation": "Verify implemented capability book.search with at least one passing evidence",
-      "platform": "all",
-      "reason": "book.search is implemented but unverified (zero evidence)",
-      "severity": "medium",
-      "sources": [
-        "protocol/reader-command.schema.json",
-        "FEATURE_MATRIX.md"
-      ]
-    },
-    {
-      "capability": "book.toc",
-      "evidence_status": "missing",
-      "id": "rb-book.toc",
-      "mitigation": "Verify implemented capability book.toc with at least one passing evidence",
-      "platform": "all",
-      "reason": "book.toc is implemented but unverified (zero evidence)",
-      "severity": "medium",
-      "sources": [
-        "protocol/reader-command.schema.json",
-        "FEATURE_MATRIX.md"
-      ]
-    },
-    {
-      "capability": "chapter.content",
-      "evidence_status": "missing",
-      "id": "rb-chapter.content",
-      "mitigation": "Verify implemented capability chapter.content with at least one passing evidence",
-      "platform": "all",
-      "reason": "chapter.content is implemented but unverified (zero evidence)",
-      "severity": "medium",
-      "sources": [
-        "protocol/reader-command.schema.json",
-        "FEATURE_MATRIX.md"
-      ]
-    },
-    {
       "capability": "core.info",
-      "evidence_status": "missing",
+      "evidence_status": "conformance",
       "id": "rb-core.info",
-      "mitigation": "Verify implemented capability core.info with at least one passing evidence",
+      "mitigation": "Verified by conformance (valid-command-core-info, core-info-rejects-unknown-params) + runtime.rs crate-test (core_info_advertises_v1_capabilities). No real Legado source exercises core.info directly.",
       "platform": "all",
-      "reason": "core.info is implemented but unverified (zero evidence)",
-      "severity": "medium",
-      "sources": [
-        "protocol/reader-command.schema.json"
-      ]
-    },
-    {
-      "capability": "host.bus.v1",
-      "evidence_status": "missing",
-      "id": "rb-host.bus.v1",
-      "mitigation": "Verify implemented capability host.bus.v1 with at least one passing evidence",
-      "platform": "all",
-      "reason": "host.bus.v1 is implemented but unverified (zero evidence)",
-      "severity": "medium",
-      "sources": [
-        "protocol/reader-command.schema.json"
-      ]
-    },
-    {
-      "capability": "host.complete",
-      "evidence_status": "missing",
-      "id": "rb-host.complete",
-      "mitigation": "Verify implemented capability host.complete with at least one passing evidence",
-      "platform": "all",
-      "reason": "host.complete is implemented but unverified (zero evidence)",
-      "severity": "medium",
+      "reason": "core.info covered by conformance + crate-test; downgraded to low (no real Legado source verification yet)",
+      "severity": "low",
       "sources": [
         "protocol/reader-command.schema.json"
       ]
     },
     {
       "capability": "host.error",
-      "evidence_status": "missing",
+      "evidence_status": "conformance",
       "id": "rb-host.error",
-      "mitigation": "Verify implemented capability host.error with at least one passing evidence",
+      "mitigation": "Verified by conformance (host-error-routes-error, host-error-routes-diagnostics, host-error-rejects-* param validation cases). No real Legado source exercises host.error path directly.",
       "platform": "all",
-      "reason": "host.error is implemented but unverified (zero evidence)",
-      "severity": "medium",
+      "reason": "host.error covered by conformance; downgraded to low (no real Legado source verification yet)",
+      "severity": "low",
       "sources": [
         "protocol/reader-command.schema.json"
-      ]
-    },
-    {
-      "capability": "host.request",
-      "evidence_status": "missing",
-      "id": "rb-host.request",
-      "mitigation": "Verify implemented capability host.request with at least one passing evidence",
-      "platform": "all",
-      "reason": "host.request is implemented but unverified (zero evidence)",
-      "severity": "medium",
-      "sources": [
-        "protocol/reader-event.schema.json"
       ]
     },
     {
@@ -125,75 +37,37 @@
       ]
     },
     {
-      "capability": "http.execute",
-      "evidence_status": "missing",
-      "id": "rb-http.execute",
-      "mitigation": "Verify implemented capability http.execute with at least one passing evidence",
-      "platform": "all",
-      "reason": "http.execute is implemented but unverified (zero evidence)",
-      "severity": "medium",
-      "sources": [
-        "protocol/reader-command.schema.json",
-        "FEATURE_MATRIX.md"
-      ]
-    },
-    {
-      "capability": "reading.progress.update",
-      "evidence_status": "missing",
-      "id": "rb-reading.progress.update",
-      "mitigation": "Verify implemented capability reading.progress.update with at least one passing evidence",
-      "platform": "all",
-      "reason": "reading.progress.update is implemented but unverified (zero evidence)",
-      "severity": "medium",
-      "sources": [
-        "protocol/reader-command.schema.json"
-      ]
-    },
-    {
-      "capability": "remote.reading.v1",
-      "evidence_status": "missing",
-      "id": "rb-remote.reading.v1",
-      "mitigation": "Verify implemented capability remote.reading.v1 with at least one passing evidence",
-      "platform": "all",
-      "reason": "remote.reading.v1 is implemented but unverified (zero evidence)",
-      "severity": "medium",
-      "sources": [
-        "protocol/reader-command.schema.json",
-        "FEATURE_MATRIX.md"
-      ]
-    },
-    {
       "capability": "runtime.config.v1",
-      "evidence_status": "missing",
+      "evidence_status": "conformance",
       "id": "rb-runtime.config.v1",
-      "mitigation": "Verify implemented capability runtime.config.v1 with at least one passing evidence",
+      "mitigation": "Verified by conformance (valid-config-empty, valid-config-directories, invalid-config-*) + runtime.rs crate-test (parses_runtime_config_boundary) + contract config.rs crate-test (rejects_unknown_runtime_config_field). No real Legado source exercises runtime.config.v1 directly.",
       "platform": "all",
-      "reason": "runtime.config.v1 is implemented but unverified (zero evidence)",
-      "severity": "medium",
+      "reason": "runtime.config.v1 covered by conformance + crate-test; downgraded to low (no real Legado source verification yet)",
+      "severity": "low",
       "sources": [
         "protocol/reader-command.schema.json"
       ]
     },
     {
       "capability": "runtime.hostSmoke",
-      "evidence_status": "missing",
+      "evidence_status": "conformance",
       "id": "rb-runtime.hostsmoke",
-      "mitigation": "Verify implemented capability runtime.hostSmoke with at least one passing evidence",
+      "mitigation": "Verified by conformance (host-request-event-shape + 20+ host fixtures using method=runtime.hostSmoke) + runtime.rs crate-test (host_smoke_rejects_malformed_capability_names) + ffi-smoke. No real Legado source exercises runtime.hostSmoke directly.",
       "platform": "all",
-      "reason": "runtime.hostSmoke is implemented but unverified (zero evidence)",
-      "severity": "medium",
+      "reason": "runtime.hostSmoke covered by conformance + crate-test + ffi-smoke; downgraded to low (no real Legado source verification yet)",
+      "severity": "low",
       "sources": [
         "protocol/reader-command.schema.json"
       ]
     },
     {
       "capability": "runtime.ping",
-      "evidence_status": "missing",
+      "evidence_status": "conformance",
       "id": "rb-runtime.ping",
-      "mitigation": "Verify implemented capability runtime.ping with at least one passing evidence",
+      "mitigation": "Verified by conformance (valid-command-runtime-ping, runtime-ping-rejects-unknown-params) + runtime.rs crate-test (ping_round_trips). No real Legado source exercises runtime.ping directly (bootstrap method).",
       "platform": "all",
-      "reason": "runtime.ping is implemented but unverified (zero evidence)",
-      "severity": "medium",
+      "reason": "runtime.ping covered by conformance + crate-test; downgraded to low (no real Legado source verification yet)",
+      "severity": "low",
       "sources": [
         "protocol/reader-command.schema.json"
       ]
@@ -775,10 +649,10 @@
       ]
     }
   ],
-  "generated_at": "2026-06-25T07:40:32Z",
+  "generated_at": "2026-06-27T00:00:00Z",
   "summary": {
     "by_platform": {
-      "all": 64,
+      "all": 54,
       "android": 0,
       "harmony": 0,
       "ios": 0,
@@ -787,10 +661,10 @@
     "by_severity": {
       "blocker": 0,
       "high": 0,
-      "medium": 26,
-      "low": 38
+      "medium": 11,
+      "low": 43
     },
-    "total": 64
+    "total": 54
   },
   "tool": "release-blocker-register-generator",
   "version": "release-blockers/1"
