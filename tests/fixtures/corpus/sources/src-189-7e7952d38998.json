@@ -1,0 +1,48 @@
+{
+  "bookSourceComment": "//by:cwjdb",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "绿色小说（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://www.greentxt.net",
+  "customButton": false,
+  "customOrder": 189,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "@js:\n    java.toast(\"正在努力加载中，请稍后\");\nvar sort = [];\nvar push = (title, url, type1, type2) => {\n    sort.push({\n        title: title,\n        url: url,\n        style: {\n            layout_flexGrow: type1,\n            layout_flexBasisPercent: type2\n        }\n    });\n};\nvar sites = [{\n        u: \"http://www.greentxt.net/sort/\",\n        ti: \"༺ˇ»`全部小说´«ˇ༻\"\n    },\n    {\n        u: \"http://www.greentxt.net/quanben/sort/\",\n        ti: \"༺ˇ»`全本小说´«ˇ༻\"\n    }];\nfor (var site of sites) {\n    var o = org.jsoup.Jsoup.parse(java.ajax(site.u));\n    var s = o.select('div.class>ul>li>a');\n    var u1 = site.u + \"/{{page}}/\";\n    push(site.ti, u1, \"1\", \"1\");\n    for (var i = 0; i < s.size(); i++) {\n        var urls = String(s[i].attr(\"href\")).replace(/(.*)\\/(\\d+)\\//,\"$1/{{page}}/\");\n        if (i + 1 <= s.length - s.length % 3) {\n            push(s[i].text(), urls, \"1\", \"0.25\")\n        } else {\n        push(s[i].text(), urls, \"-1\", \"0.29\")\n        }\n    }\n}\nJSON.stringify(sort);",
+  "lastUpdateTime": 1759294275431,
+  "respondTime": 5455,
+  "ruleBookInfo": {
+    "author": "[property$=author]@content",
+    "coverUrl": "[property$=image]@content",
+    "intro": "text.简介@text##简介[：:]|关于{{book.name}}[：:]?",
+    "kind": "[property~=category|status|update_time]@content",
+    "lastChapter": "[property$=latest_chapter_name]@content##正文卷.|正文.|VIP章节.|免费章节.|VIP卷.|默认卷.|章节目录.|最新章节.|[\\(（【].*?[求更票谢乐发订合补加].*?[】）\\)]",
+    "name": "[property$=book_name]@content"
+  },
+  "ruleContent": {
+    "content": "#rtext@html",
+    "nextContentUrl": "text.下一页@href",
+    "replaceRegex": "##↑返回顶部↑|（本章完）"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "text.作者@text##作者[：:]",
+    "bookList": "div.bookbox",
+    "bookUrl": "h4 a@href",
+    "intro": ".update@ownText##简介[：:]|关于{{book.name}}[：:]?",
+    "kind": "text.阅读量@text",
+    "lastChapter": ".cat a@text",
+    "name": "h4 a@text",
+    "wordCount": "text.字数@text##字数[：:]"
+  },
+  "ruleToc": {
+    "chapterList": "#list-chapterAll a",
+    "chapterName": "text\n@js:result\n.replace(\"••\",\"\")\n.replace(/^(\\d+).第/,'第')\n.replace(/^(正文|VIP章节|最新章节)?(\\s+|_)|[\\(\\{（｛【].*[求含理更谢乐发推票盟补加字Kk\\/].*/g,'')\n.replace(/^(\\d+)[、．]第.+章/,'第$1章')\n.replace(/^(\\d+)、\\d+、/,'第$1章 ')\n.replace(/^(\\d+)、\\d+/,'第$1章')\n.replace(/^(第.+章)\\s?\\d+/,'$1')\n.replace(/^(\\d+)、/,'第$1章 ')\n.replace(/^(第.+章)\\s?第.+章/,'$1')\n.replace(/第\\s(.+)\\s章/,'第$1章')\n.replace(/.*(chapter|Chapter)\\s?(\\d+)\\s?/,'$1 $2 ')\n.replace(/\\(.+\\)/,'')\n.replace(/\\[|。/,'')\n.replace(/第([零一二两三四五六七八九十百千]+)章/g,java.toNumChapter(result))\n##(章)([^\\s]+)(\\s·)##$1 $2$3",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "{{url=source.getKey();\ncookie.removeCookie(url)\njava.ajax(url).match(/action=\"(.+?)\"/)[1]}},{\n\"method\": \"POST\",\n\"body\": \"searchkey={{key}}\"\n}",
+  "weight": 0,
+  "sourceId": "corpus-7e7952d38998"
+}

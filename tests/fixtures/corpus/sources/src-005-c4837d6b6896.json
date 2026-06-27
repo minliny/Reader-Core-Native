@@ -1,0 +1,54 @@
+{
+  "bookSourceComment": "可看某点，搜索看节点，推荐台湾",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "天天看书（优+++）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://cn.ttkan.co/##@遇知",
+  "customButton": false,
+  "customOrder": 4,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "@js:\nJSON.stringify([[\"连载\",\"lianzai\"],[\"随选\",\"suixuan\"],[\"玄幻\",\"xuanhuan\"],[\"都市\",\"dushi\"],\n[\"仙侠\",\"xianxia\"],[\"言情\",\"gudaiyanqing\"],\n[\"穿越\",\"chuanyuechongsheng\"],[\"游戏\",\"youxi\"],[\"科幻\",\"kehuan\"],[\"悬疑\",\"xuanyi\"],[\"灵异\",\"lingyi\"],[\"历史\",\"lishi\"],[\"青春\",\"qingchun\"],[\"军事\",\"junshi\"],[\"竞技\",\"jingji\"],[\"现言\",\"yanqing\"],[\"其他\",\"qita\"]\n].map([title,id]=>({\n\ttitle: title,\n\turl: `/api/nq/amp_novel_list?language=cn&limit=18&type=${id}&filter=*&page={{page}\\}&__amp_source_origin=https%3A%2F%2Fcn.ttkan.co`,\n\tstyle: {\n\t\tlayout_flexGrow: 1,\n\t\tlayout_flexBasisPercent: 0.25\n\t}\n})));",
+  "lastUpdateTime": 1766455383923,
+  "respondTime": 181300,
+  "ruleBookInfo": {
+    "author": "[name$=author]@content",
+    "coverUrl": "[name=\"og:image\"]@content",
+    "intro": "🔔 更新时间：{{@@[name$=update_time]@content##T##🔸}}\n\n📂 内容简介：{{@@[name$=description]@content##精彩.*小说.* 免费阅读：}}##(^|[。！？]+[”」）】]?)##$1<br>",
+    "kind": "[name~=category|status|update_time]@content##T.*",
+    "lastChapter": "[name$=_chapter_name]@content",
+    "name": "[name$=book_name]@content",
+    "tocUrl": "/api/nq/amp_novel_chapters?language=cn&novel_id={{java.put('bid', baseUrl.match(/chapters\\/(.*)/)[1]);}}&__amp_source_origin=https%3A%2F%2Fcn.ttkan.co"
+  },
+  "ruleContent": {
+    "content": ".content@p@html",
+    "replaceRegex": "##{{chapter.title}}|\\(本章完\\)|（.*推荐票）"
+  },
+  "ruleExplore": {
+    "author": "$.author",
+    "bookList": "$.items[*]",
+    "bookUrl": "/novel/chapters/{{$.novel_id}}",
+    "coverUrl": "/cover/{{$.topic_img}}",
+    "intro": "$.description",
+    "kind": "$.type",
+    "name": "$.name"
+  },
+  "ruleSearch": {
+    "author": "li.1@text",
+    "bookList": ".novel_cell",
+    "bookUrl": "a.0@href",
+    "coverUrl": "amp-img@src",
+    "intro": "li.2@text##简介：",
+    "name": "h3@text"
+  },
+  "ruleToc": {
+    "chapterList": "$.items[*]",
+    "chapterName": "$.chapter_name@js:result\n.replace(\"••\",\"\")\n.replace(/^(\\d+).第/,'第')\n.replace(/^(正文|VIP章节|最新章节)?(\\s+|_)|[\\(\\{（｛【].*[求更谢乐发推票盟补加字Kk\\/].*[\\)\\}）｝】]/g,'')\n.replace(/^(\\d+)[、．]第.+章/,'第$1章')\n.replace(/^(\\d+)、\\d+、/,'第$1章 ')\n.replace(/^(\\d+)、\\d+/,'第$1章')\n.replace(/^(第.+章)\\s?\\d+/,'$1')\n.replace(/^(\\d+)、/,'第$1章 ')\n.replace(/^(第.+章)\\s?第.+章/,'$1')\n.replace(/第\\s(.+)\\s章/,'第$1章')\n.replace(/.*(chapter|Chapter)\\s?(\\d+)\\s?/,'$1 $2 ')\n.replace(/\\(.+\\)/,'')\n.replace(/\\[|。/,'')\n.replace(/第([零一二三四五六七八九十百千]+)章/g,java.toNumChapter(result))\n##(章)([^\\s]+)(\\s·)##$1 $2$3",
+    "chapterUrl": "@js:\nburl=String(source.bookSourceUrl).replace(/\\/\\#\\#.*/,'');\nurl=burl+\"/novel/pagea/{{java.get('bid')}}_{{$.chapter_id}}.html\"\n\nhead={\"headers\":{\"Referer\":url}};\n\nurl+\",\"+ JSON.stringify(head);"
+  },
+  "searchUrl": "/novel/search?q={{key}}",
+  "weight": 0,
+  "sourceId": "corpus-c4837d6b6896"
+}

@@ -1,0 +1,41 @@
+{
+  "bookSourceGroup": "正版小说 书源",
+  "bookSourceName": "梧桐中文",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://www.wtzw.com",
+  "customButton": false,
+  "customOrder": 422,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "lastUpdateTime": 1772088124667,
+  "respondTime": 1581,
+  "ruleBookInfo": {
+    "author": "class.sName@text",
+    "coverUrl": "class.w_pic@tag.img@src",
+    "intro": "class.pWorkInformation@text",
+    "lastChapter": "class.li_upDate@tag.a@text",
+    "name": "class.li_tit@tag.a@text"
+  },
+  "ruleContent": {
+    "content": "class.article@html"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "tag.a.2@text",
+    "bookList": "class.searchList@li",
+    "bookUrl": "class.sTit@tag.a@href",
+    "coverUrl": "tag.img@src",
+    "lastChapter": "tag.a.3@text",
+    "name": "class.sTit@text"
+  },
+  "ruleToc": {
+    "chapterList": "class.w_ulTxt w_ulTxt_3 clearfix@tag.li",
+    "chapterName": "tag.a@text",
+    "chapterUrl": "tag.a@href"
+  },
+  "searchUrl": "http://www.wtzw.com/search-{{key}}.html?null",
+  "weight": 0,
+  "sourceId": "corpus-46926b1e0137"
+}

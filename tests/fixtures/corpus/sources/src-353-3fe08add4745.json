@@ -1,0 +1,39 @@
+{
+  "bookSourceComment": "By关耳",
+  "bookSourceGroup": "特殊 书源",
+  "bookSourceName": "百度知道（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://zhidao.baidu.com",
+  "customButton": false,
+  "customOrder": 353,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "header": "{\"Accept\": \"application/json\",\r\n\"Referer\": \"https://zhidao.baidu.com/index/?fr=&word={{encodeURIComponent(key)}}&\"\r\n}",
+  "lastUpdateTime": 1759386301568,
+  "respondTime": 8488,
+  "ruleBookInfo": {},
+  "ruleContent": {
+    "content": "<js>\nresult=String(result).replace(/<.*?wgt-replyer-all-time\">([^<]+)<\\/span>/g,'<h1 class=\"wgt-replyer-all-time\">---$1---</h1>').replace(/<span.*?>\\d+<\\/span>/g,'').replace(/<\\/*span.*?>/g,'').replace(/展开全部/g,'')</js>\n@css:.wgt-replyer-all-time,.best-text,.answer-text@html##</*(a|strong|li|ol).*?>",
+    "imageStyle": "0",
+    "nextContentUrl": "text.下一页@href"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "bookList": "@js:result=[{a:decodeURIComponent(baseUrl.match(/word=(.*?)\\&/)[1]),b:baseUrl,c:'https://ss3.bdstatic.com/70cFv8Sh_Q1YnxGkpoWK1HF6hhy/it/u=4143784958,1445381177&fm=26&gp=0.jpg'}]",
+    "bookUrl": "b",
+    "coverUrl": "c",
+    "name": "a"
+  },
+  "ruleToc": {
+    "chapterList": "$.data.entry",
+    "chapterName": "$.title##</*em>",
+    "chapterUrl": "$.url",
+    "nextTocUrl": "@js:url=baseUrl.match(/(.*?pn=)/)[1];\nlist=[];\nfor(i=2;i<=10;i++){\nlist.push(url+(i*10))\n}\nlist",
+    "updateTime": "$.time"
+  },
+  "searchUrl": "https://zhidao.baidu.com/msearch/ajax/getsearchlist?word={{key}}&pn=10",
+  "weight": 0,
+  "sourceId": "corpus-3fe08add4745"
+}

@@ -1,0 +1,58 @@
+{
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "轻之文库（优+）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.linovel.net#yc",
+  "customButton": false,
+  "customOrder": 114,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[{\"title\":\"✱　　　　　　✱    榜  单    ✱　　　　　　✱\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"重推月榜\",\"url\":\"/hub/getTopBooks?unit=zt&time=month&page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"佳作月榜\",\"url\":\"/hub/getTopBooks?unit=jz&time=month&page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"月票月榜\",\"url\":\"/hub/getTopBooks?unit=ticket&time=month&page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"轻币月榜\",\"url\":\"/hub/getTopBooks?unit=coin&time=month&page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"墨水月榜\",\"url\":\"/hub/getTopBooks?unit=ink&time=month&page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"应援月榜\",\"url\":\"/hub/getTopBooks?unit=supp&time=month&page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"重推新人\",\"url\":\"/hub/getTopBooks?unit=zt&time=new&page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"佳作新人\",\"url\":\"/hub/getTopBooks?unit=jz&time=new&page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"轻币新人\",\"url\":\"/hub/getTopBooks?unit=coin&time=new&page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"墨水新人\",\"url\":\"/hub/getTopBooks?unit=ink&time=new&page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"应援新人\",\"url\":\"/hub/getTopBooks?unit=supp&time=new&page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"月票新人\",\"url\":\"/hub/getTopBooks?unit=ticket&time=new&page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"✱　　　　　　✱    分  类    ✱　　　　　　✱\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 精  选 \",\"url\":\"/cat/2000.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 全  部 \",\"url\":\"/cat/-1.html?sort=hot&sign=-1&page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 幻  想 \",\"url\":\"/cat/1.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 战  斗 \",\"url\":\"/cat/2.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 恋  爱 \",\"url\":\"/cat/3.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 异  界 \",\"url\":\"/cat/4.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 搞  笑 \",\"url\":\"/cat/5.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 日  常 \",\"url\":\"/cat/6.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 校  园 \",\"url\":\"/cat/7.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 后  宫 \",\"url\":\"/cat/8.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 科  幻 \",\"url\":\"/cat/10.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 治  愈 \",\"url\":\"/cat/11.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 超  能 \",\"url\":\"/cat/12.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 节  操 \",\"url\":\"/cat/13.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 妖  怪 \",\"url\":\"/cat/14.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 恐  怖 \",\"url\":\"/cat/15.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 妹  控 \",\"url\":\"/cat/16.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 伪  娘 \",\"url\":\"/cat/17.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 魔  法 \",\"url\":\"/cat/18.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 乙  女 \",\"url\":\"/cat/19.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 同  人 \",\"url\":\"/cat/20.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 百  合 \",\"url\":\"/cat/21.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 偶  像 \",\"url\":\"/cat/22.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 悬  疑 \",\"url\":\"/cat/104.html?page={{page}}\",\"style\":{\"layout_flexGrow\":1}}]",
+  "header": "{\n  \"User-Agent\": \"Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/60.0\"\n}",
+  "lastUpdateTime": 1759386526665,
+  "loginUrl": "https://www.linovel.net/",
+  "respondTime": 10515,
+  "ruleBookInfo": {
+    "author": ".name a@text",
+    "coverUrl": ".book-cover img@src",
+    "intro": "🏷️   {{@.book-cats@text}}{{'\\n'+'​'}}\n{{@.about-text@html}}##(^|[。！？]+[”」）】]?)##$1<br>",
+    "kind": ".book-data span.-2@text&&.book-last-update@text##更新于|\\s.*",
+    "lastChapter": ".recent-update a.0@text",
+    "name": "h1@text",
+    "wordCount": ".book-data span.0@text"
+  },
+  "ruleContent": {
+    "content": ".article-text@html",
+    "imageStyle": "0"
+  },
+  "ruleExplore": {
+    "author": ".book-extra@text||author##\\s*丨.+$",
+    "bookList": ".rank-book||$.data.books[*]",
+    "bookUrl": "a.0@href||https://www.linovel.net/book/{$.id}.html",
+    "coverUrl": "img@src||coverUrl",
+    "intro": ".book-intro@text||about",
+    "kind": ".book-extra@text&&.book-tag@text&&cat[*]##^[^丨]+丨\\s*|\\s.*",
+    "lastChapter": "p.-1@text||lastVolName",
+    "name": "a.0@text||name",
+    "wordCount": "words"
+  },
+  "ruleSearch": {
+    "author": "div.-1@text##\\s*丨.+$",
+    "bookList": ".rank-book-list a",
+    "bookUrl": "href",
+    "coverUrl": "img@src",
+    "intro": "div.-2@text",
+    "kind": "div.-1@text&&.book-tag@text##^[^丨]+丨\\s*|\\s.*",
+    "name": "div.4@text"
+  },
+  "ruleToc": {
+    "chapterList": ".chapter",
+    "chapterName": "@js:\nvar title = result.parentNode().parentNode().parentNode().parentNode().parentNode();\nresult = title.select('h2').text() +'：'+ result.text()",
+    "chapterUrl": "a@href"
+  },
+  "searchUrl": "/search/?kw={{key}}&page={{page}}",
+  "weight": 0,
+  "sourceId": "corpus-cbb51fe14c8a"
+}

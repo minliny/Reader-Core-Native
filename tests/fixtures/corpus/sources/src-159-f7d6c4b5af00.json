@@ -1,0 +1,53 @@
+{
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "五五读书（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.changduzw.com",
+  "customButton": false,
+  "customOrder": 159,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "总点击榜::/top/allvisit_{{page}}/\n月点击榜::/top/monthvisit_{{page}}/\n周点击榜::/top/weekvisit_{{page}}/\n日点击榜::/top/dayvisit_{{page}}/\n总收藏榜::/top/goodnum_{{page}}/\n总推荐榜::/top/weekvote_{{page}}/\n数字排行::/top/size_{{page}}/\n最近更新::/top/lastupdate_{{page}}/\n最新入库::/top/postdate_{{page}}/\n完本小说::/modules/article/articlelist.php/?fullflag=1&page={{page}}\n玄幻魔法::/fenlei/1_{{page}}/\n仙侠修真::/fenlei/2_{{page}}/\n都市言情::/fenlei/3_{{page}}/\n历史军事::/fenlei/4_{{page}}/\n网游竞技::/fenlei/5_{{page}}/\n科幻小说::/fenlei/6_{{page}}/\n恐怖灵异::/fenlei/7_{{page}}/\n其他小说::/fenlei/8_{{page}}/",
+  "lastUpdateTime": 1772085329971,
+  "respondTime": 2666,
+  "ruleBookInfo": {
+    "author": ".status@.author@text",
+    "coverUrl": ".imgbox@img@data-src",
+    "intro": ".jianjie@text##(^|[。！？]+[”」）】]?)##$1<br>",
+    "kind": ".status@a.0@text&&.status@span.-1:0@text##小说",
+    "lastChapter": ".status@a.1@text##正文卷.|正文.|VIP卷.|默认卷.|卷_|VIP章节.|免费章节.|章节目录.|最新章节.|[\\(（【].*?[求更票谢乐发订合补加架字修Kk].*?[】）\\)]|K",
+    "name": ".status@h1@text",
+    "tocUrl": ".read@href"
+  },
+  "ruleContent": {
+    "content": "id.htmlContent@html",
+    "replaceRegex": "##欢迎广大书友.*|.*55读书.*|.*520小说.*"
+  },
+  "ruleExplore": {
+    "author": ".sp_3@text",
+    "bookList": ".sk_cont@li!0",
+    "bookUrl": "a.1@href",
+    "coverUrl": "a.1@href##.+\\D((\\d+)\\d{3})\\D##/files/article/image/$2/$1/$1s.jpg###",
+    "kind": ".sp_1,.sp_6,.sp_4@text##\\[|\\]|小说",
+    "name": ".sp_2@text"
+  },
+  "ruleSearch": {
+    "author": "td.2@text",
+    "bookList": "tbody@tr!0",
+    "bookUrl": "a.0@href",
+    "coverUrl": "a.0@href##.+\\D((\\d+)\\d{3})\\D##/files/article/image/$2/$1/$1s.jpg###",
+    "kind": "td.5:4@text",
+    "lastChapter": "a.1@text##正文卷.|正文.|VIP卷.|默认卷.|卷_|VIP章节.|免费章节.|章节目录.|最新章节.|[\\(（【].*?[求更票谢乐发订合补加架字修Kk].*?[】）\\)]",
+    "name": "a.0@text"
+  },
+  "ruleToc": {
+    "chapterList": ".mulu_list@li@a",
+    "chapterName": "text##正文卷.|正文.|VIP卷.|默认卷.|卷_|VIP章节.|免费章节.|章节目录.|最新章节.|[\\(（【].*?[求更票谢乐发订合补加架字修Kk].*?[】）\\)]|K",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "/modules/article/search.php,{\n  \"method\": \"post\",\n  \"body\": \"searchkey={{key}}&searchtype=articlename&submit=\"\n}",
+  "weight": 0,
+  "sourceId": "corpus-f7d6c4b5af00"
+}

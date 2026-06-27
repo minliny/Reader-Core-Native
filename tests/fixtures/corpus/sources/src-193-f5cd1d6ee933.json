@@ -1,0 +1,44 @@
+{
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "棉花小说（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://www.mianhuatang8.net/",
+  "customButton": false,
+  "customOrder": 193,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "@js:\nvar result = [];\nvar push = (title, url, size) => result.push({\"title\": title,\"url\": url,\"style\": {\"layout_flexGrow\": 1,\"layout_flexBasisPercent\": size}});\nvar tagUrl = \"http://www.mianhuatang8.net/class/\";\nvar tag = java.ajax(tagUrl);\nvar tagList = org.jsoup.Jsoup.parse(tag).select(\".class a\");\nvar tagSize = 0.4;\npush(\"分类\",null,1);\nfor (var i in tagList) {\n    var title = tagList[i].text();\n    var url = source.key + String(tagList[i].attr(\"href\")).replace(/(.*\\/)\\d+(\\/?)$/, `$1{{page}}$2`);\n    title = String(title).replace(/\\s/g, \"\");\n    push(title, url, tagSize);\n}\nvar spaceLength = tagList.length % 2;\nfor (i = 0; i < spaceLength; i++) {\n     push(\"——\",null,tagSize);\n}\nJSON.stringify(result);",
+  "lastUpdateTime": 1759294154602,
+  "respondTime": 2455,
+  "ruleBookInfo": {
+    "author": "[property=\"og:novel:author\"]@content",
+    "coverUrl": "[property=\"og:image\"]@content",
+    "intro": "[property=\"og:description\"]@content",
+    "kind": "[property~=category|status|update_time]@content",
+    "lastChapter": "[property~=las?test_chapter_name]@content",
+    "name": "[property=\"og:novel:book_name\"]@content"
+  },
+  "ruleContent": {
+    "content": ".readcontent@p@text##{{chapter.title}}",
+    "nextContentUrl": "text.下一页@href"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": ".author.0@text",
+    "bookList": ".bookbox",
+    "bookUrl": "a.0@href",
+    "intro": ".update@text",
+    "lastChapter": "a.1@text",
+    "name": "a.0@text"
+  },
+  "ruleToc": {
+    "chapterList": "#list-chapterAll@a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "<js>cookie.removeCookie(source.key);</js>\n/search/,{\"method\":\"POST\",\"body\":\"searchkey={{key}}\"}",
+  "weight": 0,
+  "sourceId": "corpus-f5cd1d6ee933"
+}

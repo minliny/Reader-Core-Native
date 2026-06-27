@@ -1,0 +1,51 @@
+{
+  "bookSourceComment": "//by:cwjdb",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "红牛小说（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.songdalaw.com",
+  "customButton": false,
+  "customOrder": 185,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[{\"title\":\"༺ˇ»`类型分类´«ˇ༻\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"不限\",\"url\":\"/classurl/0_0_0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"修真\",\"url\":\"/classurl/1_0_0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"仙侠\",\"url\":\"/classurl/2_0_0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"情感\",\"url\":\"/classurl/3_0_0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"历史\",\"url\":\"/classurl/4_0_0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"网游\",\"url\":\"/classurl/5_0_0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"穿越\",\"url\":\"/classurl/6_0_0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"恐怖\",\"url\":\"/classurl/7_0_0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"其他\",\"url\":\"/classurl/8_0_0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"༺ˇ»`排行分类´«ˇ༻\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"不限\",\"url\":\"/classurl/0_0_0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"阅读排行\",\"url\":\"/classurl/0_allvisit_0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"推荐排行\",\"url\":\"/classurl/0_allvote_0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"收藏排行\",\"url\":\"/classurl/0_goodnum_0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"更新时间\",\"url\":\"/classurl/0_lastupdate_0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"最新小说\",\"url\":\"/classurl/0_postdate_0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"༺ˇ»`字数分类´«ˇ༻\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"不限\",\"url\":\"/classurl/0_0_0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"30万以下\",\"url\":\"/classurl/0_0_1_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"30万-50万\",\"url\":\"/classurl/0_0_2_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"50万-100万\",\"url\":\"/classurl/0_0_3_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"100万-200万\",\"url\":\"/classurl/0_0_4_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"200万以上\",\"url\":\"/classurl/0_0_5_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"༺ˇ»`进程分类´«ˇ༻\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"不限\",\"url\":\"/classurl/0_0_0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"连载中\",\"url\":\"/classurl/0_0_0_1_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"已完结\",\"url\":\"/classurl/0_0_0_2_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}}]",
+  "header": "{\"User-Agent\":\"Mozilla/5.0 (Linux; U; Android 13; zh-Hans-CN; PFJM10 Build/TP1A.220905.001) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/100.0.4896.58 Quark/6.13.6.581 Mobile Safari/537.36\",\"Accept-Language\":\"zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7\"}",
+  "lastUpdateTime": 1759294491023,
+  "respondTime": 5452,
+  "ruleBookInfo": {
+    "author": "[property$=author]@content",
+    "coverUrl": "[property$=image]@content",
+    "intro": ".intro.0@text",
+    "kind": "[property~=category|status|update_time]@content",
+    "lastChapter": "[property$=latest_chapter_name]@content##正文卷.|正文.|VIP章节.|免费章节.|VIP卷.|默认卷.|章节目录.|最新章节.|[\\(（【].*?[求更票谢乐发订合补加].*?[】）\\)]",
+    "name": "[property$=book_name]@content",
+    "tocUrl": "text.在线阅读@href",
+    "wordCount": "#info@text<js>String(result).match(/(\\d+)/)[1]+\"万字\"</js>"
+  },
+  "ruleContent": {
+    "content": "#txt@html",
+    "replaceRegex": "##新书.*啦~~"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": ".pub a.0@text",
+    "bookList": "#content ul li",
+    "bookUrl": ".info h2 a@href",
+    "coverUrl": "img@data-original",
+    "intro": ".info p@text##【内容简介】|【小说介绍】",
+    "kind": ".pub@text<js>String(result).split('/').slice(1,4)</js>##类型：|分类：|更新时间：",
+    "lastChapter": ".ft a@text##【最(新章节|近更新)】",
+    "name": ".info h2 a@text",
+    "wordCount": ".pub@text<js>String(result).split('/')[4].split('.')[0]+\"万字\"</js>"
+  },
+  "ruleToc": {
+    "chapterList": "#chapter a",
+    "chapterName": "text\n@js:result\n.replace(\"••\",\"\")\n.replace(/^(\\d+).第/,'第')\n.replace(/^(正文|VIP章节|最新章节)?(\\s+|_)|[\\(\\{（｛【].*[求含理更谢乐发推票盟补加字Kk\\/].*/g,'')\n.replace(/^(\\d+)[、．]第.+章/,'第$1章')\n.replace(/^(\\d+)、\\d+、/,'第$1章 ')\n.replace(/^(\\d+)、\\d+/,'第$1章')\n.replace(/^(第.+章)\\s?\\d+/,'$1')\n.replace(/^(\\d+)、/,'第$1章 ')\n.replace(/^(第.+章)\\s?第.+章/,'$1')\n.replace(/第\\s(.+)\\s章/,'第$1章')\n.replace(/.*(chapter|Chapter)\\s?(\\d+)\\s?/,'$1 $2 ')\n.replace(/\\(.+\\)/,'')\n.replace(/\\[|。/,'')\n.replace(/第([零一二两三四五六七八九十百千]+)章/g,java.toNumChapter(result))\n##(章)([^\\s]+)(\\s·)##$1 $2$3",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "{{cookie.removeCookie(source.getKey())}}/search/?keyword={{key}}&t=0&page={{page}}",
+  "weight": 0,
+  "sourceId": "corpus-9ad5e3d8d81b"
+}

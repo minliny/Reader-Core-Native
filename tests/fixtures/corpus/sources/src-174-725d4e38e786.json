@@ -1,0 +1,37 @@
+{
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "天堂深圳（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://tiantangxiangzuoshenzhenwangyou.qwyd.net",
+  "customButton": false,
+  "customOrder": 174,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "lastUpdateTime": 1759402749615,
+  "respondTime": 4583,
+  "ruleBookInfo": {
+    "author": "class.container@tag.p.0@text##一段悲.*\n版权所有©2013-2016 天堂向左 深圳往右 作者慕容雪村",
+    "intro": "class.container@tag.p.0@text##作者：.*",
+    "name": "tag.h1@text"
+  },
+  "ruleContent": {
+    "content": "class.span12@html",
+    "nextContentUrl": "text.下一页@href"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "bookList": "class.active",
+    "bookUrl": "tag.a@href",
+    "name": "tag.a@text"
+  },
+  "ruleToc": {
+    "chapterList": "class.thumbnail",
+    "chapterName": "tag.a@text",
+    "chapterUrl": "tag.a@href"
+  },
+  "searchUrl": "http://tiantangxiangzuoshenzhenwangyou.qwyd.net/",
+  "weight": 0,
+  "sourceId": "corpus-725d4e38e786"
+}

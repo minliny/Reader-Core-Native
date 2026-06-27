@@ -1,0 +1,56 @@
+{
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "蚂蚁阅读（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://wap.imayitxt.com",
+  "customButton": false,
+  "customOrder": 182,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "\n 点  击  榜 ::/top/monthvisit/{{page}}.html\n 推  荐  榜 ::/top/monthvote/{{page}}.html\n\n玄幻::/sort/1/{{page}}.html\n仙侠::/sort/2/{{page}}.html\n都市::/sort/3/{{page}}.html\n历史::/sort/4/{{page}}.html\n军事::/sort/5/{{page}}.html\n灵异::/sort/6/{{page}}.html\n科幻::/sort/7/{{page}}.html\n游戏::/sort/8/{{page}}.html\n现言::/sort/9/{{page}}.html\n古言::/sort/10/{{page}}.html\n穿越::/sort/11/{{page}}.html\n青春::/sort/12/{{page}}.html\n豪门::/sort/14/{{page}}.html\n耽美::/sort/15/{{page}}.html\n其他::/sort/13/{{page}}.html",
+  "lastUpdateTime": 1759348594001,
+  "respondTime": 18057,
+  "ruleBookInfo": {
+    "author": "class.book_inf@tag.p.0@text",
+    "canReName": "true",
+    "coverUrl": "img@src.0",
+    "intro": "class.h3_rf creat_time@text&&class.book_desc@text",
+    "kind": "class.book_inf@tag.p.1@text##类别：",
+    "lastChapter": "class.h3_rf new_time.0@tag.a@text",
+    "name": "class.book_inf@h3@text",
+    "tocUrl": "class.more-chapter@href",
+    "wordCount": "class.book_inf@tag.p.2@text##总字数："
+  },
+  "ruleContent": {
+    "content": "class.textarticle@html",
+    "nextContentUrl": "text.下一章@href",
+    "replaceRegex": "##最新网址.*|一秒记住.*，更新快，，免费读！|>>本章未完，继续下章阅读|免费小说，无弹窗小说网，.*下载，请记住蚂蚁阅读网.*|\\s*.*第.*章.*\\s*|一秒记住【花小说网】，为您提供精彩小说阅读。"
+  },
+  "ruleExplore": {
+    "author": "class.listbook-info@tag.p.0@text",
+    "bookList": "class.onefourbox@a",
+    "bookUrl": "@href",
+    "coverUrl": "class.listbook-cove@tag.img@src",
+    "intro": "class.listbook-info@tag.p.1@text",
+    "kind": "class.book-tag@tag.span@text",
+    "name": "class.listbook-info@tag.h3@text"
+  },
+  "ruleSearch": {
+    "author": "p@text",
+    "bookList": "class.onefourbox@tag.a",
+    "bookUrl": "tag.a@href",
+    "coverUrl": "img@src",
+    "kind": "span@text",
+    "name": "h3@text"
+  },
+  "ruleToc": {
+    "chapterList": "class.mulu_uld@li",
+    "chapterName": "h3@text##>",
+    "chapterUrl": "tag.a@href"
+  },
+  "searchUrl": "http://wap.imayitxt.com/modules/article/search.php?searchkey={{key}}",
+  "weight": 0,
+  "sourceId": "corpus-8717e04bb95d"
+}

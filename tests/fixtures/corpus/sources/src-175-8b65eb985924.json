@@ -1,0 +1,49 @@
+{
+  "bookSourceComment": "改自@m8458246@一程",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "南极小说（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "🐧",
+  "customButton": false,
+  "customOrder": 175,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "header": "{\"User-Agent\": \"Mozilla/5.0 (Linux; U; Android 13; zh-cn; V2183A Build/TP1A.220624.014) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/89.0.4389.72 MQQBrowser/13.4 Mobile Safari/537.36 COVC/046223\",\n\"Referer\":\"https://novel.html5.qq.com/\",\n\"Q-GUID\":\"0ee63838b72eb075f63e93ae0bc288cb\",\n\"QIMEI36\":\"8ff310843a87a71101958f5610001e316a11\"}",
+  "lastUpdateTime": 1766341217913,
+  "respondTime": 17175,
+  "ruleBookInfo": {
+    "author": ".author",
+    "coverUrl": ".picurl",
+    "init": "data",
+    "intro": "&nbsp;{{$..summary}}\n&lrm;\n标签：{{$..tag##\\|##&nbsp;}}##\\n&lrm;\\n标签：$",
+    "kind": "{{java.getString('$.isfinish')=='true'?'完结':'连载'}},{{$..subject}},{{String(java.timeFormat(java.getString(\"$..lastSerialUpdateTime\")*1000)).replace(/\\//g,\"\\-\")}},{{$..userscore}}分",
+    "lastChapter": ".lastSerialname",
+    "name": ".resourceName",
+    "tocUrl": "/qbread/api/book/all-chapter?bookId={{$..resourceID}}",
+    "wordCount": ".contentsize##$##字"
+  },
+  "ruleContent": {
+    "content": "data.Content[0].Content"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": ".author",
+    "bookList": "data.state[*]",
+    "bookUrl": "https://novel.html5.qq.com/qbread/api/novel/bookInfo?resourceId={{$..docId##.*_}}",
+    "coverUrl": ".cover_url",
+    "intro": ".abstract",
+    "kind": "连载{{$..is_finished}}完结,{{$..tag_views##\\s##,}}##连载1|0完结",
+    "name": ".title##.*\\s.*",
+    "wordCount": ".label_text"
+  },
+  "ruleToc": {
+    "chapterList": ".rows[*]",
+    "chapterName": "serialName",
+    "chapterUrl": "serialID\n@js:\nlet data=JSON.stringify({ContentAnchorBatch:[{BookID:baseUrl.match(/bookId=(\\d+)/)[1],ChapterSeqNo:[result]}],Scene:\"chapter\"})\nlet option={\"method\":\"POST\",\"body\":data}\n\"/be-api/content/ads-read,\"+JSON.stringify(option)"
+  },
+  "searchUrl": "https://so.html5.qq.com/ajax/real/search_result?tabId=360&q={{key}}",
+  "weight": 0,
+  "sourceId": "corpus-8b65eb985924"
+}

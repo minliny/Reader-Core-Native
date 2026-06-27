@@ -1,0 +1,46 @@
+{
+  "bookSourceComment": "需要魔法",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "电线看书（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://101kanshu.com",
+  "concurrentRate": "2000",
+  "customButton": false,
+  "customOrder": 194,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "header": "{\n\"User-Agent\":\"Mozilla/5.0 (Linux; Android 9) Mobile Safari/537.36\",\"referer\":\"{{baseUrl}}\"\n}",
+  "lastUpdateTime": 1759581869925,
+  "respondTime": 180702,
+  "ruleBookInfo": {
+    "author": "[property=\"og:novel:author\"]@content",
+    "coverUrl": "[property=\"og:image\"]@content",
+    "intro": "[property=\"og:description\"]@content",
+    "kind": "[property=\"og:novel:category\"]@content",
+    "lastChapter": "[property=\"og:novel:latest_chapter_name\"]@content",
+    "name": "[property=\"og:novel:book_name\"]@content",
+    "tocUrl": "@js:\nresult = \"/ajax_novels/chapterlist/\" + baseUrl.match(/book\\/(\\d+)/)[1]+\".html\";"
+  },
+  "ruleContent": {
+    "content": "#txtcontent@html"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": ".labelbox label.0@text",
+    "bookList": "#article_list_content li",
+    "bookUrl": "a.0@href",
+    "coverUrl": ".imgbox@img.0@data-src",
+    "intro": ".ellipsis_2@text",
+    "name": "h3@text"
+  },
+  "ruleToc": {
+    "chapterList": "li a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "/search/{{key}}/{{page}}.html",
+  "weight": 0,
+  "sourceId": "corpus-c335507dcbd9"
+}

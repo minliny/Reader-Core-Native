@@ -1,0 +1,59 @@
+{
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "酷匠网吧（优+）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://app.kujiang.com",
+  "customButton": false,
+  "customOrder": 61,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "lastUpdateTime": 1772086669341,
+  "respondTime": 2177,
+  "ruleBookInfo": {
+    "author": "penname",
+    "coverUrl": "big_cover_img_url",
+    "init": "$.body.bookinfo",
+    "intro": "&nbsp;🏷️   {{$.tags}}{{'\\n'+'​'}}\n{{$.intro}}",
+    "kind": "{{$.category}},{{java.timeFormat(java.getString('$.u_time')*1000)}}##\\s.*",
+    "lastChapter": "v_u_chapter",
+    "name": "v_book",
+    "tocUrl": "<js>\npost={\n\"headers\":{\"platform\":\"android\",\"version\":\"3.9.17\"}\n}\njava.put(\"bid\",{{$.book}})\nurl=\"https://app.kujiang.com/v1/book/catalog?book=\"+{{$.book}}+\",\"+JSON.stringify(post)\n</js>",
+    "wordCount": "public_size"
+  },
+  "ruleContent": {
+    "content": "<js>\njms=JSON.parse(result);\njm=String(jms.body.content).split(\"a2o@\");\nfunction formatSeconds(value) { \nvar theTime = parseInt(value);// 秒 \nvar theTime1 = 0;// 分 \nvar theTime2 = 0;// 小时 \nif(theTime > 60) { \ntheTime1 = parseInt(theTime/60); \ntheTime = parseInt(theTime%60); \nif(theTime1 > 60) { \ntheTime2 = parseInt(theTime1/60); \ntheTime1 = parseInt(theTime1%60); } } \nvar result = \"\"+parseInt(theTime)+\"秒\"; \nif(theTime1 > 0) { \nresult = \"\"+parseInt(theTime1)+\"分\"+result; } \nif(theTime2 > 0) { \nresult = \"\"+parseInt(theTime2)+\"小时\"+result; } \nreturn result; } \nif(jm.length>1){\nkey=\"S3VqaWFuZ0FwcDc0NzYwNQ==\";\niv=jm[0];\ndata=jm[1];\nvar javaImport = new JavaImporter();\njavaImport.importPackage(\n    Packages.java.lang,\n    Packages.java.io,\n    Packages.java.util,\n    Packages.java.util.zip\n);\nwith(javaImport) {\n    function decode(content) {\n        decode = Base64.getDecoder().decode(String(content));\n             byteArrayOutputStream = new ByteArrayOutputStream();\n             byteArrayInputStream = new ByteArrayInputStream(decode);\n            gZIPInputStream = new GZIPInputStream(byteArrayInputStream);\n            bArr = String(\" \").getBytes(); \n            while (true) {\n                read = gZIPInputStream.read(bArr);\n                if (read > 0) {\n                    byteArrayOutputStream.write(bArr, 0, read);\n                } else {\n                    gZIPInputStream.close();\n                    byteArrayInputStream.close();\n                    byteArrayOutputStream.close();\n                    return byteArrayOutputStream.toString();\n                }\n          }\n    }\n}\n\ndecode(java.aesBase64DecodeToString(data,java.base64Decode(key),\"AES/CBC/PKCS5Padding\",java.base64Decode(iv)))}\nelse{\"新章节需要解封\\n\"+\"解锁时间还需：\"+formatSeconds(String(jms.body.left_seconds))}\n</js>"
+  },
+  "ruleExplore": {
+    "author": "penname",
+    "bookList": "$.body",
+    "bookUrl": "https://app.kujiang.com/v1/book/get_book_infos?from=search&subsite=m&book={{$.book}}",
+    "coverUrl": "img_url",
+    "intro": "intro",
+    "kind": "{{$.class_a}},{{$.u_time}}##\\s.*",
+    "lastChapter": "v_u_chapter",
+    "name": "$.v_book"
+  },
+  "ruleSearch": {
+    "author": "penname",
+    "bookList": "$.body.list",
+    "bookUrl": "https://app.kujiang.com/v1/book/get_book_infos?from=search&subsite=m&book={{$.book}}",
+    "coverUrl": "img_url",
+    "intro": "intro",
+    "kind": "{{$.class_a}},{{java.timeFormat(java.getString('$.u_time')*1000)}}##\\s.*",
+    "lastChapter": "v_u_chapter",
+    "name": "v_book",
+    "wordCount": "public_size"
+  },
+  "ruleToc": {
+    "chapterList": "$.body.catalog[0].chapters",
+    "chapterName": "v_chapter",
+    "chapterUrl": "<js>\npost={\n\"headers\":{\"platform\":\"android\",\"version\":\"3.9.17\"}\n}\nurl=\"https://app.kujiang.com/v1/book/read?book=\"+java.get(\"bid\")+\"&chapter=\"+{{$.chapter}}+\",\"+JSON.stringify(post)\n</js>",
+    "isVip": "isvip",
+    "updateTime": "{{$.size}}字"
+  },
+  "searchUrl": "https://app.kujiang.com/v1/book/search202107?keyword={{key}}",
+  "weight": 0,
+  "sourceId": "corpus-aa9cec42cbc4"
+}

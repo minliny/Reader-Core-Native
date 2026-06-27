@@ -1,0 +1,52 @@
+{
+  "bookSourceComment": "// Error: failed to connect to www.mangabz.com/179.60.193.16 (port 80) from /192.168.1.106 (port 38298) after 15000ms",
+  "bookSourceGroup": "漫画 书源",
+  "bookSourceName": "曼哈漫画（优+）",
+  "bookSourceType": 2,
+  "bookSourceUrl": "https://www.mangabz.com/",
+  "customButton": false,
+  "customOrder": 247,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "连载::http://www.mangabz.com/manga-list-0-1-10/mangabz.ashx,{\"method\": \"POST\",\"body\": \"action=getclasscomics&pageindex={{page}}&pagesize=21&tagid=0&status=1&sort=10\"}\n完结::http://www.mangabz.com/manga-list-0-2-10/mangabz.ashx,{\"method\": \"POST\",\"body\": \"action=getclasscomics&pageindex={{page}}&pagesize=21&tagid=0&status=2&sort=10\"}\n最近更新::http://www.mangabz.com/manga-list-0-0-2/mangabz.ashx,{\"method\": \"POST\",\"body\": \"action=getclasscomics&pageindex={{page}}&pagesize=21&tagid=0&status=0&sort=2\"}\n最新上架::http://www.mangabz.com/manga-list-0-0-18/mangabz.ashx,{\"method\": \"POST\",\"body\": \"action=getclasscomics&pageindex={{page}}&pagesize=21&tagid=0&status=0&sort=18\"}\n热血::http://www.mangabz.com/manga-list-31-0-10/mangabz.ashx,{\"method\": \"POST\",\"body\": \"action=getclasscomics&pageindex={{page}}&pagesize=21&tagid=31&status=0&sort=10\"}\n恋爱::http://www.mangabz.com/manga-list-26-0-10/mangabz.ashx,{\"method\": \"POST\",\"body\": \"action=getclasscomics&pageindex={{page}}&pagesize=21&tagid=26&status=0&sort=10\"}\n校园::http://www.mangabz.com/manga-list-1-0-10/mangabz.ashx,{\"method\": \"POST\",\"body\": \"action=getclasscomics&pageindex={{page}}&pagesize=21&tagid=1&status=0&sort=10\"}\n冒险::http://www.mangabz.com/manga-list-2-0-10/mangabz.ashx,{\"method\": \"POST\",\"body\": \"action=getclasscomics&pageindex={{page}}&pagesize=21&tagid=2&status=0&sort=10\"}\n科幻::http://www.mangabz.com/manga-list-25-0-10/mangabz.ashx,{\"method\": \"POST\",\"body\": \"action=getclasscomics&pageindex={{page}}&pagesize=21&tagid=25&status=0&sort=10\"}\n生活::http://www.mangabz.com/manga-list-11-0-10/mangabz.ashx,{\"method\": \"POST\",\"body\": \"action=getclasscomics&pageindex={{page}}&pagesize=21&tagid=11&status=0&sort=10\"}\n悬疑::http://www.mangabz.com/manga-list-17-0-10/mangabz.ashx,{\"method\": \"POST\",\"body\": \"action=getclasscomics&pageindex={{page}}&pagesize=21&tagid=17&status=0&sort=10\"}\n魔法::http://www.mangabz.com/manga-list-15-0-10/mangabz.ashx,{\"method\": \"POST\",\"body\": \"action=getclasscomics&pageindex={{page}}&pagesize=21&tagid=15&status=0&sort=10\"}\n运动::http://www.mangabz.com/manga-list-34-0-10/mangabz.ashx,{\"method\": \"POST\",\"body\": \"action=getclasscomics&pageindex={{page}}&pagesize=21&tagid=34&status=0&sort=10\"}",
+  "header": "{\n\"User-Agent\":\"Mozilla/5.0 (Linux; Android 11; PCLM10 Build/RKQ1.200928.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/93.0.4577.62 Mobile Safari/537.36\"\n}",
+  "lastUpdateTime": 1759582070464,
+  "respondTime": 195031,
+  "ruleBookInfo": {
+    "author": ".detail-main-subtitle.0@text",
+    "name": ".detail-main-title@text"
+  },
+  "ruleContent": {
+    "content": "@js:\r\ntry{\nheaders={\"headers\":{\"Referer\":baseUrl}};\r\neval(result.match(/(eval\\([\\s\\S]+?)<\\/script/)[1]);\r\nnewImgs.map(a=>\r\n'<img src=\"'+a+','+JSON.stringify(headers)+'\">').join(\"\\n\")\r\n}catch(e){}",
+    "imageStyle": "FULL"
+  },
+  "ruleExplore": {
+    "author": "Author",
+    "bookList": "UpdateComicItems",
+    "bookUrl": "http://www.mangabz.com/{{$.UrlKey}}",
+    "coverUrl": "ShowConver",
+    "intro": "Content",
+    "lastChapter": "ShowLastPartName",
+    "name": "Title",
+    "wordCount": "LastUpdateTime"
+  },
+  "ruleSearch": {
+    "author": ".manga-item-subtitle.0@text",
+    "bookList": ".manga-list@a",
+    "bookUrl": "a@href",
+    "coverUrl": "img@src",
+    "intro": ".manga-item-content@text",
+    "kind": ".manga-item-subtitle@span@text",
+    "name": ".manga-item-title@text"
+  },
+  "ruleToc": {
+    "chapterList": "-class.detail-list@a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "http://www.mangabz.com/search?title={{key}}",
+  "weight": 0,
+  "sourceId": "corpus-174a73b04afa"
+}

@@ -1,0 +1,48 @@
+{
+  "bookSourceComment": "25-07-07 靈狐 制",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "万通蜡笔（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://wtr-lab.com",
+  "customButton": false,
+  "customOrder": 200,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "jsLib": "let l = {1:\"动作\",2:\"成人\",3:\"冒险\",4:\"喜剧\",5:\"戏剧\",6:\"情色\",7:\"二次元\",8:\"同人小说\",9:\"奇幻\",10:\"游戏\",11:\"性转\",12:\"后宫\",13:\"历史\",14:\"恐怖\",15:\"女性\",16:\"武术\",17:\"\",18:\"机械\",19:\"军事\",20:\"神秘\",21:\"心里学\",22:\"恋爱\",23:\"校园生活\",24:\"科幻\",25:\"青年向\",26:\"少女向\",27:\"少女恋爱\",28:\"少年向\",29:\"少年恋爱\",30:\"日常\",31:\"色情\",32:\"运动\",33:\"超自然\",34:\"悲剧\",35:\"都市生活\",36:\"武侠\",37:\"仙侠\",38:\"玄幻\",39:\"男同\",40:\"女同\"}",
+  "lastUpdateTime": 1759570745372,
+  "respondTime": 180000,
+  "ruleBookInfo": {
+    "author": "serie_data.data.raw.author",
+    "coverUrl": "serie_data.data.image",
+    "init": "pageProps.serie@js:\nlet id = result.serie_data.raw_id\nlet raws = result.raws\nlet u = '■', nu = '□', x = book.getVariable(\"custom\"), n = 0, info = '<br>'\nif(x!=''){\n\tn = Number(x) - 1\n\tif(raws[n]){\n\t\tif(raws[n].id != id){\n\t\t java.toast('切换到源'+raws[n].slug)\n\t\t id = raws[n].id\n\t\t let bookUrl = baseUrl.replace(/(serie-)\\d+/,'$1'+id).replace(/(\\?sid=)\\d+/,'$1'+id)\n\t\t result = java.ajax(bookUrl)\n\t\t book.bookUrl = bookUrl\n\t\t let data = JSON.parse(result).pageProps.serie\n\t\t result = data\n\t\t}\n\t}\n\telse n = 0,java.toast('没有编号为'+x+'的源')\n}\nfor(let i in raws){\n\tinfo += (raws[i].id==id?u:nu) + (i-0+1) + '：' + raws[i].slug + '\\n'\n}\nresult.info = info\nresult.raw_id = id\nPackages.java.util.LinkedHashMap(result)",
+    "intro": "{{$.info}}\n{{'类别：'+Object.values(java.getStringList('$.serie_data.genres')).map(v=>l[v]).join()}}\n创建：{{$.serie_data.created_at##\\..+}}\n简介：{{$.serie_data.data.raw.description||$.serie_data.data.description}}",
+    "kind": "serie_data.view&&serie_data.status&&serie_data.updated_at@js:result[0]+='点击',result[1]=['连载','完结'][result[1]],result[2]=String(result[2]).replace(/\\..+/,'');result",
+    "lastChapter": "{{$.last_chapters[0].name}}·{{$.last_chapters[0].updated_at##\\..+}}",
+    "name": "serie_data.data.raw.title",
+    "tocUrl": "/api/chapters/{{$.raw_id}}"
+  },
+  "ruleContent": {
+    "content": "data.data.body"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "data.raw.author",
+    "bookList": "pageProps.series.*",
+    "bookUrl": "/_next/data/{{java.get('srcPath')}}/en/serie-{{$.raw_id}}/{{$.slug}}.json?sid={{$.raw_id}}",
+    "coverUrl": "data.image",
+    "intro": "{{'类别：'+Object.values(java.getStringList('$.genres')).map(v=>l[v]).join()}}\n{{$.data.raw.description}}",
+    "kind": "view&&status&&updated_at@js:result[0]+='点击',result[1]=['连载','完结'][result[1]],result[2]=String(result[2]).replace(/\\..+/,'');result",
+    "name": "data.raw.title"
+  },
+  "ruleToc": {
+    "chapterList": "chapters",
+    "chapterName": "name",
+    "chapterUrl": "/api/reader/get,{\n  \"body\": {\"language\":\"zh\",\"raw_id\":{{baseUrl.replace(/.+\\//,'')}},\"chapter_no\":{{$.order}},\"retry\":false,\"force_retry\":false},\n  \"method\": \"POST\"\n}",
+    "updateTime": "updated_at"
+  },
+  "searchUrl": "@js:\nvar body=java.ajax(\"https://wtr-lab.com\")\nvar srcArray =Array.from(org.jsoup.Jsoup.parse(body).select(\"script\")).map((item)=>item.attr(\"src\")).filter(n=>{\n   if(n.includes(\"/static/\") && !n.includes(\"/chunks/\") ){\n      return true\n   }\n  return false\n}).map(n=>{\n    var arrayData = n.split(\"/\")\n    return arrayData.slice(-2)[0]\n})\njava.log(JSON.stringify(srcArray))\n\njava.put(\"srcPath\",srcArray.at(-1))\n\n\"/_next/data/{{java.get('srcPath')}}/en/novel-finder.json?text={{key}}\"",
+  "weight": 0,
+  "sourceId": "corpus-0b78c9f24888"
+}

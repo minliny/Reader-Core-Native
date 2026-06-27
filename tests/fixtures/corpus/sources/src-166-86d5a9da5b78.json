@@ -1,0 +1,54 @@
+{
+  "bookSourceComment": "备用：https://www.23qb.net\n搜索间隔时间不能太短",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "铅笔小说（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.23qb.com",
+  "customButton": false,
+  "customOrder": 166,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "最近更新::/book/lastupdate_0_0_0_0_0_0_0_{{page}}_0.html\n最新入库::/book/postdate_0_0_0_0_0_0_0_{{page}}_0.html\n总收藏榜::/book/goodnum_0_0_0_0_0_0_0_{{page}}_0.html\n总字数榜::/book/words_0_0_0_0_0_0_0_{{page}}_0.html\n完本小说::/book/goodnum_0_0_0_0_0_0_5_{{page}}_0.html\n全部小说::/book/lastupdate_0_0_0_0_0_0_0_{{page}}_0.html\n言情小说::/book/goodnum_0_1_0_0_0_0_0_{{page}}_0.html\n都市小说::/book/goodnum_0_2_0_0_0_0_0_{{page}}_0.html\n耽美百合::/book/goodnum_0_3_0_0_0_0_0_{{page}}_0.html\n穿越转生::/book/goodnum_0_4_0_0_0_0_0_{{page}}_0.html\n青春校园::/book/goodnum_0_5_0_0_0_0_0_{{page}}_0.html\n玄幻魔法::/book/goodnum_0_6_0_0_0_0_0_{{page}}_0.html\n修真武侠::/book/goodnum_0_7_0_0_0_0_0_{{page}}_0.html\n历史军事::/book/goodnum_0_8_0_0_0_0_0_{{page}}_0.html\n游戏竞技::/book/goodnum_0_9_0_0_0_0_0_{{page}}_0.html\n科幻空间::/book/goodnum_0_10_0_0_0_0_0_{{page}}_0.html\n悬疑惊悚::/book/goodnum_0_11_0_0_0_0_0_{{page}}_0.html\n同人小说::/book/goodnum_0_12_0_0_0_0_0_{{page}}_0.html\n官场职场::/book/goodnum_0_13_0_0_0_0_0_{{page}}_0.html",
+  "lastUpdateTime": 1772086367761,
+  "loginUrl": "https://www.23qb.com/login.php",
+  "respondTime": 11769,
+  "ruleBookInfo": {
+    "author": "//meta[@property='og:novel:author']/@content",
+    "coverUrl": "//meta[@property='og:image']/@content",
+    "intro": "//meta[@property='og:description']/@content",
+    "kind": "//meta[@property='og:novel:tags']/@content&&//meta[@property='og:novel:status']/@content@js:result[0]=String(result[0]).replace(/^\\./,'').replace(`${book.author}\\.`,'').replace(`${book.name}\\.`,'').replace(/(\\.| )/g,',')",
+    "lastChapter": "//meta[@property='og:novel:latest_chapter_name']/@content",
+    "name": "//meta[@property='og:novel:book_name']/@content",
+    "tocUrl": "class.catalog-more.0@href",
+    "wordCount": "class.novel-info-aux.0@tag.span.-1@text"
+  },
+  "ruleContent": {
+    "content": "class.article-content.0@html##\\(本章完\\)"
+  },
+  "ruleExplore": {
+    "author": "class.module-item-text.0@text",
+    "bookList": "class.module-item",
+    "bookUrl": "tag.a.0@href",
+    "coverUrl": "tag.img.0@data-src",
+    "kind": "class.module-item-caption.0@text@js:result[0]=String(result[0]).replace(/^\\./,'').replace(`${book.author}\\.`,'').replace(`${book.name}\\.`,'').replace(/(\\.| )/g,',')",
+    "name": "tag.a.0@title"
+  },
+  "ruleSearch": {
+    "bookList": "class.module-search-item",
+    "bookUrl": "tag.a.0@href",
+    "coverUrl": "tag.img.0@data-src",
+    "intro": "class.novel-info-item.0@text",
+    "kind": "class.tag-link.0@tag.span.0@text## ##,",
+    "name": "tag.a.0@title"
+  },
+  "ruleToc": {
+    "chapterList": "class.module-row-text",
+    "chapterName": "tag.span.0@text",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "/search.html?searchkey={{key}}",
+  "weight": 25,
+  "sourceId": "corpus-86d5a9da5b78"
+}

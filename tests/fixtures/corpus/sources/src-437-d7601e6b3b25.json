@@ -1,0 +1,40 @@
+{
+  "bookSourceGroup": "正版小说 书源",
+  "bookSourceName": "心轻小说",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://s.sfacg.com/",
+  "customButton": false,
+  "customOrder": 438,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "lastUpdateTime": 1759386833801,
+  "loginUrl": "http://passport.sfacg.com/Login.aspx",
+  "respondTime": 792,
+  "ruleBookInfo": {
+    "kind": "class.tag-list@class.text@text",
+    "tocUrl": "text.点击阅读@href"
+  },
+  "ruleContent": {
+    "content": "class.article-content font16@html"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "tag.li.1@text##.+综合信息：\\s*([^\\/]+).*##$1",
+    "bookList": "tag.form@tag.table.-2@tag.ul",
+    "bookUrl": "tag.a@href",
+    "coverUrl": "tag.img@src",
+    "intro": "tag.li.1@text##.+\\d+:\\d+\\s*(.+).*##$1",
+    "lastChapter": "tag.li.1@text##.+\\/(\\d+\\/\\d+\\/\\d+).*##$1",
+    "name": "tag.a@text"
+  },
+  "ruleToc": {
+    "chapterList": "class.catalog-list@tag.ul@tag.li@tag.a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "http://s.sfacg.com/?Key={{key}}&S=1&SS=0",
+  "weight": 0,
+  "sourceId": "corpus-d7601e6b3b25"
+}

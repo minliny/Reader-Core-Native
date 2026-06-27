@@ -1,0 +1,41 @@
+{
+  "bookSourceGroup": "正版漫画 书源",
+  "bookSourceName": "画涯爱子",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://api.huaya.cc",
+  "customButton": false,
+  "customOrder": 444,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "header": "{\"Content-Type\": \"application/x-www-form-urlencoded\",\n  \"app_v\": \"1.8.6\",\n  \"User-Agent\": \"okhttp/4.9.3\",\n   \"token\": \"37cb0e19d1c146d78bfff2994ad366eb\"}",
+  "lastUpdateTime": 1766266578678,
+  "respondTime": 1465,
+  "ruleBookInfo": {},
+  "ruleContent": {
+    "content": "detail.titlecontent\n@js:\njava.log(book.type)\nc=java.get(\"c\")\nif(c==1){\n\tresult=result\n\t}else{\na=result.split(';').map(x => '<img src=\"'+x+'\">').join('\\n');\nresult=a\n}\nresult",
+    "imageStyle": "FULL"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "author",
+    "bookList": "\n    \nlist",
+    "bookUrl": "@js:url=\"http://api.huaya.cc/Handler/NovelTitles_Head.ashx,\"+JSON.stringify({\n  \"body\": \"asc=true&novelId={{$.novelid}}&size=99999&sign=&index=1&type=list&first=true\",\n  \"method\": \"POST\"\n})",
+    "checkKeyWord": "我的@小说",
+    "coverUrl": "imgurl",
+    "intro": "description",
+    "kind": "{{$.noveltypelist}}\n{{$.novel_score}}分",
+    "lastChapter": "novel_publishdate",
+    "name": "novelname",
+    "wordCount": "wordscount"
+  },
+  "ruleToc": {
+    "chapterList": "list",
+    "chapterName": "titlename",
+    "chapterUrl": "@js:\nc=java.get(\"c\")\nurl=\"http://api.huaya.cc/Handler/NovelTitles_Head.ashx,\"+`{\n\t\"method\":\"POST\",\n\t\"body\":\"img_type=mix&img_val=393&novelId={{$.novelid}}&platform=android&screenHeight=2356&screenWidth=1080&SectionNum={{$.sectionnum}}&sign={{java.md5Encode(\"img_type=mix&img_val=393&novelId=\"+java.getString(\"$.novelid\")+\"&platform=android&screenHeight=2356&screenWidth=1080&SectionNum=\"+java.getString(\"$.sectionnum\")+\"&type=get_new&ver=1.8.6&37cb0e19d1c146d78bfff2994ad366eb\")}}&type=get_new&ver=1.8.6\"\n\t}`\nif (c==1) {\n    book.type = 8\n} else {\n    book.type = 64}\nurl;"
+  },
+  "searchUrl": "@js:\nc=0\nif (key.match(/@小说/)) {\n  c = 1\n  key = key.split(\"@\")[0]\n}\n\njava.put(\"c\",c)\n\nresult=\"http://api.huaya.cc/Handler/Novels_Head.ashx,\"+`{\"body\":\"code=${c}&size=99999&index=1&type=list&key=${key}\",\"method\":\"POST\"}`",
+  "weight": 0,
+  "sourceId": "corpus-19bf9db0d290"
+}

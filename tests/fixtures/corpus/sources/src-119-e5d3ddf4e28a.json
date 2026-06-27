@@ -1,0 +1,52 @@
+{
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "爱久久网（优+）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://www.jjjxsw.com",
+  "bookUrlPattern": "http://www.jjjxsw.com/txt/\\d+.htm",
+  "customButton": false,
+  "customOrder": 119,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[{\"title\":\"最新上传\",\"url\":\"\",\"style\":{\"layout_flexBasisPercent\":1,\"layout_flexGrow\":1}},{\"title\":\"现代\",\"url\":\"/txt/young/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"仙侠\",\"url\":\"/txt/wuxia/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"玄幻\",\"url\":\"/txt/xuanhuan/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"悬疑\",\"url\":\"/txt/kongbu/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"架空\",\"url\":\"/txt/lsjs/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"网游\",\"url\":\"/txt/juben/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"总裁\",\"url\":\"/txt/qinggan/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"耽美\",\"url\":\"/txt/dmtr/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"军事\",\"url\":\"/txt/tiexue/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"穿越\",\"url\":\"/txt/chuanyue/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"异能\",\"url\":\"/txt/dushi/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"重生\",\"url\":\"/txt/chongshengxiaoshuo/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"同人\",\"url\":\"/txt/tongrenxiaoshuo/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"\",\"url\":\"\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"\",\"url\":\"\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"\",\"url\":\"\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"人气最高\",\"url\":\"\",\"style\":{\"layout_flexBasisPercent\":1,\"layout_flexGrow\":1}},{\"title\":\"现代\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=9&line=10&tempid=3&ph=1&andor=and&orderby=2&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"仙侠\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=10&line=10&tempid=3&ph=1&andor=and&orderby=2&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"玄幻\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=11&line=10&tempid=3&ph=1&andor=and&orderby=2&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"悬疑\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=12&line=10&tempid=3&ph=1&andor=and&orderby=2&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"架空\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=14&line=10&tempid=3&ph=1&andor=and&orderby=2&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"网游\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=16&line=10&tempid=3&ph=1&andor=and&orderby=2&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"总裁\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=37&line=10&tempid=3&ph=1&andor=and&orderby=2&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"耽美\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=41&line=10&tempid=3&ph=1&andor=and&orderby=2&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"军事\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=42&line=10&tempid=3&ph=1&andor=and&orderby=2&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"穿越\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=47&line=10&tempid=3&ph=1&andor=and&orderby=2&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"异能\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=48&line=10&tempid=3&ph=1&andor=and&orderby=2&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"重生\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=49&line=10&tempid=3&ph=1&andor=and&orderby=2&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"同人\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=76&line=10&tempid=3&ph=1&andor=and&orderby=2&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"\",\"url\":\"\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"\",\"url\":\"\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"\",\"url\":\"\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"收藏最多\",\"url\":\"\",\"style\":{\"layout_flexBasisPercent\":1,\"layout_flexGrow\":1}},{\"title\":\"现代\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=9&line=10&tempid=3&ph=1&andor=and&orderby=3&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"仙侠\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=10&line=10&tempid=3&ph=1&andor=and&orderby=3&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"玄幻\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=11&line=10&tempid=3&ph=1&andor=and&orderby=3&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"悬疑\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=12&line=10&tempid=3&ph=1&andor=and&orderby=3&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"架空\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=14&line=10&tempid=3&ph=1&andor=and&orderby=3&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"网游\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=16&line=10&tempid=3&ph=1&andor=and&orderby=3&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"总裁\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=37&line=10&tempid=3&ph=1&andor=and&orderby=3&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"耽美\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=41&line=10&tempid=3&ph=1&andor=and&orderby=3&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"军事\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=42&line=10&tempid=3&ph=1&andor=and&orderby=3&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"穿越\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=47&line=10&tempid=3&ph=1&andor=and&orderby=3&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"异能\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=48&line=10&tempid=3&ph=1&andor=and&orderby=3&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"重生\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=49&line=10&tempid=3&ph=1&andor=and&orderby=3&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"同人\",\"url\":\"/e/action/ListInfo.php?page={{page-1}}&classid=76&line=10&tempid=3&ph=1&andor=and&orderby=3&myorder=0\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"\",\"url\":\"\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"\",\"url\":\"\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"\",\"url\":\"\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}}]",
+  "lastUpdateTime": 1758569410454,
+  "respondTime": 2243,
+  "ruleBookInfo": {
+    "author": ".zuozhe@a@text",
+    "coverUrl": ".img@img@src##\\?.*",
+    "intro": "id.mainSoftIntro@html##^##&nbsp;📥【本书源网站支持小说下载】{{'\\n'+'​'}}",
+    "kind": ".downInfoRowL@li.5@span@text&&.downInfoRowL@li.1:6@textNodes##小说",
+    "name": "id.downInfoArea@h1@text##《|》",
+    "tocUrl": ".yuedu@a@href##1\\.html|(?<=read)/\\d+",
+    "wordCount": ".downInfoRowL@li.2@textNodes"
+  },
+  "ruleContent": {
+    "content": "id.view_content_txt@html"
+  },
+  "ruleExplore": {
+    "author": ".mainGreen@text##.*作者.|\\s写作.*",
+    "bookList": ".listbg",
+    "bookUrl": "a.0@href",
+    "coverUrl": "img@src",
+    "intro": "div.1@text",
+    "kind": ".mainGreen@text&&.oldDate@text&&.newDate@text##.*进度.|\\s文件.*|\\[|\\]",
+    "name": "a.1@text",
+    "wordCount": ".mainGreen@text##.*大小.|\\s下载.*|\\s书籍.*"
+  },
+  "ruleSearch": {
+    "author": "text##.*：",
+    "bookList": ".searchTopic",
+    "bookUrl": "a@href",
+    "name": "a@text"
+  },
+  "ruleToc": {
+    "chapterList": ".view_content_list@li@a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "/e/search/index.php,{\n  \"method\": \"POST\",\n  \"body\": \"show=title&keyboard={{key}}\"\n}",
+  "weight": 0,
+  "sourceId": "corpus-e5d3ddf4e28a"
+}

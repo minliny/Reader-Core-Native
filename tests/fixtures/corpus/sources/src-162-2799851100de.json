@@ -1,0 +1,46 @@
+{
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "乐文阁网（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://www.lewenge.cc",
+  "customButton": false,
+  "customOrder": 162,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "总点击榜::/allvisit/{{page}}.shtml\n月点击榜::/monthvisit/{{page}}.shtml\n周点击榜::/weekvisit/{{page}}.shtml\n日点击榜::/dayvisit/{{page}}.shtml\n总推荐榜::/allvote/{{page}}.shtml\n月推荐榜::/monthvote/{{page}}.shtml\n周推荐榜::/weekvote/{{page}}.shtml\n日推荐榜::/dayvote/{{page}}.shtml\n总收藏榜::/goodnum/{{page}}.shtml\n总字数榜::/size/{{page}}.shtml\n最新入库::/postdate/{{page}}.shtml\n最近更新::/lastupdate/{{page}}.shtml\n魔幻玄幻::/fenlei1_{{page}}.shtml\n仙侠修真::/fenlei2_{{page}}.shtml\n都市青春::/fenlei3_{{page}}.shtml\n历史军事::/fenlei4_{{page}}.shtml\n科幻游戏::/fenlei5_{{page}}.shtml\n近代现代::/fenlei6_{{page}}.shtml\n同人耽美::/fenlei7_{{page}}.shtml\n架空历史::/fenlei8_{{page}}.shtml\n重生异能::/fenlei9_{{page}}.shtml\n恐怖推理::/fenlei10_{{page}}.shtml\n完本小说::/wanben1_{{page}}.shtml",
+  "lastUpdateTime": 1772085590205,
+  "respondTime": 2514,
+  "ruleBookInfo": {
+    "author": ".ui_tb1@em@text",
+    "coverUrl": ".pic@img@src",
+    "intro": ".intro@text##(^|[。！？]+[”」）】]?)##$1<br>",
+    "kind": ".ui_tb1@tr.4@td.0@textNodes&&.ui_tb1@tr.4@td.2@textNodes&&.ui_tb1@tr.5@td.3@textNodes",
+    "lastChapter": ".con@a.0@text##正文卷.|正文.|VIP卷.|默认卷.|卷_|VIP章节.|免费章节.|章节目录.|最新章节.|[\\(（【].*?[求更票谢乐发订合补加架字修Kk].*?[】）\\)]",
+    "name": ".ui_tb1@h1@ownText",
+    "tocUrl": ".btopt@a@href",
+    "wordCount": "tbody@tr.5@td.1@textNodes##字"
+  },
+  "ruleContent": {
+    "content": "id.content@p@html"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "span.0@text##.*：",
+    "bookList": "id.alistbox",
+    "bookUrl": "a.0@href",
+    "coverUrl": "img@src",
+    "intro": ".intro@text",
+    "lastChapter": "a.2@text##正文卷.|正文.|VIP卷.|默认卷.|卷_|VIP章节.|免费章节.|章节目录.|最新章节.|[\\(（【].*?[求更票谢乐发订合补加架字修Kk].*?[】）\\)]",
+    "name": "a.1@text"
+  },
+  "ruleToc": {
+    "chapterList": "tbody.0@td@a",
+    "chapterName": "text##正文卷.|正文.|VIP卷.|默认卷.|卷_|VIP章节.|免费章节.|章节目录.|最新章节.|[\\(（【].*?[求更票谢乐发订合补加架字修Kk].*?[】）\\)]",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "/modules/article/search.php,{\n  \"method\": \"post\",\n  \"body\": \"searchkey={{key}}\"\n}",
+  "weight": 0,
+  "sourceId": "corpus-2799851100de"
+}

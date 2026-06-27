@@ -1,0 +1,45 @@
+{
+  "bookSourceComment": "2024.11.1\nby墨殇",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "盐选文库（优+）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.yanxuanwk.com/",
+  "bookUrlPattern": "https?://www.yanxuanwk.com/%.*",
+  "customButton": false,
+  "customOrder": 77,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[{\"title\":\"首页\",\"url\":\"/topic/yanxuan/<,page/{{page}}/>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"知乎盐选\",\"url\":\"/topic/yanxuan/<,page/{{page}}/>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"天涯神贴\",\"url\":\"/topic/tianya/<,page/{{page}}/>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}}]",
+  "lastUpdateTime": 1759567284989,
+  "respondTime": 3025,
+  "ruleBookInfo": {
+    "author": ".meta-item.1@text",
+    "coverUrl": "t@js:'https://s21.ax1x.com/2024/05/29/pk3AYzd.png'",
+    "intro": "p[2:7]@html",
+    "kind": ".meta-item.2@text",
+    "name": "h1@text"
+  },
+  "ruleContent": {
+    "content": ".clearfix p@html",
+    "nextContentUrl": ".typology-link-pages a@href"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": ".meta-item.1@text",
+    "bookList": ".typology-post",
+    "bookUrl": "h2 a@href",
+    "coverUrl": "@js:'https://s21.ax1x.com/2024/05/29/pk3AYzd.png'",
+    "intro": "p@text",
+    "kind": ".meta-item.2@text",
+    "name": "h2 a@text##\\-.*"
+  },
+  "ruleToc": {
+    "chapterList": "html",
+    "chapterName": "h1@text##\\-.*"
+  },
+  "searchUrl": "https://www.yanxuanwk.com/<,page/{{page}}/>?s={{key}}",
+  "weight": 0,
+  "sourceId": "corpus-982e2106ccc5"
+}

@@ -1,0 +1,48 @@
+{
+  "bookSourceComment": "// Error: 搜索失效",
+  "bookSourceGroup": "正版小说 书源",
+  "bookSourceName": "独阅读网",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.duread8.com##喜静",
+  "customButton": false,
+  "customOrder": 369,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[{\"title\":\"全部分类\",\"url\":\"https://www.duread.cn/index/book_list/0/0/week_click/0/0/0/1{{page}}\",\"style\":{\"layout_flexBasisPercent\":0.4,\"layout_flexGrow\":1}},{\"title\":\"西幻传说\",\"url\":\"https://www.duread.cn/index/book_list/1/0/week_click/0/0/0/1{{page}}\",\"style\":{\"layout_flexBasisPercent\":0.4,\"layout_flexGrow\":1}},{\"title\":\"武侠仙侠\",\"url\":\"https://www.duread.cn/index/book_list/2/0/week_click/0/0/0/1{{page}}\",\"style\":{\"layout_flexBasisPercent\":0.4,\"layout_flexGrow\":1}},{\"title\":\"游戏动漫\",\"url\":\"https://www.duread.cn/index/book_list/3/0/week_click/0/0/0/1{{page}}\",\"style\":{\"layout_flexBasisPercent\":0.4,\"layout_flexGrow\":1}},{\"title\":\"科幻时空\",\"url\":\"https://www.duread.cn/index/book_list/4/0/week_click/0/0/0/1{{page}}\",\"style\":{\"layout_flexBasisPercent\":0.4,\"layout_flexGrow\":1}},{\"title\":\"都市逸闻\",\"url\":\"https://www.duread.cn/index/book_list/5/0/week_click/0/0/0/1{{page}}\",\"style\":{\"layout_flexBasisPercent\":0.4,\"layout_flexGrow\":1}},{\"title\":\"历史军事\",\"url\":\"https://www.duread.cn/index/book_list/6/0/week_click/0/0/0/1{{page}}\",\"style\":{\"layout_flexBasisPercent\":0.4,\"layout_flexGrow\":1}},{\"title\":\"诡异悬疑\",\"url\":\"https://www.duread.cn/index/book_list/7/0/week_click/0/0/0/1{{page}}\",\"style\":{\"layout_flexBasisPercent\":0.4,\"layout_flexGrow\":1}}]",
+  "lastUpdateTime": 1766338842002,
+  "loginUrl": "https://m.duread.cn/signup/login",
+  "respondTime": 198907,
+  "ruleBookInfo": {
+    "intro": "class.desc@text",
+    "name": "class.book-title@text"
+  },
+  "ruleContent": {
+    "content": ".article-content@p@textNodes"
+  },
+  "ruleExplore": {
+    "author": ".avatar@text",
+    "bookList": "class.book-list J_BookList@li",
+    "bookUrl": "a.1@href",
+    "coverUrl": "img@data-original",
+    "name": "a.1@text"
+  },
+  "ruleSearch": {
+    "author": "##作者[:：]([^<]+)<##$1###",
+    "bookList": "class.book-list@li",
+    "bookUrl": "tag.a.0@href",
+    "coverUrl": "img@data-original",
+    "intro": "class.summaries@html",
+    "lastChapter": "class.smaller@text##.*? / ",
+    "name": "class.book-name@text"
+  },
+  "ruleToc": {
+    "chapterList": "#chapter_list@a",
+    "chapterName": "text",
+    "chapterUrl": "href##$##,{\"webView\":true}"
+  },
+  "searchUrl": "https://www.duread8.com/index/get_search_book_list/{{key}}",
+  "weight": 0,
+  "sourceId": "corpus-e068e1133f31"
+}

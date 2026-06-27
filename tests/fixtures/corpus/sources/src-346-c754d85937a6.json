@@ -1,0 +1,35 @@
+{
+  "bookSourceGroup": "特殊 书源",
+  "bookSourceName": "海词木稽（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://dict.cn已整理",
+  "bookUrlPattern": "已校验",
+  "customButton": false,
+  "customOrder": 346,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "lastUpdateTime": 1759386721793,
+  "respondTime": 203,
+  "ruleBookInfo": {
+    "intro": "text"
+  },
+  "ruleContent": {
+    "content": "html"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "@css:.phonetic@text",
+    "bookList": "body",
+    "lastChapter": "@css:.dict-basic-ul@text",
+    "name": "@js:decodeURI(baseUrl.split(\"/\").pop())"
+  },
+  "ruleToc": {
+    "chapterList": "body",
+    "chapterName": "@js:\"详细\""
+  },
+  "searchUrl": "http://dict.cn/{{key}}",
+  "weight": 0,
+  "sourceId": "corpus-c754d85937a6"
+}

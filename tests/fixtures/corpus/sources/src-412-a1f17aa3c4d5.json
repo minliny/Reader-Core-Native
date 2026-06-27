@@ -1,0 +1,50 @@
+{
+  "bookSourceGroup": "正版小说 书源",
+  "bookSourceName": "酷我小说",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://appi.kuwo.cn#",
+  "customButton": false,
+  "customOrder": 413,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "@js:\nsort = cache.getFile('KuwoNovels');\nif(sort==null){\nvar fk = sk = 1,\nsort1 = [],\nsort2 = [];\npush=(title,url,type1,type2)=>{\n\t\tjson = JSON.stringify({\n\t\t\t\ttitle: title,\n\t\t\t\turl: url?url:\"\",\n\t\t\t\tstyle: {\n\t\t\t\t\t\tlayout_flexGrow: 1,\n\t\t\t\t\t\tlayout_flexBasisPercent: type1\n\t\t\t\t\t}\n\t\t\t});\n\t\treturn  eval('sort'+type2+'.push(json)');\n\t}\n$$=(freetype,category_id,fk,sk)=>`http://appi.kuwo.cn/novels/api/book/category/${freetype}?category_id=${category_id}&fk=${fk}&sk=${sk}&pi={{page}\\}&ps=20`;\n\nJSON.parse(java.ajax('http://appi.kuwo.cn/novels/api/book/categories')).data.map($=>{\n\t\tfreetype = $.freetype\n\t\tif(freetype==3)return;\n\n\t\tpush('༺ˇ»`ʚ'+$.freetype_name+'ɞ´«ˇ༻', null, 1, freetype);\n\t\t$.categories.map($=>{\n\t\t\t\tcategory_id = $.category_id\n\t\t\t\tpush('༺ '+$.category_name+' ༻', $$(freetype,category_id,sk,fk), 1, freetype);\n\t\t\t\t[\"综合\", \"热门\", \"最新\"].map((title,sk)=>{\n\t\t\t\t\t\tsk++\n\t\t\t\t\t\t['['+title+']', '完结', '连载'].map((title,fk)=>{\n\t\t\t\t\t\t\t\tfk++\n\t\t\t\t\t\t\t\tpush(title, $$(freetype,category_id,sk,fk), 0.25, freetype);\n\t\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t});\n\t});\nsort = sort1.concat(sort2);\ncache.putFile('KuwoNovels', sort, 6E6);\n}\n'['+sort.toString()+']'",
+  "header": "{\n\t\"Accept\": \"*/*\",\n\t\"Connection\": \"Close\",\n\t\"User-Agent\": \"Dalvik/2.1.0 (Linux; U; Android 8.0.0; LND-AL40 Build/HONORLND-AL40)\"\n}",
+  "lastUpdateTime": 1759387366408,
+  "respondTime": 1965,
+  "ruleBookInfo": {
+    "author": "author_name",
+    "coverUrl": "cover_url",
+    "init": "data",
+    "intro": "intro##(^|[。！？]+[”」）】]?)##$1<br>",
+    "kind": "连载中{$.status}已完结&&category_name&&sub_category_name&&update_time\n##连载中50|30已完结| \\d.*",
+    "lastChapter": "new_chapter_name##正文卷.|正文.|VIP卷.|默认卷.|卷_|VIP章节.|免费章节.|章节目录.|最新章节.|[\\(（【].*?[求更票谢乐发订合补加架字修Kk].*?[】）\\)]",
+    "name": "title",
+    "tocUrl": "{{baseUrl}}/chapters?paging=0",
+    "wordCount": "all_words"
+  },
+  "ruleContent": {
+    "content": "data.content"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "author_name",
+    "bookList": "data",
+    "bookUrl": "http://appi.kuwo.cn/novels/api/book/{{$.book_id}}",
+    "coverUrl": "cover_url",
+    "intro": "intro",
+    "kind": "连载中{$.status}已完结&&category_name&&sub_category_name\n##连载中50|30已完结",
+    "name": "title",
+    "wordCount": "all_words"
+  },
+  "ruleToc": {
+    "chapterList": "data",
+    "chapterName": "chapter_title##正文卷.|正文.|VIP卷.|默认卷.|卷_|VIP章节.|免费章节.|章节目录.|最新章节.|[\\(（【].*?[求更票谢乐发订合补加架字修Kk].*?[】）\\)]",
+    "chapterUrl": "{{baseUrl.replace('?paging=0','')}}/{{$.chapter_id}}",
+    "updateTime": "{{$.volume_name}} {{$.original_words}}字"
+  },
+  "searchUrl": "http://appi.kuwo.cn/novels/api/book/search?keyword={{key}}&pi={{page}}&ps=30",
+  "weight": 50,
+  "sourceId": "corpus-a1f17aa3c4d5"
+}

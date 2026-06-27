@@ -1,0 +1,48 @@
+{
+  "bookSourceGroup": "漫画 书源",
+  "bookSourceName": "好看漫画（优+）",
+  "bookSourceType": 2,
+  "bookSourceUrl": "https://www.9comic.cn/",
+  "customButton": false,
+  "customOrder": 237,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[{\"title\":\"都市\",\"url\":\"/comic22/book/list?cateid=1&end=0&free=0&sort=0&p={{page}}&n=21\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.29}},{\"title\":\"恋爱\",\"url\":\"/comic22/book/list?cateid=2&end=0&free=0&sort=0&p={{page}}&n=21\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.29}},{\"title\":\"爆笑\",\"url\":\"/comic22/book/list?cateid=3&end=0&free=0&sort=0&p={{page}}&n=21\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.29}},{\"title\":\"热血\",\"url\":\"/comic22/book/list?cateid=4&end=0&free=0&sort=0&p={{page}}&n=21\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.29}},{\"title\":\"悬疑\",\"url\":\"/comic22/book/list?cateid=5&end=0&free=0&sort=0&p={{page}}&n=21\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.29}},{\"title\":\"古风\",\"url\":\"/comic22/book/list?cateid=6&end=0&free=0&sort=0&p={{page}}&n=21\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.29}},{\"title\":\"校园\",\"url\":\"/comic22/book/list?cateid=7&end=0&free=0&sort=0&p={{page}}&n=21\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.29}},{\"title\":\"搞笑\",\"url\":\"/comic22/book/list?cateid=9&end=0&free=0&sort=0&p={{page}}&n=21\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.29}},{\"title\":\"玄幻\",\"url\":\"/comic22/book/list?cateid=10&end=0&free=0&sort=0&p={{page}}&n=21\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.29}},{\"title\":\"励志\",\"url\":\"/comic22/book/list?cateid=11&end=0&free=0&sort=0&p={{page}}&n=21\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.29}},{\"title\":\"恐怖\",\"url\":\"/comic22/book/list?cateid=13&end=0&free=0&sort=0&p={{page}}&n=21\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.29}},{\"title\":\"冒险\",\"url\":\"/comic22/book/list?cateid=14&end=0&free=0&sort=0&p={{page}}&n=21\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.29}},{\"title\":\"儿童\",\"url\":\"/comic22/book/list?cateid=15&end=0&free=0&sort=0&p={{page}}&n=21\",\"style\":{\"layout_flexGrow\":0,\"layout_flexBasisPercent\":0.29}}]",
+  "lastUpdateTime": 1759505201435,
+  "respondTime": 793,
+  "ruleBookInfo": {
+    "author": "$.author",
+    "coverUrl": "$.pic",
+    "init": "$.data",
+    "intro": "$.info",
+    "kind": "$.tag",
+    "lastChapter": "$.lastchapter",
+    "name": "$.title",
+    "tocUrl": "https://www.9comic.cn/comic22/book/listChapter?imei=aanid10d10df686793008&id={{$.id}}&p=1&n=10000"
+  },
+  "ruleContent": {
+    "content": "@js:\nvar options = {\n\"headers\": {\"Referer\": baseUrl}\n}\njava.getStringList(\"$.data..url\").toArray().map\n(id=>'<img src=\"'+id+'\" >').join(\"\\n\")"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "$.author",
+    "bookList": "$..list[*]||$.data[*]",
+    "bookUrl": "https://www.9comic.cn/comic22/book/show?id={{$.id}}&imei=aanid10d10df686793008",
+    "coverUrl": "$.pic",
+    "intro": "$.info",
+    "kind": "$.tag",
+    "lastChapter": "$.lastchapter",
+    "name": "$.title"
+  },
+  "ruleToc": {
+    "chapterList": "$.data[*]",
+    "chapterName": "$.name",
+    "chapterUrl": "https://www.9comic.cn/comic22/book/showChapter?id={{$.id}}&imei=aanid10d10df686793008",
+    "updateTime": "{{java.timeFormat(java.getString('$.createtime'))}}"
+  },
+  "searchUrl": "https://www.9comic.cn/comic22/so/comic?keyword={{key}}&p=&ver=2.0",
+  "weight": 0,
+  "sourceId": "corpus-d1561382e8fe"
+}

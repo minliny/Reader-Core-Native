@@ -1,0 +1,46 @@
+{
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "爱爱中文（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.i25zw.com",
+  "customButton": false,
+  "customOrder": 158,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "header": "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "lastUpdateTime": 1772086577728,
+  "respondTime": 2140,
+  "ruleBookInfo": {
+    "author": "p:nth-child(2) > a@text",
+    "coverUrl": "img@src",
+    "intro": ".introtxt@text##简介:",
+    "kind": "#info > p:nth-child(3)@text##\\(\\)",
+    "lastChapter": "p:nth-child(6) > a@text",
+    "name": "h1@text"
+  },
+  "ruleContent": {
+    "content": "id.content@html##投推荐票|上一章|章节目录|下一章|加入书签|返回书架"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "tag.span@text##作者：",
+    "bookList": "id.alist@id.alistbox",
+    "bookUrl": "class.title@tag.h2@tag.a.0@href",
+    "checkKeyWord": "我的",
+    "coverUrl": "tag.img@src",
+    "intro": "class.intro@text",
+    "kind": "tag.p.2@text##分类：",
+    "lastChapter": "class.sys@tag.li@text##最新更新：",
+    "name": "class.title@tag.h2@tag.a.0@text"
+  },
+  "ruleToc": {
+    "chapterList": "id.list@tag.dd",
+    "chapterName": "tag.a@text",
+    "chapterUrl": "tag.a@href"
+  },
+  "searchUrl": "/search.html,{\nmethod: \"post\",\nbody: \"searchkey={{key}}&searchtype=all&Submit=\"\n}",
+  "weight": 0,
+  "sourceId": "corpus-06fcf181e0b3"
+}

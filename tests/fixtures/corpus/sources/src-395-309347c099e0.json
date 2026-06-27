@@ -1,0 +1,40 @@
+{
+  "bookSourceGroup": "正版小说 书源",
+  "bookSourceName": "追书出版",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://www.zhuishushenqi.com/chuban",
+  "customButton": false,
+  "customOrder": 396,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "lastUpdateTime": 1766232404683,
+  "respondTime": 1106,
+  "ruleBookInfo": {
+    "coverUrl": "class.book-info@img@src",
+    "intro": "class.content intro@textNodes",
+    "lastChapter": "class.chapter-list clearfix@tag.li.0@a@text"
+  },
+  "ruleContent": {
+    "content": "class.inner-text@p@html"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "class.author@tag.span.0@text",
+    "bookList": "class.book",
+    "bookUrl": "a@href",
+    "coverUrl": "img@src",
+    "kind": "class.author@tag.span.2@text&&class.popularity@text##\\|.*",
+    "lastChapter": "class.popularity@text##.*\\|",
+    "name": "class.name@text"
+  },
+  "ruleToc": {
+    "chapterList": "id.J_chapterList@li@a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "https://www.zhuishushenqi.com/search?val={{key}}",
+  "weight": 0,
+  "sourceId": "corpus-309347c099e0"
+}

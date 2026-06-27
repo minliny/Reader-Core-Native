@@ -1,0 +1,56 @@
+{
+  "bookSourceComment": "◎登录直接点登录，填账号密码，不要改登录规则里的东西，阅读升级最新版\n◎网站只能搜作者\n（导入前请备份好自己的发现规则，登录直接点登录，填账号密码，不要改登录规则里的东西，阅读升级最新版，网站只能搜作者）",
+  "bookSourceGroup": "特殊 书源",
+  "bookSourceName": "爱发电网（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://afdian.com",
+  "customButton": false,
+  "customOrder": 339,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "兽屋之龙的作品集::https://afdian.com/api/user/get-album-list?user_id=63609ee2d7e211eabceb52540025c377&page={{page}}\n21点牌的作品集::https://afdian.com/api/user/get-album-list?user_id=23993afe491211ee9d985254001e7c00&page={{page}}\n【防弹bts】关我西红柿⚡请多多催更！的作品集::https://afdian.com/api/user/get-album-list?user_id=577c5de2090911ecbce152540025c377&page={{page}}",
+  "header": "{\n  \"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36\"\n}",
+  "lastUpdateTime": 1766339636515,
+  "loginUi": "[\n  {\n    \"name\": \"手机号码/邮箱号\",\n    \"type\": \"text\"\n  },\n  {\n    \"name\": \"密码\",\n    \"type\": \"password\"\n  }\n]",
+  "loginUrl": "<js>\nfunction login(){\nuserInfo=source.getLoginInfoMap()\njava.log(userInfo)\nUNE=userInfo['手机号码/邮箱号']\nPWD=userInfo['密码']\nurl=\"{{source.getKey()}}/api/passport/login,\";\nSU=source.getKey()\nbody={\n  \"account\": String(UNE),\n  \"password\": String(PWD),\n  \"mp_token\": -1\n}\noption={\n'method': 'POST',\n'body': JSON.stringify(body)\n}\n\nurl=url+JSON.stringify(option)\ntoken=java.ajax(url).match(/\"auth_token\":\"([^\"]+)\"/)[1]\n\nCookie={\n\t\"Cookie\":\"auth_token=\"+token\n\t}\nheader = JSON.stringify(Cookie)\nsource.putLoginHeader(header)\n}\n</js>",
+  "respondTime": 1501,
+  "ruleBookInfo": {
+    "author": "$.data.album.user.name",
+    "coverUrl": "$.data.album.cover",
+    "intro": "$..content",
+    "name": "$.data.album.title",
+    "tocUrl": "<js>\nif(baseUrl.match(/get-album-info/)){\n\tjson=JSON.parse(result);\turl=\"/api/user/get-album-catalog?album_id=\"+json.data.album.album_id\n\t}\n</js>"
+  },
+  "ruleContent": {
+    "content": "<js>\nif(baseUrl.match(/album-info/)){\n\t\n\tif(book.durChapterIndex === chapter.index){\n\t\turl = \"legado://import/addToBookshelf?src=\"+baseUrl;\n\t\tscript = `data:text/html;charset=utf-8,\n\t\t<html>\n\t\t<title>《${title}》加入书架</title>\n\t\t<p style=\"font-size:60px\"><img src=\"${JSON.parse(result).data.album.cover}\" style=\"max-width: 300px; max-height: 400px\">\n\t\t\n\t\t简介：${JSON.parse(result).data.album.content}</p>\n\t\t<p style=\"text-align: center;\"><a href=\"${url}\" style=\"font-size:50px;\">跳转加入书架</a></p>\n\t\t\n\t\t</html>\n\t\t<script>\n        window.onload = function () {\n            window.location.href = '${url}';\n        };\n    </script>`;\n\t\tjava.startBrowser(script,\"《\"+book.title+\"》\")\n\t\t\n\t\t}\n\t\ntext=\"❗️刷新本章节，跳转本书详情页\\n\"+'简介：'+JSON.parse(result).data.album.content+\"\\n\"+'<img src=\"'+JSON.parse(result).data.album.cover+'\">'\n}else if(baseUrl.match(/post_id/)){\n\tjson=JSON.parse(result)\n\tpics=json.data.post.pics;\n\tvideo=json.data.post.video?\"视频链接：\"+json.data.post.video:\"\"\n\tpreview_text=json.data.post.preview_text?json.data.post.preview_text:\"\"\n\timgs=\"\";\n\tfor(i in pics){\n\t\timgs+='<img src=\"'+pics[i]+'\">\\n'\n\t\t}\n\tresult=json.data.post.content+imgs+video;\n\tresult!=\"\"?result:preview_text+\"\\n💰\"+json.data.post.min_price+\"\\n\"+json.data.post.has_right_errMsg\n\t}else{\n\t\tresult=\"↓↓复制下面文字，编辑书源，添加至发现规则↓↓\\n\"+book.name+\"的作品集::\"+baseUrl.replace(/page=1/,'page={\\{page}}')\n\t\t}\n</js>\n##class=\"fr-fic fr-dib\".*?\"\\[object Object\\]\"",
+    "imageStyle": "FULL"
+  },
+  "ruleExplore": {
+    "bookList": "$.data.list",
+    "bookUrl": "/api/user/get-album-info?album_id={{$.album_id}}",
+    "coverUrl": "$.cover",
+    "intro": "$.content",
+    "lastChapter": "$.update_time\n<js>\njava.timeFormat(result+\"000\")\n</js>",
+    "name": "$.title"
+  },
+  "ruleSearch": {
+    "bookList": "$.data.list",
+    "bookUrl": "/api/user/get-album-list?user_id={{$.creator.user_id}}&page=1",
+    "checkKeyWord": "沙雕",
+    "coverUrl": "$.cover",
+    "intro": "$.creator.detail",
+    "kind": "$..category.name",
+    "name": "$.name"
+  },
+  "ruleToc": {
+    "chapterList": "$.data.list\n<js>\nif(baseUrl.match(/get-album-list/)){\nresult=String(result).replace(/\\[/,'[{\"text\":\"'+book.name+'\",\"url\":\"'+baseUrl+'\"},')\n}\nresult\n</js>\n$.[*]",
+    "chapterName": "$.title||$.text",
+    "chapterUrl": "<js>\nif(baseUrl.match(/get-album-list/)){\nresult=\"{{$.album_id}}\"?\"/api/user/get-album-info?album_id={{$.album_id}}\":\"{{$.url}}\";\n}else if(baseUrl.match(/get-album-catalog/)){\tresult=\"/api/post/get-detail?post_id={{$.post_id}}&album_id={{$.album_ids[0]}}\"\n\t}\n</js>",
+    "updateTime": "{{$.content_length}}字 💰{{$.min_price}} 目录总数：{{$.post_count}}\n<js>\ntime=\"{{$.publish_time}}\"?java.timeFormat(\"{{$.publish_time}}000\"):\"\"\nresult=time+\" \"+result\n</js>\n##💰0\\.00| 字 💰| 目录总数：$"
+  },
+  "searchUrl": "/api/creator/list?page={{page}}&type=hot&category_id=&q={{key}}",
+  "weight": 0,
+  "sourceId": "corpus-c2b1e5bae335"
+}

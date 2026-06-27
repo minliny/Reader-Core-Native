@@ -1,0 +1,45 @@
+{
+  "bookSourceGroup": "游戏 书源",
+  "bookSourceName": "盒子游戏（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://h.4399.com",
+  "customButton": false,
+  "customOrder": 360,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[\n{\"title\":\"🎮游戏分类\",\n\"url\":\"\",\n\"style\":{\n\t\"layout_flexGrow\":1,\n\t\"layout_flexBasisPercent\":1\n\t}},\n{\"title\":\"网游\",\n\"url\":\"http://gprp.4399.com/cg/online/get_h5_new_ranking.php?method=special&value=291&devicesupport=3&page_size=20&page_num={{page}}&cId=2\",\n\"style\":{\n\t\"layout_flexGrow\":1,\n\t\"layout_flexBasisPercent\":0.2\n\t}},\n\t{\"title\":\"女生\",\n\"url\":\"http://gprp.4399.com/cg/online/get_h5_filter_ranking.php?method=special&value=195&devicesupport=3&page_size=20&page_num={{page}}&cId=2\",\n\"style\":{\n\t\"layout_flexGrow\":1,\n\t\"layout_flexBasisPercent\":0.2\n\t}},\n\t{\"title\":\"闯关\",\n\"url\":\"http://gprp.4399.com/cg/online/get_h5_filter_ranking.php?method=special&value=90&devicesupport=3&page_size=20&page_num={{page}}&cId=2\",\n\"style\":{\n\t\"layout_flexGrow\":1,\n\t\"layout_flexBasisPercent\":0.2\n\t}},\n\t{\"title\":\"单机\",\n\"url\":\"https://h.4399.com/wap/offlinegame.htm,{'webView':true}\",\n\"style\":{\n\t\"layout_flexGrow\":1,\n\t\"layout_flexBasisPercent\":0.2\n\t}},\n\t{\"title\":\"小游戏\",\n\"url\":\"https://h.4399.com/data/android_xyxcommend_{{page}}.js\",\n\"style\":{\n\t\"layout_flexGrow\":1,\n\t\"layout_flexBasisPercent\":0.2\n\t}},\n\t{\"title\":\"火柴人\",\n\"url\":\"http://gprp.4399.com/cg/online/get_h5_new_ranking.php?method=special&value=136&devicesupport=3&page_size=20&page_num={{page}}&cId=2\",\n\"style\":{\n\t\"layout_flexGrow\":1,\n\t\"layout_flexBasisPercent\":0.2\n\t}},\n\t{\"title\":\"跑酷\",\n\"url\":\"http://gprp.4399.com/cg/online/get_h5_new_ranking.php?method=special&value=259&devicesupport=3&page_size=20&page_num={{page}}&cId=2\",\n\"style\":{\n\t\"layout_flexGrow\":1,\n\t\"layout_flexBasisPercent\":0.2\n\t}},\n\t{\"title\":\"塔防\",\n\"url\":\"http://gprp.4399.com/cg/online/get_h5_new_ranking.php?method=special&value=59&devicesupport=3&page_size=20&page_num={{page}}&cId=2\",\n\"style\":{\n\t\"layout_flexGrow\":1,\n\t\"layout_flexBasisPercent\":0.2\n\t}}\n\t]",
+  "header": "{\n\t\"User-Agent\":\"5.0 (Linux; Android 12.0.1; zh-cn; Pixel 8 Pro; wv lite baiduboxapp) baiduboxapp/ AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/108.0.4758.46 UCBrowser/13.9.1.1172 Mobile Safari/537.36 WuZhui/8.1.1 SearchCraft/3.9.2 (Baidu; P1 12) Quark/4.5.5.155 ALiSearchApp/2.4 AliApp(TB/9.5.6)\"\n\t}",
+  "lastUpdateTime": 1759580680376,
+  "loginUrl": "https://ptlogin.4399.com/oauth2/authorize.do?client_id=a9a16636dbaeb917e2ffb16f0d52006e&redirect_uri=https%3A%2F%2Fh.api.4399.com%2FunifiedLogin%2Fuser%2Flogin%2Fcallback%3FcallbackUrl%3Dhttps%253A%252F%252Fh.4399.com%252Fwap%252Fuser.htm&response_type=token&show_ext_login=true&loginRealNameLevel=4&regRealNameLevel=4",
+  "respondTime": 3854,
+  "ruleBookInfo": {},
+  "ruleContent": {
+    "content": "@js:\nif(book.durChapterIndex==chapter.index){\n\t\tjava.startBrowser(baseUrl,title)\n\t\tjava.toast('正在加载视频\\n视频加载较慢，请耐心等待')\n\t}\n'<p>【刷新正文】播放<br>或者【点击章节链接】跳转到浏览器播放</p>'"
+  },
+  "ruleExplore": {
+    "bookList": "id.list_box@li||$.data",
+    "bookUrl": "a@href||$.zzylink\n<js>\nif(!result.match(4399)){\n\tresult=book.origin+result\n\t}else{\n\t\tresult\n\t\t}\n</js>",
+    "coverUrl": "img@src||$.pic",
+    "intro": "$.html5introduce",
+    "kind": "{{$.category}},{{$.wapclicks}}{{@@class.num@span@text}}",
+    "name": "class.tit@text||$.title"
+  },
+  "ruleSearch": {
+    "bookList": "class.md-list@ul@li",
+    "bookUrl": "a.0@href##^##https://h.4399.com",
+    "coverUrl": "img@src",
+    "intro": "p@text",
+    "kind": "span@text## \\| 人气:##,",
+    "name": "em@text"
+  },
+  "ruleToc": {
+    "chapterList": "class.con-game",
+    "chapterName": "em@text",
+    "chapterUrl": "class.start@a@href##.*gameId=(\\d+)##https://h.api.4399.com/g.php?gameId=$1"
+  },
+  "searchUrl": "/wap/search2.htm?k={{key}},{\"webView\":\"true\"}",
+  "weight": 0,
+  "sourceId": "corpus-960f37097c50"
+}

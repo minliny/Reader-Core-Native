@@ -1,0 +1,39 @@
+{
+  "bookSourceComment": "// Error: 搜索目录失效\n\n\n♛推书君api md #冷魅",
+  "bookSourceGroup": "特殊 书源",
+  "bookSourceName": "爱推書君（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://pre-api.tuishujun.com#md冷魅",
+  "customButton": false,
+  "customOrder": 345,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[{\"title\":\"✱　　　　　　✱ 男频分类 ✱　　　　　　✱\",\"url\":\"/api/listBookRepository?first_type_id=1&second_type_id=0&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"玄幻\",\"url\":\"/api/listBookRepository?first_type_id=1&second_type_id=3&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"奇幻\",\"url\":\"/api/listBookRepository?first_type_id=1&second_type_id=4&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"武侠\",\"url\":\"/api/listBookRepository?first_type_id=1&second_type_id=5&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"仙侠\",\"url\":\"/api/listBookRepository?first_type_id=1&second_type_id=6&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"都市\",\"url\":\"/api/listBookRepository?first_type_id=1&second_type_id=7&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"军事\",\"url\":\"/api/listBookRepository?first_type_id=1&second_type_id=8&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"历史\",\"url\":\"/api/listBookRepository?first_type_id=1&second_type_id=9&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"游戏\",\"url\":\"/api/listBookRepository?first_type_id=1&second_type_id=10&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"体育\",\"url\":\"/api/listBookRepository?first_type_id=1&second_type_id=11&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"科幻\",\"url\":\"/api/listBookRepository?first_type_id=1&second_type_id=12&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"同人\",\"url\":\"/api/listBookRepository?first_type_id=1&second_type_id=13&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"悬疑\",\"url\":\"/api/listBookRepository?first_type_id=1&second_type_id=14&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"轻文\",\"url\":\"/api/listBookRepository?first_type_id=1&second_type_id=15&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"诸天\",\"url\":\"/api/listBookRepository?first_type_id=1&second_type_id=16&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"综合\",\"url\":\"/api/listBookRepository?first_type_id=1&second_type_id=17&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"✾　　　　　　✾ 女频分类 ✾　　　　　　✾\",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=0&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"奇幻仙侠\",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=22&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"古代言情\",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=18&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"现代言情\",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=19&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"幻想言情\",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=20&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"未来言情\",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=21&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"游戏竞技\",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=23&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"衍生言情\",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=24&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"古代纯爱\",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=25&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"现代纯爱\",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=26&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"幻想纯爱\",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=27&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"衍生纯爱\",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=28&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"百合小说\",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=29&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 女 尊 \",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=30&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 无CP \",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=31&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 悬 疑 \",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=32&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 现 实 \",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=33&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 魔 幻 \",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=34&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 短 篇 \",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=35&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\" 综 合 \",\"url\":\"/api/listBookRepository?first_type_id=2&second_type_id=38&page={{page}}&pageSize=50\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"   　　\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1}}]",
+  "lastUpdateTime": 1759513817448,
+  "respondTime": 181563,
+  "ruleBookInfo": {},
+  "ruleContent": {
+    "content": "<js>\nfunction parseComments(n){\n  for(var c=[],e=0;e<n.length;e++){\n    var o=n[e];\n    c.push(\"书友：\".concat(o.user.nickname,\"\\n时间：\").concat(o.create_time,\"\\n评分：\").concat(\"🌟\".repeat(o.score/2),\"\\n评语：\").concat(o.content.replace(/([。；！？—…]”?)([\\u4e00-\\u9fa5][^。！？—…]{9})/g,\"$1\\n$2\")))\n  }\n  return c.join(\"\\n————\\n\");\n}\nvar data = JSON.parse(result);\ndata.data.total === 0;\ndata.data.total === 0 ? '还没有人对这本书发表评价哦！<br>': parseComments(data.data.data);\n</js>"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "author_nickname",
+    "bookList": "data.data",
+    "bookUrl": "https://pre-api.tuishujun.com/api/listBookScoreByBook?book_id={$.book_id}&type=all&page=1&pageSize=10&sort_field=create_time&sort_value=desc",
+    "coverUrl": "cover",
+    "intro": "info",
+    "kind": "source_name&&process_name&&second_type_name&&tag",
+    "name": "title",
+    "wordCount": "word_number_name"
+  },
+  "ruleToc": {
+    "chapterList": "<js>\nvar data = JSON.parse(result).data;\nvar pageCount = Math.ceil(data.total/10);\nvar list = Array.from(Array(pageCount).keys());\nfor(var i = 0; i <pageCount; i++){\n  var index = list[i]+1;\n  list[i] = {title:'第00' + index +'页', url: baseUrl.split('&')[0] + '&type=all&page=' + index + '&pageSize=10&sort_field=create_time&sort_value=desc'};\n}\nlist;\n</js>",
+    "chapterName": "title",
+    "chapterUrl": "url"
+  },
+  "searchUrl": "/api/searchBook?search_value={{key}}&sort_field=hot_value&page={{page}}&pageSize=50",
+  "weight": 0,
+  "sourceId": "corpus-510d385bfa39"
+}

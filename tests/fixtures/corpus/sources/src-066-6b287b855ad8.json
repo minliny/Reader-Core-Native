@@ -1,0 +1,43 @@
+{
+  "bookSourceComment": "// Error: failed to connect to www.zhonghuadiancang.com/199.59.149.207 (port 443) from /192.168.1.4 (port 40880) after 15000ms",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "中华典藏（优+）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.zhonghuadiancang.com",
+  "customButton": false,
+  "customOrder": 66,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[{\"title\":\"分类\",\"url\":\"\",\"style\":{\"layout_flexBasisPercent\":1,\"layout_flexGrow\":1}},{\"title\":\"学术杂记\",\"url\":\"/xueshuzaji/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},{\"title\":\"文学艺术\",\"url\":\"/wenxueyishu/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},{\"title\":\"佛学宝典\",\"url\":\"/foxuebaodian/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},{\"title\":\"天文地理\",\"url\":\"/tianwendili/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},{\"title\":\"玄学五术\",\"url\":\"/xuanxuewushu/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},{\"title\":\"儒理哲学\",\"url\":\"/rulizhexue/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},{\"title\":\"历史传记\",\"url\":\"/lishizhuanji/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},{\"title\":\"诗词戏曲\",\"url\":\"/shicixiqu/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},{\"title\":\"类书文集\",\"url\":\"/leishuwenji/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},{\"title\":\"国学知识\",\"url\":\"/guoxuezhishi/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},{\"title\":\"外国名著\",\"url\":\"/waiguomingzhu/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},{\"title\":\"\",\"url\":\"\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},{\"title\":\"标签\",\"url\":\"\",\"style\":{\"layout_flexBasisPercent\":1,\"layout_flexGrow\":1}},{\"title\":\"家训\",\"url\":\"/tags-11-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"传记\",\"url\":\"/tags-9-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"笔记\",\"url\":\"/tags-15-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"哲学\",\"url\":\"/tags-24-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"易学\",\"url\":\"/tags-26-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"史学\",\"url\":\"/tags-30-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"注释\",\"url\":\"/tags-37-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"文集\",\"url\":\"/tags-39-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"兵书\",\"url\":\"/tags-44-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"小说\",\"url\":\"/tags-57-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"地方\",\"url\":\"/tags-58-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"道教\",\"url\":\"/tags-60-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"蒙学\",\"url\":\"/tags-64-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"诗集\",\"url\":\"/tags-65-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"词集\",\"url\":\"/tags-66-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"诗论\",\"url\":\"/tags-67-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"占卜\",\"url\":\"/tags-76-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"中医\",\"url\":\"/tags-80-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"农书\",\"url\":\"/tags-99-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"茶书\",\"url\":\"/tags-100-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"游记\",\"url\":\"/tags-118-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"植物\",\"url\":\"/tags-104-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"画论\",\"url\":\"/tags-109-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"书法\",\"url\":\"/tags-111-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"戏曲\",\"url\":\"/tags-113-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"诗文\",\"url\":\"/tags-125-{{page-1}}.html\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"\",\"url\":\"\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"\",\"url\":\"\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}}]",
+  "lastUpdateTime": 1759384560963,
+  "respondTime": 195046,
+  "ruleBookInfo": {
+    "author": ".panel-heading@small@a@text",
+    "coverUrl": ".fmpic@img@src",
+    "intro": ".m-summary@text##(^|[。！？]+[”」）】]?)##$1<br>",
+    "kind": ".breadcrumb@a.1@text",
+    "lastChapter": "id.booklist@a.-1@text##正文卷.|正文.|VIP卷.|默认卷.|卷_|VIP章节.|免费章节.|章节目录.|最新章节.|[\\(（【].*?[求更票谢乐发订合补加架字修Kk].*?[】）\\)]",
+    "name": ".breadcrumb@a.2@text"
+  },
+  "ruleContent": {
+    "content": "id.content@html"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "a.1@text",
+    "bookList": "tbody@tr",
+    "bookUrl": "a.0@href",
+    "intro": "p@text",
+    "name": "a.0@text"
+  },
+  "ruleToc": {
+    "chapterList": ".vv-book@a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "{{cookie.removeCookie(source.getKey())}}\n/e/search/index.php,{\n    \"method\": \"POST\",\n    \"body\": \"tbname=bookname&show=title,writer&tempid=1&keyboard={{key}}\"\n}",
+  "weight": 0,
+  "sourceId": "corpus-6b287b855ad8"
+}

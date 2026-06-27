@@ -1,0 +1,64 @@
+{
+  "bookSourceComment": "｀https://101kanshu.com/\n｀https://69shux.co/\n//❗免责声明：  \n本工具/代码/内容仅供学习交流使用，严禁用于任何非法用途。使用者应严格遵守所在国家或地区的法律法规，任何因滥用或违规使用导致的后果均与开发者/提供者无关，责任自负❗",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "太极小说（优+）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://69shux.co/",
+  "bookUrlPattern": ".*(69|101).*book.*",
+  "concurrentRate": "1200",
+  "customButton": false,
+  "customOrder": 54,
+  "enabled": false,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "@js:\nfunction shux() {\n  const cats = [\n    [\"完本小说\", \"full\"],\n    [\"小说分类\", \"class\"]  \n  ];\n\n  const subs = [\n    [\"全部分类\", 0],\n    [\"玄幻奇幻\", 1],\n    [\"武侠仙侠\", 2],\n    [\"现代都市\", 3],\n    [\"历史军事\", 4],\n    [\"科幻小说\", 5],\n    [\"游戏竞技\", 6],\n    [\"恐怖灵异\", 7],\n    [\"言情小说\", 8],\n    [\"动漫同人\", 9],\n    [\"其他类型\", 10]\n  ];\n\n  const ranks = [\n    [\"人气\", \"weekvisit\"],\n    [\"推荐\", \"allvote\"],\n    [\"新书\", \"newhot\"]\n  ];\n\n  const stats = [\n    [\"连载\", 0],\n    [\"全本\", 1]\n  ];\n\n  \n  let disc = [];\n\n  cats.forEach(c => {\n    disc.push({\n      title: c[0],\n      url: \"\",\n      style: {layout_flexBasisPercent: 1, layout_flexGrow: 1}\n    });\n    if (c[1] === \"full\" || c[1] === \"class\") {\n      subs.forEach(s => {\n        disc.push({\n          title: s[0],\n          url: `/novels/${c[1]}/${s[1]}_{{page}}.html`,\n          style: {layout_flexBasisPercent: 0.24, layout_flexGrow: 0.32}\n        });\n      });\n      if (c[1] === \"class\") {\n        subs.forEach(sb => {\n          disc.push({\n            title: `${sb[0]}排行榜`,\n            url: \"\",\n            style: {layout_flexBasisPercent: 1, layout_flexGrow: 1}\n          });\n          stats.forEach(st => {\n            ranks.forEach(r => {\n              disc.push({\n                title: `${r[0]}-${st[0]}`,\n                url: `/novels/${r[1]}_${sb[1]}_${st[1]}_{{page}}.html`,\n                style: {layout_flexGrow: 1}\n              });\n            });\n          });\n        });\n      }\n    } \n  });\n  \n  disc.push({\n            title: `热门标签`,\n            url: \"\",\n            style: {layout_flexBasisPercent: 1, layout_flexGrow: 1}\n          });\n let url = baseUrl.replaceAll(/[^\\w]+$/gi, '');\n  let tagHtml = java.ajax(`${url}/newtags`);\n  if (String(tagHtml).includes('cf_chl')) {\n    let res =java.startBrowserAwait(`${url}/newtags`, \"验证\", false);\n    tagHtml = res.body();\n  }\n  let doc = org.jsoup.Jsoup.parse(tagHtml);\n  let tags = doc.select(\".tag ul a\");\n  Array.from(tags).forEach(a => {\n    let txt = a.ownText().trim();\n    let t = java.t2s(txt);\n    disc.push({\n      title: t,\n      url: source.key + \"/newtag/\" + encodeURI(txt) + \"/{{page}}\",\n      style: {\n        layout_flexGrow: 1,\n        layout_flexBasisPercent: 0.25\n      }\n    });\n  });\n\n  disc.push({\n    title: \"最近更新\",\n    url: \"/last\",\n    style: {layout_flexBasisPercent: 1, layout_flexGrow: 1}\n  });\n  \n  return JSON.stringify(disc);\n}\nshux();",
+  "header": "@js:\nJSON.stringify({\n\t\t\"X-Requested-With\": \"mark.via\",\n\t\t\"Cache-control\": \"no-store\",\n\t\t\"Referer\": baseUrl,\n\"Accept-Language\": \"zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7\",\n\"User-Agent\": java.getWebViewUA()\n})",
+  "lastUpdateTime": 1766455257614,
+  "loginCheckJs": "var resultUrl = result.url();\nvar resultCode = result.code();\nvar resultBoDy = result.body();\nif (/_cf_|ge_ua|verify.php/ig.test(resultBoDy) && resultCode >= 403) {\n    if (key) {\n        url = baseUrl + java.ruleUrl;\n    }\n    cookie.removeCookie(baseUrl)\n    result = java.startBrowserAwait(resultUrl, \n        \"验证\", false); \n    if(key){\n        src = result.body();\n        url = org.jsoup.Jsoup.parse(src).select('meta[property=\"og:url\"]').attr('content');\n        if(url != \"\" ){\n            result = Packages.io.legado.app.help.http.StrResponse(url, src);\n        }\n    }\n}\nresult;",
+  "respondTime": 180000,
+  "ruleBookInfo": {
+    "author": "@get:{a}",
+    "coverUrl": "@get:{c}##$##,{\"headers\": {\"Referer\": \"{{source.getKey()}}\"}}",
+    "init": "<js>java.setContent(java.t2s(result))</js>\n@put:{\n\"n\":\"[property$=book_name]@content\",\n\"a\":\"[property$=author]@content\",\n\"k\":\"[property~=category|status|update_time]@content\",\n\"l\":\"[property~=las?test_chapter_name]@content\",\n\"i\":\"[property$=description]@content\",\n\"c\":\"[property$=image]@content\",\n\"m\":\"ul.infolist > li.0@textNodes\",\n\"g\":\"head > script@all##tags: '(.*?)'##$1###\",\n\"x\":\".infolist@text\",\n\"h\":\".review-item@html\"}\n@js:\n//修复书籍重定向目录加载失败\nbook.bookUrl = baseUrl;\nresult; //设置当前url，并返回结果",
+    "intro": "📝简介：@get:{x}\n@get:{i}\n&nbsp;&nbsp;\n📝书评：@get:{h}##<a.*?a>|字数",
+    "kind": "@get:{g}@get:{k}",
+    "lastChapter": "@get:{l}",
+    "name": "@get:{n}",
+    "tocUrl": "{{baseUrl.replace(/book/, \n\t\"ajax_novels/chapterlist\")}}",
+    "wordCount": "@get:{m}"
+  },
+  "ruleContent": {
+    "content": "#txtcontent@html\n@js:\ncontent = java.t2s(result)\n//java.log(content)\ncontent",
+    "replaceRegex": "##[\\p{So}+]|\\n?.*(第[^，。]+章|谢[^，。]+打赏|[首发更新最快]{3,}|本章完|补更|追读|加更|月票|章节|求票|本站域名|最.+新.+(小.+说.+|章.+节.+)?(在.+首.+发.+)?).*\\n?|.*[6六陆].*?[9九玖].*?[书書].*?[吧].*"
+  },
+  "ruleExplore": {
+    "author": "label.0@text",
+    "bookList": "<js>java.t2s(result)</js>\n#article_list_content@li||.recentupdate2@li||.tag@ul",
+    "bookUrl": "a@href",
+    "coverUrl": "img@data-src||img@src",
+    "intro": "ol.ellipsis_2@text",
+    "kind": "label.1:2@text||span@text",
+    "lastChapter": ".zxzj@p@a@text||a.1@text",
+    "name": "h3@a@text||a.0@text"
+  },
+  "ruleSearch": {
+    "author": "label.0@text",
+    "bookList": "<js>java.t2s(result)</js>\n#article_list_content@li||.recentupdate2@li||.tag@ul",
+    "bookUrl": "a@href",
+    "coverUrl": "img@data-src||img@src##$##,{\"headers\": {\"Referer\": \"{{source.getKey()}}\"}}",
+    "intro": "ol.ellipsis_2@text",
+    "kind": "label.1:2@text",
+    "lastChapter": ".zxzj@p@a@text||a.1@text",
+    "name": "h3@a@text||a.0@text"
+  },
+  "ruleToc": {
+    "chapterList": "<js>java.t2s(result)</js>\nul li a",
+    "chapterName": "text",
+    "chapterUrl": "href",
+    "preUpdateJs": "java.refreshTocUrl()"
+  },
+  "searchUrl": "@js:\nif (/^a/i.test(key)) {\n  // 搜索标签\n  // 搜索例子 `a穿越；a富二代`\n  url = `newtag/${encodeURIComponent(key.substring(1))}/${page}`;\n} else {\n  // 默认搜索模式\n  url = `search/${encodeURIComponent(key)}/${page}.html`\n}",
+  "weight": 0,
+  "sourceId": "corpus-8d65ac5eef8b"
+}

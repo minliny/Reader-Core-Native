@@ -1,0 +1,52 @@
+{
+  "bookSourceComment": "//by:cwjdb",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "书香阁子（优+）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.sxgread.com",
+  "customButton": false,
+  "customOrder": 101,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[{\"title\":\"༺ˇ»`类型分类´«ˇ༻\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"都市异能\",\"url\":\"/book/c1/<,page_{{page}}.html>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.4}},{\"title\":\"豪门总裁\",\"url\":\"/book/c2/<,page_{{page}}.html>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.4}},{\"title\":\"穿越架空\",\"url\":\"/book/c3/<,page_{{page}}.html>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.4}},{\"title\":\"玄幻奇幻\",\"url\":\"/book/c4/<,page_{{page}}.html>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.4}},{\"title\":\"仙侠武侠\",\"url\":\"/book/c5/<,page_{{page}}.html>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.4}},{\"title\":\"青春校园\",\"url\":\"/book/c6/<,page_{{page}}.html>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.4}},{\"title\":\"游戏竞技\",\"url\":\"/book/c7/<,page_{{page}}.html>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.4}},{\"title\":\"科幻悬疑\",\"url\":\"/book/c8/<,page_{{page}}.html>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.4}},{\"title\":\"༺ˇ»`分类排行´«ˇ༻\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"玄幻奇幻\",\"url\":\"/top/xuanhuan.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.4}},{\"title\":\"都市异能\",\"url\":\"/top/dushi.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.4}},{\"title\":\"豪门总裁\",\"url\":\"/top/haomen.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.4}},{\"title\":\"穿越架空\",\"url\":\"/top/chuanyue.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.4}},{\"title\":\"青春校园\",\"url\":\"/top/qingchun.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.4}},{\"title\":\"仙侠武侠\",\"url\":\"/top/xianxia.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.4}},{\"title\":\"游戏竞技\",\"url\":\"/top/youxi.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.4}},{\"title\":\"科幻未来\",\"url\":\"/top/kehuan.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.4}},{\"title\":\"༺ˇ»`点击排行´«ˇ༻\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"总点击\",\"url\":\"/top/hitsall.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"月点击\",\"url\":\"/top/hitsmonth.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"周点击\",\"url\":\"/top/hitsweek.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"热门小说\",\"url\":\"/top/hot.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"精品小说\",\"url\":\"/top/jingpin.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"推荐小说\",\"url\":\"/top/tuijian.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"全本小说\",\"url\":\"/top/quanben.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"新书入库\",\"url\":\"/top/newbook.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}}]",
+  "lastUpdateTime": 1751450791468,
+  "respondTime": 17681,
+  "ruleBookInfo": {
+    "author": "[property$=author]@content",
+    "coverUrl": "[property$=image]@content",
+    "intro": "[property$=description]@content##(^|[。！？]+[”」）】]?)##$1<br>",
+    "kind": "[property~=category|status|update_time]@content&&\n.author@p.-1@ownText##状态：|小说",
+    "lastChapter": "[property$=latest_chapter_name]@content##正文卷.|正文.|VIP章节.|免费章节.|VIP卷.|默认卷.|章节目录.|最新章节.|[\\(（【].*?[求更票谢乐发订合补加].*?[】）\\)]",
+    "name": "[property$=book_name]@content"
+  },
+  "ruleContent": {
+    "content": ".NovelTxt@html",
+    "replaceRegex": "##喜欢{{book.name}}.*全网最快。"
+  },
+  "ruleExplore": {
+    "author": ".zz@text||text.作者@text##作者：",
+    "bookList": ".tl_right_c li!0||.ClassBook",
+    "bookUrl": "a.1@href||a@href",
+    "coverUrl": ".ClassBookImg img@src",
+    "intro": ".ClassBookContent@text",
+    "kind": ".lb@text",
+    "name": "a.1@text||a@text"
+  },
+  "ruleSearch": {
+    "author": "div.-1@text",
+    "bookList": ".slist li",
+    "bookUrl": "a@href",
+    "kind": "div.0@text##\\[|\\]|小说",
+    "name": "a@text"
+  },
+  "ruleToc": {
+    "chapterList": "<js>\nvar o = org.jsoup.Jsoup.parse(result);\nvar s = o.select(\"#newlist > li[data-id] > a\"); \nvar l = s.toArray().sort((a, b) => {\n    var idA = parseInt(a.parent().attr(\"data-id\"));\n    var idB = parseInt(b.parent().attr(\"data-id\"));\n    return idA - idB;\n});\nvar list = l.map(i => ({\n    text: i.text().trim(),\n    href: i.attr(\"href\").trim()\n}));\nlist\n</js>",
+    "chapterName": "text\n@js:result\n.replace(\"••\",\"\")\n.replace(/^(\\d+).第/,'第')\n.replace(/^(正文|VIP章节|最新章节)?(\\s+|_)|[\\(\\{（｛【].*[求含理更谢乐发推票盟补加字Kk\\/].*/g,'')\n.replace(/^(\\d+)[、．]第.+章/,'第$1章')\n.replace(/^(\\d+)、\\d+、/,'第$1章 ')\n.replace(/^(\\d+)、\\d+/,'第$1章')\n.replace(/^(第.+章)\\s?\\d+/,'$1')\n.replace(/^(\\d+)、/,'第$1章 ')\n.replace(/^(第.+章)\\s?第.+章/,'$1')\n.replace(/第\\s(.+)\\s章/,'第$1章')\n.replace(/.*(chapter|Chapter)\\s?(\\d+)\\s?/,'$1 $2 ')\n.replace(/\\(.+\\)/,'')\n.replace(/\\[|。/,'')\n.replace(/第([零一二两三四五六七八九十百千]+)章/g,java.toNumChapter(result))\n##(章)([^\\s]+)(\\s·)##$1 $2$3",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "{{cookie.removeCookie(source.getKey())}}/s/?sword={{key}},{\"charset\": \"GBK\"}",
+  "weight": 0,
+  "sourceId": "corpus-2d0e64b21311"
+}

@@ -1,0 +1,59 @@
+{
+  "bookSourceComment": "By_聆听月与悦 . 2025.5.2",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "阅读书库（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://www.yeudusk.com/",
+  "bookUrlPattern": "http\\://www.yeudusk.com/book/\\d+/",
+  "customButton": false,
+  "customOrder": 192,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[\n  {\n    \"title\": \"玄幻·魔法\",\n    \"url\": \"http://www.yeudusk.com/book/sort1/0/1.html\",\n    \"style\": {\n      \"layout_flexGrow\": 1,\n      \"layout_flexBasisPercent\": 0.29\n    }\n  },\n  {\n    \"title\": \"武侠·修真\",\n    \"url\": \"http://www.yeudusk.com/book/sort2/0/1.html\",\n    \"style\": {\n      \"layout_flexGrow\": 1,\n      \"layout_flexBasisPercent\": 0.29\n    }\n  },\n  {\n    \"title\": \"都市·言情\",\n    \"url\": \"http://www.yeudusk.com/book/sort3/0/1.html\",\n    \"style\": {\n      \"layout_flexGrow\": 1,\n      \"layout_flexBasisPercent\": 0.29\n    }\n  },\n  {\n    \"title\": \"历史·军事\",\n    \"url\": \"http://www.yeudusk.com/book/sort4/0/1.html\",\n    \"style\": {\n      \"layout_flexGrow\": 1,\n      \"layout_flexBasisPercent\": 0.29\n    }\n  },\n  {\n    \"title\": \"穿越·架空\",\n    \"url\": \"http://www.yeudusk.com/book/sort5/0/1.html\",\n    \"style\": {\n      \"layout_flexGrow\": 1,\n      \"layout_flexBasisPercent\": 0.29\n    }\n  },\n  {\n    \"title\": \"游戏·竞技\",\n    \"url\": \"http://www.yeudusk.com/book/sort6/0/1.html\",\n    \"style\": {\n      \"layout_flexGrow\": 1,\n      \"layout_flexBasisPercent\": 0.29\n    }\n  },\n  {\n    \"title\": \"经部\",\n    \"url\": \"http://www.yeudusk.com/book/sort11/0/1.html\",\n    \"style\": {\n      \"layout_flexGrow\": 1,\n      \"layout_flexBasisPercent\": 0.29\n    }\n  },\n  {\n    \"title\": \"史部\",\n    \"url\": \"http://www.yeudusk.com/book/sort12/0/1.html\",\n    \"style\": {\n      \"layout_flexGrow\": 1,\n      \"layout_flexBasisPercent\": 0.29\n    }\n  },\n  {\n    \"title\": \"子部\",\n    \"url\": \"http://www.yeudusk.com/book/sort13/0/1.html\",\n    \"style\": {\n      \"layout_flexGrow\": 1,\n      \"layout_flexBasisPercent\": 0.29\n    }\n  },\n  {\n    \"title\": \"集部\",\n    \"url\": \"http://www.yeudusk.com/book/sort14/0/1.html\",\n    \"style\": {\n      \"layout_flexGrow\": 1,\n      \"layout_flexBasisPercent\": 0.29\n    }\n  },\n  {\n    \"title\": \"古典·名著\",\n    \"url\": \"http://www.yeudusk.com/book/sort16/0/1.html\",\n    \"style\": {\n      \"layout_flexGrow\": 1,\n      \"layout_flexBasisPercent\": 0.29\n    }\n  }\n]",
+  "header": "{\n\"user-agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36\"\n}",
+  "lastUpdateTime": 1759294434226,
+  "loginUrl": "http://www.yeudusk.com/register.php",
+  "respondTime": 4737,
+  "ruleBookInfo": {
+    "intro": "class.tabvalue@html",
+    "tocUrl": "class.btnlink b_hot mbs@href||text.点击阅读@href\n@js:\n(() => {\n    if (!result || result.trim().length === 0) {\n        const idMatch = baseUrl.match(/\\/(\\d+)\\/?$/);\n        if (!idMatch) {\n            java.toast(\"错误: 书籍ID提取失败\");\n            return \"\";\n        }\n        \n        const id = idMatch[1];\n        if (id.length < 3) {\n            java.toast(\"错误: 书籍ID长度不足3位\");\n            return \"\";\n        }\n        \n        const prefix = id.substring(0, 3);\n        return `http://www.yeudusk.com/html/${prefix}/${id}`;\n    } else {\n        return result;\n    }\n})();"
+  },
+  "ruleContent": {
+    "content": " id.clickeye_content@html",
+    "nextContentUrl": "text.下一页@href",
+    "replaceRegex": "@js:\ncontent = result.replace(/阅读库\\s*www\\.yeudusk\\.com.*?www\\.yeudusk\\.com/g, '').replace(/\\(+\\s*阅读库\\s*www\\.yeudusk\\.com\\)+/g, '').replace(/\\(|\\)/g, '');"
+  },
+  "ruleExplore": {
+    "author": "class.c_tag.0@span.1@text",
+    "bookList": "class.blockcontent@class.c_row cf",
+    "bookUrl": ".fl.0@a@href",
+    "coverUrl": "@img@src",
+    "intro": ".c_description@text",
+    "kind": "class.c_tag.0@span.3@text&&class.c_tag@span.7@text",
+    "name": ".fl.1@div.0@a.1@text",
+    "wordCount": "class.c_tag.0@span.5@text"
+  },
+  "ruleSearch": {
+    "author": "class.c_tag.0@span.1@text",
+    "bookList": "id.jieqi_page_contents@class.c_row",
+    "bookUrl": ".fl@a.0@href",
+    "checkKeyWord": "我的女儿",
+    "coverUrl": "img@src",
+    "kind": "class.c_tag.0@span.3@text&&class.c_tag@span.7@text",
+    "lastChapter": "class.c_tag.1@text##[最新章节更新：]*",
+    "name": "class.c_subject@text",
+    "wordCount": "class.c_tag.0@span.5@text"
+  },
+  "ruleToc": {
+    "chapterList": "@css:\n.chapters > ul > li,\ndiv.index > ul.chapters > li,\n.chapters > div.volume,\n.index > div.chapters > div.volume\n@js:\nlist = [];\nlist.push({\n    text: \"💮↓ 试读卷 ↓💮\",\n    volume: true\n});\n$ = result;\nfor (i in $) {\n    if (/volume/.test(String($[i]))) {\n        text = \"🏮↓〖\" + String($[i].text()) + \"〗↓🏮\";\n        list.push({\n            text: text,\n            volume: true\n        });\n    } else {  \n        $[i].select(\"li\").forEach(a => {\n            text = a.select(\"a\").text();\n            info = String(a.select(\"a\").attr(\"title\")).replace(/更新，共/g, '');\n            href = a.select(\"a\").attr(\"href\");\n            list.push({   \n                text: text,\n                info: info,\n                href: href\n            });\n        });\n    }\n}\nlist",
+    "chapterName": "text",
+    "chapterUrl": "href",
+    "isVolume": "volume",
+    "updateTime": "info"
+  },
+  "searchUrl": "http://www.yeudusk.com/modules/article/search.php?q={{key}}",
+  "weight": 0,
+  "sourceId": "corpus-55bbc61d2c40"
+}

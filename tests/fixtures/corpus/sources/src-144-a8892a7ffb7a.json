@@ -1,0 +1,48 @@
+{
+  "bookSourceComment": "/*\n\t24.7.2明月照大江修复\n*/",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "图书迷子（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.tushumi.cc",
+  "bookUrlPattern": "https://www.tushumi.org/info-\\d+.html",
+  "concurrentRate": "500",
+  "customButton": false,
+  "customOrder": 144,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[\n  {\n    \"title\":\"玄幻魔法\",\n    \"url\":\"/leibie1_{{page}}.html\",\n    \"style\":{\n      \"layout_flexGrow\":1,\n      \"layout_flexBasisPercent\":0.4\n    }\n  },\n  {\n    \"title\":\"武侠修真\",\n    \"url\":\"/leibie2_{{page}}.html\",\n    \"style\":{\n      \"layout_flexGrow\":1,\n      \"layout_flexBasisPercent\":0.4\n    }\n  },\n  {\n    \"title\":\"都市言情\",\n    \"url\":\"/leibie3_{{page}}.html\",\n    \"style\":{\n      \"layout_flexGrow\":1,\n      \"layout_flexBasisPercent\":0.4\n    }\n  },\n  {\n    \"title\":\"历史军事\",\n    \"url\":\"/leibie4_{{page}}.html\",\n    \"style\":{\n      \"layout_flexGrow\":1,\n      \"layout_flexBasisPercent\":0.4\n    }\n  },\n  {\n    \"title\":\"侦探推理\",\n    \"url\":\"/leibie5_{{page}}.html\",\n    \"style\":{\n      \"layout_flexGrow\":1,\n      \"layout_flexBasisPercent\":0.4\n    }\n  },\n  {\n    \"title\":\"网游动漫\",\n    \"url\":\"/leibie6_{{page}}.html\",\n    \"style\":{\n      \"layout_flexGrow\":1,\n      \"layout_flexBasisPercent\":0.4\n    }\n  },\n  {\n    \"title\":\"科幻小说\",\n    \"url\":\"/leibie7_{{page}}.html\",\n    \"style\":{\n      \"layout_flexGrow\":1,\n      \"layout_flexBasisPercent\":0.4\n    }\n  },\n  {\n    \"title\":\"恐怖灵异\",\n    \"url\":\"/leibie8_{{page}}.html\",\n    \"style\":{\n      \"layout_flexGrow\":1,\n      \"layout_flexBasisPercent\":0.4\n    }\n  },\n  {\n    \"title\":\"散文诗词\",\n    \"url\":\"/leibie9_{{page}}.html\",\n    \"style\":{\n      \"layout_flexGrow\":1,\n      \"layout_flexBasisPercent\":0.4\n    }\n  },\n  {\n    \"title\":\"其他类型\",\n    \"url\":\"/leibie10_{{page}}.html\",\n    \"style\":{\n      \"layout_flexGrow\":1,\n      \"layout_flexBasisPercent\":0.4\n    }\n  }\n]",
+  "lastUpdateTime": 1766340218068,
+  "respondTime": 14404,
+  "ruleBookInfo": {
+    "author": "#info > p:nth-child(2) > a@text",
+    "coverUrl": "#fmimg > img@src",
+    "intro": "@get:{intro}\n##^##　　",
+    "kind": "#info > p:nth-child(3)@text&&\n#info > p:nth-child(5)@text\n##类 别：|{{book.name}}|\\(|\\)|更新时间：|..:..",
+    "lastChapter": "#info > p:nth-child(6) > a@text",
+    "name": "#info > a > h1@text##\\(([^)]+?)\\)##（$1）"
+  },
+  "ruleContent": {
+    "content": "#content@html",
+    "replaceRegex": "##\\n?.*投推荐票.*"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "div.info > div.title > span@text##作者：",
+    "bookList": "#alistbox",
+    "bookUrl": "div.info > div.title > h2 > a@href",
+    "coverUrl": "div.pic > a > img@src",
+    "intro": "@put:{intro:\"div.info > div.intro@text\"}@get:{intro}",
+    "lastChapter": "div.info > div.sys > li > a@text",
+    "name": "div.info > div.title > h2 > a@text\n##\\(([^)]+?)\\)##（$1）"
+  },
+  "ruleToc": {
+    "chapterList": "#list > dl > dt:nth-of-type(2) ~ dd",
+    "chapterName": "a@text",
+    "chapterUrl": "a@href"
+  },
+  "searchUrl": "{{String(java.connect(`${java.connect(source.getKey()).raw().request().url()}search.html,{\n  \"body\": \"searchkey=${key}&searchtype=all&Submit=\",\n  \"charset\": \"UTF-8\",\n  \"method\": \"POST\"\n}`).raw().request().url()).replace(/1(?=\\.html)/, `${page}`)}}",
+  "weight": 0,
+  "sourceId": "corpus-a8892a7ffb7a"
+}

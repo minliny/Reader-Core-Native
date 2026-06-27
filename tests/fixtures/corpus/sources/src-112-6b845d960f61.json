@@ -1,0 +1,60 @@
+{
+  "bookSourceComment": "// Error: 搜索失效\n\n//修复目录,动态获取发现，优化部分规则，添加登录UI ◎夜泽川◎ 2024,11.28",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "神凑轻说（优+）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://m.shencou.com",
+  "customButton": false,
+  "customOrder": 112,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "@js: var result = [];\njava.toast(\"🔥动态获取发现中……\");\nvar push=(title,url,size)=>result.push({\n  \t\"title\": title,\n  \t\"url\": url,\n  \t\"style\": {\n   \"layout_flexGrow\": 1,\n   \"layout_flexBasisPercent\": size\n   }\n });\nvar top = java.ajax(\"https://m.shencou.com/top.php?type=allvisit&page=1\");\nvar tag = java.ajax(\"https://m.shencou.com/sort.php\")\nif (top&&tag) {\na=org.jsoup.Jsoup.parse(top).select(\".ranking a\");\nb=org.jsoup.Jsoup.parse(tag).select(\".sortlist a\");\npush(\"排行榜\",null,1)\n    for(i in a){\n        title=a[i].text()\n        url=a[i].attr(\"href\")\n        size=0.25;\n  url=String(url).replace(\"1\",\"{{page}}\")\n        push(title,url,size)\n    };\n    push(\"分类\",null,1)\n    for(i in b){\n        title=b[i].text()\n        url=b[i].attr(\"href\")\n        size=0.4;\n  url=String(url).replace(\"1\",\"{{page}}\")\n        push(title,url,size)\n    };\n      } else { \n      java.toast(\"🚫发现获取失败……\");\n}\nJSON.stringify(result);",
+  "header": "{\"User-Agent\": \"Mozilla/5.0 (Linux; Android 9) Mobile Safari/537.36\"}",
+  "lastUpdateTime": 1759350055603,
+  "loginUi": "[\n{\n        name: \"用户名\",\n        type: \"text\"\n    },\n    {\n        name: \"密码\",\n        type: \"password\"\n    },\n    {\n        name: \"         注册          \",\n        type: \"button\",\n        action: \"register()\"\n    },\n    {\n        name: \"         登录          \",\n        type: \"button\",\n        action: \"login()\"\n    }\n]",
+  "loginUrl": "function register() {\njava.startBrowser(\"https://m.shencou.com/register.php\",\"注册\");\n\t}\n\nfunction login() {\n\tcookie.removeCookie(source.getKey())\n\tname = source.getLoginInfoMap().get(\"用户名\");\n\tword = source.getLoginInfoMap().get(\"密码\");\n\tif (name&&word){\n\tul = \"https://m.shencou.com/login.php\";\n\tby = `_17mb_username=${name}&_17mb_password=<REDACTED>{word}&ac=login`\n\theaders = {\n\t\t\"User-Agent\": \"Mozilla/5.0 (Linux; Android 9) Mobile Safari/537.36\"\n\t\t}\n\tck = java.post(ul,by,headers).cookies();\n\tco = String(ck).replace(/\\{(.*),(.*)\\}/,\"$1;$2\");\n\tcookie = {\n\t\"Cookie\": co\n}\n\tif (ck) {\n\t\tjava.toast(\"用户👤 \" + name + \" 登录成功\");\n\tsource.putLoginHeader(JSON.stringify(cookie));\n\t} else {\n\t\tjava.toast(\"用户👤 \" + name + \" 登录失败\");\n\t\t}\n}\n\t}",
+  "respondTime": 184986,
+  "ruleBookInfo": {
+    "author": ".p1.0@text",
+    "coverUrl": ".tu@img@src",
+    "intro": ".jj@.p2@text##经费不足[\\s\\S]+",
+    "kind": "{{@@.catalog1@class.p4@text}},{{@@.p5@text}},{{@@.p2.1@text##：##:}}",
+    "lastChapter": ".info_chapters@.p2.0@li.0@text",
+    "name": ".inh1@text",
+    "wordCount": ".p6@text"
+  },
+  "ruleContent": {
+    "content": "#novelcontent@html",
+    "replaceRegex": "##\\s*（插图\\d+）\\s*"
+  },
+  "ruleExplore": {
+    "author": "a[href^=/author]@text",
+    "bookList": ".fl_list@.tt||.content_link",
+    "bookUrl": ".p2@a@href||a@href",
+    "coverUrl": "a@href||.p2@a@href@js:\naid = result.match(/[0-9]+/); \nstr = \"http://www.shencou.com/files/article/image/\" +( String(aid).length > 3?   String(aid)[0]: \"0\")+ \"/\" + aid + \"/\" + aid +\"s.jpg\"; \nstr;",
+    "intro": ".right@.p5@text",
+    "kind": ".label@p@ownText||a[href=#]@text##\\[|\\]",
+    "name": ".right@.p1@text||.p2@text"
+  },
+  "ruleSearch": {
+    "author": "a.2@text",
+    "bookList": ".search_list",
+    "bookUrl": "a@href",
+    "checkKeyWord": "欢迎来到实力至上",
+    "coverUrl": "a@href@js:\naid = result.match(/[0-9]+/); \nstr = \"http://www.shencou.com/files/article/image/\" +( String(aid).length > 3?   String(aid)[0]: \"0\")+ \"/\" + aid + \"/\" + aid +\"s.jpg\"; \nstr;",
+    "kind": "a.1@text##�##文库",
+    "name": "a.0@text##《|》"
+  },
+  "ruleToc": {
+    "chapterList": "@css:.info_chapters .p2:nth-of-type(2) li:not(.warning)\n@js:\nlist=[]\nlis=result\nfor(i in lis) {\n    if(String(lis[i]).match(/href/)) {\n        lis[i].select(\"a\").forEach(a=>{\n            list.push({\n                text: a.text().match(/>(.*)/)[1],\n                href: a.attr(\"href\")\n            })\n        })\n    } else {\n        list.push({\n            text: \" 🏷️ \"+lis[i].text(),\n            vo: true\n        })\n    }\n}\nlist",
+    "chapterName": "text",
+    "chapterUrl": "href",
+    "isVolume": "vo",
+    "nextTocUrl": "@js: \nvar regex = /<option value=\"([^\"]+)\"[^>]*>/g;\nvar pages = [];\nvar match;\nwhile ((match = regex.exec(src)) !== null) {\n    pages.push(match[1]);\n}\npages;"
+  },
+  "searchUrl": "@js:\nvar url=source.getKey();\nvar so=url+\"/pserchs.php,\";\nbody=`s=${key}&type=articlename&submit`;\nvar head=source.header;\nvar post={\n\t\"body\": String(body),\n\t\"charset\":\"gbk\",\n  \"method\": \"POST\"\n  };\nso+JSON.stringify(post);",
+  "weight": 0,
+  "sourceId": "corpus-6b845d960f61"
+}

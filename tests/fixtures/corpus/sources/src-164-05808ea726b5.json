@@ -1,0 +1,55 @@
+{
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "零零小说（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.00shu.la",
+  "customButton": false,
+  "customOrder": 164,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "玄幻奇幻::/xuanhuan/{{page}}/\n武侠仙侠::/wuxia/{{page}}/\n都市言情::/dushi/{{page}}/\n历史军事::/lishi/{{page}}/\n游戏竞技::/youxi/{{page}}/\n科幻灵异::/kehuan/{{page}}/",
+  "lastUpdateTime": 1772085545601,
+  "respondTime": 2175,
+  "ruleBookInfo": {
+    "author": "id.info@p.0@text",
+    "coverUrl": "id.fmimg@img@src",
+    "intro": "id.intro@p!0@text##(^|[。！？]+[”」）】]?)##$1<br>@js:result.replace(/各位书友要.*/g,\"\")",
+    "kind": ".con_top@a.2@text&&id.info@p.1:2@text##.*：|\\s.*",
+    "lastChapter": "id.info@a@text##正文卷.|正文.|VIP卷.|默认卷.|卷_|VIP章节.|免费章节.|章节目录.|最新章节.|[\\(（【].*?[求更票谢乐发订合补加架字修Kk].*?[】）\\)]",
+    "name": "id.info@h1@text",
+    "tocUrl": "text.在线阅读@href"
+  },
+  "ruleContent": {
+    "content": "id.content@html",
+    "replaceRegex": "##最新网址：.*"
+  },
+  "ruleExplore": {
+    "author": ".s5@text",
+    "bookList": ".l@li",
+    "bookUrl": "a.0@href",
+    "coverUrl": "a.0@href<js>\nvar id = result.match(/(\\d+)\\/?$/)[1];\nvar iid = parseInt(id/1000);\n'/files/article/image/'+iid+'/'+id+'/'+id+'s.jpg';\n</js>",
+    "kind": ".s3@textNodes##\\(|\\)",
+    "lastChapter": "a.1@text##正文卷.|正文.|VIP卷.|默认卷.|卷_|VIP章节.|免费章节.|章节目录.|最新章节.|[\\(（【].*?[求更票谢乐发订合补加架字修Kk].*?[】）\\)]",
+    "name": "a.0@text"
+  },
+  "ruleSearch": {
+    "author": "td.2@text",
+    "bookList": "tbody@tr!0",
+    "bookUrl": "a.0@href",
+    "coverUrl": "a.0@href<js>\nvar id = result.match(/(\\d+)\\/?$/)[1];\nvar iid = parseInt(id/1000);\n'/files/article/image/'+iid+'/'+id+'/'+id+'s.jpg';\n</js>",
+    "kind": "td.5:4@text",
+    "lastChapter": "a.1@text##正文卷.|正文.|VIP卷.|默认卷.|卷_|VIP章节.|免费章节.|章节目录.|最新章节.|[\\(（【].*?[求更票谢乐发订合补加架字修Kk].*?[】）\\)]",
+    "name": "a.0@text",
+    "wordCount": "td.3@text"
+  },
+  "ruleToc": {
+    "chapterList": "id.list@dd@a",
+    "chapterName": "text##正文卷.|正文.|VIP卷.|默认卷.|卷_|VIP章节.|免费章节.|章节目录.|最新章节.|[\\(（【].*?[求更票谢乐发订合补加架字修Kk].*?[】）\\)]",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "/modules/article/search.php?q={{key}}",
+  "weight": 0,
+  "sourceId": "corpus-05808ea726b5"
+}

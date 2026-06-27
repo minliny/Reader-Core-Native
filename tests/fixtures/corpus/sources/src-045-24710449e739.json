@@ -1,0 +1,50 @@
+{
+  "bookSourceComment": "作者：明月照大江",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "陶越文华（优++）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://qcbook.taoyuewenhua.net",
+  "customButton": false,
+  "customOrder": 45,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "@js:\nif (source.getVariable() == \"\") {\n  java.log(\"未注册设备，自动注册中…\");\n  eval(String(source.loginUrl));\n  login();\n}\nlet push = (list, title, url, type) => list.push({ title: title, url: url, style: { layout_flexGrow: type } });\n\nconst categories = [\n  [\n    \"玄幻\", \"奇幻\", \"武侠\", \"仙侠\", \"都市\",\n    \"历史\", \"军事\", \"奇闻怪谈\", \"科幻\", \"游戏\",\n    \"体育\", \"N次元\", \"现实\"\n  ],\n  [\n    \"玄幻言情\", \"仙侠奇缘\", \"古代言情\", \"现代言情\",\n    \"浪漫青春\", \"奇闻怪谈\", \"科幻空间\", \"游戏竞技\",\n    \"N次元\", \"同人纯爱\", \"短篇\"\n  ]\n];\n\nlet list = [];\n\n// 男生推荐\npush(list, \"▱▱▱▱男生推荐▱▱▱▱\", null, 1);\ncategories[0].forEach(category => {\n  // 生成动态请求地址\n  let u = `@js:let t = Date.now().toString();\n  let params = {\n    btype: 100,\n    category: \"${category}\",\n    ctype: 1,\n    page: page - 1,\n    pageSize: \"16\",\n    t: t\n  };\n  creatRequest(\"/book_mall/book_rank\", params)`;\n  push(list, category, u, 0.16);\n});\n\n// 女生推荐\npush(list, \"▱▱▱▱女生推荐▱▱▱▱\", null, 1);\ncategories[1].forEach(category => {\n  let u = `@js:let t = Date.now().toString();\n  let params = {\n    brtype: 100,\n    category: \"${category}\",\n    ctype: 2,\n    page: page - 1,\n    pageSize: \"10\",\n    t: t\n  };\n  creatRequest(\"/book_mall/book_rank\", params)`;\n  push(list, category, u, 0.16);\n});\n\nJSON.stringify(list);",
+  "header": "{\n  \"User-Agent\": \"okhttp/4.12.0\",\n  \"Connection\": \"Keep-Alive\",\n  \"Accept\": \"*/*\",\n  \"Accept-Encoding\": \"\"\n}",
+  "jsLib": "let default_pm = {\n    appid: \"qcbook\",\n    optype: \"0\",\n    ostype: \"0\",\n    package_name: \"com.martian.qmbook\",\n    version_code: \"617\",\n    version_name: \"2.2.6.8\"\n};\n\nfunction o2p(json) {\n    if (typeof json !== \"object\" || json === null) {\n        return \"\";\n    }\n    return Object.keys(json)\n        .sort()\n        .map(key => encodeURIComponent(key) + \"=\" + json[key])\n        .join(\"&\");\n}\n\nfunction ruid(l, k = true) {\n    var u = String(Packages.java.util.UUID.randomUUID());\n    u = k ? u : u.replace(/-/g, \"\");\n    return l > 0 ? u.substring(0, l) : u;\n}\n\nfunction creatRequest(path, params, method, body) {\n    const { source, java } = this;\n    let default_pm = JSON.parse(source.getVariable());\n    let pm = Object.assign({}, params, default_pm);\n    let spm = o2p(pm);\n    pm.sign = java.md5Encode(spm + \"&key=qcbook_123456\");\n    spm = o2p(pm);\n    return path + \"?\" + spm;\n}",
+  "lastUpdateTime": 1766359781494,
+  "loginUi": "[\n{\"name\":\"游客登录\",\"type\":\"button\",\"action\":\"login()\"}\n]",
+  "loginUrl": "function login() {\n    let aid = ruid(16, false),\n        did = ruid(),\n        gaid = ruid(),\n        t = Date.now().toString(),\n        model = Packages.android.os.Build.MODEL,\n        brand = Packages.android.os.Build.MANUFACTURER,\n        os = Math.floor(Math.random() * (15 - 10 + 1)) + 10;\n    default_pm.device_id = did;\n    default_pm.gaid = gaid;\n    default_pm.model = model;\n    default_pm.brand = brand;\n    default_pm.channel = brand;\n    default_pm.osversion = os;\n    default_pm.android_id = aid;\n    pm = Object.assign({}, default_pm);\n    pm.t = t;\n    spm = o2p(pm) + \"&key=qcbook_123456\";\n    sign = java.md5Encode(spm);\n    pm.sign = sign;\n    spm = o2p(pm);\n    java.log(spm);\n    u = \"https://qcbook.taoyuewenhua.net/guest_user_login?\" + spm;\n\n    loginres = java.ajax(u);\n    res = JSON.parse(loginres);\n    if (res.errmsg == \"success\") {\n        java.longToast(\"✅登录成功\");\n        default_pm.uid = res.data.uid;\n        default_pm.token = res.data.token;\n        source.setVariable(JSON.stringify(default_pm));\n    } else {\n        java.longToast(\"❌登录失败\" + res.errmsg);\n    }\n}",
+  "respondTime": 52701,
+  "ruleBookInfo": {
+    "author": "data.authorName",
+    "intro": "data.intro",
+    "lastChapter": "data.latestChapter",
+    "name": "data.title",
+    "tocUrl": "http://scdn.taoyuewenhua.net/app/chapters/{{$.data.bid}}.json"
+  },
+  "ruleContent": {
+    "content": "data.content",
+    "replaceRegex": "##[\\u0041-\\u005A\\u0061-\\u007A\\uFF21-\\uFF3A\\uFF41-\\uFF5A]+\\.[\\u0041-\\u005A\\u0061-\\u007A\\uFF21-\\uFF3A\\uFF41-\\uFF5A0-9\\uFF10-\\uFF19-]+\\.[\\u0041-\\u005A\\u0061-\\u007A\\uFF21-\\uFF3A\\uFF41-\\uFF5A]{2,}.*|{{chapter.title}}|第[0-9一二两三四五六七八九十百千万]{1,9}章.*|[(（]?本章未?完[）)]?.*|\\(第.+页\\)|.?加入书签.*|.*下一页(翻页)?继续阅读.*|.*(退出|浏览器)阅读模式.*|.*点击下载{{book.name}}.*|.*最新(永久域名|网址).*|.*一秒记住(本站地址|.+网).*"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "authorName",
+    "bookList": "data.bookList",
+    "bookUrl": "@js:\nlet t = Date.now().toString(),\n    params = { \n    \tbid: \"{{$.sourceId}}\", \n    \tt: t\n    \t};\ncreatRequest(\"/tf/book\", params);",
+    "coverUrl": "coverUrl",
+    "intro": "intro",
+    "kind": "categoryName&&tagList",
+    "name": "title",
+    "wordCount": "allWords"
+  },
+  "ruleToc": {
+    "chapterList": "data.chapterList",
+    "chapterName": "title",
+    "chapterUrl": "@js:\nlet bid = \"{{$.bid}}\"\n,cid = \"{{$.cid}}\"\n,t = Date.now().toString()\nparams = {\n\tbid:bid,\n\tcid:cid,\n\tt:t\n}\ncreatRequest(\n\t\"https://qcbook.taoyuewenhua.net/tf/chapter_content\",\n\tparams\n)"
+  },
+  "searchUrl": "@js:\nif (source.getVariable() == \"\") {\n\tjava.log(\"未注册设备，自动注册中…\")\n\teval(String(source.loginUrl));\n\tlogin();\n}\nlet t = Date.now().toString(),\n    params = {\n        ctype: 0,\n        keywords: key,\n        order: 0,\n        page: page,\n        pageSize: 10,\n        searchType: 1,\n        t: t\n    };\ncreatRequest(\"/authopt/ty/search_books\", params);",
+  "weight": 0,
+  "sourceId": "corpus-24710449e739"
+}

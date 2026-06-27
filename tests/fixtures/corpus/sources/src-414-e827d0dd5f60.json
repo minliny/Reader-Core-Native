@@ -1,0 +1,58 @@
+{
+  "bookSourceGroup": "正版小说 书源",
+  "bookSourceName": "轻菠萝包",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://book.sfacg.com##目录",
+  "customButton": false,
+  "customOrder": 415,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[{\"title\":\"----------全部----------\",\"url\":\"/List/default.aspx?tid=-1&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},\n{\"title\":\"魔幻\",\"url\":\"/List/default.aspx?tid=21&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"玄幻\",\"url\":\"/List/default.aspx?tid=22&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"古风\",\"url\":\"/List/default.aspx?tid=23&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"科幻\",\"url\":\"/List/default.aspx?tid=24&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"校园\",\"url\":\"/List/default.aspx?tid=25&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"都市\",\"url\":\"/List/default.aspx?tid=26&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"游戏\",\"url\":\"/List/default.aspx?tid=27&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"同人\",\"url\":\"/List/default.aspx?tid=28&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"悬疑\",\"url\":\"/List/default.aspx?tid=29&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"----------连载----------\",\"url\":\"/List/?ud=-1&if=0&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},\n{\"title\":\"魔幻\",\"url\":\"/List/default.aspx?tid=21&if=0&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"玄幻\",\"url\":\"/List/default.aspx?tid=22&if=0&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"古风\",\"url\":\"/List/default.aspx?tid=23&if=0&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"科幻\",\"url\":\"/List/default.aspx?tid=24&if=0&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"校园\",\"url\":\"/List/default.aspx?tid=25&if=0&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"都市\",\"url\":\"/List/default.aspx?tid=26&if=0&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"游戏\",\"url\":\"/List/default.aspx?tid=27&if=0&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"同人\",\"url\":\"/List/default.aspx?tid=28&if=0&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"悬疑\",\"url\":\"/List/default.aspx?tid=29&if=0&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"----------完结----------\",\"url\":\"/List/?ud=-1&if=1&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},\n{\"title\":\"魔幻\",\"url\":\"/List/default.aspx?tid=21&if=1&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"玄幻\",\"url\":\"/List/default.aspx?tid=22&if=1&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"古风\",\"url\":\"/List/default.aspx?tid=23&if=1&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"科幻\",\"url\":\"/List/default.aspx?tid=24&if=1&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"校园\",\"url\":\"/List/default.aspx?tid=25&if=1&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"都市\",\"url\":\"/List/default.aspx?tid=26&if=1&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"游戏\",\"url\":\"/List/default.aspx?tid=27&if=1&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"同人\",\"url\":\"/List/default.aspx?tid=28&if=1&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"悬疑\",\"url\":\"/List/default.aspx?tid=29&if=1&PageIndex={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}}]",
+  "header": "{\n  \"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36\"\n}",
+  "lastUpdateTime": 1759386981522,
+  "loginUi": "[\n  {\n    \"name\": \"账号\",\n    \"type\": \"text\"\n  },\n  {\n    \"name\": \"密码\",\n    \"type\": \"password\"\n  }\n]",
+  "loginUrl": "@js:\nune=source.getLoginInfoMap().get(\"账号\")\npwd=source.getLoginInfoMap().get(\"密码\")\n\nif(une&&pwd) {\n\t let body=JSON.stringify({\n\t   username: String(une),\n    password: String(pwd)\n  })\n  let url='https://minipapi.sfacg.com/pas/mpapi/sessions'\n  ck=java.post(url,body,{\"sf-minip-info\":\"minip_novel/1.0.70(android;11)/wxmp\",\"Content-Type\":\"application/json\"}).cookies()\n  \n   header=JSON.stringify({\n \t\"Cookie\": String(ck).match(/\\{(.*?)\\}/)[1].replace(/,/g,';')\n \t})\n\tsource.putLoginHeader(header)\n}",
+  "respondTime": 2661,
+  "ruleBookInfo": {
+    "intro": "&nbsp;&nbsp;🔖更新时间：{{@.count-detail span.3@text##更新：}}{{'\\n&lrm;\\n'}}🏷️标签：{{@.tag-list@text}}{{'\\n&lrm;\\n'}}{{@.introduce@html}}##(^|[。！？]+[”」）】]?)##$1<br>@js:result.replace(//g,\"\")",
+    "kind": ".title span!0@text&&.count-detail span.0:1:3@text##.*：|.*\\[|\\]|\\s.*",
+    "lastChapter": ".chapter-title a@text&&.count-detail span.3@text##更新：\n<js>result.replace(/(.*)\\s/,'$1 • ')</js>\n<js>result.replace(/\\s\\d+:\\d+:\\d+/,'')</js>",
+    "tocUrl": "@js:baseUrl.replace(/.+Novel/, 'https://m.sfacg.com/i')",
+    "wordCount": ".count-detail span.1@text##.*：|字.*"
+  },
+  "ruleContent": {
+    "content": "div[style=text-indent: 2em;]@html",
+    "imageStyle": "0"
+  },
+  "ruleExplore": {
+    "author": "tag.li.1@tag.a.1@text",
+    "bookList": "class.Comic_Pic_List",
+    "bookUrl": "tag.li.1@tag.a.0@href",
+    "coverUrl": "tag.img@src",
+    "intro": "tag.li.1@text##^.+/\\s*\\d+字\\s*",
+    "kind": "a.3@text&&span@text&&li.1@text##.+\\D(\\d+\\/\\d+\\/\\d+)\\D*(\\d+字)\\s*(.+)##$1,$2",
+    "lastChapter": "tag.li.1@text##.+\\D(\\d+\\/\\d+\\/\\d+)\\D*(\\d+字)\\s*(.+)##$1 · $2",
+    "name": "tag.li.1@tag.a.0@text"
+  },
+  "ruleSearch": {
+    "author": "tag.li.1@text##.+综合信息：\\s*([^\\/]+).*##$1",
+    "bookList": "tag.form@tag.table.-2@tag.ul",
+    "bookUrl": "tag.a@href",
+    "checkKeyWord": "我的徒儿竟然全是反派",
+    "coverUrl": "tag.img@src",
+    "intro": "tag.li.1@text##.+\\d+:\\d+\\s*(.+).*##$1",
+    "kind": "tag.li.1@text##.+\\/(\\d+\\/\\d+\\/\\d+).*##$1",
+    "name": "tag.a@text"
+  },
+  "ruleToc": {
+    "chapterList": "+<js>\nvar rules = {\n  volsName: '//*[@class=\"mulu\"]/text()',\n  volumes: 'class.mulu_list', \n  chapters: 'tag.a',\n  chName: 'text',\n  chLink: 'href',\n  vip: 'class.icon-lock2'\n};\nvar opts = {\n  showVolName: false\n};\n\nfunction chapterLevel(rules, opts){\n  var check = (rule) => rule !== undefined && rule !== '' ? rule : '@xpath:/x[@x=\"\" and @x!=\"\"]';\n  rules.volInfo = check(rules.volInfo);\n  rules.vip = check(rules.vip);\n  opts.showVolName = opts.showVolName === undefined ? true : !!opts.showVolName;\n\n  var NL = '<br/>', NP = \"<br/>\\uFEFF<br/>\";\n  var list = [];\n  var volsName = java.getStringList(rules.volsName).toArray();\n\n  java.getElements(rules.volumes).toArray().forEach((vol,idx) => {\n    java.setContent(vol);\n    var volInfo = '简介：' + NL + java.getStringList(rules.volInfo).toArray().join(NL);\n    var chs = java.getElements(rules.chapters).toArray().map(ch => {\n      java.setContent(ch);\n      var isVip = !java.getElements(rules.vip).isEmpty();\n      var chName = java.getString(rules.chName);\n      return {\n        text: (isVip ? '✿·' : '').padStart(0, \"\\u2000\")+(opts.showVolName ? volsName[idx]+\"\\x20\" : '')+chName,\n        href: java.getString(rules.chLink),\n        name: chName\n        \n      };\n    });\n\n    volInfo += NP + '目录(' + chs.length + ')：' + NL;\n    volInfo += chs.slice(0,10).map(v => v.name).join(NL);\n    volInfo += chs.length > 10 ? NL + '……' : '';\n    volInfo = volInfo.replace(/(\\s)\\1+/g, '$1');\n    list.push({\n      text: '📖['+volsName[idx]+']📖',\n      volsName:true,\n      href: 'https://translate.google.cn/#view=home&op=translate&sl=zh-CN&tl=en&text='+encodeURIComponent(volInfo)\n    });\n    list = list.concat(chs);\n  });\n\n  return list;\n}\n\nchapterLevel(rules, opts);\n</js>",
+    "chapterName": "text",
+    "chapterUrl": "href",
+    "isVolume": "volsName"
+  },
+  "searchUrl": "http://s.sfacg.com/?Key={{key}}&S=1&SS=0",
+  "weight": 0,
+  "sourceId": "corpus-e827d0dd5f60"
+}

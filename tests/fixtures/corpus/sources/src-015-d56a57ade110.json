@@ -1,0 +1,54 @@
+{
+  "bookSourceComment": "繁体字，需要魔法",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "天天小说（优++）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://ttks.tw/",
+  "bookUrlPattern": "https://ttks\\.tw/novel/chapters/.+?/index\\.html",
+  "customButton": false,
+  "customOrder": 15,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "連載::/novel/class/lianzai\n玄幻::/novel/class/xuanhuan\n都市::/novel/class/dushi\n仙俠::/novel/class/wuxia\n言情::/novel/class/yaniqng\n遊戲::/novel/class/youxi\n科幻::/novel/class/kehuan\n懸疑::/novel/class/kongbu\n靈異::/novel/class/lingyi\n軍事::/novel/class/lishi\n現言::/novel/class/tongren\n其它::/novel/class/qita",
+  "lastUpdateTime": 1772086396828,
+  "respondTime": 5518,
+  "ruleBookInfo": {
+    "author": "tag.li.2@a@text",
+    "coverUrl": "class.novel_info@amp-img@src",
+    "intro": "p@text",
+    "kind": "tag.li.2@text##類別：",
+    "lastChapter": "class.near_chapter@all",
+    "name": "h1@text",
+    "tocUrl": "baseUrl"
+  },
+  "ruleContent": {
+    "content": "class.content@p@textNodes",
+    "replaceRegex": "##【記住.*超靠譜 】|天天看小說.+超靠譜"
+  },
+  "ruleExplore": {
+    "author": "tag.li.1@text##作者：",
+    "bookList": "class.novel_cell",
+    "bookUrl": "tag.a.0@href",
+    "coverUrl": "amp-img@src",
+    "intro": "tag.li.2@text##簡介：",
+    "name": "h3@text"
+  },
+  "ruleSearch": {
+    "author": "tag.li.1@text",
+    "bookList": "class.pure-u-1-1 pure-u-xl-1-3 pure-u-lg-1-3 pure-u-md-1-2 novel_cell",
+    "bookUrl": "tag.a@href",
+    "coverUrl": "amp-img@src",
+    "intro": "tag.li.2@text",
+    "name": "h3@text"
+  },
+  "ruleToc": {
+    "chapterList": "class.chapters_frame@class.pure-g@class.chapter_cell@tag.a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "/novel/search?q={{key}}",
+  "weight": 0,
+  "sourceId": "corpus-d56a57ade110"
+}

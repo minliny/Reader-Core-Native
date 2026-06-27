@@ -1,0 +1,43 @@
+{
+  "bookSourceComment": "或许能博你一笑",
+  "bookSourceGroup": "特殊 书源",
+  "bookSourceName": "治能寄算（优+）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://你觉得还有网址?",
+  "customButton": false,
+  "customOrder": 335,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "lastUpdateTime": 1759622842042,
+  "loginUi": "[\n{\n\t\t\"name\": \"❤️加入QQ群(熬夜肝书源611015458)\",\n\t\t\"type\": \"button\",\n\t\t\"action\":\"https://jq.qq.com/?_wv=1027&k=1ZyEEhur\"\n\t}\n]",
+  "loginUrl": "♡",
+  "respondTime": 165,
+  "ruleBookInfo": {
+    "author": "{{'abysses'}}",
+    "coverUrl": "{{book.coverUrl}}",
+    "intro": "{{java.get('result')}}",
+    "name": "{{book.name}}"
+  },
+  "ruleContent": {
+    "content": "@js:`<h1>我的天啊，你打开了</h1><p>但是什么都没有</p>`"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "{{'abysses'}}",
+    "bookList": "@js:result=[src]",
+    "checkKeyWord": "3-7+3*5*2*(2+(4+3*2*4*2-2-8+1)*2*2)-2*2+(1/2.5+1)*3",
+    "coverUrl": "{{`https://i.postimg.cc/PqHphr81/22-09-17-21-49-48.jpg`}}",
+    "intro": "@js:\nkey = String(java.get('key'));\n// str 即为input输入的数据\nfunction sliceCountStr(str) {\n   let arr = []; // 记录分割计算表达式\n   for (let i = 0; i < str.length; i++) {\n      let item = str.charAt(i);\n      let num = item;\n      if (/[\\d|\\.]/.test(item)) {\n          let j = i + 1;\n          for (; j < str.length - 1; j++) {\n            let otherItem = str.charAt(j);\n            if (!/[\\d|\\.]/.test(otherItem)) {\n              break;\n            }\n          }\n          num = str.slice(i, j);\n          i = j - 1;\n          num = +num;\n      }\n      arr.push(num);\n   }\n   return arr;\n}\n// arr 即为上一步处理好的数组\nfunction countHandle(arr) {\n      let charArr = [],\n        numArr = [];\n      for (let i = 0; i < arr.length; i++) {\n        if (typeof arr[i] == 'number') {\n          numArr.push(arr[i]);\n        } else {\n          if (charArr.length) {\n            // 步骤1\n            // 如果当前的运算符的优先级比栈顶的优先级低或相等，就说明需要把前面的值全部计算好\n            // 存储运算符的栈要一直出栈，直到栈为空或当前的字符的优先级比栈顶的优先级高\n            while (this.isPop(arr[i], charArr[charArr.length - 1])) {\n              let t2 = numArr.pop();\n              let t1 = numArr.pop();\n              let char = charArr.pop();\n              this.handleCalculation(numArr, t1, t2, char);\n            }\n            // 当前运算符为右括号\n            if (arr[i] == ')') {\n              // 取栈顶运算符\n              let st = charArr[charArr.length - 1];\n              // 步骤2\n              // 遇到右括号也要一直出栈，直到遇到左括号\n              while (st != '(') {\n                let t1, t2;\n                let char = charArr.pop();\n                if (char != '(') {\n                  t2 = numArr.pop();\n                  t1 = numArr.pop();\n                  this.handleCalculation(numArr, t1, t2, char);\n                }\n                st = char;\n              }\n            }\n            // 运算符不为右括号\n            if (arr[i] != ')') {\n              charArr.push(arr[i]);\n            }\n          } else {\n            // 步骤3\n            // 运算符栈为空，直接入栈\n            charArr.push(arr[i]);\n          }\n        }\n      }\n      // 步骤4\n      // 最后运算符栈如果还有字符，要一直出栈直到为空\n      while (charArr.length) {\n        let t2 = numArr.pop();\n        let t1 = numArr.pop();\n        let char = charArr.pop();\n        this.handleCalculation(numArr, t1, t2, char);\n      }\n   return numArr[0];\n}\n// 基本加减乘除运算处理\n    function handleCalculation(numArr, num1, num2, char) {\n      if (char == '+') {\n        numArr.push(num1 + num2);\n      } else if (char == '-') {\n        numArr.push(num1 - num2);\n      } else if (char == '*') {\n        numArr.push(num1 * num2);\n      } else if (char == '/') {\n        numArr.push(num1 / num2);\n      }\n    }\n    // 判断运算符的优先级，是否出栈进行计算\n    function isPop(char1, char2) {\n      // 运算符栈为空\n      if (!char2) {\n        return false;\n      }\n      // 运算符优先级相同\n      if ((char1 == '+' || char1 == '-') && (char2 == '+' || char2 == '-')) {\n        return true;\n      }\n      // 前者运算符优先级比后者低\n      if ((char1 == '+' || char1 == '-') && (char2 == '*' || char2 == '/')) {\n        return true;\n      }\n      // 运算符优先级相同\n      if ((char1 == '*' || char1 == '/') && (char2 == '*' || char2 == '/')) {\n        return true;\n      }\n      // 前者运算符优先级比后者高\n      if ((char1 == '*' || char1 == '/') && (char2 == '+' || char2 == '-')) {\n        return false;\n    }\n}\ntry{\niresult=countHandle(sliceCountStr(key))\nif(!iresult) throw('error')\nresult=`答案是${iresult}`\n}catch{\napi=`http://api.qingyunke.com/api.php?key=free&appid=0&msg=${key}`\nresult=JSON.parse(java.ajax(api)).content\n}\njava.put('result',result)\nresult",
+    "name": "{{'答案在这'}}"
+  },
+  "ruleToc": {
+    "chapterList": "@js:result=[src]",
+    "chapterName": "{{'在这'}}",
+    "chapterUrl": "{{baseUrl}}"
+  },
+  "searchUrl": "@js:\njava.put('key',key)\n'https://www.baidu.com'",
+  "weight": 0,
+  "sourceId": "corpus-55e8770c62c0"
+}

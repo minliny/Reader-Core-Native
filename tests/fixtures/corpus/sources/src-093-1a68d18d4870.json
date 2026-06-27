@@ -1,0 +1,55 @@
+{
+  "bookSourceComment": "（使用需要魔法）\n//银卡书屋：https://m.yinkasw.com/",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "旭日小说（优+）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://m.xuribook.com",
+  "customButton": false,
+  "customOrder": 93,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[{\"title\":\"都市小说\",\"url\":\"/shuku/0_173_0_0_0_{{page}}_0.html\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},\n{\"title\":\"校园小说\",\"url\":\"/shuku/0_249_0_0_0_{{page}}_0.html\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},\n{\"title\":\"恐怖灵异\",\"url\":\"/shuku/0_2537_0_0_0_{{page}}_0.html\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},\n{\"title\":\"悬疑小说\",\"url\":\"/shuku/0_117_0_0_0_{{page}}_0.html\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},\n{\"title\":\"历史小说\",\"url\":\"/shuku/0_357_0_0_0_{{page}}_0.html\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},\n{\"title\":\"仙侠奇缘\",\"url\":\"/shuku/0_4209_0_0_0_{{page}}_0.html\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},\n{\"title\":\"科幻小说\",\"url\":\"/shuku/0_143_0_0_0_{{page}}_0.html\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},\n{\"title\":\"武侠修真\",\"url\":\"/shuku/0_1203_0_0_0_{{page}}_0.html\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},\n{\"title\":\"虚拟网游\",\"url\":\"/shuku/0_381_0_0_0_{{page}}_0.html\",\"style\":{\"layout_flexBasisPercent\":0.25,\"layout_flexGrow\":1}},\n{\"title\":\"东方玄幻\",\"url\":\"/shuku/0_1_0_0_0_{{page}}_0.html\",\"style\":{\"layout_flexBasisPercent\":0.29}}]",
+  "lastUpdateTime": 1766457567855,
+  "respondTime": 189784,
+  "ruleBookInfo": {
+    "author": "[property=\"og:novel:author\"]@content",
+    "coverUrl": "[property=\"og:image\"]@content",
+    "intro": "[property=\"og:description\"]@content##(^|[。！？]+[”」）】]?)##$1<br>",
+    "kind": "[property=\"og:novel:category\"]@content&&[property=\"og:novel:status\"]@content&&[property=\"og:novel:update_time\"]@content##小说",
+    "lastChapter": "[property=\"og:novel:latest_chapter_name\"]@content##[\\(（【].*?[求更谢乐发订合补加].*?[】）\\)]",
+    "name": "[property=\"og:novel:book_name\"]@content",
+    "tocUrl": "text.进入目录@href"
+  },
+  "ruleContent": {
+    "content": "<js>\nurl=\"https:\"+result.match(/initTxt\\(\"([^\"]+)\",\"[^\"]+\"\\)/)[1];\nr=String(java.ajax(url).match(/_txt_call\\(([\\s\\S]+\\})\\)/)[1]);\nvar r = eval('(' + r + ')');\n\t\t\t\tif(r.content!=null){\t\t\t\t\n      var e = r.replace;\n\t\t\t\tfor (var n in e) {\n\t\t\t\t\tvar i = new RegExp(e[n], \"ig\");\n\t\t\t\t\tr.content = r.content.replace(i, n)\n\t\t\t\t}\n\t\t\t\tresult=r.content\n\t\t\t\t\t}else{result=\"章节加载失败，或者内容正在手打中，请【收藏本站】稍后访问或者联系管理员更新~\"}\n</js>"
+  },
+  "ruleExplore": {
+    "author": "a.2@text",
+    "bookList": ".CGsectionTwo-right-content-unit",
+    "bookUrl": "a.0@href",
+    "intro": "p.2@text",
+    "kind": ".tag@text&&p.3@text##.*更新\\s|\\s..:.*",
+    "lastChapter": "p.1@text##.*\\/\\s|[\\(（【].*?[求更谢乐发订合补加].*?[】）\\)]",
+    "name": "a.0@text"
+  },
+  "ruleSearch": {
+    "author": "a.1@text",
+    "bookList": ".search-card",
+    "bookUrl": "a.0@href",
+    "intro": ".sc-content@text",
+    "kind": ".gray@text&&.sc-time span.1@text##\\[|\\]|\\(|\\)|\\s.*",
+    "lastChapter": ".sc-time span.0@text##[\\(（【].*?[求更谢乐发订合补加].*?[】）\\)]",
+    "name": "a.0@text"
+  },
+  "ruleToc": {
+    "chapterList": ".BGsectionThree-content li a",
+    "chapterName": "text##[\\(（【].*?[求更谢乐发订合补加].*?[】）\\)]",
+    "chapterUrl": "href##$##,{\"webView\": true}",
+    "nextTocUrl": "text.下页@href"
+  },
+  "searchUrl": "/search/,{\n  \"method\": \"POST\",\n  \"body\": \"keyword={{key}}\"\n}",
+  "weight": 0,
+  "sourceId": "corpus-1a68d18d4870"
+}

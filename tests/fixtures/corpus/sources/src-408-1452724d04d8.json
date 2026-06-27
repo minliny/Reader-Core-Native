@@ -1,0 +1,61 @@
+{
+  "bookSourceComment": "// Error: 发现失效",
+  "bookSourceGroup": "正版小说 书源",
+  "bookSourceName": "九阅小说",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://api.9yread.com",
+  "customButton": false,
+  "customOrder": 409,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[{\"title\":\"免费\",\"url\":\"https://www.9yread.com/category?category=-1&words=-1&fee=0&serial=-1&sort=sale&page={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"同人\",\"url\":\"https://www.9yread.com/category?category=102400&words=-1&fee=-1&serial=-1&sort=sale&page={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"文学\",\"url\":\"https://www.9yread.com/category?category=103000&words=-1&fee=-1&serial=-1&sort=sale&page={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"古代言情\",\"url\":\"https://www.9yread.com/category?category=102000&words=-1&fee=-1&serial=-1&sort=sale&page={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"现代言情\",\"url\":\"https://www.9yread.com/category?category=102100&words=-1&fee=-1&serial=-1&sort=sale&page={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"穿越重生\",\"url\":\"https://www.9yread.com/category?category=102600&words=-1&fee=-1&serial=-1&sort=sale&page={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"幻想言情\",\"url\":\"https://www.9yread.com/category?category=102200&words=-1&fee=-1&serial=-1&sort=sale&page={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"悬疑灵异\",\"url\":\"https://www.9yread.com/category?category=102900&words=-1&fee=-1&serial=-1&sort=sale&page={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"青春校园\",\"url\":\"https://www.9yread.com/category?category=102800&words=-1&fee=-1&serial=-1&sort=sale&page={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"女尊女强\",\"url\":\"https://www.9yread.com/category?category=102700&words=-1&fee=-1&serial=-1&sort=sale&page={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"玄幻奇幻\",\"url\":\"https://www.9yread.com/category?category=202000&words=-1&fee=-1&serial=-1&sort=sale&page={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"武侠仙侠\",\"url\":\"https://www.9yread.com/category?category=202100&words=-1&fee=-1&serial=-1&sort=sale&page={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"都市娱乐\",\"url\":\"https://www.9yread.com/category?category=202200&words=-1&fee=-1&serial=-1&sort=sale&page={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"历史军事\",\"url\":\"https://www.9yread.com/category?category=202300&words=-1&fee=-1&serial=-1&sort=sale&page={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"游戏竞技\",\"url\":\"https://www.9yread.com/category?category=202400&words=-1&fee=-1&serial=-1&sort=sale&page={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"科幻灵异\",\"url\":\"https://www.9yread.com/category?category=202500&words=-1&fee=-1&serial=-1&sort=sale&page={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"同人衍生\",\"url\":\"https://www.9yread.com/category?category=202600&words=-1&fee=-1&serial=-1&sort=sale&page={{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}}]",
+  "lastUpdateTime": 1765830856292,
+  "respondTime": 182042,
+  "ruleBookInfo": {
+    "author": "data.author.name",
+    "coverUrl": "data.cover##//##https://",
+    "intro": "data.introduction",
+    "kind": "data.tags",
+    "lastChapter": "data.newestChapter.name",
+    "name": "data.name",
+    "tocUrl": "/ebook/book/{{$.data.id}}/chapter_list?fetchTotal=1&size=100&page=1",
+    "wordCount": "data.wordCount"
+  },
+  "ruleContent": {
+    "content": "data.content",
+    "title": "data.name"
+  },
+  "ruleExplore": {
+    "author": ".v-book__author@text##作者：",
+    "bookList": ".v-book",
+    "bookUrl": ".v-book__title > a@href\n##^##https://api.9yread.com/ebook",
+    "coverUrl": "img@src",
+    "intro": "p:nth-child(1)@text",
+    "kind": "热度：{{@@.float-right@text}}",
+    "name": ".v-book__title > a@text"
+  },
+  "ruleSearch": {
+    "author": "author.name",
+    "bookList": "data.books.*",
+    "bookUrl": "/ebook/book/{{$.id}}",
+    "coverUrl": "cover",
+    "intro": "introduction",
+    "kind": "tags",
+    "name": "name",
+    "wordCount": "wordCount"
+  },
+  "ruleToc": {
+    "chapterList": "data.chapters.*",
+    "chapterName": "name",
+    "chapterUrl": "/ebook/read/{{$.bookId}}/{{$.id}}?autoBuy=1",
+    "isVip": "fee",
+    "isVolume": "volume",
+    "nextTocUrl": "/ebook/book/{{$.data.chapters[0].bookId}}/chapter_list?fetchTotal=1&size=100&page={{(Number(baseUrl[baseUrl.length-1])+1)}}",
+    "updateTime": "@js:java.timeFormat({{$.updateTime}})"
+  },
+  "searchUrl": "/search/book, {\n\t\"method\": \"POST\",\n\t\"body\": \"size=20&page={{page}}&keyword={{key}}\"\n\t}",
+  "weight": 0,
+  "sourceId": "corpus-1452724d04d8"
+}

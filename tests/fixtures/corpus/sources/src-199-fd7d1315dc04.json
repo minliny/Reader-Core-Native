@@ -1,0 +1,44 @@
+{
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "歌书网吧（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://www.gashuw.com/",
+  "customButton": false,
+  "customOrder": 199,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "lastUpdateTime": 1759571020991,
+  "respondTime": 2226,
+  "ruleBookInfo": {
+    "author": "text.作者：@text",
+    "coverUrl": "img@src",
+    "intro": ".tabcontent@.tabvalue.0@text",
+    "kind": ".tabcontent@tbody@tr.0@td.0@text##类 别：",
+    "name": "text.txt下载.-2@text##txt下载",
+    "tocUrl": ".ulrow@a.0@href",
+    "wordCount": ".tabcontent@tbody@tr.0@td.1@text##字 数："
+  },
+  "ruleContent": {
+    "content": "#content@textNodes##www.gebiqu.com"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": ".odd.1@text",
+    "bookList": "#nr",
+    "bookUrl": "a.0@href",
+    "kind": ".even.-1@text",
+    "lastChapter": ".even.0@text",
+    "name": ".odd.0@text",
+    "wordCount": ".even.-2@text"
+  },
+  "ruleToc": {
+    "chapterList": "dl dd[8:]",
+    "chapterName": "a@text",
+    "chapterUrl": "a@href"
+  },
+  "searchUrl": "http://www.gashuw.com/modules/article/search.php?searchkey={{key}}",
+  "weight": 0,
+  "sourceId": "corpus-fd7d1315dc04"
+}

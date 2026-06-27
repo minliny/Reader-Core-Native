@@ -1,0 +1,50 @@
+{
+  "bookSourceComment": "// Error: failed to connect to www.zhonghuadiancang.com/199.59.149.207 (port 443) from /192.168.1.4 (port 43880) after 15000ms\n\n2024.7.25\nby墨殇",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "中华典藏（优+）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.zhonghuadiancang.com/",
+  "bookUrlPattern": "https://www.zhonghuadiancang.com/\\w+/\\d+/",
+  "customButton": false,
+  "customOrder": 65,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[{\"title\":\"古籍\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1.00}},{\"title\":\"传记\",\"url\":\"https://www.zhonghuadiancang.com/tags-9-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"笔记\",\"url\":\"https://www.zhonghuadiancang.com/tags-15-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"哲学\",\"url\":\"https://www.zhonghuadiancang.com/tags-24-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"易学\",\"url\":\"https://www.zhonghuadiancang.com/tags-26-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"史学\",\"url\":\"https://www.zhonghuadiancang.com/tags-30-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"注释\",\"url\":\"https://www.zhonghuadiancang.com/tags-37-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"文集\",\"url\":\"https://www.zhonghuadiancang.com/tags-39-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"兵书\",\"url\":\"https://www.zhonghuadiancang.com/tags-44-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"小说\",\"url\":\"https://www.zhonghuadiancang.com/tags-57-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"地方志\",\"url\":\"https://www.zhonghuadiancang.com/tags-58-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"道教\",\"url\":\"https://www.zhonghuadiancang.com/tags-60-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"蒙学\",\"url\":\"https://www.zhonghuadiancang.com/tags-64-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"诗集\",\"url\":\"https://www.zhonghuadiancang.com/tags-65-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"词集\",\"url\":\"https://www.zhonghuadiancang.com/tags-66-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"诗论\",\"url\":\"https://www.zhonghuadiancang.com/tags-67-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"占卜\",\"url\":\"https://www.zhonghuadiancang.com/tags-76-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"中医\",\"url\":\"https://www.zhonghuadiancang.com/tags-80-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"农书\",\"url\":\"https://www.zhonghuadiancang.com/tags-99-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"茶书\",\"url\":\"https://www.zhonghuadiancang.com/tags-100-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"游记\",\"url\":\"https://www.zhonghuadiancang.com/tags-118-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"植物志\",\"url\":\"https://www.zhonghuadiancang.com/tags-104-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"画论\",\"url\":\"https://www.zhonghuadiancang.com/tags-109-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"书法\",\"url\":\"https://www.zhonghuadiancang.com/tags-111-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"戏曲\",\"url\":\"https://www.zhonghuadiancang.com/tags-113-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"诗文集\",\"url\":\"https://www.zhonghuadiancang.com/tags-125-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"学术\",\"url\":\"https://www.zhonghuadiancang.com/tags-136-{{page-1}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"风云榜\",\"url\":\"https://www.zhonghuadiancang.com/top/\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1.00}},{\"title\":\"分类\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1.00}},{\"title\":\"学术杂记\",\"url\":\"https://www.zhonghuadiancang.com/xueshuzaji/<,index_{{page}}.html>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"文学艺术\",\"url\":\"https://www.zhonghuadiancang.com/wenxueyishu/<,index_{{page}}.html>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"佛学宝典\",\"url\":\"https://www.zhonghuadiancang.com/foxuebaodian/<,index_{{page}}.html>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"天文地理\",\"url\":\"https://www.zhonghuadiancang.com/tianwendili/<,index_{{page}}.html>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"玄学五术\",\"url\":\"https://www.zhonghuadiancang.com/xuanxuewushu/<,index_{{page}}.html>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"儒理哲学\",\"url\":\"https://www.zhonghuadiancang.com/rulizhexue/<,index_{{page}}.html>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"历史传记\",\"url\":\"https://www.zhonghuadiancang.com/lishizhuanji/<,index_{{page}}.html>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"诗词戏曲\",\"url\":\"https://www.zhonghuadiancang.com/shicixiqu/<,index_{{page}}.html>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"类书文集\",\"url\":\"https://www.zhonghuadiancang.com/leishuwenji/<,index_{{page}}.html>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"国学知识\",\"url\":\"https://www.zhonghuadiancang.com/guoxuezhishi/<,index_{{page}}.html>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"外国名著\",\"url\":\"https://www.zhonghuadiancang.com/waiguomingzhu/<,index_{{page}}.html>\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"日本六国史\",\"url\":\"https://www.zhonghuadiancang.com/shudan/97/\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"少年丛书\",\"url\":\"https://www.zhonghuadiancang.com/shudan/96/\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"朝鲜王朝实录\",\"url\":\"https://www.zhonghuadiancang.com/shudan/chaoxianwangchaoshilu/\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"白话二十四史\",\"url\":\"https://www.zhonghuadiancang.com/shudan/baihuaershisishi/\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"江苏省通志稿\",\"url\":\"https://www.zhonghuadiancang.com/shudan/jiangsushengtongzhigao/\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"宋元四明六志\",\"url\":\"https://www.zhonghuadiancang.com/shudan/songyuansimingliuzhi/\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"一统志\",\"url\":\"https://www.zhonghuadiancang.com/shudan/yitongzhi/\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"修真十书\",\"url\":\"https://www.zhonghuadiancang.com/shudan/xiuzhenshishu/\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}}]",
+  "lastUpdateTime": 1759384522057,
+  "respondTime": 195044,
+  "ruleBookInfo": {
+    "author": "small a@text",
+    "coverUrl": "img.1@src",
+    "intro": "🐾简介内容:{{'\\n&lrm;\\n'}}{{@@.m-summary@text}}",
+    "name": "h1@text"
+  },
+  "ruleContent": {
+    "content": "#content@html||.message@html"
+  },
+  "ruleExplore": {
+    "author": "a.1@text||.col-xs-6 col-md-2 a@text",
+    "bookList": "tbody tr||.col-xs-6||.list-group-item",
+    "bookUrl": "a@href",
+    "coverUrl": "@js:'https://s21.ax1x.com/2024/05/29/pk3AYzd.png'",
+    "name": "a.0@text||h5@text"
+  },
+  "ruleSearch": {
+    "author": "a.1@text",
+    "bookList": "tbody tr",
+    "bookUrl": "a.0@href",
+    "checkKeyWord": "论语",
+    "coverUrl": "@js:'https://s21.ax1x.com/2024/05/29/pk3AYzd.png'",
+    "intro": "p@text",
+    "name": "a.0@text"
+  },
+  "ruleToc": {
+    "chapterList": ".list-group.0@li@a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "https://www.zhonghuadiancang.com/e/search/index.php,{\n  \"body\": \"tbname=bookname&show=title,writer&tempid=1&keyboard={{key}}\",\n  \"charset\": \"UTF-8\",\n  \"method\": \"POST\"\n}",
+  "weight": 0,
+  "sourceId": "corpus-83fa15bcf038"
+}

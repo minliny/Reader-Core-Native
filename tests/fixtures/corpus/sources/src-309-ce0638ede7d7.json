@@ -1,0 +1,49 @@
+{
+  "bookSourceComment": "/*\n24.7.22梓橙修复\n*/",
+  "bookSourceGroup": "音乐 书源",
+  "bookSourceName": "五丁音乐（优+）",
+  "bookSourceType": 1,
+  "bookSourceUrl": "http://5sing.kugou.com",
+  "customButton": false,
+  "customOrder": 309,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "最新 ⇨::/yc/list?t=-1&l=&s=&p={{page}}\n原创::/yc/list?t=1&s=&p={{page}}\n⇦ 推荐::/yc/list?t=1&s=&p={{page}}\n华语::/yc/list?t=1&s=&l=华语&p={{page}}\n欧美::/yc/list?t=1&s=&l=欧美&p={{page}}\n日语::/yc/list?t=1&s=&l=日语&p={{page}}\n韩语::/yc/list?t=1&s=&l=韩语&p={{page}}\n俄语::/yc/list?t=1&s=&l=俄语&p={{page}}\n法语::/yc/list?t=1&s=&l=法语&p={{page}}\n德语::/yc/list?t=1&s=&l=德语&p={{page}}\n粤语::/yc/list?t=1&s=&l=粤语&p={{page}}\n方言::/yc/list?t=1&s=&l=方言&p={{page}}\n闽南语::/yc/list?t=1&s=&l=闽南语&p={{page}}\n西班牙语::/yc/list?t=1&s=&l=西班牙语&p={{page}}\n其它语::/yc/list?t=1&s=&l=其它&p={{page}}\n候选::/yc/list?t=2&l=&s=&p={{page}}\n传播榜::/yc/spread/more_1.shtml\n分享榜::/yc/share/more_1.shtml\n最新 ⇨::/fc/list?t=-1&l=&s=&p={{page}}\n翻唱::/fc/list?t=1&s=&p={{page}}\n⇦ 推荐::/fc/list?t=1&s=&p={{page}}\n华语::/fc/list?t=1&s=&l=华语&p={{page}}\n欧美::/fc/list?t=1&s=&l=欧美&p={{page}}\n日语::/fc/list?t=1&s=&l=日语&p={{page}}\n韩语::/fc/list?t=1&s=&l=韩语&p={{page}}\n俄语::/fc/list?t=1&s=&l=俄语&p={{page}}\n法语::/fc/list?t=1&s=&l=法语&p={{page}}\n德语::/fc/list?t=1&s=&l=德语&p={{page}}\n粤语::/fc/list?t=1&s=&l=粤语&p={{page}}\n方言::/fc/list?t=1&s=&l=方言&p={{page}}\n闽南语::/fc/list?t=1&s=&l=闽南语&p={{page}}\n西班牙语::/fc/list?t=1&s=&l=西班牙语&p={{page}}\n其它语::/fc/list?t=1&s=&l=其它&p={{page}}\n候选::/fc/list?t=2&l=&s=&p={{page}}\n传播榜::/fc/spread/more_1.shtml\n分享榜::/fc/share/more_1.shtml",
+  "header": "{\n  \"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.73 Safari/537.36\"\n}",
+  "lastUpdateTime": 1759523089501,
+  "loginUrl": "｡◕‿◕｡",
+  "respondTime": 1739,
+  "ruleBookInfo": {
+    "coverUrl": ".user_tx img@src",
+    "intro": ".view_info li@html##^##<br>"
+  },
+  "ruleContent": {
+    "content": "<js>\nvar arr = baseUrl.split('/');\nvar songtype = arr[3];\nvar songid = arr[4].split('.')[0];\n/*\nvar data = java.ajax(\"http://service.5sing.kugou.com/song/getSongUrl?version=6.6.70&songid=\" + songid + \"&songtype=\" + songtype);\ndata = JSON.parse(data).data\ndata.squrl || data.hqurl || data.lqurl;\n*/\n\t\nlet params = {\n  appid: 3146,\n  clienttime: Math.ceil(Date.now() / 1000),\n  clientver: 610850,\n  dfid: \"-\",\n  from: \"com.sing.client.player\",\n  mid: 114514,\n  songfields: \"ID,SN,SK,SW,SS,ST,SI,CT,M,S,ZQ,WO,ZC,HY,YG,CK,D,RQ,DD,E,R,RC,SG,C,CS,LV,LG,SY,UID,PT,SCSR,SC,KM5\",\n  songid: songid,\n  songtype: songtype,\n  token: \"\",\n  userfields: \"ID,NN,I,YCRQ,FCRQ\",\n  uuid: \"-\"\n}\n\nlet signstr = \"\"\nlet keys = Object.keys(params).sort()\nfor (let i = 0; i < keys.length; i++) {\n  signstr += `${keys[i]}=${params[keys[i]]}`\n}\nlet signature = java.md5Encode(\"UqgPMZpjgRZQ7s8JAuUIP5DQdo5O5NB\" + signstr + \"UqgPMZpjgRZQ7s8JAuUIP5DQdo5O5NB\")\n\nlet querys = []\nfor (let i = 0; i < keys.length; i++) {\n  querys.push(`${keys[i]}=${params[keys[i]]}`.replace(/\\,/g, \"%2c\"))\n}\nlet querystr = querys.join(\"&\") + \"&signature=\" + signature\nlet request = java.ajax(\"https://5sapi.kugou.com/song/getSongUrl?\" + querystr)\n// java.log(request)\nlet data = JSON.parse(request).data\ndata.squrl || data.squrl_backup || data.hqurl || data.hqurl_backup || data.lqurl || data.lqurl_backup\n</js>"
+  },
+  "ruleExplore": {
+    "author": ".m_z@text##音乐人：",
+    "bookList": ".lists dl",
+    "bookUrl": ".l_info@tag.a@href",
+    "coverUrl": "img@src@js:result||'http://1t.click/HNK'",
+    "kind": ".l_rq@text##^##🔥",
+    "lastChapter": ".l_time@text",
+    "name": ".l_info a@text"
+  },
+  "ruleSearch": {
+    "author": "singer@js:(String(result).split(\">\")[1] ? String(result).split(\">\")[1] : String(result).split(\">\")[0]).split(\"<\")[0]",
+    "bookList": "list",
+    "bookUrl": "songurl",
+    "coverUrl": "@js:'http://1t.click/HNK'",
+    "kind": "typeName",
+    "name": "songName@js:(String(result).split(\">\")[1] ? String(result).split(\">\")[1] : String(result).split(\">\")[0]).split(\"<\")[0]"
+  },
+  "ruleToc": {
+    "chapterList": ".view_tit",
+    "chapterName": "text"
+  },
+  "searchUrl": "http://search.5sing.kugou.com/home/json?keyword={{key}}&sort=1&page={{page}}&filter=0&type=0",
+  "weight": 0,
+  "sourceId": "corpus-ce0638ede7d7"
+}

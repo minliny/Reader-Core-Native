@@ -1,0 +1,50 @@
+{
+  "bookSourceComment": "最新测试版可用",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "阅友网络（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://goway.reader.yueyouxs.com",
+  "customButton": false,
+  "customOrder": 168,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "lastUpdateTime": 1772086778695,
+  "respondTime": 984,
+  "ruleBookInfo": {
+    "author": "authorName",
+    "coverUrl": "bookPic",
+    "init": "data.book",
+    "intro": "intro",
+    "kind": "classifyName&&classifySecondName",
+    "lastChapter": "latestChapterName&&updateTime",
+    "name": "bookName",
+    "tocUrl": "@js:\ntime=Math.round(new Date()/1000);\n\nuth=\njava.HMacHex(\"b313789b-2d2a-41ce-8982-26af5271fe7c&\"+time,\"HmacMD5\",\"snY%169j\");\n\nsign=\njava.HMacHex(\"/userCenter/getChapterListbookId={{$.id}}&chapterId=0&isAll=1&platId=2&appId=com.yueyou.adreader&channelId=pc&appVersion=3.6.4&srcChannelId=pc&time=\"+time+\"&_s=C66A42978B576873D32F0EACEBBF044D&utId=996ff65deb7fbfc9f9bdcefb6c62f4ce&deviceId=183860518871512&userId=y76498329&sex=boy&wx=0&tmpToken=\"+java.get(\"tmpToken\")+\"&st=1&uth=\"+uth,\"HmacSHA256\",\"snY%169j\");\n\n_p=java.desEncodeToBase64String(\"utId=996ff65deb7fbfc9f9bdcefb6c62f4ce&deviceId=183860518871512&userId=y76498329&sex=boy&wx=0&tmpToken=\"+java.get(\"tmpToken\")+\"&st=1&uth=\"+uth+\"&sign=\"+sign,\"snY%169j\",\"DES/ECB/PKCS5Padding\",\"\");\n\nlet option={\n\"method\": \"POST\",\n\"body\":\"tmp=\"};\n\n\"http://dl.reader.yueyouxs.com/userCenter/getChapterList?bookId={{$.id}}&chapterId=0&isAll=1&platId=2&appId=com.yueyou.adreader&channelId=pc&appVersion=3.6.4&srcChannelId=pc&time=\"+time+\"&_s=C66A42978B576873D32F0EACEBBF044D&_p=\"+java.encodeURI(_p)+\",\"+JSON.stringify(option)",
+    "wordCount": "words_desc@put:{id:$.id}"
+  },
+  "ruleContent": {
+    "content": "@js:\ntime=Math.round(new Date()/1000);\n\nuth=\njava.HMacHex(\"b313789b-2d2a-41ce-8982-26af5271fe7c&\"+time,\"HmacMD5\",\"snY%169j\");\n\nsign=\njava.HMacHex(\"/userCenter/v310/downloadChapterplatId=2&appId=com.yueyou.adreader&channelId=pc&appVersion=3.6.4&srcChannelId=pc&time=\"+time+\"&_s=C66A42978B576873D32F0EACEBBF044D&utId=996ff65deb7fbfc9f9bdcefb6c62f4ce&deviceId=183860518871512&userId=y76498329&sex=boy&wx=0&tmpToken=\"+java.get(\"tmpToken\")+\"&st=2&uth=\"+uth+\"&autoBuy=false&bookId=\"+java.get(\"id\")+\"&chapterId=\"+java.get(\"chapterId\")+\"&feeState=1&inBuyView=false&isOssed=1&ossSwitch=1&readCount=2&useSrvAutoBuy=1\",\"HmacSHA256\",\"snY%169j\");\n\n_p=java.desEncodeToBase64String(\"utId=996ff65deb7fbfc9f9bdcefb6c62f4ce&deviceId=183860518871512&userId=y76498329&sex=boy&wx=0&tmpToken=\"+java.get(\"tmpToken\")+\"&st=2&uth=\"+uth+\"&sign=\"+sign,\"snY%169j\",\"DES/ECB/PKCS5Padding\",\"\");\n\nlet option={\n\"method\": \"POST\",\n\"body\":\"readCount=2&inBuyView=false&isOssed=1&bookId={{java.get(\"id\")}}&autoBuy=false&feeState=1&useSrvAutoBuy=1&chapterId={{java.get(\"chapterId\")}}&ossSwitch=1\"};\n\nurl=\"https://dl.reader.yueyouxs.com/userCenter/v310/downloadChapter?platId=2&appId=com.yueyou.adreader&channelId=pc&appVersion=3.6.4&srcChannelId=pc&time=\"+time+\"&_s=C66A42978B576873D32F0EACEBBF044D&_p=\"+java.encodeURI(_p)+\",\"+JSON.stringify(option);\n\njava.ajax(JSON.parse(java.ajax(url)).data.contentUrl)"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "authorName",
+    "bookList": "data.list[*]",
+    "bookUrl": "@js:\ntime=Math.round(new Date()/1000);\n\nuth=\njava.HMacHex(\"b313789b-2d2a-41ce-8982-26af5271fe7c&\"+time,\"HmacMD5\",\"snY%169j\");\n\nsign=\njava.HMacHex(\"/goway/goread/app/book/detailplatId=2&appId=com.yueyou.adreader&channelId=pc&appVersion=3.6.4&srcChannelId=pc&time=\"+time+\"&_s=C66A42978B576873D32F0EACEBBF044D&utId=996ff65deb7fbfc9f9bdcefb6c62f4ce&deviceId=183860518871512&userId=y76498329&sex=boy&wx=0&tmpToken=\"+java.get(\"tmpToken\")+\"&st=2&uth=\"+uth+\"&bookId={{$.id}}&trace=33_33-10-1x0_40_40-4-11x{{$.id}}%3Ftype%3Dbook%26sortValue%3D%26pos%3D2\",\"HmacSHA256\",\"snY%169j\");\n\n_p=java.desEncodeToBase64String(\"utId=996ff65deb7fbfc9f9bdcefb6c62f4ce&deviceId=183860518871512&userId=y76498329&sex=boy&wx=0&tmpToken=\"+java.get(\"tmpToken\")+\"&st=2&uth=\"+uth+\"&sign=\"+sign,\"snY%169j\",\"DES/ECB/PKCS5Padding\",\"\");\n\nlet option={\n\"method\": \"POST\",\n\"body\":\"trace=33_33-10-1x0_40_40-4-11x{{$.id}}%253Ftype%253Dbook%2526sortValue%253D%2526pos%253D2&bookId={{$.id}}\"};\n\n\"/goway/goread/app/book/detail?platId=2&appId=com.yueyou.adreader&channelId=pc&appVersion=3.6.4&srcChannelId=pc&time=\"+time+\"&_s=C66A42978B576873D32F0EACEBBF044D&_p=\"+java.encodeURI(_p)+\",\"+JSON.stringify(option)\n",
+    "coverUrl": "bookPic",
+    "intro": "intro@js:String(result).match(/[^\\x00-\\xff]+/g).join(\"\")",
+    "kind": "tag@js:String(result).match(/[^\\x00-\\xff]+/g).join(\"\")",
+    "name": "bookName@js:String(result).match(/[^\\x00-\\xff]+/g).join(\"\")",
+    "wordCount": "words"
+  },
+  "ruleToc": {
+    "chapterList": "data[*]",
+    "chapterName": "chapterName",
+    "chapterUrl": "chapterId@put:{chapterId:$.chapterId}",
+    "isVip": "vip",
+    "updateTime": "{{$.chapterWord}} 字"
+  },
+  "searchUrl": "@js:\ntime=Math.round(new Date()/1000);\n\nuth=\njava.HMacHex(\"b313789b-2d2a-41ce-8982-26af5271fe7c&\"+time,\"HmacMD5\",\"snY%169j\");\n    \t\ntmpToken=java.randomUUID().toString().replace(\"-\", \"\").toLowerCase();\njava.put(\"tmpToken\",tmpToken);\n\nsign=\njava.HMacHex(\"/goway/goread/app/search/getBookByKeywordplatId=2&appId=com.yueyou.adreader&channelId=pc&appVersion=3.6.4&srcChannelId=pc&time=\"+time+\"&_s=C66A42978B576873D32F0EACEBBF044D&utId=996ff65deb7fbfc9f9bdcefb6c62f4ce&deviceId=183860518871512&userId=y76498329&sex=boy&wx=0&tmpToken=\"+tmpToken+\"&st=2&uth=\"+uth+\"&keyword=\"+key+\"&page=1&psize=20&withRecommend=1\",\"HmacSHA256\",\"snY%169j\");\n\n_p=java.desEncodeToBase64String(\"utId=996ff65deb7fbfc9f9bdcefb6c62f4ce&deviceId=183860518871512&userId=y76498329&sex=boy&wx=0&tmpToken=\"+tmpToken+\"&st=2&uth=\"+uth+\"&sign=\"+sign,\"snY%169j\",\"DES/ECB/PKCS5Padding\",\"\");\n\nlet option={\n\"method\": \"POST\",\n\"body\": \"psize=20&page=1&withRecommend=1&keyword={{key}}\"};\n\n\"/goway/goread/app/search/getBookByKeyword?platId=2&appId=com.yueyou.adreader&channelId=pc&appVersion=3.6.4&srcChannelId=pc&time=\"+time+\"&_s=C66A42978B576873D32F0EACEBBF044D&_p=\"+java.encodeURI(_p)+\",\"+JSON.stringify(option)",
+  "weight": 0,
+  "sourceId": "corpus-c0f6dc0d8679"
+}

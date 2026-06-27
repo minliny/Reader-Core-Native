@@ -1,0 +1,55 @@
+{
+  "bookSourceComment": "需登录\n\n自己更改【发现地址规则】里的路径（一直到放小说的文件夹）\n\n名称::https://pan.baidu.com/api/list?order=time&desc=1&showempty=0&web=1&page={{page}}&num=100&dir={{encodeURIComponent('路径')}}&channel=chunlei&web=1&clienttype=0\n\n书比较大的话，看网速",
+  "bookSourceGroup": "特殊 书源",
+  "bookSourceName": "百度网盘（优++）",
+  "bookSourceType": 3,
+  "bookSourceUrl": "https://pan.baidu.com",
+  "customButton": false,
+  "customOrder": 323,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "小说文件夹::https://pan.baidu.com/api/list?order=time&desc=1&showempty=0&web=1&page={{page}}&num=100&dir={{encodeURIComponent('/我的资源/关于小说漫画的一些东西/小说')}}&channel=chunlei&web=1&clienttype=0",
+  "jsLib": "function get1(url, header,_) {\n\t   const \t{cookie,java} = _||this;\n    let html1 = java.get(url,header).body();\n    return JSON.parse(html1);\n}\n\nfunction jiexi(path,size){\nconst \t{cookie,java} = this;\nlet cookie1 = cookie.getCookie(\"https://pan.baidu.com\");\nlet pc_ua = \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36\";\nlet ua3 = \"netdisk;P2SP;2.2.91.136;android-android;\";\nlet header1 = {\n    \"User-Agent\": pc_ua,\n    \"Cookie\": cookie1\n};\nlet header = Object.assign({}, header1, {\"User-Agent\": ua3});\n        let html1 = get1(\"https://d.pcs.baidu.com/rest/2.0/pcs/file?app_id=250528&method=locatedownload&path=\"+encodeURIComponent(path)+\"&use=1\", header,this);       \n        let url = html1.urls[0].url;\n        if (size < 52428800) {\n            return {url: url, header: header1};\n        } else {\n            return {url: url, header: header};\n        }\n    }",
+  "lastUpdateTime": 1759589595580,
+  "loginUrl": "https://pan.baidu.com",
+  "respondTime": 180000,
+  "ruleBookInfo": {
+    "canReName": "1",
+    "downloadUrls": "$.info[0].picdocpreview\n<js>\nif(java.getString(\"$.info[*].isdir\")==0){\nlet a = String(java.getString(\"$.info[*].real_category\"));\nif(/txt/i.test(a)){\ntype = {\n\ttype:String(a)\n\t}\nb = result[0]+\",\"+JSON.stringify(type);\n}else{\n\tlet path = java.getString(\"$.info[*].path\");\n\tlet size = Number(String(java.getString(\"$.info[*].size\")));\n\tlet url = jiexi(path,size);\n\tresult = url.url+\",\"+JSON.stringify({\n\t\theaders:url.header,\n\t\ttype:a\n\t\t})\n\t}\n}else{\n\tresult = 'data:url;base64,,{\"type\":\"\"}'\n\t}\n</js>",
+    "intro": "<js>\nif(java.getString(\"$.info[*].isdir\")==1){\nresult = \"复制文件夹地址至发现地址规则\\n&lrm;\\n\";\nresult += `${java.getString(\"$.info[*].server_filename\")}::https://pan.baidu.com/api/list?order=time&desc=1&showempty=0&web=1&page={\\{page}}&num=100&dir={\\{encodeURIComponent('${java.getString(\"$.info[*].path\")}')}}&channel=chunlei&web=1&clienttype=0`\n}\n</js>",
+    "kind": "$.info[*].real_category##.*\\.",
+    "name": "$.info[*].server_filename@put:{text:$.info[0].server_filename}##\\.[\\a-z]+",
+    "tocUrl": "$..picdocpreview"
+  },
+  "ruleContent": {
+    "content": "all"
+  },
+  "ruleExplore": {
+    "bookList": "$.list[*]",
+    "bookUrl": "<js>\npath=decodeURIComponent(baseUrl.match(/dir=(.*?)&/)[1])\nname=\"/{{$.server_filename}}\";\nall=encodeURIComponent('[\"'+path+name+'\"]');\nresult=\"https://pan.baidu.com/api/filemetas?target=\"+all+\"&text=1&channel=chunlei&web=1&clienttype=0\"\n</js>",
+    "coverUrl": "$..thumbs.url3",
+    "kind": "<js>\nnum=\"{{$.size}}\".match(/\\d+/)[0];\nString(Number(num)/1024).match(/(\\d+\\.\\d{0,2})/)[1]+\"Kb\"\n</js>",
+    "lastChapter": "<js>java.timeFormat(\"{{$.server_ctime}}000\")</js>",
+    "name": "$.server_filename",
+    "wordCount": "{{java.getString(\"$.isdir\")==1?\"文件夹\":\"\"}}{{$.server_filename##.*\\.([a-zA-Z]+)##$1###}}"
+  },
+  "ruleSearch": {
+    "bookList": "$.list[*]",
+    "bookUrl": "<js>\nname=\"{{$.path}}\";\nall=encodeURIComponent('[\"'+name+'\"]');\nresult=\"https://pan.baidu.com/api/filemetas?target=\"+all+\"&text=1&channel=chunlei&web=1&clienttype=0\"\n</js>",
+    "coverUrl": "$..thumbs.url3",
+    "kind": "<js>\nnum=\"{{$.size}}\".match(/\\d+/)[0];\nString(Number(num)/1024).match(/(\\d+\\.\\d{0,2})/)[1]+\"Kb\"\n</js>",
+    "lastChapter": "<js>java.timeFormat(\"{{$.server_ctime}}000\")</js>",
+    "name": "$.server_filename",
+    "wordCount": "{{java.getString(\"$.isdir\")==1?\"文件夹\":\"\"}}{{$.server_filename##.*\\.([a-zA-Z]+)##$1###}}"
+  },
+  "ruleToc": {
+    "chapterList": "<js>\n'<a href=\"'+baseUrl+'\">'+book.name+'</a>'\n</js>\ntag.a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "https://pan.baidu.com/api/search?clienttype=0&order=time&desc=1&num=100&page={{page}}&recursion=1&key={{key}}",
+  "weight": 0,
+  "sourceId": "corpus-13b6579e9a21"
+}

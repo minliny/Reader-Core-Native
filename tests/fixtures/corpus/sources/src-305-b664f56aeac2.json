@@ -1,0 +1,41 @@
+{
+  "bookSourceComment": "可能是正版",
+  "bookSourceGroup": "听书 书源",
+  "bookSourceName": "漫播听书（优）",
+  "bookSourceType": 1,
+  "bookSourceUrl": "https://api.kilamanbo.com",
+  "customButton": false,
+  "customOrder": 305,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "header": "{\n\"ua\":\"appid=12\",\n\"_c\":\"20\",\n\"appId\":\"12\",\n\"User-Agent\": \"okhttp/4.9.0\"\n\t\t}",
+  "lastUpdateTime": 1759580643789,
+  "loginUi": "[\n    {\n        name: \"手机号\",\n        type: \"text\"\n    },   \n     {\n        name: \"验证码\",\n        type: \"text\"\n    },\n    {\n        name: \"获取验证码\",\n        type: \"button\",\n        action: \"getVerificationCode()\"\n    }\n]",
+  "loginUrl": "<js>\nfunction getVerificationCode(){\n\tphone = result.get(\"手机号\")\nphoneCrypto = java.createSymmetricCrypto(\"AES/CBC/Pkcs5Padding\", \"c98be79a4347bc97\", \"93x0ue23c2c9h8km\").encryptBase64(phone);\nsendUrl = \"https://api.kilamanbo.com/api/v476/user/sendValidateCode\";\nsignSend = java.md5Encode(\"nJi9o;/bizType=0&mobile=\"+phoneCrypto+\"&source=86\");\n\nsendBody = \"mobile=\"+java.encodeURI(phoneCrypto)+\"&bizType=0&source=86&sign=\"+signSend;\nsendBodyPost = {\n\t\"method\":\"POST\",\n\t\"body\":String(sendBody),\n\t\"headers\":{\n\t\t\"ua\":\"appid=12\",\n\"_c\":\"20\",\n\"appId\":\"12\",\n\"User-Agent\": \"okhttp/4.9.0\"\n\t\t}\n\t}\nsendUrl = sendUrl+\",\"+JSON.stringify(sendBodyPost);\njava.toast(JSON.parse(java.ajax(sendUrl)).h.msg);\n\n\t}\n\nfunction login(){\n\nphone = source.getLoginInfoMap().get(\"手机号\");\ncode = source.getLoginInfoMap().get(\"验证码\");\nphoneCrypto = java.createSymmetricCrypto(\"AES/CBC/Pkcs5Padding\", \"c98be79a4347bc97\", \"93x0ue23c2c9h8km\").encryptBase64(phone);\ncodeUrl = \"https://api.kilamanbo.com/api/v476/user/cellPhoneLogin\";\n\nsignCode = java.md5Encode(\"nJi9o;/code=\"+code+\"&mobile=\"+phoneCrypto+\"&source=86\");\n\ncodeBody = \"mobile=\"+java.encodeURI(phoneCrypto)+\"&code=\"+code+\"&source=86&sign=\"+signCode;\n\ntoken = java.post(codeUrl,codeBody,{\"ua\":\"appid=12\",\"_c\":\"20\",\"appId\":\"12\",\"User-Agent\": \"okhttp/4.9.0\"}).header(\"x-auth-token\");\n\nheader = {\n\t\"x-auth-token\":String(token)\n\t}\nsource.putLoginHeader(JSON.stringify(header))\n\t\n}\n</js>",
+  "respondTime": 815,
+  "ruleBookInfo": {},
+  "ruleContent": {},
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "CV:{{$..cvNameStr}}##^CV:$",
+    "bookList": "$.b.searchStructureNewRespList[0].timelineItemResp[*]",
+    "bookUrl": "https://api.kilamanbo.com/api/v476/radio/drama/set/simple/list?radioDramaId={{$..radioDramaId}}&isFilter=0",
+    "coverUrl": "$.radioDramaResp.coverPic",
+    "intro": "$.radioDramaResp.desc",
+    "kind": "{{$..categoryLabels[*].name}},{{java.getString(\"$..vipFree\")==\"1\"?\"会员免费\":(java.getString(\"$..price\")==\"0\"?\"免费\":\"付费\")}}",
+    "lastChapter": "$..lastSetTitle",
+    "name": "$.radioDramaResp.title",
+    "wordCount": "{{java.getString(\"$..endStatus\")==\"0\"?\"连载中\":\"已完结\"}}"
+  },
+  "ruleToc": {
+    "chapterList": "$..radioDramaSetList[*]||$..setRespList[*]",
+    "chapterName": "$.setTitle",
+    "chapterUrl": "$.setAudioUrl||$.setLrcUrl",
+    "updateTime": "$.desc"
+  },
+  "searchUrl": "https://api.kilamanbo.com/api/v476/search/page/content/new?type=5&keyWord={{key}}&pageNo={{page}}&pageSize=20",
+  "weight": 0,
+  "sourceId": "corpus-b664f56aeac2"
+}

@@ -1,0 +1,47 @@
+{
+  "bookSourceComment": "需要魔法",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "熊猫文学（优+）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.dxmwx.org",
+  "customButton": false,
+  "customOrder": 88,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "玄幻::/list/topall_玄幻_{{page}}.html\n奇幻::/list/topall_奇幻_{{page}}.html\n武侠::/list/topall_武侠_{{page}}.html\n仙侠::/list/topall_仙侠_{{page}}.html\n都市::/list/topall_都市_{{page}}.html\n言情::/list/topall_言情_{{page}}.html\n军事::/list/topall_军事_{{page}}.html\n历史::/list/topall_历史_{{page}}.html\n科幻::/list/topall_科幻_{{page}}.html\n悬疑::/list/topall_悬疑_{{page}}.html\n女生::/list/topmm__{{page}}.html\n完本::/list/topend__{{page}}.html\n新书榜::/list/topnew__{{page}}.html\n更新榜::/list/topupdate__{{page}}.html\n月点击::/list/topmonth__{{page}}.html\n周点击::/list/topweek__{{page}}.html\n日点击::/list/topday__{{page}}.html",
+  "lastUpdateTime": 1766313979857,
+  "respondTime": 5773,
+  "ruleBookInfo": {
+    "author": "//meta[@property='og:novel:author']/@content",
+    "coverUrl": "//meta[@property='og:image']/@content",
+    "intro": "//meta[@property='og:description']/@content",
+    "kind": "//meta[@property='og:novel:category']/@content",
+    "lastChapter": "//meta[@property='og:novel:latest_chapter_name']/@content",
+    "name": "//meta[@property='og:novel:book_name']/@content",
+    "tocUrl": "@css:a[href^='/chapter/']@href"
+  },
+  "ruleContent": {
+    "content": "id.Lab_Contents.0@html"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "class.margin0h5.0@tag.a.1@text",
+    "bookList": "@css:#ListContents>div[style*='margin']",
+    "bookUrl": "class.margin0h5.0@tag.a.0@href",
+    "coverUrl": "tag.img.0@src",
+    "intro": "class.neirongh5.0@tag.a.0@text",
+    "kind": "class.biaoqian.0@tag.a.0@text",
+    "lastChapter": "@css:a[href='javascript:void(0)']@textNodes",
+    "name": "class.margin0h5.0@tag.a.0@text"
+  },
+  "ruleToc": {
+    "chapterList": "@css:a[href^='/read/']:not([title])",
+    "chapterName": "text",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "/list/{{key}}.html",
+  "weight": 0,
+  "sourceId": "corpus-aa07f92424df"
+}

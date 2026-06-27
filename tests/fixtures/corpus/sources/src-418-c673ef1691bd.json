@@ -1,0 +1,50 @@
+{
+  "bookSourceComment": "黑岩阅读\nhttps://www.heiyan.com\nhttps://search.heiyan.com\n若夏网\nhttp://www.ruoxia.com/\nhttp://search.ruoxia.com\n若初网\nhttp://search.ruochu.com",
+  "bookSourceGroup": "正版小说 书源",
+  "bookSourceName": "若初文学",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://search.ruochu.com",
+  "customButton": false,
+  "customOrder": 419,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "                       黑岩阅读                       ::\n全部小说::https://www.heiyan.com/web/all/-1/-1/-1/-1/0/{{page}}/100\n免费小说::https://www.heiyan.com/web/all/-1/-1/1/-1/0/{{page}}/100\n收费小说::https://www.heiyan.com/web/all/-1/-1/0/-1/0/{{page}}/100\n完结小说::https://www.heiyan.com/web/all/-1/-1/-1/1/0/{{page}}/100\n连载小说::https://www.heiyan.com/web/all/-1/-1/-1/0/0/{{page}}/100\n悬疑全部::https://www.heiyan.com/web/all/1/-1/-1/-1/0/{{page}}/100\n悬疑免费::https://www.heiyan.com/web/all/1/-1/1/-1/0/{{page}}/100\n悬疑收费::https://www.heiyan.com/web/all/1/-1/0/-1/0/{{page}}/100\n悬疑完结::https://www.heiyan.com/web/all/1/-1/-1/1/0/{{page}}/100\n悬疑连载::https://www.heiyan.com/web/all/1/-1/-1/0/0/{{page}}/100\n历史全部::https://www.heiyan.com/web/all/3/-1/-1/-1/0/{{page}}/100\n历史免费::https://www.heiyan.com/web/all/3/-1/1/-1/0/{{page}}/100\n历史收费::https://www.heiyan.com/web/all/3/-1/0/-1/0/{{page}}/100\n历史完结::https://www.heiyan.com/web/all/3/-1/-1/1/0/{{page}}/100\n历史连载::https://www.heiyan.com/web/all/3/-1/-1/0/0/{{page}}/100\n军事全部::https://www.heiyan.com/web/all/5/-1/-1/-1/0/{{page}}/100\n军事免费::https://www.heiyan.com/web/all/5/-1/1/-1/0/{{page}}/100\n军事收费::https://www.heiyan.com/web/all/5/-1/0/-1/0/{{page}}/100\n军事完结::https://www.heiyan.com/web/all/5/-1/-1/1/0/{{page}}/100\n军事连载::https://www.heiyan.com/web/all/5/-1/-1/0/0/{{page}}/100\n玄幻全部::https://www.heiyan.com/web/all/6/-1/-1/-1/0/{{page}}/100\n玄幻免费::https://www.heiyan.com/web/all/6/-1/1/-1/0/{{page}}/100\n玄幻收费::https://www.heiyan.com/web/all/6/-1/0/-1/0/{{page}}/100\n玄幻完结::https://www.heiyan.com/web/all/6/-1/-1/1/0/{{page}}/100\n玄幻连载::https://www.heiyan.com/web/all/6/-1/-1/0/0/{{page}}/100\n奇幻全部::https://www.heiyan.com/web/all/14/-1/-1/-1/0/{{page}}/100\n奇幻免费::https://www.heiyan.com/web/all/14/-1/1/-1/0/{{page}}/100\n奇幻收费::https://www.heiyan.com/web/all/14/-1/0/-1/0/{{page}}/100\n奇幻完结::https://www.heiyan.com/web/all/14/-1/-1/1/0/{{page}}/100\n奇幻连载::https://www.heiyan.com/web/all/14/-1/-1/0/0/{{page}}/100\n仙侠全部::https://www.heiyan.com/web/all/7/-1/-1/-1/0/{{page}}/100\n仙侠免费::https://www.heiyan.com/web/all/7/-1/1/-1/0/{{page}}/100\n仙侠收费::https://www.heiyan.com/web/all/7/-1/0/-1/0/{{page}}/100\n仙侠完结::https://www.heiyan.com/web/all/7/-1/-1/1/0/{{page}}/100\n仙侠连载::https://www.heiyan.com/web/all/7/-1/-1/0/0/{{page}}/100\n武侠全部::https://www.heiyan.com/web/all/8/-1/-1/-1/0/{{page}}/100\n武侠免费::https://www.heiyan.com/web/all/8/-1/1/-1/0/{{page}}/100\n武侠收费::https://www.heiyan.com/web/all/8/-1/0/-1/0/{{page}}/100\n武侠完结::https://www.heiyan.com/web/all/8/-1/-1/1/0/{{page}}/100\n武侠连载::https://www.heiyan.com/web/all/8/-1/-1/0/0/{{page}}/100\n科幻全部::https://www.heiyan.com/web/all/10/-1/-1/-1/0/{{page}}/100\n科幻免费::https://www.heiyan.com/web/all/10/-1/1/-1/0/{{page}}/100\n科幻收费::https://www.heiyan.com/web/all/10/-1/0/-1/0/{{page}}/100\n科幻完结::https://www.heiyan.com/web/all/10/-1/-1/1/0/{{page}}/100\n科幻连载::https://www.heiyan.com/web/all/10/-1/-1/0/0/{{page}}/100\n游戏全部::https://www.heiyan.com/web/all/9/-1/-1/-1/0/{{page}}/100\n游戏免费::https://www.heiyan.com/web/all/9/-1/1/-1/0/{{page}}/100\n游戏收费::https://www.heiyan.com/web/all/9/-1/0/-1/0/{{page}}/100\n游戏完结::https://www.heiyan.com/web/all/9/-1/-1/1/0/{{page}}/100\n游戏连载::https://www.heiyan.com/web/all/9/-1/-1/0/0/{{page}}/100\n同人全部::https://www.heiyan.com/web/all/16/-1/-1/-1/0/{{page}}/100\n同人免费::https://www.heiyan.com/web/all/16/-1/1/-1/0/{{page}}/100\n同人收费::https://www.heiyan.com/web/all/16/-1/0/-1/0/{{page}}/100\n同人完结::https://www.heiyan.com/web/all/16/-1/-1/1/0/{{page}}/100\n同人连载::https://www.heiyan.com/web/all/16/-1/-1/0/0/{{page}}/100\n社会全部::https://www.heiyan.com/web/all/25/-1/-1/-1/0/{{page}}/100\n社会免费::https://www.heiyan.com/web/all/25/-1/1/-1/0/{{page}}/100\n社会收费::https://www.heiyan.com/web/all/25/-1/0/-1/0/{{page}}/100\n社会完结::https://www.heiyan.com/web/all/25/-1/-1/1/0/{{page}}/100\n社会连载::https://www.heiyan.com/web/all/25/-1/-1/0/0/{{page}}/100\n古言全部::https://www.heiyan.com/web/all/37/-1/-1/-1/0/{{page}}/100\n古言免费::https://www.heiyan.com/web/all/37/-1/1/-1/0/{{page}}/100\n古言收费::https://www.heiyan.com/web/all/37/-1/0/-1/0/{{page}}/100\n古言完结::https://www.heiyan.com/web/all/37/-1/-1/1/0/{{page}}/100\n古言连载::https://www.heiyan.com/web/all/37/-1/-1/0/0/{{page}}/100\n                       若初文学                       ::\n短篇::http://search.ruochu.com/web/all?sort=110&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0\n婚恋::http://search.ruochu.com/web/all?sort=35&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0\n都市::http://search.ruochu.com/web/all?sort=4&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0\n职场::http://search.ruochu.com/web/all?sort=11&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0\n豪门::http://search.ruochu.com/web/all?sort=12&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0\n总裁::http://search.ruochu.com/web/all?sort=13&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0\n架空::http://search.ruochu.com/web/all?sort=15&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0\n穿越::http://search.ruochu.com/web/all?sort=17&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0\n宫斗::http://search.ruochu.com/web/all?sort=19&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0\n宅斗::http://search.ruochu.com/web/all?sort=20&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0\n青春::http://search.ruochu.com/web/all?sort=21&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0\n仙侠::http://search.ruochu.com/web/all?sort=7&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0\n灵异::http://search.ruochu.com/web/all?sort=24&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0\n修真::http://search.ruochu.com/web/all?sort=22&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0\n玄幻::http://search.ruochu.com/web/all?sort=6&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0\n悬疑::http://search.ruochu.com/web/all?sort=1&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0\n武侠::http://search.ruochu.com/web/all?sort=8&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0\n历史::http://search.ruochu.com/web/all?sort=3&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0\n纯爱::http://search.ruochu.com/web/all?sort=23&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0\n作女::http://search.ruochu.com/web/all?sort=46&words=-1&free=&finish=&order=0&page={{page}}&size=100&solicitingid=0",
+  "lastUpdateTime": 1759351820879,
+  "loginUrl": "{\n  \"url\": \"\"\n}",
+  "respondTime": 1032,
+  "ruleBookInfo": {
+    "author": "[property=\"og:novel:author\"]@content||class.author-zone column-2@.right@a@text",
+    "coverUrl": "[property=\"og:image\"]@content||class.bd column-2 bd-p@a.0@img@src<js>'https://b.heiyanimg.com/book/'+String(result).match(/\\d+/)[0]+'.jpg'</js>",
+    "intro": "id.word-break@text||//pre[@class=\"note\"]/text()||[property=\"og:description\"]@content||class.summary min-summary-height@.note.0@text",
+    "kind": "[property=\"og:novel:category\"]@content||.hd@.cate@text",
+    "lastChapter": "[property=\"og:novel:latest_chapter_name\"]@content||class.bd column-2@h4@a@text",
+    "name": "[property=\"og:novel:book_name\"]@content||.hd@h1@text",
+    "tocUrl": "text.目录@href||text.开始阅读@href",
+    "wordCount": ".words@text||.hd@.words@text"
+  },
+  "ruleContent": {
+    "content": "class.page-content@html"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": ".author.1@text||$.authorname",
+    "bookList": "id.resultDiv@tr||$.data.content",
+    "bookUrl": ".title@href||https://www.ruochu.com/book/{$.id}",
+    "coverUrl": ".title@href||$.iconUrlSmall<js>'https://b.heiyanimg.com/book/'+String(result).match(/\\d+/)[0]+'.jpg'</js>",
+    "intro": "$.introduce",
+    "kind": "$.sortname&&$.lastchaptertime",
+    "lastChapter": ".chapter@text||$.lastchaptername",
+    "name": ".title@text||$.name",
+    "wordCount": "td.3@text||$.words"
+  },
+  "ruleToc": {
+    "chapterList": "class.float-list fill-block@li",
+    "chapterName": "html@js:if(result.match(/isvip/)){\nresult=\"🔒\"+result.match(/>([^<]+)<\\/a>/)[1];\n}else{result=result.match(/>([^<]+)<\\/a>/)[1];}",
+    "chapterUrl": "a@href"
+  },
+  "searchUrl": "/web/search?queryString={{key}}&highlight=false&page=1",
+  "weight": 0,
+  "sourceId": "corpus-c673ef1691bd"
+}

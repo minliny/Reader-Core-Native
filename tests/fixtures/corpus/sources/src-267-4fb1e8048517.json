@@ -1,0 +1,45 @@
+{
+  "bookSourceComment": "// Error: 发现失效, 搜索失效",
+  "bookSourceGroup": "漫画 书源",
+  "bookSourceName": "野蛮漫画（优）",
+  "bookSourceType": 2,
+  "bookSourceUrl": "https://mhbao.colacomic.com",
+  "customButton": false,
+  "customOrder": 267,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "周一::https://yemancomic.com/update/1.html\n周二::https://yemancomic.com/update/2.html\n周三::https://yemancomic.com/update/3.html\n周四::https://yemancomic.com/update/4.html\n周五::https://yemancomic.com/update/5.html\n周六::https://yemancomic.com/update/6.html\n周日::https://yemancomic.com/update/7.html\n全部::https://yemancomic.com/comiclists/9/全部/3/{{page}}.html\n长条::https://yemancomic.com/comiclists/9/长条/3/{{page}}.html\n大女主::https://yemancomic.com/comiclists/9/大女主/3/{{page}}.html\n百合::https://yemancomic.com/comiclists/9/百合/3/{{page}}.html\n耽美::https://yemancomic.com/comiclists/9/耽美/3/{{page}}.html\n纯爱::https://yemancomic.com/comiclists/9/纯爱/3/{{page}}.html\n後宫::https://yemancomic.com/comiclists/9/後宫/3/{{page}}.html\n韩漫::https://yemancomic.com/comiclists/9/韩漫/3/{{page}}.html\n奇幻::https://yemancomic.com/comiclists/9/奇幻/3/{{page}}.html\n轻小说::https://yemancomic.com/comiclists/9/轻小说/3/{{page}}.html\n生活::https://yemancomic.com/comiclists/9/生活/3/{{page}}.html\n悬疑::https://yemancomic.com/comiclists/9/悬疑/3/{{page}}.html\n格斗::https://yemancomic.com/comiclists/9/格斗/3/{{page}}.html\n搞笑::https://yemancomic.com/comiclists/9/搞笑/3/{{page}}.html\n伪娘::https://yemancomic.com/comiclists/9/伪娘/3/{{page}}.html\n竞技::https://yemancomic.com/comiclists/9/竞技/3/{{page}}.html\n职场::https://yemancomic.com/comiclists/9/职场/3/{{page}}.html\n萌系::https://yemancomic.com/comiclists/9/萌系/3/{{page}}.html\n冒险::https://yemancomic.com/comiclists/9/冒险/3/{{page}}.html\n治愈::https://yemancomic.com/comiclists/9/治愈/3/{{page}}.html\n都市::https://yemancomic.com/comiclists/9/都市/3/{{page}}.html\n霸总::https://yemancomic.com/comiclists/9/霸总/3/{{page}}.html\n神鬼::https://yemancomic.com/comiclists/9/神鬼/3/{{page}}.html\n侦探::https://yemancomic.com/comiclists/9/侦探/3/{{page}}.html\n爱情::https://yemancomic.com/comiclists/9/爱情/3/{{page}}.html\n古风::https://yemancomic.com/comiclists/9/古风/3/{{page}}.html\n欢乐向::https://yemancomic.com/comiclists/9/欢乐向/3/{{page}}.html\n科幻::https://yemancomic.com/comiclists/9/科幻/3/{{page}}.html\n穿越::https://yemancomic.com/comiclists/9/穿越/3/{{page}}.html\n性转换::https://yemancomic.com/comiclists/9/性转换/3/{{page}}.html\n校园::https://yemancomic.com/comiclists/9/校园/3/{{page}}.html\n美食::https://yemancomic.com/comiclists/9/美食/3/{{page}}.html\n悬疑::https://yemancomic.com/comiclists/9/悬疑/3/{{page}}.html\n剧情::https://yemancomic.com/comiclists/9/剧情/3/{{page}}.html\n热血::https://yemancomic.com/comiclists/9/热血/3/{{page}}.html\n节操::https://yemancomic.com/comiclists/9/节操/3/{{page}}.html\n励志::https://yemancomic.com/comiclists/9/励志/3/{{page}}.html\n异世界::https://yemancomic.com/comiclists/9/异世界/3/{{page}}.html\n历史::https://yemancomic.com/comiclists/9/历史/3/{{page}}.html\n战争::https://yemancomic.com/comiclists/9/战争/3/{{page}}.html\n恐怖::https://yemancomic.com/comiclists/9/恐怖/3/{{page}}.html\n霸总::https://yemancomic.com/comiclists/9/霸总/3/{{page}}.html\n日漫::https://yemancomic.com/comiclists/1/%E5%85%A8%E9%83%A8/3/{{page}}.html\n港台::https://yemancomic.com/comiclists/2/%E5%85%A8%E9%83%A8/3/{{page}}.html\n美漫::https://yemancomic.com/comiclists/3/%E5%85%A8%E9%83%A8/3/{{page}}.html\n国漫::https://yemancomic.com/comiclists/4/%E5%85%A8%E9%83%A8/3/{{page}}.html\n韩漫::https://yemancomic.com/comiclists/5/%E5%85%A8%E9%83%A8/3/{{page}}.html\n未分类::https://yemancomic.com/comiclists/6/%E5%85%A8%E9%83%A8/3/{{page}}.html\n连载中::https://yemancomic.com/comiclists/9/%E5%85%A8%E9%83%A8/4/{{page}}.html\n已完结::https://yemancomic.com/comiclists/9/%E5%85%A8%E9%83%A8/1/{{page}}.html",
+  "header": "{\n  \"User-Agent\": \"Mozilla/5.0 (Linux; Android 10; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/78.0.3904.108 Mobile Safari/537.36 SearchCraft/3.6.5 (Baidu; P1 9.0)\"\n}",
+  "lastUpdateTime": 1759571891916,
+  "respondTime": 180630,
+  "ruleBookInfo": {
+    "author": "span.author@text",
+    "intro": "id.js_desc_content@text",
+    "kind": "ul.types@tag.a@text",
+    "lastChapter": "span.last-chapter@text",
+    "name": "h1.name@textNodes"
+  },
+  "ruleContent": {
+    "content": "#imgsec@img@data-src@js:\nheaders={\"headers\":{\"Referer\":baseUrl}}\n;\nresult.split(\"\\n\").map(x=>'<img src=\\\"'+x+','+JSON.stringify(headers)+'\\\">').join(\"\\n\")",
+    "imageStyle": "FULL",
+    "nextContentUrl": "@css:a[href~=(-|_)\\d+]:contains(下一页)@href"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "bookList": "li.comic-item",
+    "bookUrl": "tag.a.0@href",
+    "coverUrl": "img@src@js:\nheader={\"Referer\":\"https://yemancomic.com\"}\nheaders={\"headers\":JSON.stringify(header)}\nresult=result+','+JSON.stringify(headers)",
+    "lastChapter": "span.chapter@text",
+    "name": "p.title@text"
+  },
+  "ruleToc": {
+    "chapterList": ".chapter-list@ul@li@a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "https://yemancomic.com/search?searchkey={{key}}",
+  "weight": 0,
+  "sourceId": "corpus-4fb1e8048517"
+}

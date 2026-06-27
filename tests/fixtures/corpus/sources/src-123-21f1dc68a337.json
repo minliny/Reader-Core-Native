@@ -1,0 +1,47 @@
+{
+  "bookSourceComment": "2024年7月27日@任尚仁",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "笔下文学（优+）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.17bxwx.com/",
+  "customButton": false,
+  "customOrder": 123,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[{\"title\":\"书库\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},\n{\"title\":\"全部分类\",\"url\":\"/shuku/0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"玄幻奇幻\",\"url\":\"/shuku/0_1_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"武侠仙侠\",\"url\":\"/shuku/0_2_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"都市生活\",\"url\":\"/shuku/0_3_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"历史军事\",\"url\":\"/shuku/0_4_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"游戏竞技\",\"url\":\"/shuku/0_5_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"科幻未来\",\"url\":\"/shuku/0_6_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"恐怖悬疑\",\"url\":\"/shuku/0_7_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"其他类型\",\"url\":\"/shuku/0_8_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"古代言情\",\"url\":\"/shuku/0_9_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"现代言情\",\"url\":\"/shuku/0_10_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"幻想奇缘\",\"url\":\"/shuku/0_11_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"游戏情缘\",\"url\":\"/shuku/0_12_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"浪漫青春\",\"url\":\"/shuku/0_13_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"言情美文\",\"url\":\"/shuku/0_14_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"科幻灵异\",\"url\":\"/shuku/0_15_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"其他类型\",\"url\":\"/shuku/0_16_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"排序\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},\n{\"title\":\"默认\",\"url\":\"/shuku/0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"总点击\",\"url\":\"/shuku/allvisit_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"月点击\",\"url\":\"/shuku/monthvisit_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"周点击\",\"url\":\"/shuku/weekvisit_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"日点击\",\"url\":\"/shuku/dayvisit_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"总推荐\",\"url\":\"/shuku/allvote_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"月推荐\",\"url\":\"/shuku/monthvote_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"周推荐\",\"url\":\"/shuku/weekvote_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"日推荐\",\"url\":\"/shuku/dayvote_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"总收藏\",\"url\":\"/shuku/goodnum_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"字数\",\"url\":\"/shuku/size_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"入库\",\"url\":\"/shuku/postdate_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"状态\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},\n{\"title\":\"全部\",\"url\":\"/shuku/0_0_0_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"连载\",\"url\":\"/shuku/0_0_1_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}},\n{\"title\":\"完本\",\"url\":\"/shuku/0_0_2_{{page}}.html\",\"style\":{\"layout_flexGrow\":1}}]",
+  "lastUpdateTime": 1759574117363,
+  "respondTime": 8356,
+  "ruleBookInfo": {
+    "author": "#info p:nth-of-type(1) a@text",
+    "coverUrl": "img@src",
+    "intro": "🕰  更新时间：{{@@#info p:nth-of-type(3)@text##最后更新：}}\n📒  作品Tags：{{@@#intro p:nth-of-type(2)@text##本书关键词：}}\n📜  内容简介：\n{{@@#intro p:nth-of-type(1)@text}}##(^|[。！？……；]+[”」）】]?)##$1<br>",
+    "kind": "#intro p:nth-of-type(2)@text##本书关键词：",
+    "lastChapter": "p:nth-of-type(4) a@text",
+    "name": "h1@text"
+  },
+  "ruleContent": {
+    "content": "#content p@html##这章没有结束^.^，请点击下一页继续阅读！"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": ".book_other span@text",
+    "bookList": "dl",
+    "bookUrl": "a.0@href",
+    "checkKeyWord": "夜的命名术",
+    "coverUrl": "img@src",
+    "intro": "dd.book_des@text",
+    "kind": "span.uptime@text",
+    "lastChapter": "a.2@text",
+    "name": "a.0@title"
+  },
+  "ruleToc": {
+    "chapterList": "dd:nth-of-type(n+13) a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "@js:\n    var head={\n\"User-Agent\": \"laobai_tv/1.1.6(Mozilla/5.0 (Linux; Android 9; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/104.0.5112.97 Mobile Safari/537.36) \" ,\n    \"Referer\": \"https://www.17bxwx.com/\"\n};\nvar so=\"search.html,\";\nvar body=`searchkey=${key}`;\nvar option={\"headers\":head, \"body\":body,\"method\":\"POST\"}\nso+JSON.stringify(option)\n",
+  "weight": 60,
+  "sourceId": "corpus-21f1dc68a337"
+}

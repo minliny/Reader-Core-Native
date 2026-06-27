@@ -1,0 +1,45 @@
+{
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "古龙武侠（优+）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://m.gulongbbs.com/wuxia",
+  "customButton": false,
+  "customOrder": 68,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "lastUpdateTime": 1766456596105,
+  "loginUrl": "{\n  \"url\": \"null\"\n}",
+  "respondTime": 2304,
+  "ruleBookInfo": {
+    "author": "##作者：(.*?)&##$1###",
+    "name": "class.crumbs@tag.a.-1@text",
+    "tocUrl": "class.crumbs@tag.a.-1@href"
+  },
+  "ruleContent": {
+    "content": "id.div_content@html||class.content@html##<!--内容关联投票-->|[\\s\\S]+?敬请关注 \"古龙武侠网\" 微信公众号|.*全面支持https访问",
+    "nextContentUrl": "text.下一页@href"
+  },
+  "ruleExplore": {
+    "author": "@get:{author}@get:{author2}##武侠小说.*|侦探推理.*",
+    "bookList": "table@tr@td@put:{author:'@@tag.th.0@text',author2:'@@class.ui-pagetitle@text'}",
+    "bookUrl": "tag.a.0@href",
+    "name": "text"
+  },
+  "ruleSearch": {
+    "bookList": "class.c wrap@li",
+    "bookUrl": "tag.a.0@href",
+    "intro": "tag.p@text",
+    "lastChapter": "class.adds@text##发布时间：",
+    "name": "h5@text"
+  },
+  "ruleToc": {
+    "chapterList": "table@tr@td@a||class.list@li@a||tag.html",
+    "chapterName": "class.title@text||text",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "http://m.gulongbbs.com/index.php?m=search&c=index&a=init&typeid=1&siteid=1&q={{key}}",
+  "weight": 0,
+  "sourceId": "corpus-d08e1045a2e7"
+}

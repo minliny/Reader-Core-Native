@@ -1,0 +1,48 @@
+{
+  "bookSourceComment": "// Error: 发现目录失效\n\n作者🍟",
+  "bookSourceGroup": "漫画 书源",
+  "bookSourceName": "包子漫画（优+）",
+  "bookSourceType": 2,
+  "bookSourceUrl": "https://cn.bzmanga.com",
+  "customButton": false,
+  "customOrder": 250,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "最新上架::/list/new\n全部::/classify\n国漫::/classify?region=cn&page={{page}}\n中国::/classify?region=cn&page={{page}}\n日本::/classify?region=jp&page={{page}}\n欧美::/classify?region=en&page={{page}}\n连载中::/classify?state=serial&page={{page}}\n已完结::/classify?state=pub&page={{page}}\n都市::/classify?type=dushi&page={{page}}\n冒险::/classify?type=mouxian&page={{page}}\n热血::/classify?type=rexie&page={{page}}\n爱情::/classify?type=aiqing&page={{page}}\n恋爱::/classify?type=lianai&page={{page}}\n耽美::/classify?type=danmei&page={{page}}\n武侠::/classify?type=wuxia&page={{page}}\n格斗::/classify?type=gedou&page={{page}}\n科幻::/classify?type=kehuan&page={{page}}\n魔幻::/classify?type=mohuan&page={{page}}\n侦探::/classify?type=zhentan&page={{page}}\n推理::/classify?type=tuili&page={{page}}\n玄幻::/classify?type=xuanhuan&page={{page}}\n日常::/classify?type=richang&page={{page}}\n生活::/classify?type=shenghuo&page={{page}}\n搞笑::/classify?type=gaoxiao&page={{page}}\n校园::/classify?type=xiaoyuan&page={{page}}\n奇幻::/classify?type=qihuan&page={{page}}",
+  "lastUpdateTime": 1759430671956,
+  "respondTime": 189132,
+  "ruleBookInfo": {
+    "author": "class.comics-detail__author@text",
+    "coverUrl": "tag.amp-img.0@src##.w=.*##",
+    "intro": "class.comics-detail__desc@text",
+    "kind": "class.tag-list@text## ##,",
+    "lastChapter": "class.supporting-text@tag.a@text",
+    "name": "class.comics-detail__title@text",
+    "tocUrl": "class.comics-chapters@tag.span@href"
+  },
+  "ruleContent": {
+    "content": "class.comic-contain@img@html##cdn##mh",
+    "nextContentUrl": "class.next_chapter@text.下一页@href"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "class.tags@text",
+    "bookList": "class.comics-card",
+    "bookUrl": "tag.a@href",
+    "checkKeyWord": "非人哉",
+    "coverUrl": "tag.amp-img.0@src##.w=.*##",
+    "kind": "class.tabs cls@text",
+    "name": "class.comics-card__title@text"
+  },
+  "ruleToc": {
+    "chapterList": "class.pure-g[3,4]@class.comics-chapters__item||class.pure-g.2@class.comics-chapters__item[-1:0]",
+    "chapterName": "tag.a@text",
+    "chapterUrl": "tag.a@href##.*comic_id=(.*?)&.*chapter_slot=(.*)##https://cn.dzmanga.com/comic/chapter/$1/0_$2.html",
+    "preUpdateJs": "book.canUpdate=false"
+  },
+  "searchUrl": "/search?q={{key}}",
+  "weight": 0,
+  "sourceId": "corpus-bb44193bd3bd"
+}

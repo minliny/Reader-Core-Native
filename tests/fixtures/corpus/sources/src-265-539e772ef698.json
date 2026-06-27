@@ -1,0 +1,39 @@
+{
+  "bookSourceComment": "纯英文",
+  "bookSourceGroup": "漫画 书源",
+  "bookSourceName": "漫红漫画（优）",
+  "bookSourceType": 2,
+  "bookSourceUrl": "https://manhuaus.com/",
+  "customButton": false,
+  "customOrder": 265,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "lastUpdateTime": 1759568903372,
+  "respondTime": 2458,
+  "ruleBookInfo": {
+    "intro": "class.summary__content show-more@text",
+    "name": "class.post-title@h1@text"
+  },
+  "ruleContent": {
+    "content": "class.reading-content@class.page-break no-gaps@img@html"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "bookList": "class.c-tabs-item@class.row c-tabs-item__content",
+    "bookUrl": ".h4@a@href",
+    "checkKeyWord": "god",
+    "coverUrl": "class.col-4 col-md-2@class.tab-thumb c-image-hover@a@img@data-src",
+    "kind": "class.summary-content@text",
+    "name": ".h4@a@text"
+  },
+  "ruleToc": {
+    "chapterList": "-class.wp-manga-chapter    ",
+    "chapterName": "a@text",
+    "chapterUrl": "a@href"
+  },
+  "searchUrl": "https://manhuaus.com/?s={{key}}&post_type=wp-manga&post_type=wp-manga",
+  "weight": 0,
+  "sourceId": "corpus-539e772ef698"
+}

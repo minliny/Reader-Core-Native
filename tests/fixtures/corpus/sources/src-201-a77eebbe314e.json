@@ -1,0 +1,54 @@
+{
+  "bookSourceComment": "//by:cwjdb",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "三叉小说（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://m.xxxbiquge.info",
+  "customButton": false,
+  "customOrder": 201,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "@js:\n    java.toast(\"正在努力加载中，请稍后\");\n    \nvar sort = [];\nvar push = (title, url, type1, type2) => {\n    sort.push ({\n        title: title,\n        url: url,\n        style: {\n            layout_flexGrow: type1,\n            layout_flexBasisPercent: type2\n        }\n    });\n};\n\nvar x = [{\n        u: \"http://m.xxxbiquge.info/xclass/0/1.html\",\n        ti: \"༺ˇ»`类型分类´«ˇ༻\",\n        reb: /(\\d+)\\.html/,\n        rea: \"{{page}}.html\"\n    },\n    {\n        u: \"http://m.xxxbiquge.info/quanben.html\",\n        ti: \"༺ˇ»`全本分类´«ˇ༻\",\n        reb: /(.*)\\.html/,\n        rea: \"$1_{{page}}.html\"\n    },\n    {\n        u: \"http://m.xxxbiquge.info/ph/week.html\",\n        ti: \"༺ˇ»`周榜´«ˇ༻\",\n        reb: /(.*)\\.html/,\n        rea: \"$1_{{page}}.html\"\n    },\n    {\n        u: \"http://m.xxxbiquge.info/ph/month0.html\",\n        ti: \"༺ˇ»`月榜´«ˇ༻\",\n        reb: /(.*)\\.html/,\n        rea: \"$1_{{page}}.html\"\n    },\n    {\n        u: \"http://m.xxxbiquge.info/ph/all0.html\",\n        ti: \"༺ˇ»`总榜´«ˇ༻\",\n        reb: /(.*)\\.html/,\n        rea: \"$1_{{page}}.html\"\n    }];\n    \nx.forEach (i => {\n    var o = org.jsoup.Jsoup.parse(java.ajax(i.u));\n    var s = o.select('nav.sortChannel_nav>a');\n    push(i.ti, \"\", 1, 1);\n    s.forEach(j => {\n        var url = String (j.attr(\"href\")).replace(i.reb,i.rea);\n        push(j.text(), url, 1, 0.25)\n    })\n});\n\nJSON.stringify(sort);",
+  "lastUpdateTime": 1759571065404,
+  "respondTime": 9480,
+  "ruleBookInfo": {
+    "author": "[property$=author]@content",
+    "coverUrl": "[property$=image]@content",
+    "intro": "[property$=description]@content##(^|[。！？]+[”」）】]?)##$1<br>\n<js>result</js>##\\\\n",
+    "kind": "[property~=category|status|update_time]@content&&text.状态@text##状态：",
+    "lastChapter": "[property$=latest_chapter_name]@content##正文卷.|正文.|VIP章节.|免费章节.|VIP卷.|默认卷.|章节目录.|最新章节.|[\\(（【].*?[求更票谢乐发订合补加].*?[】）\\)]",
+    "name": "[property$=book_name]@content",
+    "tocUrl": "text.章节列表@href"
+  },
+  "ruleContent": {
+    "content": "#chaptercontent@textNodes",
+    "nextContentUrl": "text.下一页@href",
+    "replaceRegex": "##(第\\s*[零一二三四五六七八九十百千\\d]+\\s*[章节]?[、.]?\\s*|\\d+\\s*|[零一二三四五六七八九十]+\\s*)(.*?)\\s*[（(]第.*页[)）]|（本章未完.*继续阅读）|第.+卷_?|（粉嫩.*求支持！）"
+  },
+  "ruleExplore": {
+    "author": ".author a.1@text",
+    "bookList": "#main>div",
+    "bookUrl": ".detail a@href",
+    "coverUrl": "img@data-original",
+    "intro": ".review@ownText##简介[：:]|\\\\n",
+    "name": ".title@text"
+  },
+  "ruleSearch": {
+    "author": "a.2@text",
+    "bookList": ".slide-item.list1 div",
+    "bookUrl": "a.0@href",
+    "kind": "p.-1@ownText##\\|\\s*最近更新[：:]",
+    "lastChapter": "a.-1@text",
+    "name": "a p@text"
+  },
+  "ruleToc": {
+    "chapterList": "#chapterlist>p:nth-child(n+2)>a",
+    "chapterName": "text\n@js:result\n.replace(\"••\",\"\")\n.replace(/^(\\d+).第/,'第')\n.replace(/^(正文|VIP章节|最新章节)?(\\s+|_)|[\\(\\{（｛【].*[求含理更谢乐发推票盟补加字Kk\\/].*/g,'')\n.replace(/^(\\d+)[、．]第.+章/,'第$1章')\n.replace(/^(\\d+)、\\d+、/,'第$1章 ')\n.replace(/^(\\d+)、\\d+/,'第$1章')\n.replace(/^(第.+章)\\s?\\d+/,'$1')\n.replace(/^(\\d+)、/,'第$1章 ')\n.replace(/^(第.+章)\\s?第.+章/,'$1')\n.replace(/第\\s(.+)\\s章/,'第$1章')\n.replace(/.*(chapter|Chapter)\\s?(\\d+)\\s?/,'$1 $2 ')\n.replace(/\\(.+\\)/,'')\n.replace(/\\[|。/,'')\n.replace(/^(第)?([零一二两三四五六七八九十百千]+).+第/,'第')\n.replace(/第([零一二两三四五六七八九十百千]+)章/g,java.toNumChapter(result))\n##(章)([^\\s]+)(\\s·)##$1 $2$3",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "{{url=source.getKey();\ncookie.removeCookie(url)\njava.ajax(url).match(/action=\"(.+?)\"/)[1]}},{\n\"method\": \"POST\",\n\"body\": \"keyword={{key}}\"\n}",
+  "weight": 0,
+  "sourceId": "corpus-a77eebbe314e"
+}

@@ -1,0 +1,52 @@
+{
+  "bookSourceComment": "// Error: 发现失效, 搜索失效",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "白浅小说（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://m.178yhr.com",
+  "bookUrlPattern": "https?://www.178yhr.com/book_\\d+/",
+  "customButton": false,
+  "customOrder": 173,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "全部小说::/all<,-{{page}}>.html\n玄幻小说::/xuanhuan.html\n仙侠小说::/xianxia.html\n都市小说::/dushi.html\n军史小说::/junshi.html\n网游小说::/wangyou.html\n科幻小说::/kehuan.html\n灵异小说::/lingyi.html\n言情小说::/yanqing.html\n其他小说::/qita.html",
+  "header": "{\"referer\": \"{{source.getKey()}}\",\n\"x-requested-with\": \"mark.via\",\n\"accept-language\": \"zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7\",\n\"user-agent\": \"Mozilla/5.0 (Linux; Android 10; PACM00 Build/QP1A.190711.020) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.5359.79 Mobile Safari/537.36\"}",
+  "lastUpdateTime": 1766350100703,
+  "respondTime": 191756,
+  "ruleBookInfo": {
+    "author": "@get:{a}",
+    "coverUrl": "@get:{c}",
+    "init": "@put:{n:\"[property$=book_name]@content\",\na:\"[property$=author]@content\",\nk:\"[property~=category|status|update_time]@content\",\nw:\"p.booktag@span.0@text\",\nl:\"[property$=latest_chapter_name]@content\",\ni:\"p.bookintro@text\",\nc:\"[property$=image]@content\"}\n@js:java.log(baseUrl)",
+    "intro": "@get:{i}",
+    "kind": "@get:{k}",
+    "lastChapter": "@get:{l}",
+    "name": "@get:{n}",
+    "wordCount": "@get:{w}"
+  },
+  "ruleContent": {
+    "content": ".readcontent@textNodes",
+    "nextContentUrl": "text.下一页@href",
+    "replaceRegex": "##[&nb\\->>sp;]*"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": ".author.0@text##作者：",
+    "bookList": ".bookbox",
+    "bookUrl": "a.0@href\n@js:\nvar go=/go/.test(result);\ngo?result.replace('go/',\"book_\"):result;",
+    "coverUrl": "img@src",
+    "intro": ".update@textNodes",
+    "lastChapter": "a.1@text",
+    "name": "h4@text",
+    "wordCount": ".author.1@text##字数："
+  },
+  "ruleToc": {
+    "chapterList": "#list-chapterAll dd a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "{{url=source.getKey();\ncookie.removeCookie(url)}}\nhttps://www.178yhr.com/modules/article/search.php,{\n  \"body\": \"searchkey={{key}}&action=login\",\n  \"charset\": \"GBK\",\n  \"method\": \"POST\"\n}",
+  "weight": 0,
+  "sourceId": "corpus-be06289a441b"
+}

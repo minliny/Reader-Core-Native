@@ -1,0 +1,48 @@
+{
+  "bookSourceComment": "//仅支持搜索合集准确全名\n//20250224by= =\nr=org.jsoup.Jsoup.parse(java.ajax(\"https://onehu.xyz/categories/\"))\na=r.select(\".category-item\")\nname=[];\nfor(i in a){\n\tname.push(a[i].attr(\"title\"));\n}\nJSON.stringify(name)",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "我是盐神（优+）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://onehu.xyz",
+  "customButton": false,
+  "customOrder": 78,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "<js>\neval(String(source.bookSourceComment))\nfenl=[\n{\"title\": \"首页\",  \"url\": \"https://onehu.xyz<,/page/{{page}}/#board>\",  \"style\":{\"layout_flexGrow\": 0,  layout_flexBasisPercent: 0.45}},\n{\"title\": \"分类\",  \"url\": \"https://onehu.xyz/categories/\",  \"style\":{\"layout_flexGrow\": 0,  layout_flexBasisPercent: 0.45}}\n]\nb=name\nfor (i in b){\n\tx=String(b[i]);\nurl=\"https://onehu.xyz/categories/\"+x+\"/<,page/{{page}}/#board>\";\n fenl.push({title: x,url: url,style: {\n\t\tlayout_flexGrow: 1,\n\t\tlayout_flexBasisPercent: 0.5\t}})\n}\n\nJSON.stringify(fenl)\n</js>",
+  "lastUpdateTime": 1759293355937,
+  "respondTime": 3347,
+  "ruleBookInfo": {
+    "intro": "[property~=desc]@content",
+    "kind": "time@text",
+    "name": "[property$=title]@content",
+    "wordCount": ".mt-1@span.0@text##\\s字"
+  },
+  "ruleContent": {
+    "content": ".markdown-body@p@textNodes"
+  },
+  "ruleExplore": {
+    "author": ".category-chain-item@text",
+    "bookList": ".index-card||.list-group@a||.category-post-list@a",
+    "bookUrl": ".index-excerpt__noimg@href||href",
+    "intro": "div.0@text##{{book.name}}|{{book.author}}",
+    "kind": "time@text##\\r",
+    "name": "h1@a@text||.list-group-item-title@text||.list-group-item-action@title"
+  },
+  "ruleSearch": {
+    "bookList": ".list-group a",
+    "bookUrl": "href",
+    "checkKeyWord": "回答",
+    "intro": "href##\\/%",
+    "name": ".list-group-item-title@text"
+  },
+  "ruleToc": {
+    "chapterList": ".post-content||.markdown-body",
+    "chapterName": "h1@text||p.0@text",
+    "chapterUrl": "{baseUrl}"
+  },
+  "searchUrl": "https://onehu.xyz/categories/{{key}}",
+  "weight": 0,
+  "sourceId": "corpus-2e4049ae310e"
+}

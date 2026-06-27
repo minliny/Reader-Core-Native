@@ -1,0 +1,35 @@
+{
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "鸠摩搜书（导）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.jiumodiary.com#",
+  "customButton": false,
+  "customOrder": 211,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "lastUpdateTime": 1766349461783,
+  "respondTime": 7241,
+  "ruleBookInfo": {},
+  "ruleContent": {
+    "content": "@js:\n'💬点击章节链接跳转浏览器下载'+baseUrl"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "bookList": "<js>\nlist=JSON.parse(result).sources\nJson=[]\nfor(i in list){\nlist1=JSON.parse(result).sources[i].details.data;\nfor(j in list1){\nif(list1[j].title.indexOf(java.get('key'))>-1){\nJson.push(list1[j])\n}\n}\n}\nresult=JSON.stringify(Json)\n</js>\n$.[*]",
+    "bookUrl": "$.link",
+    "coverUrl": "$.img_link",
+    "intro": "$.host&&$.des&&$.title##<.*?>",
+    "kind": "$.des",
+    "name": "$.title##<.*?>|(^.{0,15})##$1###"
+  },
+  "ruleToc": {
+    "chapterList": "@js:a=[{a:'💬下载地址',b:baseUrl}]",
+    "chapterName": "a",
+    "chapterUrl": "b"
+  },
+  "searchUrl": "@js:\nurl1='https://www.jiumodiary.com/init_hubs.php,';\npost={\"method\":\"POST\",\"body\":\"q=\"+key+\"&remote_ip=&time_int=\"+Date.now()};\nid=java.ajax(url1+JSON.stringify(post)).match(/id\":\"([^\"]+)\"/)[1];\nurl='https://www.jiumodiary.com/ajax_fetch_hubs.php';\nbody='id='+id+'&set='+page;\nheader={\n\"method\": \"POST\",\n\"body\": String(body)\n}\njava.put('key',key);\nur=url+','+JSON.stringify(header);",
+  "weight": 62,
+  "sourceId": "corpus-2950b06a1dd0"
+}

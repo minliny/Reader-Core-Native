@@ -1,0 +1,50 @@
+{
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "新读小说（繁）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://m.dxs.tw/",
+  "customButton": false,
+  "customOrder": 219,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "玄幻奇幻::https://m.dxs.tw/lb-1/?page={{page}}\n武俠仙俠::https://m.dxs.tw/lb-2/?page={{page}}\n都市言情::https://m.dxs.tw/lb-3/?page={{page}}\n曆史軍事::https://m.dxs.tw/lb-4/?page={{page}}\n科幻靈異::https://m.dxs.tw/lb-5/?page={{page}}\n網遊競技::https://m.dxs.tw/lb-6/?page={{page}}\n女頻頻道::https://m.dxs.tw/lb-7/?page={{page}}\n其他類別::https://m.dxs.tw/lb-8/?page={{page}}",
+  "lastUpdateTime": 1766348972829,
+  "respondTime": 16124,
+  "ruleBookInfo": {
+    "lastChapter": "class.book-main@update@a@text"
+  },
+  "ruleContent": {
+    "content": "id.txt@html",
+    "nextContentUrl": "id.pt_next@href",
+    "replaceRegex": "##本章尚未.*|本章已.*|(?<=[\\u4e00-\\u9fa5])\\s"
+  },
+  "ruleExplore": {
+    "author": "h4@a@text",
+    "bookList": "class.sort-view-book",
+    "bookUrl": "h4@a@href",
+    "coverUrl": "class.book-img@a@img@src",
+    "intro": "class.intro@ownText",
+    "kind": "class.blue@text",
+    "name": "h4@a@text"
+  },
+  "ruleSearch": {
+    "author": "class.author@ownText",
+    "bookList": "class.sort-view-book",
+    "bookUrl": "h4@a@href",
+    "coverUrl": "class.book-img@a@img@src",
+    "intro": "class.intro@ownText",
+    "kind": "class.blue@text",
+    "name": "h4@a@text"
+  },
+  "ruleToc": {
+    "chapterList": "class.chapter-list@li",
+    "chapterName": "a@text",
+    "chapterUrl": "a@href",
+    "nextTocUrl": "class.hidden@href"
+  },
+  "searchUrl": "https://m.dxs.tw/serch.html?siteid=m.dxs.tw&q={{key}}&page={{page}}",
+  "weight": 0,
+  "sourceId": "corpus-3b0b2873ddcb"
+}

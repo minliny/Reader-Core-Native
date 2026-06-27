@@ -1,0 +1,40 @@
+{
+  "version": "sanitize-report/1",
+  "generated_at": "2026-06-27T14:08:48.433795+00:00",
+  "total_scanned": 459,
+  "total_with_sensitive": 4,
+  "entries": [
+    {
+      "file": "src-002-55dd939a661d.json",
+      "source_name": "番茄小说（优+++）",
+      "redactions": [
+        "cookie:\\s*[\\w=/+; -]+... ×1",
+        "cookie:\\s*[\\w=/+; -]+... ×1",
+        "cookie:\\s*[\\w=/+; -]+... ×2"
+      ]
+    },
+    {
+      "file": "src-029-cab248b2cb77.json",
+      "source_name": "立方体儿（优++）",
+      "redactions": [
+        "cookie:\\s*[\\w=/+; -]+... ×3"
+      ]
+    },
+    {
+      "file": "src-035-4f91019f42dd.json",
+      "source_name": "番茄小说（优++）",
+      "redactions": [
+        "cookie:\\s*[\\w=/+; -]+... ×1",
+        "cookie:\\s*[\\w=/+; -]+... ×1"
+      ]
+    },
+    {
+      "file": "src-049-5228df2c21ed.json",
+      "source_name": "番茄小说（优+）",
+      "redactions": [
+        "cookie:\\s*[\\w=/+; -]+... ×1",
+        "cookie:\\s*[\\w=/+; -]+... ×1"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "bookSourceComment": "主要是用于下载，没有办法观看。",
+  "bookSourceGroup": "影视 书源",
+  "bookSourceName": "矮贼吧网（优）",
+  "bookSourceType": 4,
+  "bookSourceUrl": "https://www.zei8.me#",
+  "customButton": false,
+  "customOrder": 285,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "lastUpdateTime": 1766914899170,
+  "respondTime": 2410,
+  "ruleBookInfo": {
+    "author": "@css:small:contains(书籍作者：)+span@text",
+    "coverUrl": "tag.img.0@src",
+    "intro": "@js:book.intro+/邪恶漫画/.test(book.kind)?'':'<br>https://www.zei8.me{{@@text.本地高速下载@href}}'",
+    "kind": "class.place@tag.a.-1@text",
+    "wordCount": "@css:small:matches(是否连载|小说大小)+span@text"
+  },
+  "ruleContent": {
+    "content": "class.content@html||text.电信高速下载@href@js:/^http:/.test(result)?'<img src=\"'+book.coverUrl+'\"/>下载链接：'+result+'<br>───────<br>'+book.intro:result"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "bookList": "class.item",
+    "bookUrl": "tag.a@href",
+    "intro": "class.intro@html",
+    "name": "tag.a@text##[^《]*《|》[^\\n]*"
+  },
+  "ruleToc": {
+    "chapterList": "text.本地高速下载||class.content",
+    "chapterName": "@js:'正文预览'",
+    "chapterUrl": "href@js:''+result?result:baseUrl"
+  },
+  "searchUrl": "e/sch/index.php?page={{page-1}}&keyboard={{key}}",
+  "weight": 0,
+  "sourceId": "corpus-a95d83130136"
+}

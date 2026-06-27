@@ -1,0 +1,55 @@
+{
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "言情港吧（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.yanqinggang.com#",
+  "customButton": false,
+  "customOrder": 148,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[{\"title\":\"玄幻奇幻\",\"url\":\" /list/1_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"武侠仙侠\",\"url\":\" /list/2_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"都市言情\",\"url\":\" /list/3_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"历史穿越\",\"url\":\" /list/4_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"网游竞技\",\"url\":\" /list/5_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"科幻灵异\",\"url\":\" /list/6_{{page}}.html\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"恐怖惊悚\",\"url\":\" /list/7_{{page}}.html\",\"style\":{\"layout_flexGrow\":0,\"layout_flexBasisPercent\":0.295}},{\"title\":\"其他类型\",\"url\":\" /list/8_{{page}}.html\",\"style\":{\"layout_flexGrow\":0,\"layout_flexBasisPercent\":0.295}}]",
+  "lastUpdateTime": 1766349556775,
+  "respondTime": 16272,
+  "ruleBookInfo": {
+    "author": "div.w100.dispc@span@a@text##本书作者：",
+    "coverUrl": "img.lazy@src",
+    "intro": "div.info-main-intro@p@text##精.*彩.*连.*载.*书.*",
+    "kind": "div.info-title@a.1@text&&.info-main@.dispc.1@textNodes&&.info-main@span.1@text##.*：",
+    "lastChapter": ".info-chapters.flex.flex-wrap.0@a.0@text",
+    "name": "h1@text",
+    "tocUrl": "java.refreshBookUrl()"
+  },
+  "ruleContent": {
+    "content": "#article@textNodes",
+    "nextContentUrl": "#next_url@href"
+  },
+  "ruleExplore": {
+    "author": "span.gray@text",
+    "bookList": "div.border3-1@div||div.border3@div",
+    "bookUrl": "span.flex@em@a@href||span.0@a@href",
+    "coverUrl": "img.lazy@src",
+    "intro": ".intro.indent@text",
+    "kind": ".w80@em.0@text||span.0@text",
+    "name": "span.flex@em@a@text||span.0@a@text"
+  },
+  "ruleSearch": {
+    "author": ".category-div@span.0@text",
+    "bookList": "class.border3.commend.flex.flex-between.category-commend@.category-div",
+    "bookUrl": "h3@a@href",
+    "checkKeyWord": "遮天",
+    "coverUrl": "img.lazy@src",
+    "intro": "div.intro.indent@text##精.*彩.*连.*载.*书.*",
+    "name": ".category-div@h3@a.0@text"
+  },
+  "ruleToc": {
+    "chapterList": "div.container.border3-2.mt8.mb20@div.info-chapters.flex.flex-wrap@a",
+    "chapterName": "text",
+    "chapterUrl": "href",
+    "isVip": "true"
+  },
+  "searchUrl": "https://www.yanqinggang.com/modules/article/search.php,{\n\t \"body\": \"searchkey={{key}}\",\n\t \"charset\": \"gbk\",\n\t \"method\": \"POST\"\n}",
+  "weight": 0,
+  "sourceId": "corpus-fd20681384e4"
+}

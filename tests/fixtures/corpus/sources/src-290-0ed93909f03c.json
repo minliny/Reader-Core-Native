@@ -1,0 +1,57 @@
+{
+  "bookSourceComment": "// Error: Timed out waiting for 60000 ms\n\n最新 order=1\n人气 order=2\n连载 order=4\n完结 order=5",
+  "bookSourceGroup": "听书 书源",
+  "bookSourceName": "水山听书（优+）",
+  "bookSourceType": 1,
+  "bookSourceUrl": "https://m.ting13.com##@遇知",
+  "customButton": false,
+  "customOrder": 290,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "@js:\nsort=[];\npush=(title,url,type1,type2)=>sort.push({\n\t\ttitle: title,\n\t\turl: url,\n\t\tstyle: {\n\t\t\t\tlayout_flexGrow: type1,\n\t\t\t\tlayout_flexBasisPercent: type2\n\t\t\t}\n\t});\n\t\nfl=[[\"玄幻修真\",\"xuanhuan\"],[\"灵异惊悚\",\"lingyi\"],[\"都市言情\",\"dushi\"],[\"军事历史\",\"junshi\"],[\"儿童故事\",\"ertong\"],[\"经典纪实\",\"jishi\"],[\"长篇评书\",\"pingshu\"],[\"相声戏曲\",\"xiangsheng\"],[\"综艺娱乐\",\"yule\"],[\"百家讲坛\",\"bjjt\"],[\"网游竞技\",\"jingji\"],[\"官场商战\",\"guanchangshangzhan\"],[\"人物传记\",\"chuanji\"],[\"通俗文学\",\"wenxue\"],[\"其他有声\",\"qita\"]];\n\n [[\"连载\",\"lastupdate\"],[\"完结\",\"over\"]].map([title,status]=>{\n\tpush('🔖分类'+title+'🔖', null, 1, 1);\n\t  fl.map(([title,uri],index)=>{\n\t    url= `/yousheng/${uri}/${status}/{{page}}.html`;\n\tif(index+1 <= fl.length - fl.length%3)\n\t\t\t {\tpush(title, url, 1, 0.25);}\n\t\t\t\telse{ push(title, url, 0, 0.29);}\n     \t\n    \t});\n\t});\n\nJSON.stringify(sort);",
+  "lastUpdateTime": 1759504723124,
+  "respondTime": 500776,
+  "ruleBookInfo": {
+    "author": ".book-rand-a.2@text",
+    "coverUrl": "[property=\"og:image\"]@content",
+    "intro": "🔔 更新时间： {{@@.book-rand-a.4@text##连载|完结}}\n📯 {{@@.book-rand-a.3@text}}\n🏷 {{@@.book-rand-a.1@text}}\n📂 内容简介：{{@@.book-des@text}}##(^|[。！？]+[”」）】]?)##$1<br>",
+    "kind": "{{@@.book-rand-a a.0@text}}\n{{@@.book-rand-a.4@text##\\s.*}}",
+    "name": "h1@text"
+  },
+  "ruleContent": {
+    "content": "<js>result</js>",
+    "sourceRegex": ".*\\.(mp3|m4a).*"
+  },
+  "ruleExplore": {
+    "author": "演播：{{@@.book-meta.1@text}}",
+    "bookList": ".book-li",
+    "bookUrl": "a.0@href",
+    "coverUrl": "img@data-original",
+    "intro": ".book-desc@text",
+    "kind": "{{@@.score@text}}\n{{@@.playCountText@text}}℃\n{{@@h4 span@text}}",
+    "lastChapter": ".book-meta.0@text",
+    "name": "h4 a.0@text"
+  },
+  "ruleSearch": {
+    "author": "{{$.author.name}}  演播：{{$.boyin.name}}",
+    "bookList": "$.data[*]",
+    "bookUrl": "$.novel.url",
+    "coverUrl": "$.novel.cover",
+    "intro": "$.novel.intro",
+    "kind": "{{$.novel.isovername}}\n{{$.data.allvisit}}℃\n{{$.novel.lasttime}}",
+    "lastChapter": "$.novel.lastname",
+    "name": "$.novel.name"
+  },
+  "ruleToc": {
+    "chapterList": ".play-list li",
+    "chapterName": "a@textNodes",
+    "chapterUrl": "a@href@js:result+',{webView:“true”}'",
+    "nextTocUrl": "option@value",
+    "updateTime": "span@text"
+  },
+  "searchUrl": "https://m.ting13.com/api/ajax/solist?word={{key}}&type=name&page={{page}}&order=1",
+  "weight": 0,
+  "sourceId": "corpus-0ed93909f03c"
+}

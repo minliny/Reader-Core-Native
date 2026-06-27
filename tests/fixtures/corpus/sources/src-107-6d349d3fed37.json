@@ -1,0 +1,42 @@
+{
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "快眼看书（优+）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://www.xbotaodz.com",
+  "customButton": false,
+  "customOrder": 107,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreScreen": "",
+  "exploreUrl": "  总点击  ::/top/allvisit/{{page}}\n  月点击  ::/top/monthvisit/{{page}}\n  周点击  ::/top/weekvisit/{{page}}\n 玄幻 ::/category/xuanhuan/\n 奇幻 ::/category/qihuan/\n 武侠 ::/category/wuxia/\n 仙侠 ::/category/xianxia\n 都市 ::/category/dushi\n 历史 ::/category/lishi\n 军事 ::/category/junshi\n 游戏 ::/category/youxi\n 竞技 ::/category/jingji\n 科幻 ::/category/kehuan\n 灵异 ::/category/lingyi\n 同人 ::/category/tongren\n 女生 ::/category/nvsheng\n 其他 ::/category/qita",
+  "lastUpdateTime": 1766339917225,
+  "respondTime": 2223,
+  "ruleBookInfo": {
+    "author": "class.novelinfo-l@tag.li.0@text##作者：",
+    "coverUrl": "class.novelinfo-r@tag.a@tag.img@src",
+    "intro": "class.novelintro@text",
+    "name": "class.w-left@tag.h1@text"
+  },
+  "ruleContent": {
+    "content": "id.chaptercontent@textNodes"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "class.info@tag.span.1@text",
+    "bookList": "class.librarylist@tag.li",
+    "bookUrl": "class.info@tag.span.0@tag.a@href",
+    "coverUrl": "class.pt-ll-l@tag.a@tag.img@src",
+    "lastChapter": "class.last@tag.a@text",
+    "name": "class.info@tag.span.0@tag.a@text"
+  },
+  "ruleToc": {
+    "chapterList": "class.fulldir@tag.ul@tag.li@tag.a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "/modules/article/search.php?searchkey={{key}}",
+  "weight": 1,
+  "sourceId": "corpus-6d349d3fed37"
+}

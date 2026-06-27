@@ -1,0 +1,47 @@
+{
+  "bookSourceComment": "// Error: 发现失效, 搜索失效\n\n//By情无羁04.20\n//首发论坛：ysqbbs.com,发布页：taoba.cf",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "我的书城（优++）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://wodushu.com",
+  "customButton": false,
+  "customOrder": 13,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[\n  {\n    \"title\": \"玄幻\",\n    \"url\": \"/fenlei/xuanhuan/{{page}}/\"\n  },\n  {\n    \"title\": \"武侠\",\n    \"url\": \"/fenlei/wuxia/{{page}}/\"\n  },\n  {\n    \"title\": \"都市\",\n    \"url\": \"/fenlei/dushi/{{page}}/\"\n  },\n  {\n    \"title\": \"历史\",\n    \"url\": \"/fenlei/lishi/{{page}}/\"\n  },\n  {\n    \"title\": \"科幻\",\n    \"url\": \"/fenlei/kehuan/{{page}}/\"\n  },\n  {\n    \"title\": \"游戏\",\n    \"url\": \"/fenlei/youxi/{{page}}/\"\n  },\n  {\n    \"title\": \"女生\",\n    \"url\": \"/fenlei/nvsheng/{{page}}/\"\n  },\n  {\n    \"title\": \"其他\",\n    \"url\": \"/fenlei/qita/{{page}}/\"\n  },\n  {\n    \"title\": \"书库\",\n    \"url\": \"/fenlei/\"\n  },\n  {\n    \"title\": \"完本小说\",\n    \"url\": \"/quanben/fenlei/\"\n  }\n]",
+  "header": "@js:\nJSON.stringify({\n\"Accept-Language\": \"zh-CN,zh;q=0.9,en;q=0.8\",\n\"Accept\": \"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7\"\n})",
+  "lastUpdateTime": 1757700853320,
+  "respondTime": 181345,
+  "ruleBookInfo": {
+    "author": "[property=\"og:novel:author\"]@content",
+    "coverUrl": "[property=\"og:image\"]@content",
+    "intro": "[property=\"og:description\"]@content",
+    "kind": "[property~=category|status|update_time]@content",
+    "lastChapter": "[property~=las?test_chapter_name]@content",
+    "name": "[property=\"og:novel:book_name\"]@content"
+  },
+  "ruleContent": {
+    "content": ".content@p@html",
+    "nextContentUrl": "text.下一页@href"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": ".s4@text",
+    "bookList": ".txt-list-row5@li!0",
+    "bookUrl": "a@href",
+    "kind": ".s1@text##\\[|\\]",
+    "lastChapter": ".s3@text",
+    "name": ".s2@text"
+  },
+  "ruleToc": {
+    "chapterList": "#chapter_list li a",
+    "chapterName": "text",
+    "chapterUrl": "href",
+    "nextTocUrl": "option@value"
+  },
+  "searchUrl": "{{cookie.removeCookie(source.key)}}https://wodushu.com/search/,{\n  \"body\": \"searchkey={{key}}&Subimt=搜索\",\n  \"method\": \"POST\"\n}",
+  "weight": 0,
+  "sourceId": "corpus-05d1c9f007ac"
+}

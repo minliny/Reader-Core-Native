@@ -1,0 +1,46 @@
+{
+  "bookSourceComment": "// Error: 需要魔法\n\n//2025.2.4 By Buding",
+  "bookSourceGroup": "漫画 书源",
+  "bookSourceName": "滴答漫画（优）",
+  "bookSourceType": 2,
+  "bookSourceUrl": "https://ddmanhua.com",
+  "customButton": false,
+  "customOrder": 264,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[\n  {\n    \"title\": \"国产漫画\",\n    \"url\": \"/category/list/page/{{page}}\"\n  },\n  {\n    \"title\": \"日本漫画\",\n    \"url\": \"/category/list/2/page/{{page}}\"\n  },\n  {\n    \"title\": \"韩国漫画\",\n    \"url\": \"/category/list/3/page/{{page}}\"\n  },\n  {\n    \"title\": \"欧美漫画\",\n    \"url\": \"/category/list/4/page{{page}}\"\n  }\n]",
+  "header": "{\n  \"User-Agent\": \"Mozilla/5.0 (Linux; Android 8.0.0; MI 5s Plus Build/OPR1.170623.032; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.0.0 Mobile Safari/537.36\"\n}",
+  "lastUpdateTime": 1759520191189,
+  "respondTime": 180323,
+  "ruleBookInfo": {
+    "author": ".product-excerpt.0@span@text",
+    "coverUrl": "img.1@src",
+    "intro": ".product-excerpt.4@span@text",
+    "kind": "{{@@.product-excerpt.1@span@text}},{{@@.product-excerpt.2@span@text}},{{@@h1@span.1@text}}分,{{@@.product-excerpt.3@span@text##\\s.*}}",
+    "name": "h1@ownText",
+    "tocUrl": "text.目录@href"
+  },
+  "ruleContent": {
+    "content": "#cp_img@html"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "bookList": ".lists-content@ul@li",
+    "bookUrl": "a@href",
+    "checkKeyWord": "辣妹与我的",
+    "coverUrl": "a@data-original",
+    "kind": "{{@@.countrie@span.1@text}},{{@@.rate@text}}分",
+    "lastChapter": ".note@text",
+    "name": "h2@text"
+  },
+  "ruleToc": {
+    "chapterList": "#myList@li@a",
+    "chapterName": "text",
+    "chapterUrl": "href##$##,{'webView': true}"
+  },
+  "searchUrl": "/index.php/search?key={{key}}",
+  "weight": 0,
+  "sourceId": "corpus-db3c810f3f56"
+}

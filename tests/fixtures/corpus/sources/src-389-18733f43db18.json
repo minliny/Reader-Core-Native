@@ -1,0 +1,41 @@
+{
+  "bookSourceComment": "\"一天一个新书源\"-20210809",
+  "bookSourceGroup": "正版小说 书源",
+  "bookSourceName": "纵横中文",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://m.zongheng.com",
+  "customButton": false,
+  "customOrder": 390,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "lastUpdateTime": 1759351871200,
+  "respondTime": 609,
+  "ruleBookInfo": {
+    "tocUrl": "baseUrl"
+  },
+  "ruleContent": {
+    "content": "class.content@html",
+    "nextContentUrl": "a.c_next:matches(下一页)@href",
+    "replaceRegex": "##（本章完）|上一页|下一章|下一页|目录|上一章|新用户7天限免，畅读全本|（本章未完，请翻页）|.*全本免费看|点击领取"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "$.authorName\n##<i class=\"red\">|</i>",
+    "bookList": "$.data.searchBooks",
+    "bookUrl": "https://m.zongheng.com/chapter/list?bookId={{$.bookId}}",
+    "coverUrl": "$.coverUrl@js:'https://static.zongheng.com/upload'+result",
+    "intro": "$.description",
+    "name": "$.bookName\n##<i class=\"red\">|</i>"
+  },
+  "ruleToc": {
+    "chapterList": "class.list_wrap@tag.ul@tag.li",
+    "chapterName": "tag.a@text",
+    "chapterUrl": "tag.a@href",
+    "isVip": "@js:result.select('em').hasClass('lock')"
+  },
+  "searchUrl": "{{cookie.removeCookie(source.getKey())}}\nhttps://m.zongheng.com/api/search,{\n\t\"headers\": {\n    \"Content-Length\": \"33\",\n    \"x-csrf-token\": \"ryhLbyZx-fDIksDerMHNcOV-1R1VyQjdtt6I\",\n    \"User-Agent\": \"Mozilla/5.0 (Linux; Android 10; SK) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36\",\n    \"Content-Type\": \"application/json;charset=UTF-8\",\n    \"Cookie\": \"acw_tc=ac11000117021098874695420ef00be0da29f2c225b352ddd0d03686a99252; _csrf=7PK69jhzLmYk92A6WJSF_4at; ZHID=4DC697CFA852ED6C54C9807962F1F745; zhffr=0; __cs__=ryhLbyZx-fDIksDerMHNcOV-1R1VyQjdtt6I; searchHistory=%E4%BC%A0%E8%AF%B4%7C%E7%B3%BB%E7%BB%9F; connect.sid=s%3AAkDQWNrwgrGOeAlVR_0Cfacf2u_yo37u.JG39Wo0Z8ll7f3YAQBXLCdWJhObWHrsZQRJzIcT6fko\"\n},\n  \"body\": '{\"keywords\":\"{{key}}\",\"pageNum\":1}',\n  \"charset\": \"UTF-8\",\n  \"method\": \"POST\"\n}",
+  "weight": 0,
+  "sourceId": "corpus-18733f43db18"
+}

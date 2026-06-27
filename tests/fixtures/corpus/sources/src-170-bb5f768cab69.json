@@ -1,0 +1,49 @@
+{
+  "bookSourceComment": "// Error: 发现失效, 搜索失效\n\n//搜索字数6-20个字符之间",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "手机看书（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.sjks88.com",
+  "customButton": false,
+  "customOrder": 170,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "[{\"title\":\"最新\",\"url\":\"/latest/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"排行\",\"url\":\"/ranking/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"鬼话\",\"url\":\"/Direct1/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"情感\",\"url\":\"/Direct2/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"玄幻\",\"url\":\"/xuanhuan/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"奇幻\",\"url\":\"/Direct3/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"商道\",\"url\":\"/Direct4/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"军事\",\"url\":\"/Direct5/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"历史\",\"url\":\"/Direct6/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"传记\",\"url\":\"/zhuanji/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"言情\",\"url\":\"/Direct7/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"都市\",\"url\":\"/ds/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"耽美\",\"url\":\"/danmei/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"同人\",\"url\":\"/erciyuan/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"武侠\",\"url\":\"/wuxia/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"修真\",\"url\":\"/xiuzhen/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"官场\",\"url\":\"/guanchang/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"网游\",\"url\":\"/wangyou/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"科幻\",\"url\":\"/kehuan/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"穿越\",\"url\":\"/chuanyue/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"悬疑\",\"url\":\"/Suspense/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"纪实\",\"url\":\"/jishi/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"精品\",\"url\":\"/xiaoshuo/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}},{\"title\":\"乡土\",\"url\":\"/xt/<,index_{{page}}.html>\",\"style\":{\"layout_flexBasisPercent\":0.2,\"layout_flexGrow\":1}}]",
+  "lastUpdateTime": 1766349916342,
+  "respondTime": 189786,
+  "ruleBookInfo": {
+    "author": ".box-artic div.0@text##\\_.*",
+    "intro": ".desc@html",
+    "kind": ".box-artic div.2:1@text##.*：",
+    "name": ".box-artic h1@text##（.*|\\(.*"
+  },
+  "ruleContent": {
+    "content": ".content@html"
+  },
+  "ruleExplore": {
+    "author": "span.0@text##\\_.*",
+    "bookList": ".list li",
+    "bookUrl": "a@href",
+    "intro": "p@text",
+    "kind": ".pubdate@text",
+    "name": "b@text##（.*|\\(.*"
+  },
+  "ruleSearch": {
+    "bookList": ".box ul li",
+    "bookUrl": "a.0@href",
+    "checkKeyWord": "洪荒：",
+    "intro": "p@text",
+    "kind": "a.1@text&&span@textNodes",
+    "name": "a.0@text##（.*|\\(.*"
+  },
+  "ruleToc": {
+    "chapterList": ".list li a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "/e/search/index.php,{\n  \"charset\": \"gb2312\",\n  \"method\": \"post\",\n  \"body\": \"keyboard={{key}}&show=title&classid=0\"\n}",
+  "weight": 0,
+  "sourceId": "corpus-bb5f768cab69"
+}

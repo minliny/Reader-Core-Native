@@ -1,0 +1,51 @@
+{
+  "bookSourceComment": "// Error: 发现正文失效",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "商店小说（优）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://www.16kbook.net",
+  "bookUrlPattern": "http://www.16kbook.co/[\\d_]+/",
+  "customButton": false,
+  "customOrder": 142,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "玄幻::http://www.16kbook.net/list1/{{page}}.html\n武侠::http://www.16kbook.net/list2/{{page}}.html\n都市::http://www.16kbook.net/list3/{{page}}.html\n历史::http://www.16kbook.net/list4/{{page}}.html\n网游::http://www.16kbook.net/list5/{{page}}.html\n科幻::http://www.16kbook.net/list6/{{page}}.html\n言情::http://www.16kbook.net/list7/{{page}}.html\n其他::http://www.16kbook.net/list8/{{page}}.html\n排行::http://www.16kbook.net/top/all_0_{{page}}.html\n完本::http://www.16kbook.net/full/0_{{page}}.html",
+  "header": "{\"User-Agent\": \"Mozilla/5.0 (Linux; Android 9) Mobile Safari/537.36\"}",
+  "lastUpdateTime": 1766341360394,
+  "respondTime": 195997,
+  "ruleBookInfo": {
+    "author": "@get:{a}",
+    "coverUrl": "@get:{c}",
+    "init": "@put:{n:\"[property$=book_name]@content\",\na:\"[property$=author]@content\",\nk:\"[property~=category|status|update_time]@content\",\nl:\"[property$=lastest_chapter_name]@content\",\ni:\"[property$=description]@content\",\nc:\"[property$=image]@content\"}",
+    "intro": "@get:{i}",
+    "kind": "@get:{k}",
+    "lastChapter": "@get:{l}",
+    "name": "@get:{n}"
+  },
+  "ruleContent": {
+    "content": "class.font_max@html",
+    "nextContentUrl": "text.下一章@href",
+    "replaceRegex": "##最近转码严重.*退出阅读模式.*|.*新书.*支持.*|第.*页|.*com.*"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "dd.1@span@text",
+    "bookList": "class.col-12 col-md-6",
+    "bookUrl": "h3@a@href",
+    "checkKeyWord": "我的",
+    "coverUrl": "dt@a@img@src",
+    "lastChapter": "dd.4@a@text",
+    "name": "h3@a@text##\\]|\\["
+  },
+  "ruleToc": {
+    "chapterList": "class.row@li",
+    "chapterName": "a@text",
+    "chapterUrl": "a@href",
+    "nextTocUrl": "class.page-item@a@href"
+  },
+  "searchUrl": "http://www.16kbook.net/search.php?q={{key}}&p={{page}}",
+  "weight": 0,
+  "sourceId": "corpus-163c03c3e875"
+}

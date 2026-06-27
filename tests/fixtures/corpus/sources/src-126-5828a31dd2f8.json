@@ -1,0 +1,49 @@
+{
+  "bookSourceComment": "搜索好像有点问题，优先使用发现",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "铅笔轻说（优+）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.qxsw.cc",
+  "customButton": false,
+  "customOrder": 126,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "GA文库::/list/GA文库.html\nHJ文库::/list/HJ文库.html\nMF文库J::/list/MF文库J.html\n富士见文库::/list/富士见文库.html\n少女文库::/list/少女文库.html\n游戏剧本::/list/游戏剧本.html\n角川文库::/list/角川文库.html\n集英社::/list/集英社.html\nFami通文库::/list/Fami通文库.html\n阅读记录::/shujia.html",
+  "header": "{\n  \"User-Agent\":\"Mozilla/5.0 (Linux; Android 12.0; wv) AppleWebKit/603.1.30 (KHTML, like Gecko) Version/4.0 Chrome/100.0.2987.108 Mobile Safari/537.36\"\n}",
+  "lastUpdateTime": 1759520857526,
+  "respondTime": 2391,
+  "ruleBookInfo": {
+    "author": "[property=\"og:novel:author\"]@content",
+    "coverUrl": "[property=\"og:image\"]@content",
+    "intro": "[property=\"og:description\"]@content",
+    "kind": "[property~=category|status]@content",
+    "lastChapter": "{{@@[property=\"og:novel:latest_chapter_name\"]@content}} | {{@@[property=\"og:novel:update_time\"]@content}}",
+    "name": "[property=\"og:novel:book_name\"]@content##（.*"
+  },
+  "ruleContent": {
+    "content": "#TextContent@html##{{book.name}}.+最新章节",
+    "replaceRegex": "##铅笔小说"
+  },
+  "ruleExplore": {
+    "name": "##（.*"
+  },
+  "ruleSearch": {
+    "author": ".txt@textNodes",
+    "bookList": "dl",
+    "bookUrl": "a@href",
+    "coverUrl": ".lazy@data-original",
+    "intro": ".book_des@text||.name@text",
+    "kind": ".book_other@span@text",
+    "name": "h3 a@text||h3@text##（.*"
+  },
+  "ruleToc": {
+    "chapterList": "#chapterList li a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+  },
+  "searchUrl": "/search/?searchkey={{key}}&submit=",
+  "weight": 0,
+  "sourceId": "corpus-5828a31dd2f8"
+}

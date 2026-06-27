@@ -1,0 +1,43 @@
+{
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "英文小说（英）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.yingyuxiaoshuo.com",
+  "customButton": false,
+  "customOrder": 223,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "lastUpdateTime": 1766359054956,
+  "respondTime": 10551,
+  "ruleBookInfo": {
+    "author": "@css:.listshadow1 .text-danger:nth-child(2)@text",
+    "coverUrl": "@css:.listshadow1 img@src",
+    "intro": "@css:.listshadow1 .text-intro1@text",
+    "kind": "@css:.listshadow1 .text-danger:nth-child(n+3)@text",
+    "name": "@css:.listshadow1 .text-danger:first-child h2@text"
+  },
+  "ruleContent": {
+    "content": "{{@css:.text-content1 .c-en@text||.text-content1@text}}"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "@css:.grow>div:nth-child(2)@text",
+    "bookList": "@css:.main-list-container>div.h-36",
+    "bookUrl": "a@href",
+    "checkKeyWord": "加",
+    "coverUrl": "img@src",
+    "intro": "@css:.grow>div:nth-child(3)@text",
+    "kind": "@css:.grow>div:nth-child(4) span:first-child@text",
+    "name": "@css:.grow h2>a:nth-child(n)@text"
+  },
+  "ruleToc": {
+    "chapterList": "@css:.shadow-listshadow1 .grid .text-danger",
+    "chapterName": "class.text-danger@text",
+    "chapterUrl": "class.text-danger@href"
+  },
+  "searchUrl": "/search/{{key}}",
+  "weight": 0,
+  "sourceId": "corpus-1fd243a7684d"
+}

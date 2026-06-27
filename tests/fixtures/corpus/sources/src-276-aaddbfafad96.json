@@ -1,0 +1,42 @@
+{
+  "bookSourceGroup": "影视 书源",
+  "bookSourceName": "稀饭动漫（优+）",
+  "bookSourceType": 4,
+  "bookSourceUrl": "https://dm.xifanacg.com",
+  "customButton": false,
+  "customOrder": 276,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "header": "{\n\"User-Agent\":\"Mozilla/5.0 (Android 14; Mobile; rv:120.0) Gecko/120.0 Firefox/120.0\"\n}",
+  "lastUpdateTime": 1766914853553,
+  "respondTime": 180000,
+  "ruleBookInfo": {
+    "intro": ".occlusion@text",
+    "wordCount": ".fraction@text##^##⭐️"
+  },
+  "ruleContent": {
+    "content": ".player-left@script.0@all\n<js>\n//https://jx.hls.one/?url=\nvar jx=\"\",data=\"\",MacPlayerConfig={};\nh={\"headers\":{\"Referer\":\"https://nkvod.me/\"}}\n$=JSON.parse(result.match(/{.*}/)[0]);\n\np=`${book.origin}/static/player/${$.from}.js`\njx_data=String(java.ajax(p))\nif(jx_data.match(/http.*url=/)){\n\tjx=jx_data.match(/src=\"(.*)'\\+MacPlayer.PlayUrl/)[1]\n\tresult=jx+$.url\n}else if(jx_data.match(/\\?url=/)){\n\tjx=jx_data.match(/src=\"(.*)'\\+MacPlayer.PlayUrl/)[1]\n\tresult=source.key+jx+$.url\n}else{\n\tif(($.url).match(/maoyan/)){\n\t\tjx=\"https://codjx.com?url=\"\n result=jx+$.url+\",\"+JSON.stringify(h)\n\t}else{\n   url = \"https://nkvod.me/static/js/playerconfig.js\"\n   data=String(java.ajax(url))\n   eval(data.match(/player_list=({.*})/)[0])\n   result=player_list.lzm3u8.parse+$.url+\",\"+JSON.stringify(h)\n\t}\n\t\n}\n\nif(book.durChapterIndex==chapter.index){\n\t\tjava.startBrowser(result,title)\n\t\tjava.toast('正在加载视频\\n视频加载较慢，请耐心等待')\n\t}\n'【刷新正文】播放\\n✅直链:\\n'+result\n</js>"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": ".lightSpeedIn>div.-3@a@text##\\n##,",
+    "bookList": ".search-list",
+    "bookUrl": "a.0@href",
+    "checkKeyWord": "碧蓝之海",
+    "coverUrl": "img@data-src",
+    "kind": "{{@@.slide-info-remarks.0@text}}\n{{@@.slide-info-remarks[1,2]@a@text}}",
+    "name": ".slide-info-title@text",
+    "wordCount": "{{\"💮稀饭动漫\"}}"
+  },
+  "ruleToc": {
+    "chapterList": "<js>\nfunction $(rule){\n\treturn java.getElements(rule);\n}\nvar tab_name=\"\",v_list=[];\n//获取所有线路❗️\ntab=$('.nav-swiper@a')\nfor(i=0;i<tab.length;i++){\n\t//获取播放列表❗️\n\tlist=$('.anthology-list-play')[i]\n\tlist=list.select('li')\n\t//线路名称❗️\n\ttab_name=`${String(tab[i].text()).replace(/\\d+$/,'')} (${list.length})`;\n\t\tfor(j in list){\n\t\t //获取播放链接和标题\n\t\t text=list[j].text();\n\t\t url=list[j].select('a').attr('href');\n\t\t //java.log(text+url)\n\t\t v_list.push(JSON.stringify({\n\t\t\t text,url,tab_name\n\t\t }))\n\t }\n}\nv_list\n</js>",
+    "chapterName": "$.text",
+    "chapterUrl": "$.url",
+    "updateTime": "$.tab_name"
+  },
+  "searchUrl": "/search/wd/{{key}}/page/{{page}}.html",
+  "weight": 0,
+  "sourceId": "corpus-aaddbfafad96"
+}

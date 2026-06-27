@@ -1,0 +1,53 @@
+{
+  "bookSourceGroup": "正版小说 书源",
+  "bookSourceName": "纵横中文",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://m.zongheng.com/",
+  "customButton": false,
+  "customOrder": 389,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "header": "{\n  \"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/82.0.4080.0 Safari/537.36 Edg/82.0.453.0\"\n}",
+  "lastUpdateTime": 1765832377943,
+  "respondTime": 2901,
+  "ruleBookInfo": {
+    "author": "class.de-header-author@text",
+    "canReName": "True",
+    "coverUrl": "img@src",
+    "intro": "class.de-header-title@text&&\nclass.de-header-author@text&&\nclass.tags de-tags@text&&\nclass.de-update-chapter flex@class.time JissueTime@text&&\nclass.de-summary@span@text",
+    "kind": "class.tags de-header-line.0@span.0@text&&class.tags de-header-line.0@span.-1@text",
+    "lastChapter": "class.de-update-chapter flex@class.flex--fluid@text",
+    "name": "class.de-header-title@text",
+    "tocUrl": "text.进入作品目录 查看更多@href||class.de-gray-btn@href",
+    "wordCount": "class.tags de-header-line@span.1@text"
+  },
+  "ruleContent": {
+    "content": "class.content@p@text",
+    "title": "class.chapterName-modul@text"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "author": "class.book-author@text##[作者：·]*",
+    "bookList": "class.book-li",
+    "bookUrl": "class.book-li@a@href",
+    "checkKeyWord": "穿书炮灰，全家偷听我心声",
+    "coverUrl": "img@data-imgsrc",
+    "intro": "class.book-desc@text",
+    "kind": "class.book-label@text&&class.book-state@text##[类型状态：·\\d+万]",
+    "lastChapter": "class.book-li@a@href<js>java.ajax(result)</js>class.de-update-chapter flex@class.flex--fluid@text",
+    "name": "class.book-title@text",
+    "wordCount": "class.book-label@ownText##[·]*"
+  },
+  "ruleToc": {
+    "chapterList": "class.chapbox",
+    "chapterName": "class.chapbox@text##App内免费##💎VIP",
+    "chapterUrl": "class.chapbox@a@href",
+    "isVip": "VIP",
+    "updateTime": "class.list_wrap__top@span@text"
+  },
+  "searchUrl": "https://m.zongheng.com/search?keywords={{key}},{\n  \"webView\": true\n}",
+  "weight": 0,
+  "sourceId": "corpus-367114d72d21"
+}

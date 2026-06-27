@@ -1,0 +1,59 @@
+{
+  "bookSourceComment": "//仅供学习研究使用，请在24h内删除\n//同网址https://api.midukanshu.com/\n/**\n//目录url规则，获取目录url\thttps://api.midureader.com/fiction/book/getChaptersCdn,{\"method\": \"POST\",\"body\": \"app=midu&lastUpdatedTime=&bookId={{$.book_id}}\"}\n//目录列表规则，获取目录列表\n$..url\n<js>\nurl=String(result).match(/\"(.*)\"/) [1].replace(/\\\\/g,'').trim();\njava.ajax(url)\n//java.log(url)\n</js>\n$.[*]\n*/",
+  "bookSourceGroup": "小说 书源",
+  "bookSourceName": "米读小说（优+）",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://api.midureader.com/#@遇知",
+  "customButton": false,
+  "customOrder": 109,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": true,
+  "eventListener": false,
+  "exploreUrl": "@js:\nsort = [];\npush = (title, url, type) => sort.push({\n    title: title,\n    url: url,\n    style: {\n        layout_flexGrow: 1,\n        layout_flexBasisPercent: type\n    }\n});\n$$ = (second_channel, status) => `/fiction/search/channel,{\"method\": \"POST\",\"body\": \"app=midu&second_channel=${second_channel}&status=${status}&page={{page-1}\\}&rank=\"}`;\n[\n    [\n        [\"玄幻\", 3],\n        [\"都市\", 5],\n        [\"推理\", 7],\n        [\"仙侠\", 15],\n        [\"科幻\", 27],\n        [\"游戏\", 30],\n        [\"武侠\", 32],\n        [\"历史\", 35],\n        [\"奇幻\", 39],\n        [\"军事\", 93],\n        [\"体育\", 47],\n        [\"现实\", 79],\n        [\"同人\", 61]\n    ],\n    [\n        [\"现代言情\", 13],\n        [\"古代言情\", 17],\n        [\"悬疑刑侦\", 24],\n        [\"玄幻仙侠\", 41],\n        [\"青春校园\", 51],\n        [\"同人小说\", 68],\n        [\"科幻空间\", 78],\n        [\"游戏竞技\", 95]\n    ]\n].map((Arr, isN) => {\n    push(\"༺ˇ»`ʚ \" + (isN ? \"女\" : \"男\") + \"频 ɞ´«ˇ༻\", null, 1);\n    Arr.map([title, second_channel] => {\n        [\"[\" + title + \"]\", \"完结\", \"连载\"].map((title, status) => {\n            push(title, $$(second_channel, status), 0.25);\n        });\n    });\n});\nJSON.stringify(sort);",
+  "header": "{\"User-Agent\":\"okhttp/3.12.1\"}",
+  "lastUpdateTime": 1766340985633,
+  "respondTime": 29939,
+  "ruleBookInfo": {
+    "author": "$.author",
+    "coverUrl": "$..cover",
+    "init": "$.data",
+    "intro": "🏅 评分：{{$.score}}分\n🔥 热度：{{$.hot}}{{$.hotLabel}}\n🎗 标签：{{$..name##\\s##，}}\n🕰 更新时间：{{$.updateStatus}}\n📂 简介：{{$..description}}##(^|[。！？]+[”」）】]?)##$1<br>",
+    "kind": "{{java.getString('$.end_status')=='1'?'完结':'连载'}}\n{{$.category}}\n{{$.score}}分",
+    "name": "$.title",
+    "tocUrl": "@js:\ntry{\n\"https://book.midureader.com/book/chapter_list/100/{{$.book_id}}.txt\"\n}\ncatch(e){\n\t\"https://book-spare.midureader.com/book/chapter_list/100/{{$.book_id}}.txt\"\n\t}",
+    "wordCount": "$.word_count"
+  },
+  "ruleContent": {
+    "content": "$..content\n@js:\n   if(result!=\"\"){\tresult}\n      else{java.ajax(baseUrl)}"
+  },
+  "ruleExplore": {
+    "author": "$..leftTags..text## · .*",
+    "bookList": "$.data[*]",
+    "bookUrl": "https://api.midureader.com/fiction/book/getDetail,{\n  \"method\": \"POST\",\n  \"body\": \"app=midu&book_id={{$..book_id}}\"\n}\n##(getBrief||getDetail)选用其中之一",
+    "coverUrl": "$.cover",
+    "intro": "$.description",
+    "kind": "{{$..leftTags..text##·|\\d.*}}##.*\\s",
+    "name": "$..title",
+    "wordCount": "$..leftTags..text##.*·"
+  },
+  "ruleSearch": {
+    "author": "$.author||$..emAuthor",
+    "bookList": "$.data[*]",
+    "bookUrl": "https://api.midureader.com/fiction/book/getDetail,{\n  \"method\": \"POST\",\n  \"body\": \"app=midu&book_id={{$..book_id}}\"\n}\n##(getBrief||getDetail)选用其中之一",
+    "checkKeyWord": "斗破苍穹",
+    "coverUrl": "$..cover",
+    "intro": "$..description",
+    "kind": "{{java.getString('$.end_status')=='1'?'完结':'连载'}}\n{{$.category}}\n{{$..name##\\s.*}}\n{{$.score}}分",
+    "name": "$..title",
+    "wordCount": "$.word_count"
+  },
+  "ruleToc": {
+    "chapterList": "$.[*]",
+    "chapterName": "$.title",
+    "chapterUrl": "@js:\ntry{\n\"https://book.midureader.com/book/chapter/segment/master/{{$.bookId}}/{{$.chapterId}}/{{$.content_md5}}.txt\"\n}\ncatch(e){\n\t\"https://book.midureader.com/book/chapter/master/{{$.bookId}}_{{$.chapterId}}.txt\"\n\t}"
+  },
+  "searchUrl": "@js:\nvar option = {   \n        \"method\": \"POST\",\n        \"body\": \"app=midu&keyword={{key}}&page={{page-1}}\"\n    };\ntry{\n\trun;\n\t\n\"https://api.midureader.com/fiction/search/search,\"+ JSON.stringify(option)\n}\ncatch(e){\n\t\"https://api.midureader.com/fiction/search/searchV2,\"+ JSON.stringify(option)\n\t}",
+  "weight": 0,
+  "sourceId": "corpus-8c05fec02a4b"
+}

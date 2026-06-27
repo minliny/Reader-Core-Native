@@ -1,0 +1,36 @@
+{
+  "bookSourceComment": "感谢酷安大佬 “莫宁哦” 做的源\n纯英文",
+  "bookSourceGroup": "漫画 书源",
+  "bookSourceName": "霓虹漫画（优）",
+  "bookSourceType": 2,
+  "bookSourceUrl": "https://rawkuma.com/",
+  "customButton": false,
+  "customOrder": 256,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": true,
+  "eventListener": false,
+  "lastUpdateTime": 1759568930817,
+  "respondTime": 3805,
+  "ruleBookInfo": {},
+  "ruleContent": {
+    "content": "#readerarea@html",
+    "imageStyle": "FULL"
+  },
+  "ruleExplore": {},
+  "ruleSearch": {
+    "bookList": ".bs",
+    "bookUrl": ".bsx@a.0@href",
+    "coverUrl": ".limit@img@src",
+    "lastChapter": ".epxs@text",
+    "name": ".tt@text"
+  },
+  "ruleToc": {
+    "chapterList": "-.clstyle@li",
+    "chapterName": ".chapternum.0@text",
+    "chapterUrl": ".eph-num@a@href"
+  },
+  "searchUrl": "page/{{page}}/?s={{key}}",
+  "weight": 0,
+  "sourceId": "corpus-65382fed95b7"
+}
