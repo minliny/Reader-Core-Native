@@ -14,3 +14,7 @@ serde_json.workspace = true
 # EPUB container is a ZIP archive; Core owns text extraction per S5 closure
 # (matching Legado's in-app epublib behavior). Pure-Rust, no system deps.
 zip = { version = "2", default-features = false, features = ["deflate"] }
+# GBK / GB18030 decoding for Chinese TXT files. Legado's EncodingDetect
+# (ICU4J CharsetDetector) handles these; encoding_rs is the pure-Rust parity
+# crate (no system deps, no GPL code).
+encoding_rs = "0.8"

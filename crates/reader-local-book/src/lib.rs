@@ -801,6 +801,10 @@ pub struct LocalBookChangeResult {
 }
 
 /// Text encoding detected while ingesting a TXT file.
+///
+/// Mirrors Legado's `EncodingDetect.getEncode` return labels (`UTF-8`,
+/// `UTF-16LE/BE`, `GBK`, `GB18030`). GBK/GB18030 are decoded with the
+/// pure-Rust `encoding_rs` crate; no system deps.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum LocalBookEncoding {
@@ -808,6 +812,8 @@ pub enum LocalBookEncoding {
     Utf8Bom,
     Utf16Le,
     Utf16Be,
+    Gbk,
+    Gb18030,
 }
 
 /// Chapter split strategy labels from the legacy Reader-Core local-book model.
@@ -5223,6 +5229,89 @@ fn single_policy_chapter(text: &str) -> Vec<LocalBookChapter> {
     }]
 }
 
+/// Legado `TextFile.analyze()` no-pattern parity: split a no-heading TXT
+/// into ~`target_bytes` chunks at newline boundaries (Legado's `blank`
+/// byte `0x0a`). Chapter titles follow Legado's `第{block}章({n})` format
+/// where `block` is the 1-based chunk index and `n` is the 1-based
+/// chapter-within-chunk index. A trailing runt (<100 bytes) is folded
+/// into the previous chapter, matching Legado's tail-merge logic.
+fn split_no_heading_by_size(text: &str, target_bytes: usize) -> Vec<LocalBookChapter> {
+    let total_bytes = text.len();
+    if total_bytes == 0 {
+        return single_policy_chapter(text);
+    }
+    let target_bytes = target_bytes.max(1);
+
+    let mut chapters = Vec::new();
+    let mut start_byte = 0usize;
+    let mut block_pos = 1u32;
+    let mut chapter_pos = 0u32;
+
+    while start_byte < total_bytes {
+        let mut end_byte = (start_byte + target_bytes).min(total_bytes);
+        // Legado parity: scan forward from the target for the next newline
+        // byte (`blank = 0x0a`). In valid UTF-8, 0x0a only appears as a
+        // newline, so byte-level scan is safe.
+        if end_byte < total_bytes {
+            let bytes = text.as_bytes();
+            while end_byte < total_bytes && bytes[end_byte] != b'\n' {
+                end_byte += 1;
+            }
+            // Include the newline in this chapter so the next one starts fresh.
+            if end_byte < total_bytes && bytes[end_byte] == b'\n' {
+                end_byte += 1;
+            }
+        }
+        // Ensure we made progress (avoid infinite loop on edge cases).
+        if end_byte <= start_byte {
+            end_byte = total_bytes.min(start_byte + 1);
+        }
+
+        chapter_pos += 1;
+        let start_char = text[..start_byte].chars().count();
+        let end_char = text[..end_byte].chars().count();
+        let content = trim_outer_blank_lines(&text[start_byte..end_byte]);
+        chapters.push(LocalBookChapter {
+            index: chapters.len() as u32,
+            title: format!("第{block_pos}章({chapter_pos})"),
+            content,
+            start_char,
+            end_char,
+        });
+        start_byte = end_byte;
+        if start_byte >= total_bytes {
+            break;
+        }
+        block_pos += 1;
+        chapter_pos = 0;
+    }
+
+    // Legado tail-merge: a trailing runt (<100 bytes) is folded into the
+    // previous chapter instead of standing as its own short chapter.
+    if chapters.len() > 1 {
+        let last_len = chapters
+            .last()
+            .map(|c| c.content.chars().count())
+            .unwrap_or(0);
+        if last_len < 100 {
+            let last = chapters.pop().unwrap();
+            if let Some(prev) = chapters.last_mut() {
+                if !prev.content.is_empty() && !last.content.is_empty() {
+                    prev.content.push('\n');
+                }
+                prev.content.push_str(&last.content);
+                prev.end_char = last.end_char;
+            }
+        }
+    }
+
+    if chapters.is_empty() {
+        single_policy_chapter(text)
+    } else {
+        chapters
+    }
+}
+
 impl LocalBookLibrary {
     pub fn new() -> Self {
         Self::default()
@@ -5349,8 +5438,26 @@ fn decode_txt_bytes(bytes: &[u8]) -> Result<(String, LocalBookEncoding), LocalBo
 
     match std::str::from_utf8(bytes) {
         Ok(text) => Ok((text.to_string(), LocalBookEncoding::Utf8)),
-        Err(_) => Err(LocalBookError::UnsupportedEncoding),
+        Err(_) => decode_gbk_or_gb18030(bytes),
     }
+}
+
+/// Fallback for non-UTF-8 Chinese TXT bytes, mirroring Legado's
+/// `EncodingDetect.getEncode` which returns `GBK` / `GB18030` for the
+/// dominant non-UTF-8 Chinese encoding. Tries GBK first (the common case);
+/// if GBK decode is clean (no U+FFFD replacement), accepts it. Otherwise
+/// tries GB18030 (superset with 4-byte sequences). If both produce
+/// replacements, rejects with `UnsupportedEncoding`.
+fn decode_gbk_or_gb18030(bytes: &[u8]) -> Result<(String, LocalBookEncoding), LocalBookError> {
+    let gbk = encoding_rs::GBK.decode_without_bom_handling(bytes);
+    if !gbk.1 {
+        return Ok((gbk.0.into_owned(), LocalBookEncoding::Gbk));
+    }
+    let gb18030 = encoding_rs::GB18030.decode_without_bom_handling(bytes);
+    if !gb18030.1 {
+        return Ok((gb18030.0.into_owned(), LocalBookEncoding::Gb18030));
+    }
+    Err(LocalBookError::UnsupportedEncoding)
 }
 
 fn decode_utf16(
@@ -5524,6 +5631,13 @@ fn normalize_text(text: &str) -> String {
         .replace('\r', "\n")
 }
 
+/// Legado `TextFile.kt` `maxLengthWithNoToc` (10 KiB): when a TXT file has
+/// no detectable chapter headings, Legado falls back to splitting the body
+/// into ~10 KiB chunks at newline boundaries. We mirror that here so the
+/// Auto path doesn't collapse long no-heading TXTs into a single giant
+/// chapter.
+const LEGADO_MAX_LENGTH_WITH_NO_TOC: usize = 10 * 1024;
+
 fn split_chapters(text: &str) -> Vec<LocalBookChapter> {
     let lines = indexed_lines(text);
     let heading_indices = lines
@@ -5533,6 +5647,13 @@ fn split_chapters(text: &str) -> Vec<LocalBookChapter> {
         .collect::<Vec<_>>();
 
     if heading_indices.is_empty() {
+        // Legado parity: short no-heading text → single "正文" chapter;
+        // long no-heading text (>10 KiB) → split into ~10 KiB chunks at
+        // newline boundaries, titled `第{block}章({n})` like Legado's
+        // `analyze()` no-pattern path.
+        if text.len() > LEGADO_MAX_LENGTH_WITH_NO_TOC {
+            return split_no_heading_by_size(text, LEGADO_MAX_LENGTH_WITH_NO_TOC);
+        }
         return vec![LocalBookChapter {
             index: 0,
             title: "正文".into(),
