@@ -41,13 +41,25 @@ fn observing_registry(sink: Arc<Mutex<Vec<HostDescriptor>>>) -> HostCallbackRegi
 
     register!("java.head", json!({"status": 200, "headers": {}}));
     register!("java.webView", json!("<html>webView body</html>"));
-    register!("java.webViewGetSource", json!("https://example.test/stream.m3u8"));
-    register!("java.webViewGetOverrideUrl", json!("https://example.test/redirect"));
+    register!(
+        "java.webViewGetSource",
+        json!("https://example.test/stream.m3u8")
+    );
+    register!(
+        "java.webViewGetOverrideUrl",
+        json!("https://example.test/redirect")
+    );
     register!("java.startBrowser", json!(null));
-    register!("java.startBrowserAwait", json!({"url": "https://example.test", "body": "verified"}));
+    register!(
+        "java.startBrowserAwait",
+        json!({"url": "https://example.test", "body": "verified"})
+    );
     register!("java.getVerificationCode", json!("ABCD"));
     register!("java.getCookie", json!("session=abc123"));
-    register!("java.getFile", json!({"path": "/cache/file.txt", "exists": true}));
+    register!(
+        "java.getFile",
+        json!({"path": "/cache/file.txt", "exists": true})
+    );
     register!("java.readFile", json!("aGVsbG8=")); // base64
     register!("java.readTxtFile", json!("file contents\n"));
     register!("java.deleteFile", json!(true));
@@ -62,7 +74,10 @@ fn observing_registry(sink: Arc<Mutex<Vec<HostDescriptor>>>) -> HostCallbackRegi
     register!("java.getZipByteArrayContent", json!("Ynl0ZXM="));
     register!("java.getRarByteArrayContent", json!("Ynl0ZXM="));
     register!("java.get7zByteArrayContent", json!("Ynl0ZXM="));
-    register!("java.queryBase64TTF", json!({"handle": "ttf-1", "glyphs": 256}));
+    register!(
+        "java.queryBase64TTF",
+        json!({"handle": "ttf-1", "glyphs": 256})
+    );
     register!("java.queryTTF", json!({"handle": "ttf-1", "glyphs": 256}));
     register!("java.replaceFont", json!("replaced font text"));
     register!("java.androidId", json!("abcdef0123456789"));
@@ -128,7 +143,12 @@ fn routes_java_webview_get_source_with_regex() {
 
     let calls = calls.lock().unwrap();
     match &calls[0] {
-        HostDescriptor::WebViewGetSource { html, url, js, source_regex } => {
+        HostDescriptor::WebViewGetSource {
+            html,
+            url,
+            js,
+            source_regex,
+        } => {
             assert!(html.is_none());
             assert_eq!(url.as_deref(), Some("https://example.test"));
             assert!(js.is_none());
@@ -152,7 +172,9 @@ fn routes_java_webview_get_override_url() {
 
     let calls = calls.lock().unwrap();
     match &calls[0] {
-        HostDescriptor::WebViewGetOverrideUrl { override_url_regex, .. } => {
+        HostDescriptor::WebViewGetOverrideUrl {
+            override_url_regex, ..
+        } => {
             assert_eq!(override_url_regex, "redirect");
         }
         other => panic!("expected WebViewGetOverrideUrl, got {other:?}"),
@@ -194,7 +216,11 @@ fn routes_java_start_browser_await_with_optional_bool() {
 
     let calls = calls.lock().unwrap();
     match &calls[0] {
-        HostDescriptor::StartBrowserAwait { url, title, refetch_after_success } => {
+        HostDescriptor::StartBrowserAwait {
+            url,
+            title,
+            refetch_after_success,
+        } => {
             assert_eq!(url, "https://example.test");
             assert_eq!(title, "Captcha");
             assert_eq!(*refetch_after_success, Some(true));
@@ -211,11 +237,16 @@ fn routes_java_start_browser_await_two_arg_form_defaults_refetch_to_none() {
 
     // 2-arg form: url, title (legado defaults refetchAfterSuccess=true; reader-js
     // passes None and lets the host apply its own default).
-    sandbox.evaluate(r#"java.startBrowserAwait("https://example.test", "Captcha")"#).unwrap();
+    sandbox
+        .evaluate(r#"java.startBrowserAwait("https://example.test", "Captcha")"#)
+        .unwrap();
 
     let calls = calls.lock().unwrap();
     match &calls[0] {
-        HostDescriptor::StartBrowserAwait { refetch_after_success, .. } => {
+        HostDescriptor::StartBrowserAwait {
+            refetch_after_success,
+            ..
+        } => {
             assert_eq!(*refetch_after_success, None);
         }
         other => panic!("expected StartBrowserAwait, got {other:?}"),
@@ -249,7 +280,9 @@ fn routes_java_get_cookie_with_optional_key() {
     let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
 
     // tag-only form: returns full cookie header
-    let result = sandbox.evaluate(r#"java.getCookie("example.test")"#).unwrap();
+    let result = sandbox
+        .evaluate(r#"java.getCookie("example.test")"#)
+        .unwrap();
     assert_eq!(result.value, json!("session=abc123"));
 
     let calls = calls.lock().unwrap();
@@ -268,7 +301,9 @@ fn routes_java_get_cookie_with_key_returns_specific_cookie() {
     let registry = observing_registry(Arc::clone(&calls));
     let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
 
-    sandbox.evaluate(r#"java.getCookie("example.test", "session")"#).unwrap();
+    sandbox
+        .evaluate(r#"java.getCookie("example.test", "session")"#)
+        .unwrap();
 
     let calls = calls.lock().unwrap();
     match &calls[0] {
@@ -286,14 +321,30 @@ fn routes_java_file_methods_with_path_string() {
     let registry = observing_registry(Arc::clone(&calls));
     let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
 
-    sandbox.evaluate(r#"java.getFile("cache/file.txt")"#).unwrap();
-    sandbox.evaluate(r#"java.readFile("cache/file.txt")"#).unwrap();
-    sandbox.evaluate(r#"java.deleteFile("cache/file.txt")"#).unwrap();
-    sandbox.evaluate(r#"java.unzipFile("cache/archive.zip")"#).unwrap();
-    sandbox.evaluate(r#"java.un7zFile("cache/archive.7z")"#).unwrap();
-    sandbox.evaluate(r#"java.unrarFile("cache/archive.rar")"#).unwrap();
-    sandbox.evaluate(r#"java.unArchiveFile("cache/archive")"#).unwrap();
-    sandbox.evaluate(r#"java.getTxtInFolder("cache/folder")"#).unwrap();
+    sandbox
+        .evaluate(r#"java.getFile("cache/file.txt")"#)
+        .unwrap();
+    sandbox
+        .evaluate(r#"java.readFile("cache/file.txt")"#)
+        .unwrap();
+    sandbox
+        .evaluate(r#"java.deleteFile("cache/file.txt")"#)
+        .unwrap();
+    sandbox
+        .evaluate(r#"java.unzipFile("cache/archive.zip")"#)
+        .unwrap();
+    sandbox
+        .evaluate(r#"java.un7zFile("cache/archive.7z")"#)
+        .unwrap();
+    sandbox
+        .evaluate(r#"java.unrarFile("cache/archive.rar")"#)
+        .unwrap();
+    sandbox
+        .evaluate(r#"java.unArchiveFile("cache/archive")"#)
+        .unwrap();
+    sandbox
+        .evaluate(r#"java.getTxtInFolder("cache/folder")"#)
+        .unwrap();
 
     let calls = calls.lock().unwrap();
     assert_eq!(calls.len(), 8);
@@ -323,9 +374,13 @@ fn routes_java_read_txt_file_with_optional_charset() {
     let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
 
     // 1-arg form: auto-detect charset
-    sandbox.evaluate(r#"java.readTxtFile("cache/file.txt")"#).unwrap();
+    sandbox
+        .evaluate(r#"java.readTxtFile("cache/file.txt")"#)
+        .unwrap();
     // 2-arg form: explicit charset
-    sandbox.evaluate(r#"java.readTxtFile("cache/file.txt", "GBK")"#).unwrap();
+    sandbox
+        .evaluate(r#"java.readTxtFile("cache/file.txt", "GBK")"#)
+        .unwrap();
 
     let calls = calls.lock().unwrap();
     match &calls[0] {
@@ -350,9 +405,15 @@ fn routes_java_archive_string_content_methods() {
     let registry = observing_registry(Arc::clone(&calls));
     let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
 
-    sandbox.evaluate(r#"java.getZipStringContent("https://example.test/a.zip", "chapter1.txt")"#).unwrap();
-    sandbox.evaluate(r#"java.getRarStringContent("https://example.test/a.rar", "ch.txt", "GBK")"#).unwrap();
-    sandbox.evaluate(r#"java.get7zStringContent("https://example.test/a.7z", "ch.txt")"#).unwrap();
+    sandbox
+        .evaluate(r#"java.getZipStringContent("https://example.test/a.zip", "chapter1.txt")"#)
+        .unwrap();
+    sandbox
+        .evaluate(r#"java.getRarStringContent("https://example.test/a.rar", "ch.txt", "GBK")"#)
+        .unwrap();
+    sandbox
+        .evaluate(r#"java.get7zStringContent("https://example.test/a.7z", "ch.txt")"#)
+        .unwrap();
 
     let calls = calls.lock().unwrap();
     match &calls[0] {
@@ -379,9 +440,15 @@ fn routes_java_archive_byte_array_content_methods() {
     let registry = observing_registry(Arc::clone(&calls));
     let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
 
-    sandbox.evaluate(r#"java.getZipByteArrayContent("https://example.test/a.zip", "image.png")"#).unwrap();
-    sandbox.evaluate(r#"java.getRarByteArrayContent("https://example.test/a.rar", "image.png")"#).unwrap();
-    sandbox.evaluate(r#"java.get7zByteArrayContent("https://example.test/a.7z", "image.png")"#).unwrap();
+    sandbox
+        .evaluate(r#"java.getZipByteArrayContent("https://example.test/a.zip", "image.png")"#)
+        .unwrap();
+    sandbox
+        .evaluate(r#"java.getRarByteArrayContent("https://example.test/a.rar", "image.png")"#)
+        .unwrap();
+    sandbox
+        .evaluate(r#"java.get7zByteArrayContent("https://example.test/a.7z", "image.png")"#)
+        .unwrap();
 
     let calls = calls.lock().unwrap();
     assert_eq!(calls.len(), 3);
@@ -401,9 +468,13 @@ fn routes_java_query_ttf_with_optional_use_cache() {
     let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
 
     // 1-arg form: useCache defaults to true in legado; reader-js passes None
-    sandbox.evaluate(r#"java.queryTTF("https://example.test/font.ttf")"#).unwrap();
+    sandbox
+        .evaluate(r#"java.queryTTF("https://example.test/font.ttf")"#)
+        .unwrap();
     // 2-arg form: explicit useCache=false
-    sandbox.evaluate(r#"java.queryTTF("https://example.test/font.ttf", false)"#).unwrap();
+    sandbox
+        .evaluate(r#"java.queryTTF("https://example.test/font.ttf", false)"#)
+        .unwrap();
 
     let calls = calls.lock().unwrap();
     match &calls[0] {
@@ -458,7 +529,12 @@ fn routes_java_replace_font_with_optional_filter() {
 
     let calls = calls.lock().unwrap();
     match &calls[0] {
-        HostDescriptor::ReplaceFont { text, error_query_ttf, correct_query_ttf, filter } => {
+        HostDescriptor::ReplaceFont {
+            text,
+            error_query_ttf,
+            correct_query_ttf,
+            filter,
+        } => {
             assert_eq!(text, "obfuscated");
             assert_eq!(error_query_ttf, &json!({"handle":"err"}));
             assert_eq!(correct_query_ttf, &json!({"handle":"ok"}));
@@ -497,9 +573,13 @@ fn routes_java_open_url_with_optional_mime_type() {
     let sandbox = QuickJsSandbox::with_host_callbacks(JsRuntimeConfig::default(), registry);
 
     // 1-arg form
-    sandbox.evaluate(r#"java.openUrl("https://example.test")"#).unwrap();
+    sandbox
+        .evaluate(r#"java.openUrl("https://example.test")"#)
+        .unwrap();
     // 2-arg form with mimeType
-    sandbox.evaluate(r#"java.openUrl("https://example.test", "text/html")"#).unwrap();
+    sandbox
+        .evaluate(r#"java.openUrl("https://example.test", "text/html")"#)
+        .unwrap();
 
     let calls = calls.lock().unwrap();
     match &calls[0] {
@@ -633,7 +713,10 @@ fn full_s3_surface_round_trips_through_host_callback() {
     // Verify the descriptor order matches the call sequence
     assert!(matches!(calls[0], HostDescriptor::WebView { .. }));
     assert!(matches!(calls[1], HostDescriptor::GetCookie { .. }));
-    assert!(matches!(calls[2], HostDescriptor::GetZipStringContent { .. }));
+    assert!(matches!(
+        calls[2],
+        HostDescriptor::GetZipStringContent { .. }
+    ));
     assert!(matches!(calls[3], HostDescriptor::QueryTTF { .. }));
     assert!(matches!(calls[4], HostDescriptor::ReplaceFont { .. }));
 }

@@ -1051,10 +1051,7 @@ impl RemoteContentPipeline {
             .unwrap_or("")
             .replace('\\', "\\\\")
             .replace('\'', "\\'");
-        let page = context
-            .get("page")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(1);
+        let page = context.get("page").and_then(|v| v.as_u64()).unwrap_or(1);
         let base_url = context
             .get("baseUrl")
             .and_then(|v| v.as_str())
@@ -1063,9 +1060,8 @@ impl RemoteContentPipeline {
             .replace('\'', "\\'");
         // Prepend variable bindings so the expression can reference `key`/
         // `page`/`baseUrl` as top-level globals.
-        let script = format!(
-            "var key = '{key}';\nvar page = {page};\nvar baseUrl = '{base_url}';\n{expr}"
-        );
+        let script =
+            format!("var key = '{key}';\nvar page = {page};\nvar baseUrl = '{base_url}';\n{expr}");
         let evaluation = self.js.evaluate(&script).map_err(|e| e.to_string())?;
         Ok(match evaluation.value {
             serde_json::Value::String(s) => s,
@@ -3321,7 +3317,10 @@ mod tests {
             result["apiResponse"],
             "{\"chapterId\":456,\"content\":\"encrypted-body\"}"
         );
-        assert_eq!(result["rawContent"], "raw chapter text with obfuscated glyphs");
+        assert_eq!(
+            result["rawContent"],
+            "raw chapter text with obfuscated glyphs"
+        );
         assert_eq!(result["fontMap"]["0xF001"], "的");
         assert_eq!(result["fontMap"]["0xF002"], "一");
         assert_eq!(result["fontMap"]["0xF003"], "是");

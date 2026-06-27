@@ -235,11 +235,13 @@ pub enum HostDescriptor {
     ReGetBook,
 
     // ===== S3 network-class closure: 28 new variants vs Legado JsExtensions.kt =====
-
     /// `java.head(urlStr, headers)` — HTTP HEAD (no body, like `get` but HEAD).
     /// Legado JsExtensions.kt:399. `headers` is the JS object passed as 2nd arg
     /// (legado `Map<String,String>`); reader-js passes the raw JSON through.
-    HttpHead { url: String, headers: Option<JsonValue> },
+    HttpHead {
+        url: String,
+        headers: Option<JsonValue>,
+    },
 
     /// `java.webView(html?, url?, js?)` — load WebView, run JS, return body.
     /// Legado JsExtensions.kt:170. All three args are nullable strings.
@@ -7652,12 +7654,7 @@ fn install_residual_host_routing<'js>(
     // Network/HTTP
     java.set(
         "head",
-        make_residual_host_callback(
-            ctx.clone(),
-            "java.head",
-            UrlAndHeaders,
-            registry.clone(),
-        )?,
+        make_residual_host_callback(ctx.clone(), "java.head", UrlAndHeaders, registry.clone())?,
     )?;
     // WebView/Browser
     java.set(
@@ -7831,7 +7828,12 @@ fn install_residual_host_routing<'js>(
     )?;
     java.set(
         "queryTTF",
-        make_residual_host_callback(ctx.clone(), "java.queryTTF", TtfDataOptBool, registry.clone())?,
+        make_residual_host_callback(
+            ctx.clone(),
+            "java.queryTTF",
+            TtfDataOptBool,
+            registry.clone(),
+        )?,
     )?;
     java.set(
         "replaceFont",
@@ -8028,12 +8030,18 @@ fn build_residual_descriptor<'js>(
         }
         ("java.startBrowser", ResidualArgShape::UrlAndTitle) => HostDescriptor::StartBrowser {
             url: args[0].as_str().expect("validated URL string").to_string(),
-            title: args[1].as_str().expect("validated title string").to_string(),
+            title: args[1]
+                .as_str()
+                .expect("validated title string")
+                .to_string(),
         },
         ("java.startBrowserAwait", ResidualArgShape::UrlTitleOptBool) => {
             HostDescriptor::StartBrowserAwait {
                 url: args[0].as_str().expect("validated URL string").to_string(),
-                title: args[1].as_str().expect("validated title string").to_string(),
+                title: args[1]
+                    .as_str()
+                    .expect("validated title string")
+                    .to_string(),
                 refetch_after_success: args.get(2).and_then(JsonValue::as_bool),
             }
         }
@@ -8113,12 +8121,14 @@ fn build_residual_descriptor<'js>(
                 path: args[1].as_str().expect("validated path string").to_string(),
             }
         }
-        ("java.queryBase64TTF", ResidualArgShape::TtfDataOptBool) => HostDescriptor::QueryBase64TTF {
-            data: args[0]
-                .as_str()
-                .expect("validated base64 string")
-                .to_string(),
-        },
+        ("java.queryBase64TTF", ResidualArgShape::TtfDataOptBool) => {
+            HostDescriptor::QueryBase64TTF {
+                data: args[0]
+                    .as_str()
+                    .expect("validated base64 string")
+                    .to_string(),
+            }
+        }
         ("java.queryTTF", ResidualArgShape::TtfDataOptBool) => HostDescriptor::QueryTTF {
             data: args[0].clone(),
             use_cache: args.get(1).and_then(JsonValue::as_bool),

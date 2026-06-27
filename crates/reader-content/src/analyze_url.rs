@@ -403,9 +403,7 @@ impl AnalyzeUrl {
         let dsl = UrlDslParser::parse(&expanded)?;
 
         // Determine the JS expression source: `@js:`/`<js>` in URL, or DSL `js` option.
-        let active_js = js_expr
-            .clone()
-            .or_else(|| dsl.options.js.clone());
+        let active_js = js_expr.clone().or_else(|| dsl.options.js.clone());
 
         let has_js = classification == JsExpressionClassification::RequiresJsSandbox
             || dsl.options.js.is_some()
@@ -430,8 +428,7 @@ impl AnalyzeUrl {
             "baseUrl": base_url,
         });
 
-        let result = js_eval(&expr, &js_context)
-            .map_err(AnalyzeUrlError::JsExecution)?;
+        let result = js_eval(&expr, &js_context).map_err(AnalyzeUrlError::JsExecution)?;
 
         // The JS result is a URL string (or a Legado DSL form
         // `url,{"method":"POST",...}`). Re-parse it.
@@ -486,7 +483,9 @@ impl AnalyzeUrl {
             let charset = content_type_charset(&dsl.options.charset);
             headers.insert(
                 "Content-Type".to_string(),
-                Value::String(format!("application/x-www-form-urlencoded; charset={charset}")),
+                Value::String(format!(
+                    "application/x-www-form-urlencoded; charset={charset}"
+                )),
             );
         }
 

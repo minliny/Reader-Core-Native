@@ -107,11 +107,7 @@ fn build_request_for_case(case: &BuildCase) -> reader_contract::remote::HostHttp
 }
 
 fn headers_map(request: &reader_contract::remote::HostHttpRequest) -> Map<String, Value> {
-    request
-        .headers
-        .as_object()
-        .cloned()
-        .unwrap_or_default()
+    request.headers.as_object().cloned().unwrap_or_default()
 }
 
 #[test]
@@ -128,11 +124,7 @@ fn host_replay_suite_all_cases_build_expected_requests() {
 
         // URL assertions.
         if let Some(expected_url) = &case.expected.url {
-            assert_eq!(
-                request.url, *expected_url,
-                "case {}: url mismatch",
-                case.id
-            );
+            assert_eq!(request.url, *expected_url, "case {}: url mismatch", case.id);
         }
         if let Some(prefix) = &case.expected.url_starts_with {
             assert!(
@@ -155,11 +147,7 @@ fn host_replay_suite_all_cases_build_expected_requests() {
 
         // Method.
         if let Some(method) = &case.expected.method {
-            assert_eq!(
-                request.method, *method,
-                "case {}: method mismatch",
-                case.id
-            );
+            assert_eq!(request.method, *method, "case {}: method mismatch", case.id);
         }
 
         // Body.
@@ -214,10 +202,9 @@ fn host_replay_suite_all_cases_build_expected_requests() {
             let ct = headers
                 .get("Content-Type")
                 .and_then(|v| v.as_str())
-                .unwrap_or_else(|| panic!(
-                    "case {}: expected Content-Type header but missing",
-                    case.id
-                ));
+                .unwrap_or_else(|| {
+                    panic!("case {}: expected Content-Type header but missing", case.id)
+                });
             assert!(
                 ct.contains(ct_fragment),
                 "case {}: Content-Type {} should contain {}",
@@ -249,11 +236,7 @@ fn host_replay_suite_all_cases_build_expected_requests() {
                 .get(key)
                 .and_then(|v| v.as_str())
                 .unwrap_or_else(|| panic!("case {}: header {} missing", case.id, key));
-            assert_eq!(
-                actual, value,
-                "case {}: header {} mismatch",
-                case.id, key
-            );
+            assert_eq!(actual, value, "case {}: header {} mismatch", case.id, key);
         }
 
         // Header present.

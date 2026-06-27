@@ -4,7 +4,8 @@
 //! and the AnalyzeUrl builder ported from `BookSourceRequestBuilder.swift`.
 
 use reader_content::analyze_url::{
-    expand_static_templates, AnalyzeUrl, AnalyzeUrlContext, JsExpressionClassification, UrlDslParser,
+    expand_static_templates, AnalyzeUrl, AnalyzeUrlContext, JsExpressionClassification,
+    UrlDslParser,
 };
 
 #[test]
@@ -25,7 +26,8 @@ fn parse_empty_string_yields_empty_url() {
 
 #[test]
 fn parse_url_with_json_options_post_body() {
-    let raw = r#"https://example.test/search, {"method":"POST","body":"k={{key}}","charset":"gbk"}"#;
+    let raw =
+        r#"https://example.test/search, {"method":"POST","body":"k={{key}}","charset":"gbk"}"#;
     let result = UrlDslParser::parse(raw).expect("URL+JSON parses");
     assert_eq!(result.url, "https://example.test/search");
     assert_eq!(result.options.method, "POST");
@@ -88,10 +90,7 @@ fn expand_static_templates_replaces_key_and_page() {
         "https://example.test/search?q={{key}}&p={{page}}&pm={{pageMinus}}&pp={{pagePlus}}",
         &ctx,
     );
-    assert_eq!(
-        out,
-        "https://example.test/search?q=mirror&p=2&pm=1&pp=3"
-    );
+    assert_eq!(out, "https://example.test/search?q=mirror&p=2&pm=1&pp=3");
 }
 
 #[test]
@@ -135,7 +134,8 @@ fn build_request_plain_get_url() {
 #[test]
 fn build_request_post_with_body_and_charset() {
     let ctx = AnalyzeUrlContext::for_search("mirror", 1);
-    let raw = r#"https://example.test/search, {"method":"POST","body":"k={{key}}","charset":"gbk"}"#;
+    let raw =
+        r#"https://example.test/search, {"method":"POST","body":"k={{key}}","charset":"gbk"}"#;
     let request = AnalyzeUrl::build_request(raw, &ctx, "https://example.test", &Default::default())
         .expect("POST+body builds");
     assert_eq!(request.url, "https://example.test/search");
