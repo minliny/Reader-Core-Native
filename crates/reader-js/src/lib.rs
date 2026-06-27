@@ -493,7 +493,7 @@ impl HostCallbackRegistry {
         self.callbacks.keys().cloned().collect()
     }
 
-    fn call(&self, name: &str, descriptor: HostDescriptor) -> Result<JsonValue, HostError> {
+    pub fn call(&self, name: &str, descriptor: HostDescriptor) -> Result<JsonValue, HostError> {
         let callback = self
             .callbacks
             .get(name)
@@ -4636,65 +4636,29 @@ fn chinese_number_value(ch: char) -> Option<i64> {
 }
 
 fn t2s(input: &str) -> String {
-    input.chars().map(t2s_char).collect()
+    // Legado parity: `ChineseUtils.t2s` (quick-transfer full TS→ST dictionary).
+    // zhhz is a pure-Rust OpenCC reimplementation with embedded dictionaries,
+    // so no C deps and no runtime data download. The converter is expensive to
+    // build (~ms), so cache one per thread via OnceCell (QuickJS sandboxes are
+    // single-threaded).
+    thread_local! {
+        static T2S_CONVERTER: std::cell::OnceCell<zhhz::Converter> = const { std::cell::OnceCell::new() };
+    }
+    T2S_CONVERTER.with(|cell| {
+        cell.get_or_init(|| zhhz::Converter::new(zhhz::Config::T2s))
+            .convert(input)
+    })
 }
 
 fn s2t(input: &str) -> String {
-    input.chars().map(s2t_char).collect()
-}
-
-fn t2s_char(ch: char) -> char {
-    match ch {
-        '門' => '门',
-        '會' => '会',
-        '說' => '说',
-        '書' => '书',
-        '圖' => '图',
-        '館' => '馆',
-        '發' => '发',
-        '體' => '体',
-        '國' => '国',
-        '語' => '语',
-        '話' => '话',
-        '學' => '学',
-        '時' => '时',
-        '開' => '开',
-        '關' => '关',
-        '臺' | '颱' | '檯' => '台',
-        '個' => '个',
-        '們' => '们',
-        '對' => '对',
-        '過' => '过',
-        '點' => '点',
-        _ => ch,
+    // Legado parity: `ChineseUtils.s2t` (quick-transfer full ST→TS dictionary).
+    thread_local! {
+        static S2T_CONVERTER: std::cell::OnceCell<zhhz::Converter> = const { std::cell::OnceCell::new() };
     }
-}
-
-fn s2t_char(ch: char) -> char {
-    match ch {
-        '门' => '門',
-        '会' => '會',
-        '说' => '說',
-        '书' => '書',
-        '图' => '圖',
-        '馆' => '館',
-        '发' => '發',
-        '体' => '體',
-        '国' => '國',
-        '语' => '語',
-        '话' => '話',
-        '学' => '學',
-        '时' => '時',
-        '开' => '開',
-        '关' => '關',
-        '台' => '臺',
-        '个' => '個',
-        '们' => '們',
-        '对' => '對',
-        '过' => '過',
-        '点' => '點',
-        _ => ch,
-    }
+    S2T_CONVERTER.with(|cell| {
+        cell.get_or_init(|| zhhz::Converter::new(zhhz::Config::S2t))
+            .convert(input)
+    })
 }
 
 fn html_format(input: &str) -> String {

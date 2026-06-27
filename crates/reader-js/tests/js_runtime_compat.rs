@@ -38,6 +38,39 @@ fn chinese_conversion_helpers_match_old_core_postprocessor_fixture() {
 }
 
 #[test]
+fn java_t2s_and_s2t_match_legado_chinese_utils_full_dictionary_paths() {
+    // Legado parity: `JsExtensions.kt:547` exposes `t2s`/`s2t` backed by
+    // `ChineseUtils.t2s`/`s2t` (quick-transfer full TS/ST dictionaries).
+    // The reader-js sandbox must produce the same full-dictionary output for
+    // the Legado fixture pair `測試 <-> 测试`, which the old 20-char stub
+    // could not handle.
+    let sandbox = QuickJsSandbox::default();
+
+    let result = sandbox
+        .evaluate(
+            r#"
+            ({
+                javaT2s: java.t2s("測試"),
+                globalT2s: t2s("測試"),
+                javaS2t: java.s2t("测试"),
+                globalS2t: s2t("测试")
+            })
+            "#,
+        )
+        .unwrap();
+
+    assert_eq!(
+        result.value,
+        json!({
+            "javaT2s": "测试",
+            "globalT2s": "测试",
+            "javaS2t": "測試",
+            "globalS2t": "測試"
+        })
+    );
+}
+
+#[test]
 fn timeout_and_cancel_boundaries_are_enforced() {
     let timeout_sandbox = QuickJsSandbox::new(JsRuntimeConfig {
         timeout: Some(Duration::from_millis(10)),
