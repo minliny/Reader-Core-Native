@@ -64,13 +64,13 @@
       "capability": "包体签名和分发",
       "evidence_status": "unknown",
       "id": "rb-包体签名和分发",
-      "mitigation": "Configure release signing on all three platforms: Android signingConfigs + keystore (env-driven passwords); iOS ExportOptions.plist + provisioning profile + distribution cert; HarmonyOS signingConfigs in build-profile.json5 with .p12/.p7b material via DevEco Studio. Verification: release build installs on a real device for each platform.",
+      "mitigation": "Fix plan (priority: P1, blocks any real-device release). Files to change per platform: (1) Android app/build.gradle.kts:33-41 — add signingConfigs { release { storeFile=file(System.env.KEYSTORE_PATH); storePassword=System.env.KEYSTORE_PASSWORD; keyAlias=System.env.KEY_ALIAS; keyPassword=System.env.KEY_PASSWORD } } and wire release.signingConfig=signingConfigs.release; add keystore.properties + .gitignore entry. (2) iOS project.yml:134-143 — add PROVISIONING_PROFILE_SPECIFIER + CODE_SIGN_IDENTITY='iPhone Distribution' for Release + entitlements path + .xcconfig; generate ExportOptions.plist (App Store / Development); remove CODE_SIGN_IDENTITY:'' / CODE_SIGNING_ALLOWED:NO from framework sub-targets (project.yml:31-33,47-49,81-83,105-107) for Release config. (3) HarmonyOS build-profile.json5:3 — populate signingConfigs:[{name:'default',type:'HarmonyOS',material:{cert:'...',key:'...',...}}] with .p12/.p7b/.cer material via DevEco Studio; remove dangling signingConfig:'default' at :7. Legado reference: legado/app/build.gradle:35 signingConfigs { myConfig } + :78,:93 signingConfig references + .github/workflows/legado.jks CI signing material. Verification: release build installs on a real device for each platform.",
       "platform": "all",
-      "reason": "Audit 2026-06-27: 包体签名和分发 NOT ready on any platform. Android app/build.gradle.kts release build has no signingConfig, no signingConfigs block, no keystore reference. iOS ReaderForIOS.xcodeproj/project.pbxproj has only CODE_SIGN_IDENTITY='iPhone Developer' (Debug); no PROVISIONING_PROFILE_SPECIFIER, no ExportOptions.plist, no .entitlements, no .xcconfig. HarmonyOS build-profile.json5 has signingConfigs:[] empty with a dangling signingConfig:'default' reference; no .p12/.p7b/.cer key material in repo.",
+      "reason": "Re-audit 2026-06-27: 包体签名和分发 NOT ready on any platform (unchanged since 2026-06-27 audit). Android app/build.gradle.kts:33-41 release block has no signingConfigs block, no signingConfig reference, no keystore file in repo (0 *.jks/*.keystore/keystore.properties hits). iOS project.yml:134-143 has no PROVISIONING_PROFILE_SPECIFIER / CODE_SIGN_IDENTITY / entitlements / xcconfig; all framework sub-targets (project.yml:31-33,47-49,81-83,105-107) explicitly disable signing (CODE_SIGN_IDENTITY:'', CODE_SIGNING_REQUIRED:NO, CODE_SIGNING_ALLOWED:NO); no .entitlements / ExportOptions.plist in repo (0 glob hits). HarmonyOS build-profile.json5:3 signingConfigs:[] empty with dangling signingConfig:'default' at :7; no .p12/.p7b/.cer key material in repo (0 glob hits); AppScope/app.json5:1-10 has no signing fields.",
       "severity": "medium",
       "sources": [
         "app/build.gradle.kts",
-        "ReaderForIOS.xcodeproj/project.pbxproj",
+        "project.yml",
         "build-profile.json5"
       ]
     },
@@ -78,9 +78,9 @@
       "capability": "后台任务和通知",
       "evidence_status": "unknown",
       "id": "rb-后台任务和通知",
-      "mitigation": "Android: declare ForegroundService + wire startForeground. iOS: BGTaskScheduler + UNUserNotificationCenter authorization. HarmonyOS: real @ohos.notificationManager + @ohos.backgroundTaskManager APIs replacing smoke checksum. Verification: foreground/background download + visible notification on each platform.",
+      "mitigation": "Fix plan (priority: P1, blocks background download/TTS playback/sync user-visible feedback). Files to change per platform: (1) Android — add <service android:name='.service.DownloadForegroundService' android:foregroundServiceType='dataSync' android:exported='false'/> to AndroidManifest.xml:1-23 + add <uses-permission android:name='android.permission.FOREGROUND_SERVICE'/> + <uses-permission android:name='android.permission.FOREGROUND_SERVICE_DATA_SYNC'/>; create DownloadForegroundService.kt subclassing Service, call startForeground(id, AndroidNotificationRuntimeAdapter.buildForegroundNotification()) in onStartCommand; call ContextCompat.startForegroundService(ctx, Intent) from download trigger. (2) iOS — add BGTaskSchedulerPermittedIdentifiers to Info.plist; register BGAppRefreshTask / BGProcessingTask in ReaderApp.swift via BGTaskScheduler.shared.register; add UNUserNotificationCenter.current().requestAuthorization in AppEntry; post UNNotificationRequest for download/sync completion. (3) HarmonyOS — replace HarmonyOSHostSmokeRunner.ets:58,117 checksum placeholder with real @ohos.notificationManager.publish + @ohos.backgroundTaskManager APIs; add ohos.permission.NOTIFICATION to module.json5:38-42 + backgroundModes declaration. Legado reference: legado/app/src/main/java/io/legado/app/service/DownloadService.kt + AudioPlayService.kt + WebService.kt + TTSReadAloudService.kt (all foreground Services with startForeground). Verification: foreground/background download + visible notification on each platform.",
       "platform": "all",
-      "reason": "Audit 2026-06-27: 后台任务和通知 NOT functional on any platform. Android PARTIAL — AndroidNotificationRuntimeAdapter.kt creates NotificationChannel (downloads / playback / sync / maintenance) + NotificationCompat.Builder + runtime permission check, but NO <service> in AndroidManifest.xml, no startForeground() call, no foregroundServiceType (ForegroundService missing). iOS NONE — no BGTaskScheduler / UNUserNotificationCenter / registerForRemoteNotifications. HarmonyOS NONE — only a checksum placeholder in HarmonyOSHostSmokeRunner.ets; no @ohos.notificationManager / @ohos.backgroundTaskManager imports.",
+      "reason": "Re-audit 2026-06-27: 后台任务和通知 NOT functional on any platform (unchanged). Android PARTIAL — AndroidNotificationRuntimeAdapter.kt:92-141 creates NotificationChannel (ensureChannels :112-125) + NotificationCompat.Builder (buildForegroundNotification :127-141) + runtime permission check, but NO <service> in AndroidManifest.xml:1-23 (only MainActivity), 0 grep hits for startForeground/ForegroundService/foregroundServiceType. iOS NONE — 0 grep hits for BGTaskScheduler/UNUserNotificationCenter/registerForRemoteNotifications. HarmonyOS NONE — HarmonyOSHostSmokeRunner.ets:58,117 still checksum placeholder 'boundedChecksum(notification|permission|route)'; 0 imports of @ohos.notificationManager/@ohos.backgroundTaskManager; module.json5:38-42 only declares ohos.permission.INTERNET, no NOTIFICATION permission, no backgroundModes.",
       "severity": "medium",
       "sources": [
         "app/src/main/kotlin/com/reader/android/data/adapter/AndroidNotificationRuntimeAdapter.kt",
@@ -92,9 +92,9 @@
       "capability": "登录-webview-交互",
       "evidence_status": "unknown",
       "id": "rb-登录-webview-交互",
-      "mitigation": "Implement WebView login flow on all three: dedicated login WebView that loads bookSource.loginUrl, intercepts redirect / auth, harvests cookies into the shared cookie store. Android LoginActivity + WebView; iOS flip supportsLoginFlow:true + LoginView; HarmonyOS LoginPage.ets + onLoadIntercept. Verification: complete a real book-source web login and reuse cookies on a subsequent http.execute.",
+      "mitigation": "Fix plan (priority: P2, blocks login-required book sources). Files to change per platform: (1) Android — create LoginActivity.kt + LoginWebView Composable wrapping android.webkit.WebView; load bookSource.loginUrl (DomainModels.kt:82); override shouldOverrideUrlLoading to intercept redirect/auth completion; harvest cookies via CookieManager.getInstance().getCookie(url) into shared cookie store; add <activity android:name='.LoginActivity'/> to AndroidManifest.xml. (2) iOS — flip ProductionWebViewAdapter.swift:91 supportsLoginFlow:true; remove WebViewAdapterSmokeTests.swift:332 XCTAssertFalse lock; create LoginView.swift wrapping WKWebView with WKNavigationDelegate shouldPerformDownloadAction / decidePolicyForNavigationAction to intercept login redirect; harvest cookies via WKHTTPCookieStore.getAllCookies into shared URLSession cookie store. (3) HarmonyOS — add onLoadIntercept / onUrlLoadIntercept to ArkWebPlatformAdapter.ets:1-128 (currently only executeHTML/probePage/putAndMirrorCookie); create LoginPage.ets under entry/src/main/ets/pages/; wire loginUrl (BookSource.ets:62) consumption replacing HomeDashboardService.ets:284 fixture://login stub. Legado reference: legado/app/src/main/java/io/legado/app/ui/login/SourceLoginActivity.kt + WebViewLoginFragment.kt + SourceLoginViewModel.kt + SourceLoginDialog.kt (WebView login flow with redirect interception + cookie harvest). Verification: complete a real book-source web login and reuse cookies on a subsequent http.execute.",
       "platform": "all",
-      "reason": "Audit 2026-06-27: 登录 WebView 交互 NOT implemented on any platform. Android — no LoginActivity / LoginScreen / LoginViewModel; loginUrl field exists in DomainModels.kt but no WebView login UI. iOS — ProductionWebViewAdapter.capabilities() explicitly declares supportsLoginFlow:false; no login view. HarmonyOS PARTIAL — ArkWebPlatformAdapter has WebView + runJavaScript + cookie mirror, but no onLoadIntercept / onUrlLoadIntercept login flow, no LoginPage.ets; host_login_ui_authorization_audit only checks sessionPersistence.",
+      "reason": "Re-audit 2026-06-27: 登录 WebView 交互 NOT implemented on any platform (unchanged). Android — DomainModels.kt:82 has loginUrl field but 0 Login*.kt files (glob 0 hits); WebView usage only in AndroidPlatformRuntimeAdapters.kt:195-232 (book-source JS runtime, not login); field only read by DataStoreBookSourceRepository.kt:101 / BookSourceRepository.kt:70 for JSON serialization, no UI/ViewModel consumes it. iOS — ProductionWebViewAdapter.swift:91 still declares supportsLoginFlow:false; WebViewAdapterSmokeTests.swift:332 XCTAssertFalse(adapter.capabilities().supportsLoginFlow) locks it; 0 LoginView/LoginViewController files; HostRuntimeEvidenceExporter.swift:263 nativeWKWebViewLoginFlow is only an enum value with comment 'Requires iOS simulator or device WKWebView run'. HarmonyOS — ArkWebPlatformAdapter.ets:1-128 only has executeHTML(:48)/probePage(:64)/putAndMirrorCookie(:77), no onLoadIntercept/onUrlLoadIntercept; loginUrl only at BookSource.ets:62 (model field) and HomeDashboardService.ets:284 ('fixture://login' test stub); 0 LoginPage.ets files.",
       "severity": "medium",
       "sources": [
         "app/src/main/kotlin/com/reader/android/data/model/DomainModels.kt",
@@ -559,34 +559,6 @@
       ]
     },
     {
-      "capability": "harmonyos-napi-binding-index-dts",
-      "evidence_status": "unknown",
-      "id": "rb-harmonyos-index-dts-stale",
-      "mitigation": "Audit 2026-06-27 found entry/src/main/cpp/types/libreader_core_napi/Index.d.ts only declares 3 exports (abiVersion / pingSmoke / sendJsonCommand) while reader_napi.cpp exports 12 (abiVersion / createRuntime / releaseRuntime / sendCommand / cancelRequest / readEvent / pendingEventCount / completeHostRequest / failHostRequest / pingSmoke / hostSmoke / lifecycleSmoke). sendJsonCommand is a stale POC residual not present in C++. Plan: docs/superpowers/plans/2026-06-27-harmonyos-rust-core-integration-s6.md Task 1 rewrites Index.d.ts to declare all 12 exports aligned with bindings/harmony/sdk/reader_core.ts NativeReaderCoreModule type. Blocks: any ArkTS code referencing completeHostRequest/failHostRequest/readEvent/pendingEventCount/hostSmoke/lifecycleSmoke will not compile or runtime-link against libreader_core_napi.so. Verification: hvigorw assembleHap + ReaderCoreNapiBridge.ets runHostSmokeClosedLoop() green on simulator.",
-      "platform": "harmony",
-      "reason": "HarmonyOS NAPI Index.d.ts severely stale (3/12 exports declared, includes non-existent sendJsonCommand); breaks NAPI smoke closed-loop validation and any host.request round-trip from ArkTS",
-      "severity": "medium",
-      "sources": [
-        "docs/superpowers/plans/2026-06-27-harmonyos-rust-core-integration-s6.md",
-        "bindings/harmony/native/reader_napi.cpp",
-        "bindings/harmony/sdk/reader_core.ts"
-      ]
-    },
-    {
-      "capability": "harmonyos-host-adapter-arkts-module",
-      "evidence_status": "unknown",
-      "id": "rb-harmonyos-host-adapter-missing",
-      "mitigation": "Audit 2026-06-27 found no ArkTS host-adapter module exists in entry/src/main/ets/. Android has bindings/android/host-adapter/src/main/java/com/reader/core/host/ (HostAdapter.java + HostTransport + HostReply + HostReplyCodec + CapabilityHandler) but HarmonyOS has no equivalent. BridgeHTTPClient.ets implements 'Strategy B: localhost:8899 dev bridge' which bypasses Core host.request protocol entirely and violates Core/Host boundary. Plan: docs/superpowers/plans/2026-06-27-harmonyos-rust-core-integration-s6.md Task 3 creates entry/src/main/ets/hostadapter/ module (10 files: HostTransport / HttpRequest / HttpResponse / HostReply / HostReplyCodec / CapabilityHandler / HostAdapter / HostBus / HttpExecuteHandler / HostRuntime) mirroring Android host-adapter. Task 4 writes OHOSHTTPHostTransport using @ohos.net.http. Blocks: any real host.request round-trip (HTTP transport, persistence, system TTS) cannot route from Core to Host capabilities. Verification: host.request('http.execute', ...) returns host.complete with real 2xx body on simulator.",
-      "platform": "harmony",
-      "reason": "HarmonyOS missing ArkTS host-adapter module; Core host.request events cannot be dispatched to platform-owned capabilities (HTTP / persistence / TTS). Current BridgeHTTPClient bypasses Core protocol entirely.",
-      "severity": "medium",
-      "sources": [
-        "docs/superpowers/plans/2026-06-27-harmonyos-rust-core-integration-s6.md",
-        "bindings/android/host-adapter/src/main/java/com/reader/core/host/HostAdapter.java",
-        "AGENTS.md"
-      ]
-    },
-    {
       "capability": "harmonyos-business-path-rust-core-switch",
       "evidence_status": "unknown",
       "id": "rb-harmonyos-business-path-not-rust-core",
@@ -605,9 +577,9 @@
       "capability": "主题和字体",
       "evidence_status": "unknown",
       "id": "rb-主题和字体-harmony",
-      "mitigation": "Implement HarmonyOS theme system: ArkUI theme tokens (colors / typography / spacing) + dark/light mode switching + custom font registration (@ohos.font), mirroring Android ReaderTheme / iOS ReaderTheme. Verification: theme switch reflects on all 5 pages on simulator.",
+      "mitigation": "Fix plan (priority: P2, blocks theme parity with Android/iOS). Files to change: (1) Create entry/src/main/ets/theme/ module — AppTheme.ets (color tokens mirroring entry/src/main/resources/{base,dark}/element/color.json 13 tokens: color_primary/color_background/color_text_primary/...) + ReaderTypography.ets (font size tokens) + ReaderSpacing.ets. (2) Wire the EXISTING but unused resource tokens — entry/src/main/resources/dark/element/color.json already defines 13 tokens with dark values (#0A84FF/#1A1A1A/#E5E5F5) but 0 pages reference them via $color:; replace all hardcoded colors in 5 pages with $r('app.color.color_primary') etc. (3) Add dark/light mode switch — EntryAbility.ets: subscribe to ConfigurationConstant.ColorMode via onConfigurationUpdate, push to AppStorage.SetOrCreate('colorMode'); bind @StorageLink('colorMode') in pages. (4) Custom font registration — add @ohos.font.registerFont in EntryAbility.onCreate for custom .ttf. Legado reference: legado/app/src/main/assets/bg/ (theme background images) + legado/app/src/main/res/values/colors.xml + attrs.xml (theme tokens). Internal parity reference: Android app/src/main/kotlin/com/reader/ui/theme/ReaderTheme.kt (MaterialTheme dark/light) + iOS iOS/Modules/Theme/ReaderTheme.swift + ReaderColors.swift + ReaderTypography.swift. Verification: theme switch reflects on all 5 pages on simulator.",
       "platform": "harmony",
-      "reason": "Audit 2026-06-27: 主题和字体 implemented on Android (app/src/main/kotlin/com/reader/ui/theme/ReaderTheme.kt — MaterialTheme dark/light) and iOS (iOS/Modules/Theme/ReaderTheme.swift + ReaderColors.swift + ReaderTypography.swift). HarmonyOS NOT implemented — all 5 pages (Index.ets / BookshelfPage.ets / ReaderPage.ets / SettingsPage.ets / SearchPage.ets) use hardcoded colors (#1A1A1A / #007AFF / #F5F5F5) and fontSize() literals; no theme system, no @ohos.font registration, no dark/light switch. storage.write('setting.theme','light') is a string only with no ArkUI binding.",
+      "reason": "Re-audit 2026-06-27: 主题和字体 NOT implemented on HarmonyOS (unchanged; token system half-baked). All 5 pages use hardcoded colors — Index.ets (#007AFF at :63,66,198,273,316 / #1A1A1A at :181,252,302,426,501,684 / #F5F5F5 at :167,409,471 + fontSize literals), BookshelfPage.ets:17,33,41,46,53,57,68, ReaderPage.ets:114,119,128,134,142,167,172,200, SearchPage.ets:28,35,53,57,65,75,80,85,93,105, SettingsPage.ets:18,23,29,45,51. Half-baked: entry/src/main/resources/dark/element/color.json defines 13 tokens (color_primary/color_background/color_text_primary etc.) with dark values but 0 page references ($color: grep 0 hits) — token system defined but completely unwired. No theme/ dir (0 *Theme* files), 0 @ohos.font registration, 0 colorMode/ConfigurationConstant.ColorMode/AppStorage color mode switching logic.",
       "severity": "medium",
       "sources": [
         "entry/src/main/ets/pages/Index.ets",
@@ -620,9 +592,9 @@
       "capability": "文件选择和沙箱授权",
       "evidence_status": "unknown",
       "id": "rb-文件选择和沙箱授权-android",
-      "mitigation": "Add Android SAF launcher: ActivityResultContracts.OpenDocument in ImportBook ViewModel/Screen feeding content:// Uri into existing AndroidContentUriLocalBookAdapter. Verification: pick .epub/.txt from system file picker and import book on emulator.",
+      "mitigation": "Fix plan (priority: P2, blocks local-book import on Android; iOS + HarmonyOS already done). Files to change: (1) Create SAF launcher entry — add ActivityResultContracts.OpenDocument() remembered via rememberLauncherForActivityResult in a new ImportBookScreen.kt (Composable) under app/src/main/kotlin/com/reader/android/ui/importbook/; launch with arrayOf('application/epub+zip','text/plain','application/pdf','application/x-mobipocket-ebook'). (2) Wire the returned content:// Uri into the EXISTING AndroidContentUriLocalBookAdapter (AndroidPlatformRuntimeAdapters.kt:26-64) — call takePersistableReadPermission(:29-40) then readPrefixAndDetectEncoding(:42-57) then hand off to Core local-book parse. (3) Add 'Import Book' menu entry in Bookshelf screen to launch the SAF picker. Legado reference: legado uses ActivityResultContracts for file import (SearchActivity / ImportBookActivity patterns). Internal parity reference: iOS iOS/Features/FileImporter/FileImportView.swift (.fileImporter + security-scoped resource) + HarmonyOS entry/src/main/ets/platform/FilePickerAdapter.ets (@kit.CoreFileKit DocumentViewPicker + permission handoff token). Verification: pick .epub/.txt from system file picker and import book on emulator.",
       "platform": "android",
-      "reason": "Audit 2026-06-27: 文件选择和沙箱授权 implemented on iOS (iOS/Features/FileImporter/FileImportView.swift .fileImporter + security-scoped resource handoff) and HarmonyOS (entry/src/main/ets/platform/FilePickerAdapter.ets @kit.CoreFileKit DocumentViewPicker + permission handoff token). Android PARTIAL — AndroidContentUriLocalBookAdapter implements ContentResolver.takePersistableUriPermission() + openInputStream() (sandbox authorization ready) but NO SAF launcher (no ACTION_OPEN_DOCUMENT / ActivityResultContracts.OpenDocument), so the user has no file-pick entry point.",
+      "reason": "Re-audit 2026-06-27: PARTIAL (unchanged). AndroidContentUriLocalBookAdapter in AndroidPlatformRuntimeAdapters.kt:26-64 implements takePersistableReadPermission (:29-40, contentResolver.takePersistableUriPermission at :35 with SecurityException→permissionDeniedMapped) + readPrefixAndDetectEncoding (:42-57, openInputStream at :44) — sandbox authorization ready. BUT 0 grep hits for OpenDocument/ACTION_OPEN_DOCUMENT/GetContent/rememberLauncherForActivityResult — no SAF launcher entry point exists. ui/ dir has bookshelf/reading/search/source.ImportBookSource*/theme/ but no local-book import entry. iOS and HarmonyOS already complete (FileImportView.swift .fileImporter / FilePickerAdapter.ets @kit.CoreFileKit DocumentViewPicker).",
       "severity": "medium",
       "sources": [
         "app/src/main/kotlin/com/reader/android/data/adapter/AndroidPlatformRuntimeAdapters.kt",
@@ -634,9 +606,9 @@
       "capability": "系统-tts-发声",
       "evidence_status": "unknown",
       "id": "rb-系统-tts-发声-android",
-      "mitigation": "Implement Android TextToSpeech: concrete AndroidTtsAdapter wrapping android.speech.tts.TextToSpeech (init / speak / stop / shutdown + UtteranceProgressListener), replacing FakeAndroidTtsAdapter. Verification: ReaderPage TTS plays zh-CN speech on emulator.",
+      "mitigation": "Fix plan (priority: P1, blocks Android 朗读能力; violates AGENTS.md TTS 策略 §2 '发声归 Host 系统级 TTS, Android TextToSpeech'). Files to change: (1) Create RealAndroidTtsAdapter.kt under app/src/main/kotlin/com/reader/android/data/adapter/ implementing AndroidTtsAdapter interface — wrap android.speech.tts.TextToSpeech: TextToSpeech(context, InitListener) in init(), setLanguage(Locale('zh','CN')), speak(text, TextToSpeech.QUEUE_ADD, params, utteranceId) in speak(), stop() + shutdown() in lifecycle; add UtteranceProgressListener (onStart/onDone/onError) to drive Core TTS queue state machine callbacks. (2) Replace FakeAndroidTtsAdapter injection with RealAndroidTtsAdapter in AppProvider.kt wiring (keep Fake for unit tests). Legado reference: legado/app/src/main/java/io/legado/app/service/TTSReadAloudService.kt + BaseReadAloudService.kt (foreground Service wrapping android.speech.tts.TextToSpeech with UtteranceProgressListener + zh-CN voice + rate/pitch control). Internal parity reference: iOS iOS/Features/Reader/ReaderTTSPlayer.swift (AVSpeechSynthesizer + delegate + rate control + zh-CN voice) + HarmonyOS entry/src/main/ets/platform/SystemTtsAdapter.ets (@kit.CoreSpeechKit textToSpeech.createEngine + SpeakListener + state machine). Verification: ReaderPage TTS plays zh-CN speech on emulator.",
       "platform": "android",
-      "reason": "Audit 2026-06-27: 系统 TTS 发声 implemented on iOS (iOS/Features/Reader/ReaderTTSPlayer.swift AVSpeechSynthesizer + delegate + rate control + zh-CN voice) and HarmonyOS (entry/src/main/ets/platform/SystemTtsAdapter.ets @kit.CoreSpeechKit textToSpeech.createEngine + SpeakListener + state machine). Android NOT implemented — only TtsEngine interface + FakeTtsEngine / FakeAndroidTtsAdapter stubs exist; no class instantiates android.speech.tts.TextToSpeech. Violates AGENTS.md TTS 策略 (发声归 Host 系统级 TTS).",
+      "reason": "Re-audit 2026-06-27: NOT implemented (unchanged). TtsEngine.kt:1-43 only defines TtsEngine interface (:15-21) + FakeTtsEngine (:23-43, memory @Volatile state, no audio). AndroidTtsAdapter.kt:1-26 only defines AndroidTtsAdapter interface (:8-16) + FakeAndroidTtsAdapter (:18-26, delegates to FakeTtsEngine). 0 grep hits for android.speech.tts / TextToSpeech / UtteranceProgressListener — no class instantiates android.speech.tts.TextToSpeech. Violates AGENTS.md TTS 策略 §2 (发声归 Host 系统级 TTS, Android TextToSpeech). iOS + HarmonyOS already complete (ReaderTTSPlayer.swift AVSpeechSynthesizer / SystemTtsAdapter.ets @kit.CoreSpeechKit).",
       "severity": "medium",
       "sources": [
         "app/src/main/kotlin/com/reader/android/data/adapter/TtsEngine.kt",
@@ -664,19 +636,19 @@
   "generated_at": "2026-06-27T00:00:00Z",
   "summary": {
     "by_platform": {
-      "all": 53,
+      "all": 47,
       "android": 2,
-      "harmony": 4,
+      "harmony": 2,
       "ios": 0,
       "unknown": 0
     },
     "by_severity": {
       "blocker": 1,
       "high": 0,
-      "medium": 8,
+      "medium": 6,
       "low": 44
     },
-    "total": 53
+    "total": 51
   },
   "tool": "release-blocker-register-generator",
   "version": "release-blockers/1"
