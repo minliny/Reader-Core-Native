@@ -462,12 +462,14 @@ fn build_search_request_from_source(
         )
         .with_details(serde_json::json!({ "sourceId": params.source_id }))
     })?;
-    let search_url = legado.search_url.as_deref().filter(|s| !s.is_empty()).ok_or_else(|| {
-        CoreError::invalid_params(
-            "cannot auto-build searchRequest: source.searchUrl is empty",
-        )
-        .with_details(serde_json::json!({ "sourceId": params.source_id }))
-    })?;
+    let search_url = legado
+        .search_url
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+            CoreError::invalid_params("cannot auto-build searchRequest: source.searchUrl is empty")
+                .with_details(serde_json::json!({ "sourceId": params.source_id }))
+        })?;
     let page = params.page.unwrap_or(1).max(1);
     let ctx = AnalyzeUrlContext::for_search(keyword, page);
     // Source-level headers from Legado `header` field (object form). If the
@@ -478,13 +480,7 @@ fn build_search_request_from_source(
         .and_then(|h| h.as_object())
         .cloned()
         .unwrap_or_default();
-    build_analyze_url_request(
-        state,
-        search_url,
-        &ctx,
-        &source.base_url,
-        &source_headers,
-    )
+    build_analyze_url_request(state, search_url, &ctx, &source.base_url, &source_headers)
 }
 
 /// Build a `HostHttpRequest` from an explicit URL field (`bookUrl` /
@@ -593,7 +589,8 @@ fn book_detail(
     }
     if let Some(book_url) = params.book_url.as_deref() {
         if !book_url.trim().is_empty() {
-            let request = build_request_from_url_field(state, &params.source_id, &params.source, book_url)?;
+            let request =
+                build_request_from_url_field(state, &params.source_id, &params.source, book_url)?;
             return Ok(RemoteCommandResult::Pending(pending_http_request(
                 request,
                 RemoteHostContinuation::BookDetail(params.clone()),
@@ -641,7 +638,8 @@ fn book_toc(
     }
     if let Some(toc_url) = params.toc_url.as_deref() {
         if !toc_url.trim().is_empty() {
-            let request = build_request_from_url_field(state, &params.source_id, &params.source, toc_url)?;
+            let request =
+                build_request_from_url_field(state, &params.source_id, &params.source, toc_url)?;
             return Ok(RemoteCommandResult::Pending(pending_http_request(
                 request,
                 RemoteHostContinuation::BookToc(params.clone()),
@@ -693,7 +691,12 @@ fn chapter_content(
     }
     if let Some(chapter_url) = params.chapter_url.as_deref() {
         if !chapter_url.trim().is_empty() {
-            let request = build_request_from_url_field(state, &params.source_id, &params.source, chapter_url)?;
+            let request = build_request_from_url_field(
+                state,
+                &params.source_id,
+                &params.source,
+                chapter_url,
+            )?;
             return Ok(RemoteCommandResult::Pending(pending_http_request(
                 request,
                 RemoteHostContinuation::ChapterContent(params.clone()),

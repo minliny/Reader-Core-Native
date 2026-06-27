@@ -9,7 +9,8 @@ use reader_contract::{
     LocalBookCatalogData, LocalBookParseData, PendingHostOperationStatus,
     ReadingProgressUpdateData, RssParseData, RssRefreshData, RuntimeCancelData, RuntimeConfig,
     RuntimePingData, RuntimeShutdownData, RuntimeStatus, SourceImportData, SyncBackupData,
-    SyncMergeData, PROTOCOL_VERSION, V1_CAPABILITIES,
+    SyncMergeData, TtsChapterPlanData, TtsQueueState, TtsQueueStatusData, TtsSliceData,
+    TtsSlicingStrategy, PROTOCOL_VERSION, V1_CAPABILITIES,
 };
 use reader_runtime::{EventSink, Runtime};
 use serde_json::{json, Value};
@@ -163,6 +164,27 @@ const INVALID_LOCAL_BOOK_CATALOG_UNKNOWN_FIELD: &str = include_str!(
 );
 const INVALID_LOCAL_BOOK_CATALOG_ENTRY_NOT_OBJECT: &str = include_str!(
     "../../../protocol/fixtures/conformance/commands/invalid-local-book-catalog-entry-not-object.json"
+);
+
+const VALID_TTS_SLICE: &str =
+    include_str!("../../../protocol/fixtures/conformance/commands/valid-tts-slice.json");
+const VALID_TTS_QUEUE_STATUS: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/valid-tts-queue-status.json"
+);
+const VALID_TTS_CHAPTER_PLAN: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/valid-tts-chapter-plan.json"
+);
+const INVALID_TTS_SLICE_CONTENT_EMPTY: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-tts-slice-content-empty.json"
+);
+const INVALID_TTS_SLICE_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-tts-slice-unknown-field.json"
+);
+const INVALID_TTS_QUEUE_STATUS_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-tts-queue-status-unknown-field.json"
+);
+const INVALID_TTS_CHAPTER_PLAN_UNKNOWN_FIELD: &str = include_str!(
+    "../../../protocol/fixtures/conformance/commands/invalid-tts-chapter-plan-unknown-field.json"
 );
 
 const VALID_CONFIG_EMPTY: &str =
@@ -745,6 +767,7 @@ pub(crate) fn run_conformance() -> ConformanceReport {
                     if method != "GET" {
                         return Err(format!("expected GET, got {method}"));
                     }
+                    // {{key}} expands to percent-encoded "dune"; {{page}} to "2".
                     if !url.starts_with("https://auto-build.example.test/search?q=") {
                         return Err(format!("unexpected url: {url}"));
                     }
@@ -1567,6 +1590,78 @@ pub(crate) fn run_conformance() -> ConformanceReport {
         }
     });
 
+    record(&mut report, "valid-command-tts-slice", || {
+        let (_runtime, rx) = send_to_fresh_runtime(VALID_TTS_SLICE)?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 420 => {
+                let data = serde_json::from_value::<TtsSliceData>(data)
+                    .map_err(|err| format!("tts.slice data contract parse failed: {err}"))?;
+                if data.plan.strategy == TtsSlicingStrategy::Paragraph
+                    && data.plan.slices.len() == 2
+                    && data.plan.slices[0].text == "第一段内容。"
+                    && data.plan.slices[1].text == "第二段内容。"
+                    && data.plan.source_char_count == 14
+                    && data.plan.chapter.chapter_index == 0
+                    && data.plan.chapter.chapter_title == "第一章"
+                {
+                    Ok(())
+                } else {
+                    Err(format!("unexpected tts.slice data {data:?}"))
+                }
+            }
+            other => Err(format!("unexpected tts.slice result {other:?}")),
+        }
+    });
+
+    record(&mut report, "valid-command-tts-queue-status", || {
+        let (_runtime, rx) = send_to_fresh_runtime(VALID_TTS_QUEUE_STATUS)?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 421 => {
+                let data = serde_json::from_value::<TtsQueueStatusData>(data).map_err(|err| {
+                    format!("tts.queue.status data contract parse failed: {err}")
+                })?;
+                if data.snapshot.state == TtsQueueState::Idle
+                    && data.snapshot.total_slices == 0
+                    && data.snapshot.completed_slices == 0
+                    && data.snapshot.current_slice_index.is_none()
+                    && data.snapshot.chapter.chapter_index == 2
+                {
+                    Ok(())
+                } else {
+                    Err(format!("unexpected tts.queue.status data {data:?}"))
+                }
+            }
+            other => Err(format!("unexpected tts.queue.status result {other:?}")),
+        }
+    });
+
+    record(&mut report, "valid-command-tts-chapter-plan", || {
+        let (_runtime, rx) = send_to_fresh_runtime(VALID_TTS_CHAPTER_PLAN)?;
+        match recv_event(&rx)? {
+            Event::Result {
+                request_id, data, ..
+            } if request_id == 422 => {
+                let data = serde_json::from_value::<TtsChapterPlanData>(data).map_err(|err| {
+                    format!("tts.chapter.plan data contract parse failed: {err}")
+                })?;
+                if data.transition.next.is_none()
+                    && data.transition.current.chapter_index == 2
+                    && data.transition.drain_behavior
+                        == reader_contract::TtsQueueDrainBehavior::AdvanceToNext
+                {
+                    Ok(())
+                } else {
+                    Err(format!("unexpected tts.chapter.plan data {data:?}"))
+                }
+            }
+            other => Err(format!("unexpected tts.chapter.plan result {other:?}")),
+        }
+    });
+
     for (name, json, request_id) in [
         (
             "rss-parse-rejects-unknown-params",
@@ -1627,6 +1722,26 @@ pub(crate) fn run_conformance() -> ConformanceReport {
             "local-book-catalog-rejects-entry-not-object",
             INVALID_LOCAL_BOOK_CATALOG_ENTRY_NOT_OBJECT,
             618,
+        ),
+        (
+            "tts-slice-rejects-content-empty",
+            INVALID_TTS_SLICE_CONTENT_EMPTY,
+            423,
+        ),
+        (
+            "tts-slice-rejects-unknown-params",
+            INVALID_TTS_SLICE_UNKNOWN_FIELD,
+            424,
+        ),
+        (
+            "tts-queue-status-rejects-unknown-params",
+            INVALID_TTS_QUEUE_STATUS_UNKNOWN_FIELD,
+            425,
+        ),
+        (
+            "tts-chapter-plan-rejects-unknown-params",
+            INVALID_TTS_CHAPTER_PLAN_UNKNOWN_FIELD,
+            426,
         ),
     ] {
         record(&mut report, name, || {

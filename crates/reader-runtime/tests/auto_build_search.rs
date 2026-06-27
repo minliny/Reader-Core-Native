@@ -49,20 +49,11 @@ fn inline_search_source(search_url: &str, base_url: &str) -> serde_json::Value {
     })
 }
 
-fn dispatch_book_search(
-    state: &RemoteState,
-    params: serde_json::Value,
-) -> RemoteDispatch {
+fn dispatch_book_search(state: &RemoteState, params: serde_json::Value) -> RemoteDispatch {
     let cmd = Command::new(7, "book.search", params);
     let sink: Arc<dyn EventSink> = Arc::new(CapturingSink::new());
     let active = Arc::new(Mutex::new(std::collections::HashSet::<u64>::new()));
-    reader_runtime::remote::dispatch_remote(
-        "book.search",
-        &cmd,
-        &sink,
-        &active,
-        state,
-    )
+    reader_runtime::remote::dispatch_remote("book.search", &cmd, &sink, &active, state)
 }
 
 /// Common assertion helper: pulls the pending `HostHttpRequest` URL/method
@@ -126,10 +117,7 @@ fn book_search_auto_builds_post_request_with_body_and_charset() {
     match dispatch {
         RemoteDispatch::Pending(pending) => {
             assert_eq!(pending.params["method"], "POST");
-            assert_eq!(
-                pending.params["url"],
-                "https://api.example.test/search"
-            );
+            assert_eq!(pending.params["url"], "https://api.example.test/search");
             assert_eq!(pending.params["body"], "k=test");
             assert_eq!(pending.params["charset"], "gbk");
             // Auto Content-Type for POST with body should be set.
@@ -153,10 +141,7 @@ fn book_search_auto_builds_post_request_with_body_and_charset() {
 #[test]
 fn book_search_auto_build_resolves_relative_search_url_against_base() {
     let state = RemoteState::new();
-    let source = inline_search_source(
-        "/search?q={{key}}",
-        "https://api.example.test",
-    );
+    let source = inline_search_source("/search?q={{key}}", "https://api.example.test");
     let params = serde_json::json!({
         "sourceId": "src-1",
         "source": source,
@@ -266,15 +251,13 @@ fn book_search_auto_build_continuation_carries_keyword_and_page() {
 
     let dispatch = dispatch_book_search(&state, params);
     match dispatch {
-        RemoteDispatch::Pending(pending) => {
-            match pending.continuation {
-                RemoteHostContinuation::BookSearch(p) => {
-                    assert_eq!(p.keyword.as_deref(), Some("继续"));
-                    assert_eq!(p.page, Some(3));
-                }
-                other => panic!("expected BookSearch continuation, got {other:?}"),
+        RemoteDispatch::Pending(pending) => match pending.continuation {
+            RemoteHostContinuation::BookSearch(p) => {
+                assert_eq!(p.keyword.as_deref(), Some("继续"));
+                assert_eq!(p.page, Some(3));
             }
-        }
+            other => panic!("expected BookSearch continuation, got {other:?}"),
+        },
         other => panic!("expected Pending, got {other:?}"),
     }
 }

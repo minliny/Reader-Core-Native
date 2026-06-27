@@ -10,7 +10,7 @@
       "chapterTitle": "第一章",
       "chapterUrl": "https://books.example.test/ch1"
     },
-    "content": "第一段内容。\n第二段内容。",
+    "content": "第一段内容。\n\n第二段内容。",
     "strategy": "paragraph"
   }
 }

@@ -363,6 +363,12 @@ fn dispatch_command(
             dispatch_host_error(cmd, sink, active_requests, cancelled, host_operations)
         }
         other => {
+            // TTS vertical (pure logic, no host I/O) is tried first so that
+            // tts.* commands don't fall through to unknown_method.
+            match crate::tts::dispatch_tts(other, cmd, sink, active_requests) {
+                crate::tts::TtsDispatch::Finished => return,
+                crate::tts::TtsDispatch::NotHandled => {}
+            }
             match dispatch_remote(other, cmd, sink, active_requests, remote_state) {
                 RemoteDispatch::Finished => return,
                 RemoteDispatch::Pending(pending) => {

@@ -189,7 +189,7 @@ pub struct TtsChapterTransition {
 /// Params for `tts.slice`. Core slices chapter content into speakable
 /// utterances using the requested strategy.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TtsSliceParams {
     pub chapter: TtsChapterRef,
     #[serde(deserialize_with = "deserialize_non_empty_tts_text")]
@@ -201,7 +201,7 @@ pub struct TtsSliceParams {
 /// Params for `tts.queue.status`. Core returns the current queue snapshot
 /// for the given chapter.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TtsQueueStatusParams {
     pub chapter: TtsChapterRef,
 }
@@ -209,7 +209,7 @@ pub struct TtsQueueStatusParams {
 /// Params for `tts.chapter.plan`. Core returns the chapter boundary
 /// transition plan for the given chapter.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TtsChapterPlanParams {
     pub chapter: TtsChapterRef,
     #[serde(default)]

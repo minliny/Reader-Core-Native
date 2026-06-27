@@ -369,7 +369,10 @@ fn chapter_content_auto_build_continuation_carries_chapter_url() {
     match dispatch {
         RemoteDispatch::Pending(pending) => match pending.continuation {
             RemoteHostContinuation::ChapterContent(p) => {
-                assert_eq!(p.chapter_url.as_deref(), Some("https://api.example.test/ch/1"));
+                assert_eq!(
+                    p.chapter_url.as_deref(),
+                    Some("https://api.example.test/ch/1")
+                );
             }
             other => panic!("expected ChapterContent continuation, got {other:?}"),
         },
@@ -392,7 +395,10 @@ fn book_detail_auto_build_continuation_carries_book_url() {
     match dispatch {
         RemoteDispatch::Pending(pending) => match pending.continuation {
             RemoteHostContinuation::BookDetail(p) => {
-                assert_eq!(p.book_url.as_deref(), Some("https://api.example.test/book/123"));
+                assert_eq!(
+                    p.book_url.as_deref(),
+                    Some("https://api.example.test/book/123")
+                );
             }
             other => panic!("expected BookDetail continuation, got {other:?}"),
         },
