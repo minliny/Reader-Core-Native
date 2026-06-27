@@ -15,6 +15,10 @@ reader-storage = { path = "../reader-storage" }
 reader-rss = { path = "../reader-rss" }
 reader-sync = { path = "../reader-sync" }
 reader-local-book = { path = "../reader-local-book" }
+# S6: JS host-callback bridge — needed so RemoteState can construct a
+# QuickJsSandbox wired with java.get/post/ajax/... callbacks that emit
+# http.execute host.request events through the runtime sink.
+reader-js = { path = "../reader-js" }
 serde_json.workspace = true
 serde.workspace = true
 # S5: base64 decode for local_book.parse binary path (EPUB/PDF/MOBI bytes).

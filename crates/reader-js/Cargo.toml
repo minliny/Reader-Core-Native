@@ -14,3 +14,5 @@ reader-contract = { path = "../reader-contract" }
 # native targets the generated bindings are equivalent to the shipped ones.
 rquickjs = { version = "=0.8.1", features = ["bindgen"] }
 serde_json.workspace = true
+# Pure-Rust OpenCC — backs Legado `JsExtensions.kt:547` `t2s`/`s2t`.
+zhhz.workspace = true
