@@ -25,18 +25,6 @@
       ]
     },
     {
-      "capability": "http-transport",
-      "evidence_status": "unknown",
-      "id": "rb-http-transport",
-      "mitigation": "Add passing evidence for http-transport on all required platforms",
-      "platform": "all",
-      "reason": "http-transport is host-owned with zero evidence",
-      "severity": "medium",
-      "sources": [
-        "FEATURE_MATRIX.md"
-      ]
-    },
-    {
       "capability": "runtime.config.v1",
       "evidence_status": "conformance",
       "id": "rb-runtime.config.v1",
@@ -73,98 +61,30 @@
       ]
     },
     {
-      "capability": "tls-实际网络-socket",
-      "evidence_status": "unknown",
-      "id": "rb-tls-实际网络-socket",
-      "mitigation": "Add passing evidence for tls-实际网络-socket on all required platforms",
-      "platform": "all",
-      "reason": "tls-实际网络-socket is host-owned with zero evidence",
-      "severity": "medium",
-      "sources": [
-        "FEATURE_MATRIX.md"
-      ]
-    },
-    {
-      "capability": "ui-组件和导航",
-      "evidence_status": "unknown",
-      "id": "rb-ui-组件和导航",
-      "mitigation": "Add passing evidence for ui-组件和导航 on all required platforms",
-      "platform": "all",
-      "reason": "ui-组件和导航 is host-owned with zero evidence",
-      "severity": "medium",
-      "sources": [
-        "FEATURE_MATRIX.md"
-      ]
-    },
-    {
-      "capability": "webview-cookie-获取",
-      "evidence_status": "unknown",
-      "id": "rb-webview-cookie-获取",
-      "mitigation": "Add passing evidence for webview-cookie-获取 on all required platforms",
-      "platform": "all",
-      "reason": "webview-cookie-获取 is host-owned with zero evidence",
-      "severity": "medium",
-      "sources": [
-        "FEATURE_MATRIX.md"
-      ]
-    },
-    {
-      "capability": "主题和字体",
-      "evidence_status": "unknown",
-      "id": "rb-主题和字体",
-      "mitigation": "Add passing evidence for 主题和字体 on all required platforms",
-      "platform": "all",
-      "reason": "主题和字体 is host-owned with zero evidence",
-      "severity": "medium",
-      "sources": [
-        "FEATURE_MATRIX.md"
-      ]
-    },
-    {
       "capability": "包体签名和分发",
       "evidence_status": "unknown",
       "id": "rb-包体签名和分发",
-      "mitigation": "Add passing evidence for 包体签名和分发 on all required platforms",
+      "mitigation": "Configure release signing on all three platforms: Android signingConfigs + keystore (env-driven passwords); iOS ExportOptions.plist + provisioning profile + distribution cert; HarmonyOS signingConfigs in build-profile.json5 with .p12/.p7b material via DevEco Studio. Verification: release build installs on a real device for each platform.",
       "platform": "all",
-      "reason": "包体签名和分发 is host-owned with zero evidence",
+      "reason": "Audit 2026-06-27: 包体签名和分发 NOT ready on any platform. Android app/build.gradle.kts release build has no signingConfig, no signingConfigs block, no keystore reference. iOS ReaderForIOS.xcodeproj/project.pbxproj has only CODE_SIGN_IDENTITY='iPhone Developer' (Debug); no PROVISIONING_PROFILE_SPECIFIER, no ExportOptions.plist, no .entitlements, no .xcconfig. HarmonyOS build-profile.json5 has signingConfigs:[] empty with a dangling signingConfig:'default' reference; no .p12/.p7b/.cer key material in repo.",
       "severity": "medium",
       "sources": [
-        "FEATURE_MATRIX.md"
+        "app/build.gradle.kts",
+        "ReaderForIOS.xcodeproj/project.pbxproj",
+        "build-profile.json5"
       ]
     },
     {
       "capability": "后台任务和通知",
       "evidence_status": "unknown",
       "id": "rb-后台任务和通知",
-      "mitigation": "Add passing evidence for 后台任务和通知 on all required platforms",
+      "mitigation": "Android: declare ForegroundService + wire startForeground. iOS: BGTaskScheduler + UNUserNotificationCenter authorization. HarmonyOS: real @ohos.notificationManager + @ohos.backgroundTaskManager APIs replacing smoke checksum. Verification: foreground/background download + visible notification on each platform.",
       "platform": "all",
-      "reason": "后台任务和通知 is host-owned with zero evidence",
+      "reason": "Audit 2026-06-27: 后台任务和通知 NOT functional on any platform. Android PARTIAL — AndroidNotificationRuntimeAdapter.kt creates NotificationChannel (downloads / playback / sync / maintenance) + NotificationCompat.Builder + runtime permission check, but NO <service> in AndroidManifest.xml, no startForeground() call, no foregroundServiceType (ForegroundService missing). iOS NONE — no BGTaskScheduler / UNUserNotificationCenter / registerForRemoteNotifications. HarmonyOS NONE — only a checksum placeholder in HarmonyOSHostSmokeRunner.ets; no @ohos.notificationManager / @ohos.backgroundTaskManager imports.",
       "severity": "medium",
       "sources": [
-        "FEATURE_MATRIX.md"
-      ]
-    },
-    {
-      "capability": "安全凭据存储-keychain-keystore-etc",
-      "evidence_status": "unknown",
-      "id": "rb-安全凭据存储-keychain-keystore-etc",
-      "mitigation": "Add passing evidence for 安全凭据存储-keychain-keystore-etc on all required platforms",
-      "platform": "all",
-      "reason": "安全凭据存储-keychain-keystore-etc is host-owned with zero evidence",
-      "severity": "medium",
-      "sources": [
-        "FEATURE_MATRIX.md"
-      ]
-    },
-    {
-      "capability": "文件选择和沙箱授权",
-      "evidence_status": "unknown",
-      "id": "rb-文件选择和沙箱授权",
-      "mitigation": "Add passing evidence for 文件选择和沙箱授权 on all required platforms",
-      "platform": "all",
-      "reason": "文件选择和沙箱授权 is host-owned with zero evidence",
-      "severity": "medium",
-      "sources": [
+        "app/src/main/kotlin/com/reader/android/data/adapter/AndroidNotificationRuntimeAdapter.kt",
+        "entry/src/main/ets/coreAdapter/HarmonyOSHostSmokeRunner.ets",
         "FEATURE_MATRIX.md"
       ]
     },
@@ -172,24 +92,14 @@
       "capability": "登录-webview-交互",
       "evidence_status": "unknown",
       "id": "rb-登录-webview-交互",
-      "mitigation": "Add passing evidence for 登录-webview-交互 on all required platforms",
+      "mitigation": "Implement WebView login flow on all three: dedicated login WebView that loads bookSource.loginUrl, intercepts redirect / auth, harvests cookies into the shared cookie store. Android LoginActivity + WebView; iOS flip supportsLoginFlow:true + LoginView; HarmonyOS LoginPage.ets + onLoadIntercept. Verification: complete a real book-source web login and reuse cookies on a subsequent http.execute.",
       "platform": "all",
-      "reason": "登录-webview-交互 is host-owned with zero evidence",
+      "reason": "Audit 2026-06-27: 登录 WebView 交互 NOT implemented on any platform. Android — no LoginActivity / LoginScreen / LoginViewModel; loginUrl field exists in DomainModels.kt but no WebView login UI. iOS — ProductionWebViewAdapter.capabilities() explicitly declares supportsLoginFlow:false; no login view. HarmonyOS PARTIAL — ArkWebPlatformAdapter has WebView + runJavaScript + cookie mirror, but no onLoadIntercept / onUrlLoadIntercept login flow, no LoginPage.ets; host_login_ui_authorization_audit only checks sessionPersistence.",
       "severity": "medium",
       "sources": [
-        "FEATURE_MATRIX.md"
-      ]
-    },
-    {
-      "capability": "系统-tts-发声",
-      "evidence_status": "unknown",
-      "id": "rb-系统-tts-发声",
-      "mitigation": "Add passing evidence for 系统-tts-发声 on all required platforms",
-      "platform": "all",
-      "reason": "系统-tts-发声 is host-owned with zero evidence",
-      "severity": "medium",
-      "sources": [
-        "FEATURE_MATRIX.md"
+        "app/src/main/kotlin/com/reader/android/data/model/DomainModels.kt",
+        "iOS/CoreBridge/ProductionWebViewAdapter.swift",
+        "entry/src/main/ets/platform/ArkWebPlatformAdapter.ets"
       ]
     },
     {
@@ -690,24 +600,69 @@
         "entry/src/main/ets/services/SearchService.ets",
         "entry/src/main/ets/pages/ReaderPage.ets"
       ]
+    },
+    {
+      "capability": "主题和字体",
+      "evidence_status": "unknown",
+      "id": "rb-主题和字体-harmony",
+      "mitigation": "Implement HarmonyOS theme system: ArkUI theme tokens (colors / typography / spacing) + dark/light mode switching + custom font registration (@ohos.font), mirroring Android ReaderTheme / iOS ReaderTheme. Verification: theme switch reflects on all 5 pages on simulator.",
+      "platform": "harmony",
+      "reason": "Audit 2026-06-27: 主题和字体 implemented on Android (app/src/main/kotlin/com/reader/ui/theme/ReaderTheme.kt — MaterialTheme dark/light) and iOS (iOS/Modules/Theme/ReaderTheme.swift + ReaderColors.swift + ReaderTypography.swift). HarmonyOS NOT implemented — all 5 pages (Index.ets / BookshelfPage.ets / ReaderPage.ets / SettingsPage.ets / SearchPage.ets) use hardcoded colors (#1A1A1A / #007AFF / #F5F5F5) and fontSize() literals; no theme system, no @ohos.font registration, no dark/light switch. storage.write('setting.theme','light') is a string only with no ArkUI binding.",
+      "severity": "medium",
+      "sources": [
+        "entry/src/main/ets/pages/Index.ets",
+        "entry/src/main/ets/pages/ReaderPage.ets",
+        "app/src/main/kotlin/com/reader/ui/theme/ReaderTheme.kt",
+        "iOS/Modules/Theme/ReaderTheme.swift"
+      ]
+    },
+    {
+      "capability": "文件选择和沙箱授权",
+      "evidence_status": "unknown",
+      "id": "rb-文件选择和沙箱授权-android",
+      "mitigation": "Add Android SAF launcher: ActivityResultContracts.OpenDocument in ImportBook ViewModel/Screen feeding content:// Uri into existing AndroidContentUriLocalBookAdapter. Verification: pick .epub/.txt from system file picker and import book on emulator.",
+      "platform": "android",
+      "reason": "Audit 2026-06-27: 文件选择和沙箱授权 implemented on iOS (iOS/Features/FileImporter/FileImportView.swift .fileImporter + security-scoped resource handoff) and HarmonyOS (entry/src/main/ets/platform/FilePickerAdapter.ets @kit.CoreFileKit DocumentViewPicker + permission handoff token). Android PARTIAL — AndroidContentUriLocalBookAdapter implements ContentResolver.takePersistableUriPermission() + openInputStream() (sandbox authorization ready) but NO SAF launcher (no ACTION_OPEN_DOCUMENT / ActivityResultContracts.OpenDocument), so the user has no file-pick entry point.",
+      "severity": "medium",
+      "sources": [
+        "app/src/main/kotlin/com/reader/android/data/adapter/AndroidPlatformRuntimeAdapters.kt",
+        "iOS/Features/FileImporter/FileImportView.swift",
+        "entry/src/main/ets/platform/FilePickerAdapter.ets"
+      ]
+    },
+    {
+      "capability": "系统-tts-发声",
+      "evidence_status": "unknown",
+      "id": "rb-系统-tts-发声-android",
+      "mitigation": "Implement Android TextToSpeech: concrete AndroidTtsAdapter wrapping android.speech.tts.TextToSpeech (init / speak / stop / shutdown + UtteranceProgressListener), replacing FakeAndroidTtsAdapter. Verification: ReaderPage TTS plays zh-CN speech on emulator.",
+      "platform": "android",
+      "reason": "Audit 2026-06-27: 系统 TTS 发声 implemented on iOS (iOS/Features/Reader/ReaderTTSPlayer.swift AVSpeechSynthesizer + delegate + rate control + zh-CN voice) and HarmonyOS (entry/src/main/ets/platform/SystemTtsAdapter.ets @kit.CoreSpeechKit textToSpeech.createEngine + SpeakListener + state machine). Android NOT implemented — only TtsEngine interface + FakeTtsEngine / FakeAndroidTtsAdapter stubs exist; no class instantiates android.speech.tts.TextToSpeech. Violates AGENTS.md TTS 策略 (发声归 Host 系统级 TTS).",
+      "severity": "medium",
+      "sources": [
+        "app/src/main/kotlin/com/reader/android/data/adapter/TtsEngine.kt",
+        "app/src/main/kotlin/com/reader/android/data/adapter/AndroidTtsAdapter.kt",
+        "iOS/Features/Reader/ReaderTTSPlayer.swift",
+        "entry/src/main/ets/platform/SystemTtsAdapter.ets",
+        "AGENTS.md"
+      ]
     }
   ],
   "generated_at": "2026-06-27T00:00:00Z",
   "summary": {
     "by_platform": {
-      "all": 54,
-      "android": 0,
-      "harmony": 3,
+      "all": 46,
+      "android": 2,
+      "harmony": 4,
       "ios": 0,
       "unknown": 0
     },
     "by_severity": {
       "blocker": 0,
       "high": 0,
-      "medium": 13,
-      "low": 44
+      "low": 44,
+      "medium": 8
     },
-    "total": 57
+    "total": 52
   },
   "tool": "release-blocker-register-generator",
   "version": "release-blockers/1"
