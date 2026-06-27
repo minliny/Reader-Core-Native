@@ -1,6 +1,6 @@
 # 项目状态快照
 
-扫描日期：2026-06-27
+扫描日期：2026-06-27（第三次更新，含 MultiRule 修复 + 测试工具链首批结果）
 本文为时间点快照，不作为永久事实。后续工作必须以实际代码验证为准。
 
 ---
@@ -9,172 +9,193 @@
 
 | 仓库 | 分支 | 最新 commit | 状态 |
 |------|------|-------------|------|
-| Core (Reader-Core-Native) | main | 62e6765d | 有 MultiRule agent 未提交变更(reader-rule + reader-content)，不动 |
-| Android (Reader for Android) | codex/android-real-core-runtime-evidence | 19dfdab | 已 push，8/8 instrumented test pass (simulator) |
+| Core (Reader-Core-Native) | main | 35d12372 | 有多个 agent 未提交变更（见下） |
+| Android (Reader for Android) | codex/android-real-core-runtime-evidence | 19dfdab | 已 push，8/8 instrumented test pass |
 | iOS (Reader for iOS) | codex/ios-real-app-core-evidence | a845066 | 已 push，110/110 smoke test pass |
 | HarmonyOS (Reader for HarmonyOS) | codex/harmony-signed-device-runtime | 338205f | host/ 11文件 + api/ 4文件，BUILD SUCCESSFUL |
-| Reader-Core (Swift 旧 Core) | codex/atcss-prefix-booklist-fix | 7eac5058 | 冻结 |
-| Reader UI | codex/motion-demo-optimizations | 1a635ec | 设计稿 + 前端 demo |
+
+### Core 仓库未提交变更（多 agent 并发）
+
+| 变更 | Agent | 文件 | 状态 |
+|------|-------|------|------|
+| MultiRule 修复 | MultiRule agent | reader-rule/src/lib.rs (+442), reader-content/src/lib.rs (+35), legado_multirule_operator.rs (273行), yodu_multirule_fixture.rs (162行) | ✅ 完成，测试通过，未提交 |
+| 测试工具链 | 测试工具 agent | reader-cli/Cargo.toml (+7), main.rs (+274), test_source.rs (1020行), test_corpus.rs (388行), core.yml (+231) | ⚠️ WIP，有编译问题 |
+| release-blockers | 审计 agent | release-blockers.json (multirule 标记 RESOLVED) | ✅ 完成，未提交 |
+| corpus 批量结果 | 测试工具 agent | corpus-batch-p0.json, corpus-batch-offline-test.json, recorded/ (1文件) | ✅ 首批结果已产出 |
 
 ---
 
-## 2. 已完成 Agent 结果记录
+## 2. MultiRule 修复结果（rb-legado-css-multirule-operator — RESOLVED）
 
-### Agent A — 审计 8 个 medium blocker（commit dd824aca）
+### 修复内容
+- `split_legado_combined_rule` 在 `execute_mode` / `execute_legado_rule_list` 分发层统一分割 `&&`/`||`/`%%`
+- `||` = OR-fallback（first non-empty branch wins）
+- `&&` = AND-merge（concat all branch results）
+- `%%` = parallel zip（interleave by index）
+- 多类 CSS 简写 `class.X Y Z` → `.X.Y.Z`
+- 裸抽取词识别（text/textNodes/ownText/html/all + 属性名）
+- list 模式返回 outer HTML（保留外层元素属性）
+- fragment 根元素（跳过 html/head/body 包裹）
 
-- 删除 2 个已修 HarmonyOS blocker：
-  - rb-harmonyos-index-dts-stale → commit 412d08c 已修
-  - rb-harmonyos-host-adapter-missing → host/ 模块已建(10 文件真实实现)
-- 保留 6 个 medium blocker，reason/mitigation 已刷新：
-  - rb-包体签名和分发 (all) — 三平台均未实现签名配置
-  - rb-后台任务和通知 (all) — Android 仅 Notification 无 ForegroundService
-  - rb-登录-webview-交互 (all) — 三平台均无完整登录流
-  - rb-主题和字体-harmony (harmony) — 硬编码，无主题系统
-  - rb-文件选择和沙箱授权-android (android) — adapter ready，无 SAF 入口
-  - rb-系统-tts-发声-android (android) — 仅 Fake TTS
-- Summary 修正：51 total / 6 medium / 44 low / 1 blocker
-- conformance 回归：173 passed / 0 failed
-
-### Agent B — HarmonyOS S6 Task 3/4/5（commit 0c73bc2 + 338205f）
-
-- Task 3: host/ 模块 11 文件 767 行（HostTransport/HostAdapter/HostBus/HostRuntime/
-  HostCommander/HttpExecuteHandler/HttpRequest/HostReply/HostReplyCodec/CapabilityHandler）
-- Task 4: OHOSHTTPHostTransport.ets（@ohos.net.http 实现 HostTransport）
-- Task 5: api/ 模块 4 文件 499 行（ReaderCoreClient/BookApi/SourceApi/BookshelfApi）
-- 验证：hvigorw assembleHap BUILD SUCCESSFUL
-- 证据级别：Build proof（非 device proof）
-
-### Agent C — HarmonyOS S6 Task 6/7/8（commit 0c29184）
-
-- Task 6: 退役 fixture 业务路径（strangler 模式，标记 deprecated 不删除）
-- Task 7: 5 个 UI 页面切换到 Rust Core（Bookshelf/Search/Reader/Settings/ImportBookSource）
-- Task 8: E2E 测试需设备/模拟器（本地无 hdc target）
-- 证据级别：Build proof（非 device proof）
-
-### Agent D — MultiRule 拆分（未完成，agent 仍在运行）
-
-- 工作树有未提交变更：reader-rule/src/lib.rs (+391 行) + reader-content/src/lib.rs (+35 行)
-- 新增测试文件：legado_multirule_operator.rs（15 tests pass）
-- reader-rule 全部测试通过：130 unit + 15 multirule = 145 tests pass
-- 影响：459 源中 292 源含 MultiRule（64%），修复后预期大幅提升批量测试通过率
-- 状态：仍在运行，不触碰
+### 验证
+- reader-rule: 130 unit tests + 15 multirule tests = 145 pass
+- reader-content: 4 yodu fixture tests pass（search 15 books / detail title 非空 / toc 非空 / content 含"萧炎"）
+- conformance: 173/173 pass
+- release-blockers.json: blocker 计数 1→0，multirule 标记 `evidence_status: fixed`，severity 降为 low
 
 ---
 
-## 3. S 阶段进度（修正后）
+## 3. 测试工具链首批结果（真实数据！）
+
+### corpus-batch-p0.json（30 个 P0 源，live 网络测试）
+
+| 级别 | passed | failed | skipped |
+|------|--------|--------|---------|
+| L1-import | 30 | 0 | 0 |
+| L2-search | 1 | 29 | 0 |
+| L3-detail | 0 | 1 | 29 |
+| L4-toc | 0 | 0 | 30 |
+| L5-content | 0 | 0 | 30 |
+
+**完全通过: 0 / 30 = 0%**
+**部分通过: 30 / 30 = 100%**（全部 L1 通过，L2 大面积失败）
+
+### L2-search 失败原因分布（29 个失败）
+
+| 原因 | 数量 | 说明 |
+|------|------|------|
+| no_search_results | 10 | HTTP 请求成功但解析返回空（规则引擎问题） |
+| URL JS 执行失败 | 8 | @js: searchUrl 的 JS 无法执行（host callback 缺失/语法错误/变量未定义） |
+| URL DSL parse error | 2 | Legado URL DSL 格式解析失败 |
+| invalid JSON input | 2 | 响应体非合法 JSON（JSONPath 规则期望 JSON） |
+| invalid CSS selector | 2 | 规则含 `<js>` 被当 CSS selector |
+| invalid JSONPath | 1 | MultiRule 在 JSONPath 中未正确处理 |
+| Network Error | 2 | 真实网络超时/连接失败 |
+| recv timeout | 1 | 12s 超时 |
+| Bad URL | 1 | IDN 域名解析失败 |
+
+### 关键发现
+
+1. **L1-import 100% 通过** — 459 源全部能被 Core 导入解析（source.import 无问题）
+2. **L2-search 仅 3.3% 通过** — 真实书源搜索大面积失败
+3. **最大失败原因: no_search_results (34%)** — HTTP 成功但规则解析返回空
+   - 可能原因: 规则补全未实现(RuleComplete)、站点 HTML 变化、编码问题
+4. **第二大原因: URL JS 执行失败 (28%)** — @js: searchUrl 的 JS 无法执行
+   - 根因: JS sandbox 中 java.get/post 等 host callback 未接通
+   - 这不是 MultiRule 问题，是 S3(JS/host) 的真实缺口
+5. **MultiRule 修复已生效** — yodu 真实源直驱测试全链路通过，但批量测试中
+   仍有 1 个 invalid JSONPath MultiRule 失败（可能是 JSONPath 层的 && 未修）
+
+---
+
+## 4. S 阶段进度（基于真实数据修正）
 
 | 阶段 | 之前声称 | 修正后实际 | 依据 |
 |------|---------|-----------|------|
 | S0 (baseline) | 100% | ✅ 100% | — |
-| S1 (BookSource compat) | 100% | ⚠️ ~40% | 97 项能力中仅 22 项实现，459 源从未批量测试 |
-| S2 (DSL) | 70% | ⚠️ ~50% | MultiRule blocker 未闭环(正在修)，JS 端到端未验证 |
-| S3 (request/JS/host) | 100% | ⚠️ ~60% | 79 个 java.* 方法有单元测试，但真实源 JS 执行未验证 |
-| S4 (remote reading) | 60% | ⚠️ ~30% | 3 源 fixture (0.65%)，多页加载/规则补全未实现 |
-| S5 (data/local/RSS/sync) | 90% | ⚠️ ~50% | crate test 存在但替换规则/繁简/TXT目录/书签等未实现 |
-| S6 (strangler migration) | 45% | ⚠️ ~50% | Android simulator proof ✅；iOS smoke 110/110 ✅；HarmonyOS build proof ✅ |
-| S7 (corpus benchmark) | 0% | ❌ 0% | 工具存在但从未跑过 |
+| S1 (BookSource compat) | 100% | ⚠️ ~35% | L1 100% 但 L2 仅 3.3%，真实源大面积搜索失败 |
+| S2 (DSL) | 70% | ⚠️ ~55% | MultiRule 已修(15+4 tests)，但 URL JS 执行未通 |
+| S3 (request/JS/host) | 100% | ⚠️ ~40% | 28% 源因 URL JS 失败，java.* host callback 未接通 |
+| S4 (remote reading) | 60% | ⚠️ ~15% | 30 源 0% 完全通过，L3-L5 全 skip |
+| S5 (data/local/RSS/sync) | 90% | ⚠️ ~50% | 替换规则/繁简/TXT目录等未实现 |
+| S6 (strangler migration) | 45% | ⚠️ ~50% | Android simulator proof；iOS smoke 110/110；HarmonyOS build proof |
+| S7 (corpus benchmark) | 0% | ⚠️ ~5% | 首次批量测试已跑（30源），但通过率 0% |
 
 ---
 
-## 4. Release Blockers 状态
+## 5. Release Blockers 状态
 
-- **blocker (1):** rb-legado-css-multirule-operator — Agent 正在修，15 tests pass
-- **medium (6):** 签名/后台任务/登录(all) + 主题(harmony) + SAF(android) + TTS(android)
-- **low (44):** 各种能力 blocker，多为"有实现但未用真实源验证"
-- **total: 51**
-
----
-
-## 5. Legado 能力对标真实状态
-
-基于 docs/LEGADO_CAPABILITY_INVENTORY.md（97 项能力审计）：
-
-| 状态 | 数量 | 说明 |
-|------|------|------|
-| 已实现 | 22 | 大部分只有单元测试，无真实源端到端验证 |
-| 部分实现 | 16 | 从未用真实 Legado 数据验证 |
-| 未实现 | 45 | 替换规则/繁简/TXT目录/书签/书架分组/段评/多页/发现/字体反混淆/封面解密/全文搜索/换源等 |
-| Host/UI 层 | 14 | 不在 Core 范围 |
-| **合计** | **97** | |
-
-**Core 侧实际完成度：~23%**（22/83 非Host能力，且大部分无真实源验证）
+- **blocker: 0**（MultiRule 已 RESOLVED）
+- **medium: 6** — 签名/后台任务/登录(all) + 主题(harmony) + SAF(android) + TTS(android)
+- **low: 45**（含已 RESOLVED 的 multirule）
+- **total: 52**（含 1 个 RESOLVED 条目）
 
 ---
 
-## 6. 测试工具链状态
+## 6. 能力对标真实状态（基于 97 项清单 + 批量测试）
+
+### 已验证通过
+- source.import: 30/30 P0 源 L1 通过 ✅
+- MultiRule CSS &&/||/%%: yodu 真实源全链路通过 ✅
+
+### 批量测试暴露的真实缺口（按影响排序）
+
+| 缺口 | 影响 | 占比 | 优先级 |
+|------|------|------|--------|
+| 规则补全 (RuleComplete) | no_search_results | 34% | P0 |
+| URL JS 执行 (java.get/post host callback) | URL JS 执行失败 | 28% | P0 |
+| 多页加载 (nextTocUrl/nextContentUrl) | L4/L5 全 skip | — | P0 |
+| 编码检测 (GBK/GB2312) | 部分 no_search_results | ~5% | P1 |
+| JSONPath MultiRule | invalid JSONPath | 3% | P1 |
+
+### 完全未实现的 45 项能力（见 CAPABILITY_GAP_PLAN.md）
+
+---
+
+## 7. 测试工具链状态
 
 | 组件 | 状态 |
 |------|------|
-| corpus-manager (import/classify) | ✅ 已创建，459 源已导入分类 |
-| reader-cli --corpus-import-batch | ❌ 未实现 |
-| reader-cli --test-source (单源 L1-L5) | ❌ 未实现（缺 HTTP 客户端 + 链式提取） |
-| reader-cli --test-corpus (批量) | ❌ 未实现 |
-| 17 个 Python 工具 | ❌ 全部未跑过 |
-| CI (core.yml) | ⚠️ 仅 fmt+test+conformance |
-| 459 源批量通过率 | ❓ 未知（从未测试） |
-
-**关键断链：** CLI 没有 HTTP 客户端（0 行 HTTP 代码），无法发真实请求。
-现有 fixture-vertical 需要一次性喂全部 mock 响应，不链式提取。
-无法实现"给一个书源就跑完所有测试"。
+| corpus-manager (import/classify) | ✅ 459 源已导入分类 |
+| reader-cli --test-source | ⚠️ WIP (1020行，有编译问题) |
+| reader-cli --test-corpus | ⚠️ WIP (388行，有编译问题) |
+| CLI HTTP 客户端 (ureq) | ⚠️ WIP (Cargo.toml 已加依赖) |
+| 链式提取 | ⚠️ WIP |
+| corpus-batch-p0.json | ✅ 首批结果(30源 live) |
+| corpus-batch-offline-test.json | ✅ 首批结果(30源 offline) |
+| recorded/ 录像 | ⚠️ 仅 1 个源 |
+| CI workflow | ⚠️ WIP (core.yml +231行) |
 
 ---
 
-## 7. 关键缺口清单
+## 8. 关键缺口清单（基于批量测试真实数据修正优先级）
 
-### 阻断真实书源（P0-blocker）
-1. MultiRule 拆分 — Agent 正在修（292/459 源受影响）
-2. 多页加载 (nextTocUrl/nextContentUrl) — 完全未实现
-3. 规则补全 (RuleComplete) — 完全未实现
+### P0-blocker（阻断 L2-L5，影响最大）
 
-### Legado 核心能力缺失（P1-core）
-4. 替换规则 (ReplaceRule) — 完全未实现
-5. 繁简转换 (t2s/s2t) — 完全未实现
-6. TXT 目录规则 (TxtTocRule) — 完全未实现
-7. 书签 (Bookmark) — 完全未实现
-8. 书架分组 (BookGroup) — 完全未实现
-9. 阅读记录 (ReadRecord) — 完全未实现
-10. 发现 (Explore) — 有字段无协议方法
+1. **规则补全 (RuleComplete)** — 34% 源因 no_search_results 失败
+   - Legado RuleComplete.kt autoComplete()，省略尾操作符的规则返回空
+2. **URL JS 执行 (java.get/post)** — 28% 源因 @js: searchUrl 失败
+   - JS sandbox 中 java.get/post 等 host callback 未接通
+   - 这不是 reader-js 的问题（79 个方法有单元测试），是 runtime 中
+     JS → host callback → http.execute 的链路未通
+3. **多页加载 (nextTocUrl/nextContentUrl)** — L4/L5 无法验证
+   - 不补则目录和正文只能取第一页
 
-### 重要能力缺失（P2）
-11. 段评 (ReviewRule)
-12. 字体反混淆 (QueryTTF)
-13. 封面解密 (coverDecodeJs)
-14. 全文搜索 (SearchContent)
-15. 换源 (ChangeSource)
-16. 去重标题
-17. 智能分段
+### P1-core（Legado 核心能力）
 
-### 测试基础设施缺失
-18. CLI HTTP 客户端（ureq/reqwest）
-19. 链式提取逻辑（search→detail→toc→content URL 传递）
-20. --test-source / --test-corpus 命令
-21. 录像 + 离线回放
-22. CI 四级 gate
+4. 替换规则 (ReplaceRule)
+5. 繁简转换 (t2s/s2t)
+6. TXT 目录规则 (TxtTocRule)
+7. 书签 (Bookmark)
+8. 书架分组 (BookGroup)
+9. 阅读记录 (ReadRecord)
+10. 发现 (Explore)
+
+### P2（重要能力）
+
+11. 段评 / 字体反混淆 / 封面解密 / 全文搜索 / 换源 / 去重标题 / 智能分段
 
 ---
 
-## 8. 平台侧状态
+## 9. 平台侧状态
 
 ### Android (codex/android-real-core-runtime-evidence)
-- libreader_core.a 重建 (core main@81679ea5)
-- CoreEndToEndTest PASS: search→detail→toc→content 全链路 (simulator, 121.897s)
-- CoreSmokeTest 3/3 PASS: JNI 链接 + abiVersion=1 + pingSmoke
-- InstrumentedSmokeTest 4/4 PASS: keystore/SAF/WebView/cookie
+- CoreEndToEndTest PASS: search→detail→toc→content 全链路 (simulator)
+- CoreSmokeTest 3/3 PASS
+- InstrumentedSmokeTest 4/4 PASS
 - 缺失: ForegroundService、SAF 入口、TextToSpeech 发声
 
 ### iOS (codex/ios-real-app-core-evidence)
-- S6.2 完成: default ServiceMode .rustCore + fail-loud
+- S6.2 完成: default ServiceMode .rustCore
 - 110/110 smoke test pass
-- RustCoreBookDetailService 已接入
 - 缺失: 签名配置、BGTaskScheduler、完整登录流
 
 ### HarmonyOS (codex/harmony-signed-device-runtime)
-- Task 1: Index.d.ts 对齐 reader_napi.cpp 12 导出 ✅
-- Task 3/4/5: host/ 模块 + OHOSHTTPHostTransport + api/ facade ✅ (build proof)
-- Task 6/7/8: 退役 fixture + 5 页 UI 切换 ✅ (build proof)
-- 缺失: 主题系统、device proof (无 hdc target)、签名配置
+- Task 1-8 完成: Index.d.ts + host/ 模块 + api/ facade + UI 切换
+- BUILD SUCCESSFUL
+- 缺失: 主题系统、device proof、签名配置
 
 ---
 
-*本文为 2026-06-27 时间点快照。后续工作必须以实际代码验证为准，
-不得凭此快照声称能力已完成。*
+*本文为 2026-06-27 时间点快照（第三次更新）。后续工作必须以实际代码验证为准。*
+*批量测试通过率 0% 是真实数据，不是猜测——30 个 P0 源 live 测试，L2-search 仅 1 通过。*

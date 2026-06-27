@@ -37,6 +37,7 @@
 | 项 | 值 |
 |----|-----|
 | 缺口 | 目录和正文不支持翻页加载 |
+| 批量测试影响 | L4-toc / L5-content 全 skip（30源 0 通过），无法验证 |
 | Legado 源码 | BookChapterList.kt:192 `nextTocUrl`、BookContent.kt:185 `nextContentUrl` |
 | 影响 | 大量源目录分页、正文分页，不补则 L4-toc / L5-content 只能取第一页 |
 | 方案 | reader-runtime/remote.rs 中 `book_toc` / `chapter_content` 完成后检查 nextUrl，循环发 http.execute 直到无下一页，合并结果 |
@@ -47,10 +48,23 @@
 | 项 | 值 |
 |----|-----|
 | 缺口 | 简单规则不自动补全 @text/@href/@src |
+| 批量测试影响 | 34% 源因 no_search_results 失败（HTTP 成功但解析返回空）—— 这是 L2 最大失败原因 |
 | Legado 源码 | RuleComplete.kt `autoComplete()` |
 | 影响 | 大量源规则省略尾部操作符（如 `div.class&&` 后无 @text），不补则解析返回空 |
 | 方案 | reader-rule 中实现 `RuleComplete::auto_complete()`：正则识别缺尾操作符的规则，按 type(文字/链接/图片) 补全 |
 | 验收 | 省略尾操作符的源能正确解析 |
+
+### 4. URL JS 执行（java.get/post host callback）— 批量测试新发现
+
+| 项 | 值 |
+|----|-----|
+| 缺口 | @js: searchUrl 中的 JS 无法执行 java.get/post 等 host callback |
+| Legado 源码 | AnalyzeUrl.kt:153 `analyzeJs()` + JsExtensions.kt ajax/get/post |
+| 批量测试影响 | 28% 源因 URL JS 执行失败（第二大 L2 失败原因） |
+| 根因 | reader-js 有 79 个 java.* 方法单元测试，但 runtime 中 JS → host callback → http.execute 链路未通 |
+| 方案 | 在 reader-runtime 中接通 JS sandbox 的 java.get/post → 发 http.execute host request → Host 执行 → 返回响应给 JS |
+| 验收 | @js: searchUrl 的源能正确执行 JS 构造搜索 URL |
+| 状态 | ❌ 未实现，批量测试首次暴露 |
 
 ---
 
