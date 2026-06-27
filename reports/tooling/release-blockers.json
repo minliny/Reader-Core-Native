@@ -812,44 +812,6 @@
       ]
     },
     {
-      "id": "rb-legado-rulesearch-object-deser",
-      "capability": "legado.bookSource.ruleSearch-object",
-      "severity": "blocker",
-      "platform": "all",
-      "reason": "Real Legado sources use ruleSearch/ruleBookInfo/ruleToc/ruleContent as JSON objects (modern format), but LegadoBookSource types them as Option<String>. Deserialization fails silently via .ok() in legado_book_source(), producing empty results with no error.",
-      "evidence_status": "failing",
-      "mitigation": "Type rule_search/rule_book_info/rule_toc/rule_content as Option<Value> (like rule_explore_raw), or add *_raw companion fields. Remove silent .ok() swallow in legado_book_source().",
-      "sources": [
-        "tests/fixtures/remote_source/legado_sudugu_vertical.json",
-        "crates/reader-domain/src/lib.rs:136,146,150,154,329"
-      ]
-    },
-    {
-      "id": "rb-legado-concurrentrate-string-deser",
-      "capability": "legado.bookSource.concurrentRate-string",
-      "severity": "blocker",
-      "platform": "all",
-      "reason": "Real Legado sources use concurrentRate as string (e.g. \"3\", \"0.5\"), but LegadoBookSource.concurrent_rate is Option<i64>. String value fails deserialization, causing entire LegadoBookSource to fail silently.",
-      "evidence_status": "failing",
-      "mitigation": "Type concurrent_rate as Option<Value> or use custom deserializer accepting both int and string.",
-      "sources": [
-        "crates/reader-domain/src/lib.rs:100,329"
-      ]
-    },
-    {
-      "id": "rb-legado-css-shorthand-selector",
-      "capability": "legado.rule-engine.css-shorthand",
-      "severity": "blocker",
-      "platform": "all",
-      "reason": "Legado uses class.X/tag.X/id.X as CSS shorthand selectors (e.g. class.item, tag.h3, id.list). Core passes them directly to scraper::Selector::parse without translation, matching wrong elements (e.g. <class class=\"item\"> instead of <div class=\"item\">). Search returns empty results on real Legado sources.",
-      "evidence_status": "failing",
-      "mitigation": "Add translation layer in compile_legado_css_selector: class.X -> .X, tag.X -> X, id.X -> #X before Selector::parse.",
-      "sources": [
-        "crates/reader-rule/src/lib.rs:3865",
-        "tests/fixtures/remote_source/legado_sudugu_vertical.json"
-      ]
-    },
-    {
       "id": "rb-xpath-strict-xml-parser",
       "capability": "legado.rule-engine.xpath-html",
       "severity": "blocker",
@@ -878,19 +840,19 @@
   "generated_at": "2026-06-25T07:40:32Z",
   "summary": {
     "by_platform": {
-      "all": 67,
+      "all": 69,
       "android": 0,
       "harmony": 0,
       "ios": 0,
       "unknown": 0
     },
     "by_severity": {
-      "blocker": 2,
+      "blocker": 4,
       "high": 0,
       "low": 38,
       "medium": 27
     },
-    "total": 67
+    "total": 69
   },
   "tool": "release-blocker-register-generator",
   "version": "release-blockers/1"

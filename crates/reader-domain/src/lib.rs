@@ -97,7 +97,7 @@ pub struct LegadoBookSource {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub js_lib_raw: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub concurrent_rate: Option<i64>,
+    pub concurrent_rate: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_update_time: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -132,8 +132,12 @@ pub struct LegadoBookSource {
     pub rule_review_raw: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub review_rule: Option<ReviewRule>,
+    // rule_search/rule_book_info/rule_toc/rule_content 接受两种形态:
+    // - 字符串(legacy/混合格式,如 LEGADO_BOOK_SOURCE fixture)
+    // - 对象(真实 Legado 导出格式,见 BookSource.kt ruleSearch: SearchRule)
+    // 用 Option<Value> 天然兼容两种,后续在 normalize_*_semantics 展开。
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rule_search: Option<String>,
+    pub rule_search: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub search_rule: Option<SearchRule>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -143,15 +147,15 @@ pub struct LegadoBookSource {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rule_search_url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rule_book_info: Option<String>,
+    pub rule_book_info: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub book_info_rule: Option<BookInfoRule>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rule_toc: Option<String>,
+    pub rule_toc: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub toc_rule: Option<TocRule>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rule_content: Option<String>,
+    pub rule_content: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_rule: Option<ContentRule>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -326,7 +330,17 @@ impl Source {
         if self.book_source.is_null() {
             return None;
         }
-        serde_json::from_value(self.book_source.clone()).ok()
+        serde_json::from_value(self.book_source.clone())
+            .map_err(|err| {
+                // 不再静默吞错误:记录诊断到 stderr,让 release blocker 可见。
+                // reader-domain 是纯 domain crate,无 tracing/log 依赖,用 eprintln!。
+                eprintln!(
+                    "[reader-domain] legado book source deserialization failed: source_id={} error={}",
+                    self.source_id, err
+                );
+                err
+            })
+            .ok()
     }
 
     pub fn book_source_semantics(&self) -> Option<BookSourceSemantics> {
@@ -592,7 +606,13 @@ pub struct ReadingProgress {
 }
 
 fn normalize_search_semantics(source: &LegadoBookSource) -> BookSourceSearchSemantics {
-    let structured = source.search_rule.as_ref();
+    // structured 优先用 search_rule 字段(canonical fixture 格式),
+    // 其次用 rule_search 对象形态(真实 Legado 导出格式)。
+    let structured_owned = source
+        .search_rule
+        .clone()
+        .or_else(|| rule_value_as_structured::<SearchRule>(&source.rule_search));
+    let structured = structured_owned.as_ref();
     let legacy_fields = [
         source.rule_search_name.as_deref(),
         source.rule_search_author.as_deref(),
@@ -600,17 +620,12 @@ fn normalize_search_semantics(source: &LegadoBookSource) -> BookSourceSearchSema
     ]
     .iter()
     .any(|value| clean_string(*value).is_some());
+    let raw_str = rule_value_as_string(&source.rule_search);
     BookSourceSearchSemantics {
-        raw: clean_string(source.rule_search.as_deref()),
+        raw: clean_string(raw_str),
         list: structured
             .and_then(|rule| clean_string(rule.book_list.as_deref()))
-            .or_else(|| {
-                if legacy_fields {
-                    clean_string(source.rule_search.as_deref())
-                } else {
-                    None
-                }
-            }),
+            .or_else(|| if legacy_fields { clean_string(raw_str) } else { None }),
         name: structured
             .and_then(|rule| clean_string(rule.name.as_deref()))
             .or_else(|| clean_string(source.rule_search_name.as_deref())),
@@ -649,12 +664,17 @@ fn normalize_explore_semantics(source: &LegadoBookSource) -> BookSourceExploreSe
 }
 
 fn normalize_detail_semantics(source: &LegadoBookSource) -> BookSourceDetailSemantics {
-    let structured = source.book_info_rule.as_ref();
+    let structured_owned = source
+        .book_info_rule
+        .clone()
+        .or_else(|| rule_value_as_structured::<BookInfoRule>(&source.rule_book_info));
+    let structured = structured_owned.as_ref();
+    let raw_str = rule_value_as_string(&source.rule_book_info);
     BookSourceDetailSemantics {
-        raw: clean_string(source.rule_book_info.as_deref()),
+        raw: clean_string(raw_str),
         init: structured
             .and_then(|rule| clean_string(rule.r#init.as_deref()))
-            .or_else(|| clean_string(source.rule_book_info.as_deref())),
+            .or_else(|| clean_string(raw_str)),
         name: structured.and_then(|rule| clean_string(rule.name.as_deref())),
         author: structured.and_then(|rule| clean_string(rule.author.as_deref())),
         intro: structured.and_then(|rule| clean_string(rule.intro.as_deref())),
@@ -668,7 +688,11 @@ fn normalize_detail_semantics(source: &LegadoBookSource) -> BookSourceDetailSema
 }
 
 fn normalize_toc_semantics(source: &LegadoBookSource) -> BookSourceTocSemantics {
-    let structured = source.toc_rule.as_ref();
+    let structured_owned = source
+        .toc_rule
+        .clone()
+        .or_else(|| rule_value_as_structured::<TocRule>(&source.rule_toc));
+    let structured = structured_owned.as_ref();
     let structured_fields = structured.is_some_and(|rule| {
         [
             rule.chapter_name.as_deref(),
@@ -678,17 +702,12 @@ fn normalize_toc_semantics(source: &LegadoBookSource) -> BookSourceTocSemantics 
         .iter()
         .any(|value| clean_string(*value).is_some())
     });
+    let raw_str = rule_value_as_string(&source.rule_toc);
     BookSourceTocSemantics {
-        raw: clean_string(source.rule_toc.as_deref()),
+        raw: clean_string(raw_str),
         list: structured
             .and_then(|rule| clean_string(rule.chapter_list.as_deref()))
-            .or_else(|| {
-                if structured_fields {
-                    clean_string(source.rule_toc.as_deref())
-                } else {
-                    None
-                }
-            }),
+            .or_else(|| if structured_fields { clean_string(raw_str) } else { None }),
         name: structured.and_then(|rule| clean_string(rule.chapter_name.as_deref())),
         url: structured.and_then(|rule| clean_string(rule.chapter_url.as_deref())),
         next_url: structured.and_then(|rule| clean_string(rule.next_toc_url.as_deref())),
@@ -696,12 +715,17 @@ fn normalize_toc_semantics(source: &LegadoBookSource) -> BookSourceTocSemantics 
 }
 
 fn normalize_content_semantics(source: &LegadoBookSource) -> BookSourceContentSemantics {
-    let structured = source.content_rule.as_ref();
+    let structured_owned = source
+        .content_rule
+        .clone()
+        .or_else(|| rule_value_as_structured::<ContentRule>(&source.rule_content));
+    let structured = structured_owned.as_ref();
+    let raw_str = rule_value_as_string(&source.rule_content);
     BookSourceContentSemantics {
-        raw: clean_string(source.rule_content.as_deref()),
+        raw: clean_string(raw_str),
         content: structured
             .and_then(|rule| clean_string(rule.content.as_deref()))
-            .or_else(|| clean_string(source.rule_content.as_deref())),
+            .or_else(|| clean_string(raw_str)),
         title: structured.and_then(|rule| clean_string(rule.title.as_deref())),
         next_url: structured.and_then(|rule| clean_string(rule.next_content_url.as_deref())),
         source_regex: structured.and_then(|rule| clean_string(rule.source_regex.as_deref())),
@@ -711,6 +735,21 @@ fn normalize_content_semantics(source: &LegadoBookSource) -> BookSourceContentSe
 
 fn first_non_empty_str(values: &[Option<&str>]) -> Option<String> {
     values.iter().find_map(|value| clean_string(*value))
+}
+
+/// 从 `Option<Value>` 中取字符串形态(legacy/混合格式 fixture)。
+/// 对象形态返回 None,调用方应改用 `rule_value_as_structured`。
+fn rule_value_as_string(v: &Option<Value>) -> Option<&str> {
+    v.as_ref().and_then(|val| val.as_str())
+}
+
+/// 从 `Option<Value>` 中取对象形态,反序列化为对应 Rule struct
+/// (真实 Legado 导出格式,见 BookSource.kt ruleSearch: SearchRule)。
+/// 字符串形态或解析失败返回 None。
+fn rule_value_as_structured<T: serde::de::DeserializeOwned>(v: &Option<Value>) -> Option<T> {
+    v.as_ref()
+        .and_then(|val| if val.is_object() { Some(val.clone()) } else { None })
+        .and_then(|val| serde_json::from_value(val).ok())
 }
 
 fn clean_string(value: Option<&str>) -> Option<String> {
@@ -988,7 +1027,10 @@ mod tests {
             Some("Legado Compat Source")
         );
         assert_eq!(
-            source.rule_search.as_deref(),
+            source
+                .rule_search
+                .as_ref()
+                .and_then(|v| v.as_str()),
             Some("div.list&&div.item;div.name&&a@text")
         );
         assert_eq!(
@@ -1106,6 +1148,101 @@ mod tests {
         assert_eq!(
             semantics.rules.content.next_url.as_deref(),
             Some("a.next@href")
+        );
+    }
+
+    /// 真实 Legado 导出格式:ruleSearch/ruleBookInfo/ruleToc/ruleContent 是 JSON
+    /// 对象(见 BookSource.kt),concurrentRate 是字符串(如 "3"/"0.5")。
+    /// 修复 rb-legado-rulesearch-object-deser / rb-legado-concurrentrate-string-deser
+    /// 后必须能反序列化,且 normalize_*_semantics 能从对象形态提取字段。
+    #[test]
+    fn legado_book_source_decodes_real_legado_object_rules_and_string_concurrent_rate() {
+        let json = r#"
+{
+  "bookSourceName": "Real Legado Source",
+  "bookSourceUrl": "https://real.example.test",
+  "concurrentRate": "3",
+  "ruleSearch": {
+    "bookList": "class.item",
+    "name": "tag.h3@tag.a@text",
+    "author": "tag.p.1@tag.a@text##作者：",
+    "bookUrl": "tag.h3@tag.a@href",
+    "coverUrl": "tag.img@src",
+    "checkKeyWord": "轮回乐园"
+  },
+  "ruleBookInfo": {
+    "name": "tag.h1@tag.a@text",
+    "author": "class.itemtxt@tag.p@tag.a@text",
+    "tocUrl": "{{baseUrl}}/#dir",
+    "init": "@js:java.ajax(source.bookSourceUrl)"
+  },
+  "ruleToc": {
+    "chapterList": "id.list@tag.li",
+    "chapterName": "tag.a@text",
+    "chapterUrl": "tag.a@href",
+    "nextTocUrl": "@xpath://div[@class='pages']//a/@href"
+  },
+  "ruleContent": {
+    "content": "class.con@html##<div.*?>|</div>",
+    "nextContentUrl": "@xpath://div[@class='prenext']//a/@href"
+  }
+}
+"#;
+        let source: LegadoBookSource =
+            serde_json::from_str(json).expect("real legado format should decode");
+
+        // concurrentRate 字符串形态被保留为 Value::String。
+        assert_eq!(
+            source.concurrent_rate.as_ref().and_then(|v| v.as_str()),
+            Some("3")
+        );
+        // rule_search 是对象形态,字符串提取返回 None,但 structured 反序列化成功。
+        assert!(source.rule_search.as_ref().unwrap().is_object());
+        let semantics = BookSourceSemantics::from_legado(
+            "real-legado-src",
+            Some("Real Legado Source"),
+            Some("https://real.example.test"),
+            &source,
+        );
+        assert_eq!(semantics.rules.search.list.as_deref(), Some("class.item"));
+        assert_eq!(
+            semantics.rules.search.name.as_deref(),
+            Some("tag.h3@tag.a@text")
+        );
+        assert_eq!(
+            semantics.rules.search.author.as_deref(),
+            Some("tag.p.1@tag.a@text##作者：")
+        );
+        assert_eq!(
+            semantics.rules.detail.toc_url.as_deref(),
+            Some("{{baseUrl}}/#dir")
+        );
+        assert_eq!(
+            semantics.rules.detail.init.as_deref(),
+            Some("@js:java.ajax(source.bookSourceUrl)")
+        );
+        assert_eq!(
+            semantics.rules.toc.list.as_deref(),
+            Some("id.list@tag.li")
+        );
+        assert_eq!(
+            semantics.rules.content.content.as_deref(),
+            Some("class.con@html##<div.*?>|</div>")
+        );
+    }
+
+    /// concurrentRate 也接受数字形态(部分导出工具输出 int)。
+    #[test]
+    fn legado_book_source_concurrent_rate_accepts_int_or_string() {
+        let int_json = r#"{"bookSourceUrl":"u","concurrentRate":3}"#;
+        let s: LegadoBookSource = serde_json::from_str(int_json).expect("int concurrentRate");
+        assert_eq!(s.concurrent_rate.as_ref().and_then(|v| v.as_i64()), Some(3));
+
+        let str_json = r#"{"bookSourceUrl":"u","concurrentRate":"0.5"}"#;
+        let s: LegadoBookSource = serde_json::from_str(str_json).expect("string concurrentRate");
+        assert_eq!(
+            s.concurrent_rate.as_ref().and_then(|v| v.as_str()),
+            Some("0.5")
         );
     }
 }

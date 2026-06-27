@@ -8,7 +8,7 @@
       "bookSourceName": "速读谷吧（优）",
       "bookSourceType": 0,
       "bookSourceUrl": "https://www.sudugu.org",
-      "concurrentRate": 3,
+      "concurrentRate": "3",
       "customOrder": 154,
       "enabled": true,
       "enabledCookieJar": true,
@@ -19,7 +19,7 @@
       "respondTime": 15017,
       "searchUrl": "https://www.sudugu.org/i/sor.aspx?key={{key}}",
       "weight": 0,
-      "searchRule": {
+      "ruleSearch": {
         "author": "tag.p.1@tag.a@text##作者：",
         "bookList": "class.item",
         "bookUrl": "tag.h3@tag.a@href",
@@ -29,7 +29,7 @@
         "lastChapter": "tag.ul@tag.li.0@tag.a@text",
         "name": "tag.h3@tag.a@text"
       },
-      "bookInfoRule": {
+      "ruleBookInfo": {
         "author": "class.itemtxt@tag.p@tag.a@text",
         "coverUrl": "class.item@tag.img@src",
         "downloadUrls": "@put:{id:\"##/(\\\\d+)/##1\"}@js:result='https://www.sudugu.org/txt/?id='+result.id+'&p=1'",
@@ -40,14 +40,14 @@
         "tocUrl": "{{baseUrl}}/#dir",
         "wordCount": "class.itemtxt@tag.h1@tag.i@text"
       },
-      "tocRule": {
+      "ruleToc": {
         "chapterList": "id.list@tag.li",
         "chapterName": "tag.a@text",
         "chapterUrl": "tag.a@href",
         "isVip": "id.pages@tag.a@href",
         "nextTocUrl": "@xpath://div[@class='pages bb']//a[contains(text(),'下一页')]/@href"
       },
-      "contentRule": {
+      "ruleContent": {
         "content": "class.con@html##<div.*?>|</div>",
         "nextContentUrl": "@xpath://div[@class='prenext']//a[contains(text(),'下一页')]/@href"
       }

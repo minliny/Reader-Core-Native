@@ -63,16 +63,24 @@ fn fixture_vertical_runs_legado_css_dsl_pipeline() {
 /// - @js: `@js:result='...'` in ruleBookInfo.downloadUrls
 /// - @xpath: `@xpath://div[@class='pages bb']//a[...]/@href` in ruleToc/ruleContent
 ///
-/// Current Core gaps documented via release blockers (rb-*):
-/// - rb-legado-rulesearch-object-deser: ruleSearch object → Option<String> fail
-/// - rb-legado-concurrentrate-string-deser: concurrentRate "3" → Option<i64> fail
-///   (fixture works around both by renaming to searchRule/etc + int concurrentRate)
-/// - rb-legado-css-shorthand-selector: class.X/tag.X/id.X not translated to CSS
+/// Fixture uses the real Legado export format: ruleSearch/ruleBookInfo/ruleToc/
+/// ruleContent as JSON objects and concurrentRate as a string ("3"), matching
+/// BookSource.kt. Resolved blockers:
+/// - rb-legado-rulesearch-object-deser: rule_search now Option<Value>, accepts
+///   both string (legacy) and object (real Legado) forms.
+/// - rb-legado-concurrentrate-string-deser: concurrent_rate now Option<Value>,
+///   accepts both int and string.
+/// - rb-legado-css-shorthand-selector: class.X/tag.X/id.X now translated to CSS
+///   `.X`/`X`/`#X` before scraper::Selector::parse. Search returns 10 books
+///   with correct title/author/kind/lastChapter/coverUrl/bookUrl extracted via
+///   `tag.h3@tag.a@text`, `tag.p.1@tag.a@text##作者：`, `tag.p.0@tag.span.1@text`,
+///   `tag.ul@tag.li.0@tag.a@text`, `tag.img@src`, `tag.h3@tag.a@href`.
+/// Remaining open blockers (detail/toc/chapter still error):
 /// - rb-xpath-strict-xml-parser: @xpath fails on real HTML (not well-formed XML)
 /// - rb-tocurl-template-as-selector: {{baseUrl}}/#dir treated as CSS selector
 ///
-/// When these blockers are resolved, this test should be updated to assert
-/// successful parsing (non-empty books, toc, content).
+/// When these remaining blockers are resolved, this test should be updated to
+/// assert successful parsing (non-empty toc, content).
 #[test]
 fn fixture_vertical_runs_legado_sudugu_real_source_pipeline() {
     let events = run_fixture("legado_sudugu_vertical.json");
@@ -86,9 +94,18 @@ fn fixture_vertical_runs_legado_sudugu_real_source_pipeline() {
     assert_eq!(events[0]["data"]["sourceId"], "legado-sudugu-src");
     assert_eq!(events[0]["data"]["name"], "速读谷吧（优）");
 
-    // 2. inline search — currently empty due to rb-legado-css-shorthand-selector
-    //    (class.item not translated to .item). Returns a books array regardless.
-    assert!(events[1]["data"]["books"].is_array());
+    // 2. inline search — rb-legado-css-shorthand-selector resolved: class.item
+    //    now translates to .item, returning 10 books with full metadata.
+    let inline_books = events[1]["data"]["books"].as_array().unwrap();
+    assert!(
+        !inline_books.is_empty(),
+        "inline search should return non-empty books after rb-legado-css-shorthand-selector fix"
+    );
+    let first = &inline_books[0];
+    assert_eq!(first["title"], "诡秘：善魔女");
+    assert_eq!(first["author"], "囧囧哟");
+    assert_eq!(first["kind"], "奇幻");
+    assert_eq!(first["bookId"], "https://www.sudugu.org/301/");
 
     // 3. host.request emitted for http.execute
     assert_eq!(events[2]["type"], "host.request");
@@ -98,8 +115,12 @@ fn fixture_vertical_runs_legado_sudugu_real_source_pipeline() {
         "https://www.sudugu.org/search?q=dune"
     );
 
-    // 4. search via host — currently empty (same selector gap)
-    assert!(events[3]["data"]["books"].is_array());
+    // 4. search via host — same fix applies, returns the same 10 books.
+    let host_books = events[3]["data"]["books"].as_array().unwrap();
+    assert!(
+        !host_books.is_empty(),
+        "host search should return non-empty books after rb-legado-css-shorthand-selector fix"
+    );
 
     // 5. detail — currently error due to rb-tocurl-template-as-selector
     //    (tocUrl "{{baseUrl}}/#dir" treated as CSS selector)
