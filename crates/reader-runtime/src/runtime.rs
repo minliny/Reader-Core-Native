@@ -14,7 +14,7 @@ use reader_contract::{
 };
 
 use crate::remote::{
-    complete_remote_host, dispatch_remote, PendingHostRequest, RemoteDispatch,
+    complete_remote_host, dispatch_remote, PendingHostRequest, RemoteCommandResult, RemoteDispatch,
     RemoteHostContinuation, RemoteState,
 };
 use crate::sink::EventSink;
@@ -83,6 +83,11 @@ pub struct Runtime {
     tts_state: Arc<TtsState>,
     /// Shutdown latch so the worker can stop even mid-processing.
     shutdown: Arc<AtomicBool>,
+    /// JS host-callback bridge (mirrored from [`RemoteState::bridge`]) used to
+    /// intercept `host.complete`/`host.error` for operationIds emitted from
+    /// inside `java.get`/`java.post`/`java.ajax` JS callbacks. `None` when the
+    /// runtime was constructed with the legacy [`RemoteState::new`] path.
+    host_callback_bridge: Option<crate::host_callback_bridge::HostCallbackBridge>,
 }
 
 impl Runtime {
@@ -105,7 +110,14 @@ impl Runtime {
         let host_operations = Arc::new(Mutex::new(HashMap::new()));
         let next_operation_id = Arc::new(AtomicU64::new(1));
         let shutdown = Arc::new(AtomicBool::new(false));
-        let remote_state = Arc::new(RemoteState::new());
+        // Wire the JS host-callback bridge: the pipeline's QuickJsSandbox now
+        // has `java.get`/`java.post`/`java.ajax`/`java.connect`/`java.ajaxAll`
+        // callbacks that emit `host.request` events through `sink` and block
+        // the worker thread until `host.complete` is routed back here in
+        // [`Runtime::send`]. This unblocks the 28% of P0 corpus sources whose
+        // `@js:` searchUrl calls `java.get`/`java.ajax`.
+        let remote_state = Arc::new(RemoteState::with_sink(sink.clone()));
+        let host_callback_bridge = remote_state.bridge().cloned();
         let tts_state = Arc::new(TtsState::new());
 
         let worker_active = active_requests.clone();
@@ -145,6 +157,7 @@ impl Runtime {
             remote_state,
             tts_state,
             shutdown,
+            host_callback_bridge,
         })
     }
 
@@ -185,6 +198,23 @@ impl Runtime {
         command.validate()?;
         if self.shutdown.load(Ordering::Acquire) {
             return Err(CoreError::internal("runtime shutting down"));
+        }
+
+        // JS host-callback fast path: when a `host.complete` / `host.error`
+        // arrives for an operationId that belongs to a JS callback (emitted
+        // from inside `java.get`/`java.ajax` on the worker thread), deliver the
+        // result directly to the blocked callback WITHOUT enqueueing on the
+        // worker mpsc queue. The worker thread is blocked inside JS waiting for
+        // this very signal — routing through the queue would deadlock (the
+        // worker would never dequeue the completion because it is blocked
+        // waiting for it). Non-JS host operations fall through to the normal
+        // enqueue path below (zero behavioral change for existing flows).
+        if command.method == methods::HOST_COMPLETE || command.method == methods::HOST_ERROR {
+            if let Some(bridge) = &self.host_callback_bridge {
+                if bridge.try_complete(&command.method, &command.params) {
+                    return Ok(());
+                }
+            }
         }
 
         {
@@ -374,6 +404,7 @@ fn dispatch_command(
             active_requests,
             cancelled,
             host_operations,
+            next_operation_id,
             remote_state,
         ),
         methods::HOST_ERROR => {
@@ -779,6 +810,7 @@ fn dispatch_host_complete(
     active_requests: &Mutex<HashSet<u64>>,
     cancelled: &Mutex<HashSet<u64>>,
     host_operations: &Mutex<HashMap<u64, HostOperation>>,
+    next_operation_id: &AtomicU64,
     remote_state: &RemoteState,
 ) {
     let params = match parse_host_complete_params(cmd) {
@@ -817,28 +849,115 @@ fn dispatch_host_complete(
         return;
     };
 
-    let event = match operation.continuation {
+    // Stamp the originating requestId so any JS host callbacks invoked while
+    // resuming the continuation (e.g. AnalyzeUrl JS that calls java.get after
+    // the initial search response arrives) attribute host.request to the
+    // original request, not the host.complete command.
+    if let Some(bridge) = remote_state.bridge() {
+        bridge.set_current_request_id(operation.request_id);
+    }
+
+    let request_id = operation.request_id;
+    match operation.continuation {
         HostOperationContinuation::Echo => {
-            match complete_echo_host_operation(&operation, params.result) {
-                Ok(data) => Event::result(operation.request_id, data),
-                Err(error) => Event::error(operation.request_id, error),
-            }
+            let event = match complete_echo_host_operation(&operation, params.result) {
+                Ok(data) => Event::result(request_id, data),
+                Err(error) => Event::error(request_id, error),
+            };
+            finish_request(sink, active_requests, cancelled, request_id, event);
         }
         HostOperationContinuation::Remote(continuation) => {
             match complete_remote_host(continuation, params.result, remote_state) {
-                Ok(data) => Event::result(operation.request_id, data),
-                Err(error) => Event::error(operation.request_id, error),
+                Ok(RemoteCommandResult::Complete(data)) => {
+                    finish_request(
+                        sink,
+                        active_requests,
+                        cancelled,
+                        request_id,
+                        Event::result(request_id, data),
+                    );
+                }
+                Ok(RemoteCommandResult::Pending(pending)) => {
+                    register_pending_host_request(
+                        request_id,
+                        pending,
+                        sink,
+                        active_requests,
+                        cancelled,
+                        host_operations,
+                        next_operation_id,
+                    );
+                }
+                Err(error) => {
+                    finish_request(
+                        sink,
+                        active_requests,
+                        cancelled,
+                        request_id,
+                        Event::error(request_id, error),
+                    );
+                }
             }
         }
-    };
+    }
+}
 
-    finish_request(
-        sink,
-        active_requests,
-        cancelled,
-        operation.request_id,
-        event,
-    );
+/// Register a new pending host operation (emitted by a `complete_remote_host`
+/// continuation that needs another HTTP round-trip, e.g. pagination) and emit
+/// the corresponding `host.request` event. Mirrors `dispatch_remote_host_request`
+/// but reuses an existing `request_id` instead of deriving it from a `Command`.
+fn register_pending_host_request(
+    request_id: u64,
+    pending: PendingHostRequest,
+    sink: &Arc<dyn EventSink>,
+    active_requests: &Mutex<HashSet<u64>>,
+    cancelled: &Mutex<HashSet<u64>>,
+    host_operations: &Mutex<HashMap<u64, HostOperation>>,
+    next_operation_id: &AtomicU64,
+) {
+    let operation_id = next_operation_id.fetch_add(1, Ordering::AcqRel);
+    if let Ok(mut operations) = host_operations.lock() {
+        operations.insert(
+            operation_id,
+            HostOperation {
+                request_id,
+                capability: pending.capability.clone(),
+                state: HostOperationState::Pending,
+                continuation: HostOperationContinuation::Remote(pending.continuation),
+            },
+        );
+    } else {
+        finish_request(
+            sink,
+            active_requests,
+            cancelled,
+            request_id,
+            Event::error(
+                request_id,
+                CoreError::internal("host operation registry poisoned"),
+            ),
+        );
+        return;
+    }
+
+    if take_cancelled(cancelled, request_id) {
+        remove_operation(host_operations, operation_id);
+        finish_request(
+            sink,
+            active_requests,
+            cancelled,
+            request_id,
+            Event::error(request_id, CoreError::cancelled()),
+        );
+        return;
+    }
+
+    sink.emit(&Event::host_request(
+        request_id,
+        operation_id,
+        pending.capability,
+        pending.params,
+    ));
 }
 
 fn complete_echo_host_operation(
@@ -2990,6 +3109,13 @@ mod tests {
 
     #[test]
     fn js_rule_unsupported_is_structured_not_fake_network() {
+        // S6: with the JS host-callback bridge wired (the default since
+        // `Runtime::new` now calls `RemoteState::with_sink`), a `java.get`
+        // call inside a JS rule no longer returns "unregistered host callback".
+        // Instead it emits a structured `host.request` event that the Host
+        // must complete. This test asserts the new correct behavior: the
+        // runtime emits `HostRequest` (structured, not a fake network result)
+        // rather than an "unsupported" error.
         let sink = Arc::new(CollectSink::new());
         let rt = Runtime::new(sink.clone());
         let event = send_and_wait(
@@ -3009,13 +3135,17 @@ mod tests {
             ),
         );
         match event {
-            Event::Error { error, .. } => {
-                assert_eq!(error.code, ErrorCode::Internal);
-                assert_eq!(error.details["unsupported"], true);
-                // Must never claim a network result happened.
-                assert!(error.message.contains("unsupported"));
+            Event::HostRequest {
+                capability, params, ..
+            } => {
+                assert_eq!(capability, HostCapability::HttpExecute);
+                assert_eq!(params["url"], "https://books.example.test/protected");
+                assert_eq!(params["method"], "GET");
+                // Must never claim a network result happened — this is a
+                // request descriptor, not a fake response.
+                assert!(params.get("body").is_some());
             }
-            other => panic!("expected structured unsupported error, got {other:?}"),
+            other => panic!("expected HostRequest (structured), got {other:?}"),
         }
     }
 

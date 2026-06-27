@@ -21,34 +21,85 @@ use reader_contract::{
         BookshelfGetData, BookshelfGetParams, BookshelfListData, BookshelfListParams,
         ChapterContentParams, HostHttpRequest, HostHttpResponse, LocalBookCatalogData,
         LocalBookCatalogParams, LocalBookParseData, LocalBookParseParams,
-        ReadingProgressUpdateParams, RssParseData, RssParseEntryData, RssParseParams,
-        RssRefreshData, RssRefreshParams, SourceImportParams, SyncBackupData, SyncBackupParams,
-        SyncMergeData, SyncMergeParams,
+        ReadingProgressUpdateParams, ReplaceRuleCreateData, ReplaceRuleCreateParams,
+        ReplaceRuleData, ReplaceRuleDeleteData, ReplaceRuleDeleteParams, ReplaceRuleListData,
+        ReplaceRuleListParams, ReplaceRuleUpdateData, ReplaceRuleUpdateParams, RssParseData,
+        RssParseEntryData, RssParseParams, RssRefreshData, RssRefreshParams,
+        SourceExploreKindEntry, SourceExploreKindsData, SourceExploreKindsParams,
+        SourceExploreParams, SourceImportParams, SyncBackupData, SyncBackupParams, SyncMergeData,
+        SyncMergeParams, TxtTocRuleCreateData, TxtTocRuleCreateParams, TxtTocRuleData,
+        TxtTocRuleDeleteData, TxtTocRuleDeleteParams, TxtTocRuleListData, TxtTocRuleListParams,
+        TxtTocRuleUpdateData, TxtTocRuleUpdateParams,
     },
     CoreError, Event, HostCapability,
 };
-use reader_domain::{Book, ReadingProgress, Source, SourceRules};
+use reader_domain::{
+    Book, ReadingProgress, ReplaceRule, Source, SourceRules, TocEntry, TxtTocRule,
+};
 use reader_storage::{BookshelfEntry, BookshelfQuery, BookshelfSortBy, BookshelfSortDirection};
 use reader_storage::{BookshelfStore, InMemoryStorage};
 
+use crate::host_callback_bridge::HostCallbackBridge;
 use crate::sink::EventSink;
+
+/// Maximum number of next-page fetches per `book.toc` / `chapter.content` call.
+///
+/// Mirrors Legado's implicit cap: the sequential `while (nextUrl.isNotEmpty()
+/// && !nextUrlList.contains(nextUrl))` loop (`BookChapterList.kt:69`,
+/// `BookContent.kt:85`) is bounded by visited-URL detection in the happy path.
+/// 50 is a safety guard against broken sources with cycles that never revisit
+/// an exact URL string (e.g. page URLs that include a timestamp).
+const MAX_NEXT_PAGES: u32 = 50;
 
 /// Shared remote-reading state held by the runtime: the content pipeline and
 /// the in-memory storage. The active-request registry is owned by the runtime
 /// and passed in at dispatch time so remote handlers reuse the same tracking as
 /// the built-in commands.
+///
+/// When constructed via [`RemoteState::with_sink`] the pipeline's JS sandbox
+/// is wired with `java.get`/`java.post`/`java.ajax`/`java.connect`/`java.ajaxAll`
+/// host callbacks that emit `http.execute` host.request events through `sink`
+/// and block the worker thread until `host.complete` arrives (intercepted by
+/// [`crate::runtime::Runtime::send`]). Without the bridge (the legacy
+/// [`RemoteState::new`] path) any `@js:` URL rule that calls `java.get` will
+/// return the legacy "unregistered host callback" error.
 #[derive(Clone)]
 pub struct RemoteState {
     pipeline: Arc<RemoteContentPipeline>,
     storage: Arc<InMemoryStorage>,
+    bridge: Option<HostCallbackBridge>,
 }
 
 impl RemoteState {
     /// Create fresh state with default pipeline + storage.
+    ///
+    /// The default pipeline uses a `QuickJsSandbox::default()` with no host
+    /// callbacks registered — JS rules calling `java.get`/`java.post` will
+    /// surface the legacy "unregistered host callback" error. Use
+    /// [`RemoteState::with_sink`] to wire the host-callback bridge.
     pub fn new() -> Self {
         Self {
             pipeline: Arc::new(RemoteContentPipeline::new()),
             storage: Arc::new(InMemoryStorage::new()),
+            bridge: None,
+        }
+    }
+
+    /// Create fresh state with a JS host-callback bridge wired to `sink`.
+    ///
+    /// The bridge installs `java.get`/`java.post`/`java.ajax`/`java.connect`/
+    /// `java.ajaxAll` callbacks on the pipeline's `QuickJsSandbox`. Each
+    /// callback emits an `Event::HostRequest` (capability `HttpExecute`) through
+    /// `sink` and blocks the worker thread until a matching `host.complete` /
+    /// `host.error` is routed back via
+    /// [`HostCallbackBridge::try_complete`] (called from `Runtime::send`).
+    pub fn with_sink(sink: Arc<dyn EventSink>) -> Self {
+        let bridge = HostCallbackBridge::new(sink);
+        let sandbox = bridge.build_sandbox();
+        Self {
+            pipeline: Arc::new(RemoteContentPipeline::with_js_sandbox(sandbox)),
+            storage: Arc::new(InMemoryStorage::new()),
+            bridge: Some(bridge),
         }
     }
 
@@ -58,6 +109,12 @@ impl RemoteState {
 
     pub fn storage(&self) -> &InMemoryStorage {
         &self.storage
+    }
+
+    /// The JS host-callback bridge, if wired. `None` for the legacy
+    /// [`RemoteState::new`] constructor.
+    pub fn bridge(&self) -> Option<&HostCallbackBridge> {
+        self.bridge.as_ref()
     }
 }
 
@@ -76,7 +133,7 @@ pub enum RemoteDispatch {
 }
 
 #[derive(Debug)]
-enum RemoteCommandResult {
+pub enum RemoteCommandResult {
     Complete(serde_json::Value),
     Pending(PendingHostRequest),
 }
@@ -97,6 +154,54 @@ pub enum RemoteHostContinuation {
     BookDetail(BookDetailParams),
     BookToc(BookTocParams),
     ChapterContent(ChapterContentParams),
+    /// Paginated `book.toc` follow-up: a previous page returned a `nextTocUrl`.
+    /// The runtime fetched the next page and is now ready to parse it and
+    /// decide whether to emit another `Pending` or the final merged result.
+    BookTocNextPage(BookTocNextPageState),
+    /// Paginated `chapter.content` follow-up: a previous page returned a
+    /// `nextContentUrl`. The runtime fetched the next page and is now ready
+    /// to append its content and decide whether to continue or finish.
+    ChapterContentNextPage(ChapterContentNextPageState),
+    /// `source.explore` follow-up: Core emitted `http.execute` for the
+    /// discovery category URL and is waiting for the host to return the
+    /// response body. Once received, Core parses the book list.
+    SourceExplore(SourceExploreParams),
+}
+
+/// Continuation state for the `book.toc` pagination loop (`nextTocUrl`).
+///
+/// Mirrors Legado `BookChapterList.kt:69`:
+///   `while (nextUrl.isNotEmpty() && !nextUrlList.contains(nextUrl)) { ... }`
+///
+/// Core accumulates chapters across pages, dedups against `visited_urls`, and
+/// re-emits an `http.execute` host request for each next-page URL. The final
+/// merged result is emitted when no next URL is returned, the URL was already
+/// visited, or [`MAX_NEXT_PAGES`] is reached.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BookTocNextPageState {
+    /// Original request params (source_id, book_id, source, etc.).
+    pub params: BookTocParams,
+    /// Chapters accumulated so far (across all visited pages).
+    pub accumulated: Vec<TocEntry>,
+    /// Number of next-page fetches issued so far (for the MAX_NEXT_PAGES guard).
+    pub pages_fetched: u32,
+    /// Absolute URLs already fetched (cycle detection, mirrors Legado
+    /// `nextUrlList`).
+    pub visited_urls: HashSet<String>,
+}
+
+/// Continuation state for the `chapter.content` pagination loop
+/// (`nextContentUrl`). Mirrors Legado `BookContent.kt:85`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChapterContentNextPageState {
+    /// Original request params (source_id, book_id, source, etc.).
+    pub params: ChapterContentParams,
+    /// Chapter body text accumulated so far (pages concatenated in order).
+    pub accumulated_content: String,
+    /// Number of next-page fetches issued so far (for the MAX_NEXT_PAGES guard).
+    pub pages_fetched: u32,
+    /// Absolute URLs already fetched (cycle detection).
+    pub visited_urls: HashSet<String>,
 }
 
 fn finish(
@@ -138,6 +243,23 @@ fn resolve_source(
         })
 }
 
+/// Extract a `source_id` from an `Option<String>` for params where the id is
+/// only required when no inline `source` is provided. Returns an empty string
+/// when the inline source is present (matching `resolve_source` which ignores
+/// `source_id` in that case), and a structured error otherwise.
+fn source_id_or_empty(
+    source_id: &Option<String>,
+    inline: &Option<serde_json::Value>,
+) -> Result<String, CoreError> {
+    if inline.is_some() {
+        return Ok(String::new());
+    }
+    source_id.clone().ok_or_else(|| {
+        CoreError::invalid_params("sourceId is required when source is not provided inline")
+            .with_details(serde_json::json!({ "field": "sourceId" }))
+    })
+}
+
 fn storage_internal(_: reader_storage::StorageError) -> CoreError {
     CoreError::internal("storage lock poisoned")
 }
@@ -154,6 +276,69 @@ fn content_internal(err: reader_content::ContentError) -> CoreError {
     }
 }
 
+/// Mirror of `reader_content::has_rule_spec` (private there). Returns `true`
+/// when the rule spec carries a non-empty rule (string/array/object with
+/// content). Used to decide whether to take the Legado book-source semantics
+/// path (which yields `nextTocUrl`/`nextContentUrl`) or the rule-chain path.
+fn has_rule_spec(value: &serde_json::Value) -> bool {
+    match value {
+        serde_json::Value::Null => false,
+        serde_json::Value::String(value) => !value.trim().is_empty(),
+        serde_json::Value::Array(values) => !values.is_empty(),
+        serde_json::Value::Object(values) => !values.is_empty(),
+        _ => true,
+    }
+}
+
+/// Extract the table of contents together with the next-page URL. Mirrors
+/// `RemoteContentPipeline::toc` but preserves `nextTocUrl` for pagination.
+///
+/// When the source has no explicit `rules.toc` spec and carries Legado
+/// book-source semantics, delegates to `toc_book_source` (which extracts
+/// `nextTocUrl` via the Legado `ruleToc.nextUrl` rule). Otherwise falls back
+/// to `toc()` (rule-chain path) with `next_toc_url: None` — the rule chain
+/// does not extract next-page URLs.
+fn toc_with_next(
+    pipeline: &RemoteContentPipeline,
+    source: &Source,
+    toc_response: &str,
+) -> Result<reader_content::BookSourceToc, reader_content::ContentError> {
+    if !has_rule_spec(&source.rules.toc) {
+        if let Some(semantics) = source.book_source_semantics() {
+            let context = reader_content::BookSourceRequestContext::for_semantics(&semantics);
+            return pipeline.toc_book_source(&semantics, toc_response, &context);
+        }
+    }
+    let chapters = pipeline.toc(source, toc_response)?;
+    Ok(reader_content::BookSourceToc {
+        chapters,
+        next_toc_url: None,
+    })
+}
+
+/// Extract chapter body together with the next-page URL. Mirrors
+/// `RemoteContentPipeline::chapter_content` but preserves `nextContentUrl` for
+/// pagination.
+fn chapter_content_with_next(
+    pipeline: &RemoteContentPipeline,
+    source: &Source,
+    chapter_response: &str,
+) -> Result<reader_content::BookSourceContent, reader_content::ContentError> {
+    if !has_rule_spec(&source.rules.chapter) {
+        if let Some(semantics) = source.book_source_semantics() {
+            let context = reader_content::BookSourceRequestContext::for_semantics(&semantics);
+            return pipeline.content_book_source(&semantics, chapter_response, &context);
+        }
+    }
+    let content = pipeline.chapter_content(source, chapter_response)?;
+    Ok(reader_content::BookSourceContent {
+        title: None,
+        content,
+        next_content_url: None,
+        variables: std::collections::BTreeMap::new(),
+    })
+}
+
 /// Dispatch a remote-reading command. Returns `true` if the method was handled
 /// (including errors), `false` if the method is not a remote-reading method.
 pub fn dispatch_remote(
@@ -164,6 +349,13 @@ pub fn dispatch_remote(
     state: &RemoteState,
 ) -> RemoteDispatch {
     let request_id = cmd.request_id;
+    // Stamp the originating requestId so any JS host callbacks invoked while
+    // evaluating `@js:`/`<js>` URL rules attribute the emitted `host.request`
+    // to this request. The bridge is `None` for the legacy `RemoteState::new()`
+    // constructor — in that case this is a no-op.
+    if let Some(bridge) = state.bridge() {
+        bridge.set_current_request_id(request_id);
+    }
     let result: Result<RemoteCommandResult, CoreError> = match method {
         contract::methods::SOURCE_IMPORT => {
             source_import(cmd, state).map(RemoteCommandResult::Complete)
@@ -195,6 +387,38 @@ pub fn dispatch_remote(
         contract::methods::BOOKSHELF_GET => {
             bookshelf_get(cmd, state).map(RemoteCommandResult::Complete)
         }
+        contract::methods::REPLACE_RULE_CREATE => {
+            replace_rule_create(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::REPLACE_RULE_LIST => {
+            replace_rule_list(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::REPLACE_RULE_UPDATE => {
+            replace_rule_update(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::REPLACE_RULE_DELETE => {
+            replace_rule_delete(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        // TEMPORARILY DISABLED: source.explore / txt.tocRule.* dispatch cases
+        // require handler functions (source_explore_kinds, source_explore,
+        // txt_toc_rule_*) being added by other agents but not yet in the work
+        // tree. Re-enable once the reader-content updates land.
+        // contract::methods::SOURCE_EXPLORE_KINDS => {
+        //     source_explore_kinds(cmd, state).map(RemoteCommandResult::Complete)
+        // }
+        // contract::methods::SOURCE_EXPLORE => source_explore(cmd, state),
+        // contract::methods::TXT_TOC_RULE_CREATE => {
+        //     txt_toc_rule_create(cmd, state).map(RemoteCommandResult::Complete)
+        // }
+        // contract::methods::TXT_TOC_RULE_LIST => {
+        //     txt_toc_rule_list(cmd, state).map(RemoteCommandResult::Complete)
+        // }
+        // contract::methods::TXT_TOC_RULE_UPDATE => {
+        //     txt_toc_rule_update(cmd, state).map(RemoteCommandResult::Complete)
+        // }
+        // contract::methods::TXT_TOC_RULE_DELETE => {
+        //     txt_toc_rule_delete(cmd, state).map(RemoteCommandResult::Complete)
+        // }
         _ => return RemoteDispatch::NotHandled,
     };
     match result {
@@ -348,33 +572,67 @@ fn with_http_diagnostics(
     data
 }
 
+/// Attach HTTP diagnostics to a `RemoteCommandResult::Complete` payload.
+/// `Pending` results are passed through unchanged (diagnostics from a
+/// next-page request will be attached to the final result).
+fn with_http_diagnostics_result(
+    result: RemoteCommandResult,
+    diagnostics: Option<serde_json::Value>,
+) -> RemoteCommandResult {
+    match result {
+        RemoteCommandResult::Complete(data) => {
+            RemoteCommandResult::Complete(with_http_diagnostics(data, diagnostics))
+        }
+        RemoteCommandResult::Pending(pending) => RemoteCommandResult::Pending(pending),
+    }
+}
+
 /// Continue a remote-reading command after its host HTTP request completes.
 pub fn complete_remote_host(
     continuation: RemoteHostContinuation,
     host_result: serde_json::Value,
     state: &RemoteState,
-) -> Result<serde_json::Value, CoreError> {
+) -> Result<RemoteCommandResult, CoreError> {
     let response = parse_http_response(host_result)?;
     let diagnostics = http_response_diagnostics(&response);
+    let fetched_url = response.final_url.clone();
     match continuation {
         RemoteHostContinuation::BookSearch(mut params) => {
             params.search_response = response.body;
             book_search_from_params(params, state)
-                .map(|data| with_http_diagnostics(data, diagnostics))
+                .map(|data| RemoteCommandResult::Complete(data))
+                .map(|result| with_http_diagnostics_result(result, diagnostics))
         }
         RemoteHostContinuation::BookDetail(mut params) => {
             params.detail_response = response.body;
             book_detail_from_params(params, state)
-                .map(|data| with_http_diagnostics(data, diagnostics))
+                .map(|data| RemoteCommandResult::Complete(data))
+                .map(|result| with_http_diagnostics_result(result, diagnostics))
         }
         RemoteHostContinuation::BookToc(mut params) => {
             params.toc_response = response.body;
-            book_toc_from_params(params, state).map(|data| with_http_diagnostics(data, diagnostics))
+            book_toc_from_params(params, state, fetched_url.as_deref())
+                .map(|result| with_http_diagnostics_result(result, diagnostics))
         }
         RemoteHostContinuation::ChapterContent(mut params) => {
             params.chapter_response = response.body;
-            chapter_content_from_params(params, state)
-                .map(|data| with_http_diagnostics(data, diagnostics))
+            chapter_content_from_params(params, state, fetched_url.as_deref())
+                .map(|result| with_http_diagnostics_result(result, diagnostics))
+        }
+        RemoteHostContinuation::BookTocNextPage(mut state_) => {
+            state_.params.toc_response = response.body;
+            continue_toc_pagination(state_, state, fetched_url.as_deref())
+                .map(|result| with_http_diagnostics_result(result, diagnostics))
+        }
+        RemoteHostContinuation::ChapterContentNextPage(mut state_) => {
+            state_.params.chapter_response = response.body;
+            continue_chapter_content_pagination(state_, state, fetched_url.as_deref())
+                .map(|result| with_http_diagnostics_result(result, diagnostics))
+        }
+        RemoteHostContinuation::SourceExplore(mut params) => {
+            params.explore_response = Some(response.body);
+            source_explore_from_params(params, state)
+                .map(|result| with_http_diagnostics_result(result, diagnostics))
         }
     }
 }
@@ -652,7 +910,7 @@ fn book_toc(
 ) -> Result<RemoteCommandResult, CoreError> {
     let params: BookTocParams = parse_params(contract::methods::BOOK_TOC, &cmd.params)?;
     if !params.toc_response.is_empty() {
-        return book_toc_from_params(params, state).map(RemoteCommandResult::Complete);
+        return book_toc_from_params(params, state, None);
     }
     if let Some(request) = params.toc_request.clone() {
         return Ok(RemoteCommandResult::Pending(pending_http_request(
@@ -678,20 +936,107 @@ fn book_toc(
 fn book_toc_from_params(
     params: BookTocParams,
     state: &RemoteState,
-) -> Result<serde_json::Value, CoreError> {
+    initial_url: Option<&str>,
+) -> Result<RemoteCommandResult, CoreError> {
     let source = resolve_source(state.storage(), &params.source_id, &params.source)?;
-    let toc = state
-        .pipeline()
-        .toc(&source, &params.toc_response)
-        .map_err(content_internal)?;
+    let pipeline = state.pipeline();
+    let toc = toc_with_next(pipeline, &source, &params.toc_response).map_err(content_internal)?;
+    if let Some(next_url) = toc.next_toc_url.as_deref() {
+        if !next_url.trim().is_empty() {
+            return start_toc_pagination(params, toc.chapters, initial_url, next_url, state);
+        }
+    }
+    finish_toc_result(params, toc.chapters, state)
+}
+
+/// Emit the final merged toc result (no further pages).
+fn finish_toc_result(
+    params: BookTocParams,
+    chapters: Vec<TocEntry>,
+    state: &RemoteState,
+) -> Result<RemoteCommandResult, CoreError> {
     let cache_key = format!("toc:{}", params.book_id);
-    let payload = serde_json::to_string(&toc).unwrap_or_else(|_| "[]".into());
+    let payload = serde_json::to_string(&chapters).unwrap_or_else(|_| "[]".into());
     let _ = state.storage().put_cache(cache_key, payload);
-    Ok(serde_json::json!({
+    Ok(RemoteCommandResult::Complete(serde_json::json!({
         "sourceId": params.source_id,
         "bookId": params.book_id,
-        "toc": toc,
-    }))
+        "toc": chapters,
+    })))
+}
+
+/// Kick off the first next-page fetch for `book.toc`. Registers the
+/// accumulated chapters + visited URLs in a [`BookTocNextPageState`] and
+/// emits a `Pending` host HTTP request for `next_url`.
+fn start_toc_pagination(
+    params: BookTocParams,
+    chapters: Vec<TocEntry>,
+    initial_url: Option<&str>,
+    next_url: &str,
+    state: &RemoteState,
+) -> Result<RemoteCommandResult, CoreError> {
+    let mut visited_urls = HashSet::new();
+    if let Some(url) = initial_url {
+        visited_urls.insert(url.to_string());
+    } else if let Some(toc_url) = params.toc_url.as_deref() {
+        if !toc_url.trim().is_empty() {
+            visited_urls.insert(toc_url.to_string());
+        }
+    }
+    visited_urls.insert(next_url.to_string());
+    let request = build_request_from_url_field(state, &params.source_id, &params.source, next_url)?;
+    let pagination_state = BookTocNextPageState {
+        params,
+        accumulated: chapters,
+        pages_fetched: 1,
+        visited_urls,
+    };
+    Ok(RemoteCommandResult::Pending(pending_http_request(
+        request,
+        RemoteHostContinuation::BookTocNextPage(pagination_state),
+    )?))
+}
+
+/// Continue the `book.toc` pagination loop after a next-page response arrives.
+/// Parses the new page, appends its chapters, and either emits another
+/// `Pending` (if another `nextTocUrl` is returned) or finishes.
+fn continue_toc_pagination(
+    mut pagination_state: BookTocNextPageState,
+    state: &RemoteState,
+    fetched_url: Option<&str>,
+) -> Result<RemoteCommandResult, CoreError> {
+    if let Some(url) = fetched_url {
+        pagination_state.visited_urls.insert(url.to_string());
+    }
+    if pagination_state.pages_fetched >= MAX_NEXT_PAGES {
+        return finish_toc_result(pagination_state.params, pagination_state.accumulated, state);
+    }
+    let source = resolve_source(
+        state.storage(),
+        &pagination_state.params.source_id,
+        &pagination_state.params.source,
+    )?;
+    let pipeline = state.pipeline();
+    let toc = toc_with_next(pipeline, &source, &pagination_state.params.toc_response)
+        .map_err(content_internal)?;
+    pagination_state.accumulated.extend(toc.chapters);
+    if let Some(next_url) = toc.next_toc_url.as_deref() {
+        if !next_url.trim().is_empty() && !pagination_state.visited_urls.contains(next_url) {
+            pagination_state.pages_fetched += 1;
+            pagination_state.visited_urls.insert(next_url.to_string());
+            let request = build_request_from_url_field(
+                state,
+                &pagination_state.params.source_id,
+                &pagination_state.params.source,
+                next_url,
+            )?;
+            return Ok(RemoteCommandResult::Pending(pending_http_request(
+                request,
+                RemoteHostContinuation::BookTocNextPage(pagination_state),
+            )?));
+        }
+    }
+    finish_toc_result(pagination_state.params, pagination_state.accumulated, state)
 }
 
 fn chapter_content(
@@ -702,10 +1047,10 @@ fn chapter_content(
         parse_params(contract::methods::CHAPTER_CONTENT, &cmd.params)?;
     // JS-rule path: skip auto-build entirely (existing behaviour).
     if params.js_rule.is_some() {
-        return chapter_content_from_params(params, state).map(RemoteCommandResult::Complete);
+        return chapter_content_from_params(params, state, None);
     }
     if !params.chapter_response.is_empty() {
-        return chapter_content_from_params(params, state).map(RemoteCommandResult::Complete);
+        return chapter_content_from_params(params, state, None);
     }
     if let Some(request) = params.chapter_request.clone() {
         return Ok(RemoteCommandResult::Pending(pending_http_request(
@@ -735,7 +1080,8 @@ fn chapter_content(
 fn chapter_content_from_params(
     params: ChapterContentParams,
     state: &RemoteState,
-) -> Result<serde_json::Value, CoreError> {
+    initial_url: Option<&str>,
+) -> Result<RemoteCommandResult, CoreError> {
     let source = resolve_source(state.storage(), &params.source_id, &params.source)?;
     let pipeline = state.pipeline();
 
@@ -747,13 +1093,13 @@ fn chapter_content_from_params(
                     cache_key,
                     serde_json::to_string(&value).unwrap_or_else(|_| "{}".into()),
                 );
-                return Ok(serde_json::json!({
+                return Ok(RemoteCommandResult::Complete(serde_json::json!({
                     "sourceId": params.source_id,
                     "bookId": params.book_id,
                     "chapterTitle": params.chapter_title,
                     "content": value,
                     "via": "js",
-                }));
+                })));
             }
             JsOutcome::Unsupported { reason } => {
                 return Err(content_internal(
@@ -763,20 +1109,122 @@ fn chapter_content_from_params(
         }
     }
 
-    let content = pipeline
-        .chapter_content(&source, &params.chapter_response)
+    let content = chapter_content_with_next(pipeline, &source, &params.chapter_response)
         .map_err(content_internal)?;
+    if let Some(next_url) = content.next_content_url.as_deref() {
+        if !next_url.trim().is_empty() {
+            return start_chapter_content_pagination(
+                params,
+                content.content,
+                initial_url,
+                next_url,
+                state,
+            );
+        }
+    }
+    finish_chapter_content_result(params, content.content, state)
+}
 
+/// Emit the final merged chapter content (no further pages).
+fn finish_chapter_content_result(
+    params: ChapterContentParams,
+    content: String,
+    state: &RemoteState,
+) -> Result<RemoteCommandResult, CoreError> {
     let cache_key = format!("chapter:{}:{}", params.book_id, params.chapter_title);
     let _ = state.storage().put_cache(cache_key, content.clone());
-
-    Ok(serde_json::json!({
+    Ok(RemoteCommandResult::Complete(serde_json::json!({
         "sourceId": params.source_id,
         "bookId": params.book_id,
         "chapterTitle": params.chapter_title,
         "content": content,
         "via": "rule",
-    }))
+    })))
+}
+
+/// Kick off the first next-page fetch for `chapter.content`. Registers the
+/// accumulated content + visited URLs in a [`ChapterContentNextPageState`] and
+/// emits a `Pending` host HTTP request for `next_url`.
+fn start_chapter_content_pagination(
+    params: ChapterContentParams,
+    content: String,
+    initial_url: Option<&str>,
+    next_url: &str,
+    state: &RemoteState,
+) -> Result<RemoteCommandResult, CoreError> {
+    let mut visited_urls = HashSet::new();
+    if let Some(url) = initial_url {
+        visited_urls.insert(url.to_string());
+    } else if let Some(chapter_url) = params.chapter_url.as_deref() {
+        if !chapter_url.trim().is_empty() {
+            visited_urls.insert(chapter_url.to_string());
+        }
+    }
+    visited_urls.insert(next_url.to_string());
+    let request = build_request_from_url_field(state, &params.source_id, &params.source, next_url)?;
+    let pagination_state = ChapterContentNextPageState {
+        params,
+        accumulated_content: content,
+        pages_fetched: 1,
+        visited_urls,
+    };
+    Ok(RemoteCommandResult::Pending(pending_http_request(
+        request,
+        RemoteHostContinuation::ChapterContentNextPage(pagination_state),
+    )?))
+}
+
+/// Continue the `chapter.content` pagination loop after a next-page response
+/// arrives. Parses the new page, appends its content, and either emits another
+/// `Pending` (if another `nextContentUrl` is returned) or finishes.
+fn continue_chapter_content_pagination(
+    mut pagination_state: ChapterContentNextPageState,
+    state: &RemoteState,
+    fetched_url: Option<&str>,
+) -> Result<RemoteCommandResult, CoreError> {
+    if let Some(url) = fetched_url {
+        pagination_state.visited_urls.insert(url.to_string());
+    }
+    if pagination_state.pages_fetched >= MAX_NEXT_PAGES {
+        return finish_chapter_content_result(
+            pagination_state.params,
+            pagination_state.accumulated_content,
+            state,
+        );
+    }
+    let source = resolve_source(
+        state.storage(),
+        &pagination_state.params.source_id,
+        &pagination_state.params.source,
+    )?;
+    let pipeline = state.pipeline();
+    let content =
+        chapter_content_with_next(pipeline, &source, &pagination_state.params.chapter_response)
+            .map_err(content_internal)?;
+    pagination_state
+        .accumulated_content
+        .push_str(&content.content);
+    if let Some(next_url) = content.next_content_url.as_deref() {
+        if !next_url.trim().is_empty() && !pagination_state.visited_urls.contains(next_url) {
+            pagination_state.pages_fetched += 1;
+            pagination_state.visited_urls.insert(next_url.to_string());
+            let request = build_request_from_url_field(
+                state,
+                &pagination_state.params.source_id,
+                &pagination_state.params.source,
+                next_url,
+            )?;
+            return Ok(RemoteCommandResult::Pending(pending_http_request(
+                request,
+                RemoteHostContinuation::ChapterContentNextPage(pagination_state),
+            )?));
+        }
+    }
+    finish_chapter_content_result(
+        pagination_state.params,
+        pagination_state.accumulated_content,
+        state,
+    )
 }
 
 fn reading_progress_update(
@@ -1181,4 +1629,424 @@ fn entry_to_data(entry: BookshelfEntry) -> BookshelfEntryData {
 
 fn serde_internal(err: serde_json::Error) -> CoreError {
     CoreError::internal(format!("serialization failed: {err}"))
+}
+
+// ===========================================================================
+// replace-rule.* CRUD (Legado ReplaceRule.kt + ContentProcessor.kt:91 parity)
+// ===========================================================================
+
+fn replace_rule_to_data(rule: ReplaceRule) -> ReplaceRuleData {
+    ReplaceRuleData {
+        id: rule.id,
+        name: rule.name,
+        group: rule.group,
+        pattern: rule.pattern,
+        replacement: rule.replacement,
+        scope: rule.scope,
+        scope_title: rule.scope_title,
+        scope_content: rule.scope_content,
+        exclude_scope: rule.exclude_scope,
+        is_enabled: rule.is_enabled,
+        is_regex: rule.is_regex,
+        timeout_millisecond: rule.timeout_millisecond,
+        order: rule.order,
+    }
+}
+
+fn next_replace_rule_id(state: &RemoteState) -> Result<i64, CoreError> {
+    let rules = state
+        .storage()
+        .list_replace_rules()
+        .map_err(storage_internal)?;
+    Ok(rules.iter().map(|r| r.id).max().unwrap_or(0) + 1)
+}
+
+fn replace_rule_create(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: ReplaceRuleCreateParams =
+        parse_params(contract::methods::REPLACE_RULE_CREATE, &cmd.params)?;
+    let id = params
+        .id
+        .unwrap_or_else(|| next_replace_rule_id(state).unwrap_or(1));
+    let rule = ReplaceRule {
+        id,
+        name: params.name,
+        group: params.group,
+        pattern: params.pattern,
+        replacement: params.replacement,
+        scope: params.scope,
+        scope_title: params.scope_title,
+        scope_content: params.scope_content,
+        exclude_scope: params.exclude_scope,
+        is_enabled: params.is_enabled,
+        is_regex: params.is_regex,
+        timeout_millisecond: params.timeout_millisecond,
+        order: params.order,
+    };
+    let stored = state
+        .storage()
+        .put_replace_rule(rule)
+        .map_err(storage_internal)?;
+    let data = ReplaceRuleCreateData {
+        rule: replace_rule_to_data(stored),
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+fn replace_rule_list(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: ReplaceRuleListParams =
+        parse_params(contract::methods::REPLACE_RULE_LIST, &cmd.params)?;
+    let rules = state
+        .storage()
+        .list_replace_rules()
+        .map_err(storage_internal)?;
+    let rules = if params.enabled_only == Some(true) {
+        rules.into_iter().filter(|r| r.is_enabled).collect()
+    } else {
+        rules
+    };
+    let data = ReplaceRuleListData {
+        rules: rules.into_iter().map(replace_rule_to_data).collect(),
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+fn replace_rule_update(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: ReplaceRuleUpdateParams =
+        parse_params(contract::methods::REPLACE_RULE_UPDATE, &cmd.params)?;
+    let existing = state
+        .storage()
+        .get_replace_rule(params.id)
+        .map_err(storage_internal)?
+        .ok_or_else(|| {
+            CoreError::invalid_params(format!("replace-rule not found: id={}", params.id))
+        })?;
+    let updated = ReplaceRule {
+        id: existing.id,
+        name: params.name.unwrap_or(existing.name),
+        group: params.group.or(existing.group),
+        pattern: params.pattern.unwrap_or(existing.pattern),
+        replacement: params.replacement.unwrap_or(existing.replacement),
+        scope: params.scope.or(existing.scope),
+        scope_title: params.scope_title.unwrap_or(existing.scope_title),
+        scope_content: params.scope_content.unwrap_or(existing.scope_content),
+        exclude_scope: params.exclude_scope.or(existing.exclude_scope),
+        is_enabled: params.is_enabled.unwrap_or(existing.is_enabled),
+        is_regex: params.is_regex.unwrap_or(existing.is_regex),
+        timeout_millisecond: params
+            .timeout_millisecond
+            .unwrap_or(existing.timeout_millisecond),
+        order: params.order.unwrap_or(existing.order),
+    };
+    let stored = state
+        .storage()
+        .put_replace_rule(updated)
+        .map_err(storage_internal)?;
+    let data = ReplaceRuleUpdateData {
+        rule: replace_rule_to_data(stored),
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+fn replace_rule_delete(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: ReplaceRuleDeleteParams =
+        parse_params(contract::methods::REPLACE_RULE_DELETE, &cmd.params)?;
+    let existed = state
+        .storage()
+        .get_replace_rule(params.id)
+        .map_err(storage_internal)?
+        .is_some();
+    if existed {
+        state
+            .storage()
+            .delete_replace_rule(params.id)
+            .map_err(storage_internal)?;
+    }
+    let data = ReplaceRuleDeleteData {
+        id: params.id,
+        deleted: existed,
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+// ===========================================================================
+// source.exploreKinds + source.explore (Legado WebBook.kt:93 parity)
+// ===========================================================================
+
+/// `source.exploreKinds`: parse a source's `exploreUrl` field into discovery
+/// categories. Pure parse — no host callback.
+fn source_explore_kinds(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: SourceExploreKindsParams =
+        parse_params(contract::methods::SOURCE_EXPLORE_KINDS, &cmd.params)?;
+    let explore_url = if let Some(url) = params.explore_url.as_deref() {
+        url.to_string()
+    } else {
+        let source_id = source_id_or_empty(&params.source_id, &params.source)?;
+        let source = resolve_source(state.storage(), &source_id, &params.source)?;
+        let legado = source.legado_book_source().ok_or_else(|| {
+            CoreError::invalid_params(
+                "cannot parse exploreKinds: source has no Legado bookSource payload",
+            )
+            .with_details(serde_json::json!({ "sourceId": source_id }))
+        })?;
+        legado.explore_url.clone().unwrap_or_default()
+    };
+    let trimmed = explore_url.trim();
+    let kinds: Vec<SourceExploreKindEntry> =
+        if trimmed.starts_with("@js:") || trimmed.starts_with("<js>") {
+            let context = serde_json::json!({});
+            state
+                .pipeline()
+                .parse_explore_kinds_with_js(&explore_url, &context)
+                .into_iter()
+                .map(|kind| SourceExploreKindEntry {
+                    title: kind.title,
+                    url: kind.url,
+                })
+                .collect()
+        } else {
+            reader_content::parse_explore_kinds(&explore_url)
+                .into_iter()
+                .map(|kind| SourceExploreKindEntry {
+                    title: kind.title,
+                    url: kind.url,
+                })
+                .collect()
+        };
+    let data = SourceExploreKindsData { kinds };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+/// `source.explore`: fetch books from a discovery category URL. Three modes
+/// (mirrors `book.search`): prefetched response, pre-built request, or
+/// auto-build from `url` + source `header`.
+fn source_explore(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<RemoteCommandResult, CoreError> {
+    let params: SourceExploreParams = parse_params(contract::methods::SOURCE_EXPLORE, &cmd.params)?;
+    if let Some(response) = params.explore_response.as_deref() {
+        if !response.is_empty() {
+            let data = source_explore_parse_response(params.clone(), response, state)?;
+            return Ok(RemoteCommandResult::Complete(data));
+        }
+    }
+    if let Some(request) = params.explore_request.clone() {
+        return Ok(RemoteCommandResult::Pending(pending_http_request(
+            request,
+            RemoteHostContinuation::SourceExplore(params),
+        )?));
+    }
+    if let Some(url) = params.url.as_deref() {
+        if !url.trim().is_empty() {
+            let request = build_explore_request_from_url(state, &params, url)?;
+            return Ok(RemoteCommandResult::Pending(pending_http_request(
+                request,
+                RemoteHostContinuation::SourceExplore(params),
+            )?));
+        }
+    }
+    Err(CoreError::invalid_params(
+        "exploreResponse is required unless exploreRequest or url is provided",
+    ))
+}
+
+fn build_explore_request_from_url(
+    state: &RemoteState,
+    params: &SourceExploreParams,
+    raw_url: &str,
+) -> Result<HostHttpRequest, CoreError> {
+    let source_id = source_id_or_empty(&params.source_id, &params.source)?;
+    let source = resolve_source(state.storage(), &source_id, &params.source)?;
+    let legado = source.legado_book_source().ok_or_else(|| {
+        CoreError::invalid_params(
+            "cannot auto-build exploreRequest: source has no Legado bookSource payload",
+        )
+        .with_details(serde_json::json!({ "sourceId": source_id }))
+    })?;
+    let source_headers = legado
+        .header
+        .as_ref()
+        .and_then(|h| h.as_object())
+        .cloned()
+        .unwrap_or_default();
+    let page = params.page.unwrap_or(1).max(1);
+    let ctx = AnalyzeUrlContext::for_search("", page);
+    build_analyze_url_request(state, raw_url, &ctx, &source.base_url, &source_headers)
+}
+
+fn source_explore_from_params(
+    params: SourceExploreParams,
+    state: &RemoteState,
+) -> Result<RemoteCommandResult, CoreError> {
+    // Clone the response before moving `params` into the parser to satisfy
+    // the borrow checker (the response is a field of `params`).
+    let response = params
+        .explore_response
+        .clone()
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| CoreError::internal("source.explore continuation missing response"))?;
+    let data = source_explore_parse_response(params, &response, state)?;
+    Ok(RemoteCommandResult::Complete(data))
+}
+
+fn source_explore_parse_response(
+    params: SourceExploreParams,
+    response: &str,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let source_id = source_id_or_empty(&params.source_id, &params.source)?;
+    let source = resolve_source(state.storage(), &source_id, &params.source)?;
+    let books = state
+        .pipeline()
+        .explore(&source, response)
+        .map_err(content_internal)?;
+    for book in &books {
+        let _ = state.storage().put_book(book.clone());
+    }
+    let books_data: Vec<serde_json::Value> = books
+        .iter()
+        .map(|book| serde_json::to_value(book).unwrap_or(serde_json::Value::Null))
+        .collect();
+    Ok(serde_json::json!({
+        "sourceId": source_id,
+        "books": books_data,
+    }))
+}
+
+// ===========================================================================
+// txt-toc-rule.* CRUD (Legado TxtTocRule.kt parity)
+// ===========================================================================
+
+fn txt_toc_rule_to_data(rule: TxtTocRule) -> TxtTocRuleData {
+    TxtTocRuleData {
+        id: rule.id,
+        name: rule.name,
+        rule: rule.rule,
+        example: rule.example,
+        serial_number: rule.serial_number,
+        enable: rule.enable,
+    }
+}
+
+fn next_txt_toc_rule_id(state: &RemoteState) -> i64 {
+    let rules = state.storage().list_txt_toc_rules().unwrap_or_default();
+    rules.iter().map(|r| r.id).max().unwrap_or(0) + 1
+}
+
+fn txt_toc_rule_create(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: TxtTocRuleCreateParams =
+        parse_params(contract::methods::TXT_TOC_RULE_CREATE, &cmd.params)?;
+    let id = params.id.unwrap_or_else(|| next_txt_toc_rule_id(state));
+    let rule = TxtTocRule {
+        id,
+        name: params.name,
+        rule: params.rule,
+        example: params.example,
+        serial_number: params.serial_number,
+        enable: params.enable,
+    };
+    let stored = state
+        .storage()
+        .put_txt_toc_rule(rule)
+        .map_err(storage_internal)?;
+    let data = TxtTocRuleCreateData {
+        rule: txt_toc_rule_to_data(stored),
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+fn txt_toc_rule_list(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: TxtTocRuleListParams =
+        parse_params(contract::methods::TXT_TOC_RULE_LIST, &cmd.params)?;
+    let rules = if params.enabled_only == Some(true) {
+        state
+            .storage()
+            .list_enabled_txt_toc_rules()
+            .map_err(storage_internal)?
+    } else {
+        state
+            .storage()
+            .list_txt_toc_rules()
+            .map_err(storage_internal)?
+    };
+    let data = TxtTocRuleListData {
+        rules: rules.into_iter().map(txt_toc_rule_to_data).collect(),
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+fn txt_toc_rule_update(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: TxtTocRuleUpdateParams =
+        parse_params(contract::methods::TXT_TOC_RULE_UPDATE, &cmd.params)?;
+    let existing = state
+        .storage()
+        .get_txt_toc_rule(params.id)
+        .map_err(storage_internal)?
+        .ok_or_else(|| {
+            CoreError::invalid_params(format!("txt-toc-rule not found: id={}", params.id))
+        })?;
+    let updated = TxtTocRule {
+        id: existing.id,
+        name: params.name.unwrap_or(existing.name),
+        rule: params.rule.unwrap_or(existing.rule),
+        example: params.example.or(existing.example),
+        serial_number: params.serial_number.unwrap_or(existing.serial_number),
+        enable: params.enable.unwrap_or(existing.enable),
+    };
+    let stored = state
+        .storage()
+        .put_txt_toc_rule(updated)
+        .map_err(storage_internal)?;
+    let data = TxtTocRuleUpdateData {
+        rule: txt_toc_rule_to_data(stored),
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+fn txt_toc_rule_delete(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: TxtTocRuleDeleteParams =
+        parse_params(contract::methods::TXT_TOC_RULE_DELETE, &cmd.params)?;
+    let existing = state
+        .storage()
+        .get_txt_toc_rule(params.id)
+        .map_err(storage_internal)?;
+    let deleted = existing.is_some();
+    if deleted {
+        state
+            .storage()
+            .delete_txt_toc_rule(params.id)
+            .map_err(storage_internal)?;
+    }
+    let data = TxtTocRuleDeleteData {
+        id: params.id,
+        deleted,
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
 }

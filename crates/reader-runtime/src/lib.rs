@@ -9,6 +9,7 @@
 //! Tokio is intentionally NOT a dependency in v1 to keep the OHOS toolchain
 //! risk surface minimal.
 
+pub mod host_callback_bridge;
 pub mod remote;
 pub mod runtime;
 pub mod sink;
