@@ -44,3 +44,19 @@ git log -5 --oneline
 `docs/PROJECT_CHARTER.md` > `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md` >
 `docs/MAINLINE_EXECUTION_PLAN.md` > 其他 roadmap / 审计 / 报告 > 历史归档文档。
 冲突时以上层为准。
+
+## TTS 策略（强制）
+
+TTS 是 Reader 对标 Legado 朗读能力的关键模块，以下约束不可偏离：
+
+1. **Core 只做编排，不做合成**：Core（Rust）负责文本切片、播放队列状态机、
+   章节边界过渡与朗读位置持久化，**不嵌入任何语音模型、不做语音合成**。
+2. **发声归 Host 系统级 TTS**：各平台使用系统原生 TTS（iOS `AVSpeechSynthesizer`、
+   Android `TextToSpeech`、HarmonyOS `SystemTts`），与 Legado 架构一致。
+3. **HttpTTS 为下一阶段能力**：兼容 Legado HttpTTS 配置格式（百度 / 阿里云 /
+   自建服务等），Core 产出请求 descriptor（URL、headers、body、拼接规则），
+   Host 执行 HTTP 拉取音频流并喂给播放器；Core 不开 socket。
+4. **本地神经声学 TTS 暂不定型**：Sherpa-ONNX 等本地小模型方案等 HttpTTS 验证
+   后再评估选型；当前保留"系统 TTS + HttpTTS"双轨策略。
+5. **Core 永不嵌入语音模型**：神经声学模型体积 50–200MB，会让三端包体爆炸且
+   违反 Core/Host 边界；如需本地神经 TTS，模型由 Host 按需下载加载。
