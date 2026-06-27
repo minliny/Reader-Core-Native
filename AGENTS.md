@@ -52,7 +52,9 @@ git log -5 --oneline
 ## 文档优先级
 
 `docs/PROJECT_CHARTER.md` > `docs/LOCAL_REPO_MIGRATION_DIRECTIVE.md` >
-`docs/MAINLINE_EXECUTION_PLAN.md` > 其他 roadmap / 审计 / 报告 > 历史归档文档。
+`docs/MAINLINE_EXECUTION_PLAN.md` > `docs/LEGADO_CAPABILITY_INVENTORY.md` >
+`docs/CAPABILITY_GAP_PLAN.md` > `docs/TEST_AND_VERIFICATION_PLAN.md` >
+状态快照 `docs/STATUS_SNAPSHOT_*.md` > 其他 roadmap / 审计 / 报告 > 历史归档文档。
 冲突时以上层为准。
 
 ## TTS 策略（强制）
@@ -70,3 +72,83 @@ TTS 是 Reader 对标 Legado 朗读能力的关键模块，以下约束不可偏
    后再评估选型；当前保留"系统 TTS + HttpTTS"双轨策略。
 5. **Core 永不嵌入语音模型**：神经声学模型体积 50–200MB，会让三端包体爆炸且
    违反 Core/Host 边界；如需本地神经 TTS，模型由 Host 按需下载加载。
+
+## 书源测试工具链（强制）
+
+书源测试工具链是验证"能力底线 = Legado"的核心基础设施。以下约束不可偏离：
+
+### 工具链架构
+
+```
+corpus-manager (Python)          — 书源管理：导入/分类/脱敏/验证
+  ↓
+reader-cli --test-source (Rust)  — 单源 L1-L5 live 测试（CLI 充当 Host 发 HTTP）
+reader-cli --test-corpus (Rust)  — 批量 L1-L5 live 测试
+reader-cli --test-corpus-offline — 批量 L1-L5 离线回放（用录像数据，CI PR gate）
+  ↓
+reports/tooling/                 — 结果产出 + 证据索引 + blocker 自动生成
+```
+
+### 5 级通过定义（评估规则）
+
+每个真实 Legado 书源"跑通" = 以下 5 级全部 pass：
+
+| 级别 | 步骤 | 通过条件 |
+|------|------|----------|
+| L1-import | `source.import` | 返回 result，sourceId 非空，无 error |
+| L2-search | `book.search` | ≥1 本书，title 非空 |
+| L3-detail | `book.detail` | name 非空 |
+| L4-toc | `book.toc` | ≥1 章节，title 非空 |
+| L5-content | `chapter.content` | content >50 字符 |
+
+前级 fail 则后续级 skip。一个源"完全通过" = L1-L5 全绿。
+
+### 链式提取（核心机制）
+
+测试工具必须链式提取 URL，不能一次性喂 mock 数据：
+- search 结果 → 提取 `bookUrl` → 喂给 detail
+- detail 结果 → 提取 `tocUrl` → 喂给 toc
+- toc 结果 → 提取 `chapterUrl` → 喂给 content
+
+Core 已就绪（`book.search` 传 `keyword` 自动构造 URL → `http.execute` → Host 执行 →
+`complete_remote_host` continuation）。CLI 缺失 HTTP 客户端 + 链式提取，
+这是工具链能否工作的关键断链。
+
+### Core/Host 边界在测试工具中的体现
+
+- **CLI 充当 Host**：CLI 用 `ureq` 发真实 HTTP 请求（Core 不开 socket，红线 4 遵守）
+- **Core 产出 request descriptor**：Core 发 `http.execute` host request，CLI 执行
+- **离线回放不触网**：`--test-corpus-offline` 把录像的 response body 喂给 Core 的
+  `xxxResponse` 字段，Core 不发 `http.execute`
+
+### 录像（副产品，非前置步骤）
+
+- live 测试时自动保存每步 HTTP 响应到 `tests/fixtures/corpus/recorded/`
+- 录像是 live 测试的副产品，不是先录制再测试
+- CI PR gate 用离线回放（稳定），nightly 用 live（真实网络）
+
+### Gate 规则
+
+| Gate | 触发 | 内容 | 通过条件 |
+|------|------|------|----------|
+| PR | 每次 PR | fmt + clippy + test + conformance + P0 offline 10 源 | 0 fail |
+| main | 合并 main | PR + fixture_vertical + P0 offline 30 源 + 证据索引 | P0 ≥80% |
+| nightly | 每天 02:00 | main + 全量 459 offline + live smoke 10 源 | 全量 ≥60% |
+| release | 手动触发 | nightly + 四端 corpus benchmark | parity ≥90% |
+
+### 跨会话审计要求
+
+任何会话的 agent 在完成书源测试工具链相关工作后，必须：
+1. 更新 `docs/STATUS_SNAPSHOT_*.md` 中的"测试工具链状态"小节
+2. 更新 `docs/LEGADO_CAPABILITY_INVENTORY.md` 中受影响能力项的"证据"列
+3. 如果跑了批量测试，记录通过率到 `reports/tooling/` 并在快照中引用
+4. 不得凭单次测试结果声称能力已完成，必须对照 97 项清单逐项验证
+
+### 当前关键断链（截至 2026-06-27）
+
+1. **CLI 无 HTTP 客户端**：`grep "reqwest|ureq|hyper|std::net" tools/reader-cli/src/*.rs` = 0
+2. **无链式提取**：现有 `--fixture-vertical` 需一次性喂全部 mock 响应，不提取 URL
+3. **无 `--test-source` / `--test-corpus`**：批量测试子命令未实现
+4. **459 源批量通过率 = 未知**：从未测试过
+5. **17 个 Python 工具全部未跑过**
+
