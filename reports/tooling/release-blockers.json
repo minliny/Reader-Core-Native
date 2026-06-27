@@ -64,6 +64,21 @@
       ]
     },
     {
+      "capability": "bookshelf.list",
+      "evidence_status": "missing",
+      "id": "rb-bookshelf-protocol-gap",
+      "mitigation": "Expose reader-storage BookshelfStore (list_shelf/query_shelf/get_book) via a new bookshelf.list / bookshelf.get protocol command in protocol/reader-command.schema.json + crates/reader-contract/src/lib.rs methods, or have Android maintain a local bookshelf Room table. Until then Android BookshelfViewModel shows an empty shelf.",
+      "platform": "all",
+      "reason": "Core protocol v1 has no bookshelf.get / bookshelf.list command. reader-storage internally defines BookshelfStore::{list_shelf, query_shelf, get_book, add_to_shelf} and BookshelfEntry, but the JSON protocol (reader-command.schema.json method examples + reader-contract methods module, enforced by command_schema_method_examples_are_current_v1_methods) does not expose any bookshelf.* method. Android BookshelfViewModel.kt calls client.sendAndAwait(\"bookshelf.list\", ...) which always fails and falls back to an empty shelf after a 10s timeout.",
+      "severity": "medium",
+      "sources": [
+        "protocol/reader-command.schema.json",
+        "crates/reader-contract/src/lib.rs",
+        "crates/reader-storage/src/lib.rs",
+        "Reader for Android/app/src/main/kotlin/com/reader/ui/bookshelf/BookshelfViewModel.kt"
+      ]
+    },
+    {
       "capability": "chapter.content",
       "evidence_status": "missing",
       "id": "rb-chapter.content",
@@ -815,7 +830,7 @@
   "generated_at": "2026-06-25T07:40:32Z",
   "summary": {
     "by_platform": {
-      "all": 67,
+      "all": 68,
       "android": 0,
       "harmony": 0,
       "ios": 0,
@@ -825,9 +840,9 @@
       "blocker": 2,
       "high": 0,
       "low": 38,
-      "medium": 27
+      "medium": 28
     },
-    "total": 67
+    "total": 68
   },
   "tool": "release-blocker-register-generator",
   "version": "release-blockers/1"
