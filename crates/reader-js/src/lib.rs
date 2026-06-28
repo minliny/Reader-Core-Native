@@ -55,6 +55,13 @@ pub struct JsRuntimeConfig {
 pub struct JsExecutionOptions {
     pub timeout: Option<Duration>,
     pub cancellation_token: Option<CancellationToken>,
+    /// Prelude global variables injected before script evaluation, mirroring
+    /// Legado's JS execution prelude (`book`, `source`, `result`, `base_url`,
+    /// `bookUrl`, `chapterUrl`, `key`, `page`, `cookie`, etc.). When set, must
+    /// be a JSON object whose entries are installed as top-level JS globals.
+    /// Host-installed globals (`java`, `console`, `Buffer`, ...) are never
+    /// overwritten by prelude entries.
+    pub prelude_globals: Option<JsonValue>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -825,6 +832,32 @@ impl QuickJsSandbox {
         ctx.globals().set("console", console_object)?;
         Ok(())
     }
+
+    /// Install prelude global variables from a JSON object before script
+    /// evaluation, mirroring Legado's JS execution prelude (`book`, `source`,
+    /// `result`, `base_url`, `bookUrl`, `chapterUrl`, `key`, `page`,
+    /// `cookie`, ...). Each entry of `globals` (when it is a JSON object) is
+    /// set as a top-level JS global. Host-installed globals (`java`, `console`,
+    /// `Buffer`, `ajax`, ...) are skipped so prelude entries can never clobber
+    /// the host API surface.
+    fn install_prelude_globals<'js>(
+        &self,
+        ctx: &Ctx<'js>,
+        globals: &JsonValue,
+    ) -> Result<(), QuickJsError> {
+        let Some(map) = globals.as_object() else {
+            return Ok(());
+        };
+        for (name, value) in map {
+            match name.as_str() {
+                "java" | "console" | "Buffer" | "ajax" | "ajaxAll" => continue,
+                _ => {}
+            }
+            let quickjs_value = json_to_quickjs(ctx, value)?;
+            ctx.globals().set(name.as_str(), quickjs_value)?;
+        }
+        Ok(())
+    }
 }
 
 impl Default for QuickJsSandbox {
@@ -878,11 +911,16 @@ impl JsSandbox for QuickJsSandbox {
 
         let console = Arc::new(Mutex::new(Vec::new()));
         let context = Context::full(&runtime).map_err(map_quickjs_engine_error)?;
+        let prelude_globals = options.prelude_globals.clone();
         let mut evaluation = context.with(|ctx| {
             self.install_host_api(&ctx, console.clone())
                 .map_err(map_quickjs_engine_error)?;
             self.install_console_api(&ctx, console.clone())
                 .map_err(map_quickjs_engine_error)?;
+            if let Some(globals) = &prelude_globals {
+                self.install_prelude_globals(&ctx, globals)
+                    .map_err(map_quickjs_engine_error)?;
+            }
             let result = ctx.eval::<QuickJsValue<'_>, _>(script).catch(&ctx);
             let value = result.map_err(|error| map_caught_error(error, &interrupt))?;
             let value = resolve_maybe_promise(value, &ctx, &interrupt)?;
@@ -5344,6 +5382,66 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.value, json!({"answer": 42, "ok": true}));
+    }
+
+    #[test]
+    fn evaluate_with_options_installs_prelude_globals() {
+        let sandbox = QuickJsSandbox::default();
+        let options = JsExecutionOptions {
+            prelude_globals: Some(json!({
+                "bookUrl": "https://example.test/book/1",
+                "chapterUrl": "https://example.test/chapter/2",
+                "sourceId": "src-42",
+                "page": 3,
+                "base_url": "https://example.test",
+                "cookie": { "session": "abc123" },
+                "result": "line1\nline2",
+            })),
+            ..Default::default()
+        };
+
+        let result = sandbox
+            .evaluate_with_options(
+                r#"({
+                    bookUrl,
+                    chapterUrl,
+                    sourceId,
+                    page,
+                    base_url,
+                    cookieSession: cookie.session,
+                    resultFirstLine: result.split("\n")[0]
+                })"#,
+                options,
+            )
+            .unwrap();
+
+        assert_eq!(result.value["bookUrl"], "https://example.test/book/1");
+        assert_eq!(result.value["chapterUrl"], "https://example.test/chapter/2");
+        assert_eq!(result.value["sourceId"], "src-42");
+        // JS numbers are IEEE-754 doubles; compare as f64 after the round-trip.
+        assert_eq!(result.value["page"].as_f64(), Some(3.0));
+        assert_eq!(result.value["base_url"], "https://example.test");
+        assert_eq!(result.value["cookieSession"], "abc123");
+        assert_eq!(result.value["resultFirstLine"], "line1");
+    }
+
+    #[test]
+    fn evaluate_with_options_prelude_does_not_clobber_host_globals() {
+        let sandbox = QuickJsSandbox::default();
+        let options = JsExecutionOptions {
+            prelude_globals: Some(json!({
+                "java": "shadowed",
+                "console": "shadowed",
+            })),
+            ..Default::default()
+        };
+
+        // `java.get` is a host-installed function; prelude `java` entry must
+        // be skipped so the host API remains callable.
+        let result = sandbox
+            .evaluate_with_options(r#"typeof java.get === "function""#, options)
+            .unwrap();
+        assert_eq!(result.value, true);
     }
 
     #[test]

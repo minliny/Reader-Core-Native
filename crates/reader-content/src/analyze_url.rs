@@ -29,7 +29,15 @@ pub struct UrlDslOptions {
     pub charset: String,
     #[serde(default)]
     pub headers: Map<String, Value>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Legado `body` accepts either a string (`"k=v"`) or a JSON object
+    /// (`{"k":"v"}`). When a JSON object is supplied, it is serialized back
+    /// to a JSON string so [`HostHttpRequest::body`] stays `Option<String>`.
+    /// Mirrors Legado `AnalyzeUrl` body handling for sources like 番薯小说.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_body"
+    )]
     pub body: Option<String>,
     /// Legado `retry: Int?` — nullable integer. `None` means no retry override.
     #[serde(default)]
@@ -48,6 +56,44 @@ fn default_method() -> String {
 
 fn default_charset() -> String {
     "utf-8".to_string()
+}
+
+/// Deserialize the Legado `body` field, which accepts either a string
+/// (`"k=v"`) or a JSON object (`{"k":"v"}`). A JSON object is serialized back
+/// to a JSON string so the field stays `Option<String>`. Other JSON types
+/// (numbers, arrays, bools) are rejected.
+fn deserialize_body<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    let value = Option::<Value>::deserialize(deserializer)?;
+    match value {
+        None => Ok(None),
+        Some(Value::String(s)) => Ok(Some(s)),
+        Some(Value::Object(_)) => {
+            let json = serde_json::to_string(&value).map_err(|e| {
+                Error::custom(format!("failed to serialize body object: {e}"))
+            })?;
+            Ok(Some(json))
+        }
+        Some(other) => Err(Error::custom(format!(
+            "body must be a string or JSON object, got {}",
+            json_value_type_name(&other)
+        ))),
+    }
+}
+
+fn json_value_type_name(v: &Value) -> &'static str {
+    match v {
+        Value::Null => "null",
+        Value::Bool(_) => "bool",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+    }
 }
 
 impl Default for UrlDslOptions {
@@ -125,49 +171,70 @@ impl UrlDslParser {
     /// - `url` (no comma+brace) → plain URL, default options.
     /// - `url, {"method":"POST",...}` → split on the comma followed by `{`,
     ///   parse JSON options with Legado quirks (single quotes, semicolons).
+    /// - `url,...@js:expr` / `url,...<js>expr</js>` → the `@js:`/`<js>` tail
+    ///   is stripped BEFORE DSL parsing so it doesn't break JSON option
+    ///   parsing (e.g. 图书迷子-style sources). The stripped expression is
+    ///   attached to [`UrlDslResult::js_expression`].
     pub fn parse(raw: &str) -> Result<UrlDslResult, UrlDslParseError> {
         let trimmed = raw.trim();
         if trimmed.is_empty() {
             return Ok(UrlDslResult::new(String::new(), UrlDslOptions::default()));
         }
 
-        if has_legacy_method_prefix(trimmed) {
-            return Ok(UrlDslResult::new(
-                trimmed.to_string(),
-                UrlDslOptions::default(),
+        // Strip @js:/<js> tail BEFORE DSL parsing so a trailing JS expression
+        // doesn't break JSON option parsing (e.g.
+        // `url,{"method":"POST"}@js:java.webView(...)`). The stripped
+        // expression is attached to the result afterwards.
+        let (dsl_part, stripped_js) = split_js_suffix(trimmed);
+
+        if dsl_part.is_empty() {
+            // Whole input was a JS expression (e.g. `@js:...` or `<js>...</js>`).
+            return Ok(attach_stripped_js(
+                UrlDslResult::new(String::new(), UrlDslOptions::default()),
+                stripped_js,
             ));
         }
 
-        let Some(comma_index) = find_dsl_separator(trimmed) else {
-            return Ok(UrlDslResult::new(
-                trimmed.to_string(),
-                UrlDslOptions::default(),
+        if has_legacy_method_prefix(dsl_part) {
+            return Ok(attach_stripped_js(
+                UrlDslResult::new(dsl_part.to_string(), UrlDslOptions::default()),
+                stripped_js,
+            ));
+        }
+
+        let Some(comma_index) = find_dsl_separator(dsl_part) else {
+            return Ok(attach_stripped_js(
+                UrlDslResult::new(dsl_part.to_string(), UrlDslOptions::default()),
+                stripped_js,
             ));
         };
 
-        let url_part = trimmed[..comma_index].trim();
-        let options_part = trimmed[comma_index + 1..].trim();
+        let url_part = dsl_part[..comma_index].trim();
+        let options_part = dsl_part[comma_index + 1..].trim();
 
         if options_part.is_empty() {
-            return Ok(UrlDslResult::new(
-                url_part.to_string(),
-                UrlDslOptions::default(),
+            return Ok(attach_stripped_js(
+                UrlDslResult::new(url_part.to_string(), UrlDslOptions::default()),
+                stripped_js,
             ));
         }
 
         // find_dsl_separator already guarantees options_part starts with '{',
         // but double-check defensively.
         if !options_part.starts_with('{') {
-            return Ok(UrlDslResult::new(
-                trimmed.to_string(),
-                UrlDslOptions::default(),
+            return Ok(attach_stripped_js(
+                UrlDslResult::new(dsl_part.to_string(), UrlDslOptions::default()),
+                stripped_js,
             ));
         }
 
         let normalized = normalize_legado_json(options_part);
         let options: UrlDslOptions = serde_json::from_str(&normalized)
             .map_err(|err| UrlDslParseError::MalformedJson(format!("{err}: {options_part}")))?;
-        Ok(UrlDslResult::new(url_part.to_string(), options))
+        Ok(attach_stripped_js(
+            UrlDslResult::new(url_part.to_string(), options),
+            stripped_js,
+        ))
     }
 
     /// Classify a URL for embedded JS expressions. Public so callers can
@@ -175,6 +242,67 @@ impl UrlDslParser {
     pub fn classify_js_expression(url: &str) -> (Option<String>, JsExpressionClassification) {
         classify_js_expression(url)
     }
+}
+
+/// Strip a trailing `@js:` / `<js>...</js>` suffix from a URL DSL string,
+/// returning `(dsl_part, js_expression)`. The split point is the first
+/// `@js:` or `<js>` that occurs OUTSIDE quoted strings and OUTSIDE JSON
+/// object braces, so `@js:` inside a body value (e.g.
+/// `{"body":"q=test@js:foo"}`) is NOT treated as a separator.
+///
+/// For `@js:`, the expression is everything after `@js:` (trimmed). For
+/// `<js>...</js>`, the expression is the content between the tags (trimmed);
+/// if no closing `</js>` is found, the rest of the input is treated as the
+/// expression.
+fn split_js_suffix(input: &str) -> (&str, Option<String>) {
+    let lower = input.to_ascii_lowercase();
+    let mut in_double = false;
+    let mut in_single = false;
+    let mut brace_depth: i32 = 0;
+
+    for (i, ch) in input.char_indices() {
+        match ch {
+            '"' if !in_single => in_double = !in_double,
+            '\'' if !in_double => in_single = !in_single,
+            '{' if !in_double && !in_single => brace_depth += 1,
+            '}' if !in_double && !in_single => brace_depth -= 1,
+            _ => {
+                if !in_double && !in_single && brace_depth == 0 {
+                    if lower[i..].starts_with("@js:") {
+                        let dsl_part = &input[..i];
+                        let expr = input[i + 4..].trim();
+                        return (dsl_part, Some(expr.to_string()));
+                    }
+                    if lower[i..].starts_with("<js>") {
+                        let dsl_part = &input[..i];
+                        let start = i + 4;
+                        if let Some(end_rel) = lower[start..].find("</js>") {
+                            let end = start + end_rel;
+                            let expr = input[start..end].trim();
+                            return (dsl_part, Some(expr.to_string()));
+                        } else {
+                            // No closing </js> — treat the rest as the JS expression.
+                            let expr = input[start..].trim();
+                            return (dsl_part, Some(expr.to_string()));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    (input, None)
+}
+
+/// Attach a JS expression (stripped from the input tail) to a [`UrlDslResult`].
+/// When `js` is `Some`, overrides the classification to `RequiresJsSandbox`.
+/// When `js` is `None`, the result is returned unchanged.
+fn attach_stripped_js(mut result: UrlDslResult, js: Option<String>) -> UrlDslResult {
+    if let Some(expr) = js {
+        result.js_expression = Some(expr);
+        result.has_js_expression = true;
+        result.js_classification = JsExpressionClassification::RequiresJsSandbox;
+    }
+    result
 }
 
 /// Detect Legado legacy method prefix: `GET,url` / `POST,url` etc. The whole

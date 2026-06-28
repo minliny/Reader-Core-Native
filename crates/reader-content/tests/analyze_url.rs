@@ -347,3 +347,107 @@ fn build_request_with_js_surfaces_evaluator_error() {
         other => panic!("expected JsExecution, got {other:?}"),
     }
 }
+
+// ===========================================================================
+// Issue 1: POST body accepts JSON object value (番薯小说 case)
+// ===========================================================================
+
+#[test]
+fn parse_url_with_json_object_body_serializes_to_string() {
+    // 番薯小说-style: body is a JSON object, not a string.
+    let raw = r#"https://example.test/search, {"method":"POST","body":{"keyword":"斗破苍穹","page_index":1,"page_size":20}}"#;
+    let result = UrlDslParser::parse(raw).expect("URL with JSON object body parses");
+    assert_eq!(result.url, "https://example.test/search");
+    assert_eq!(result.options.method, "POST");
+    assert_eq!(
+        result.options.body.as_deref(),
+        Some(r#"{"keyword":"斗破苍穹","page_index":1,"page_size":20}"#)
+    );
+}
+
+#[test]
+fn build_request_post_with_json_object_body_serializes_to_string() {
+    let ctx = AnalyzeUrlContext::for_search("k", 1);
+    let raw = r#"https://example.test/search, {"method":"POST","body":{"keyword":"斗破苍穹","page_index":1}}"#;
+    let request = AnalyzeUrl::build_request(raw, &ctx, "https://example.test", &Default::default())
+        .expect("POST with JSON object body builds");
+    assert_eq!(request.method, "POST");
+    assert_eq!(
+        request.body.as_deref(),
+        Some(r#"{"keyword":"斗破苍穹","page_index":1}"#)
+    );
+}
+
+#[test]
+fn parse_url_with_string_body_still_works() {
+    // Regression guard: existing string-body behavior unchanged.
+    let raw = r#"https://example.test/search, {"method":"POST","body":"key=value&page=1"}"#;
+    let result = UrlDslParser::parse(raw).expect("URL with string body parses");
+    assert_eq!(result.options.body.as_deref(), Some("key=value&page=1"));
+}
+
+// ===========================================================================
+// Issue 2: DSL JSON + JS tail concatenation (图书迷子 case)
+// ===========================================================================
+
+#[test]
+fn parse_url_with_json_options_and_at_js_suffix_strips_js_tail() {
+    // 图书迷子-style: URL+JSON DSL followed by @js: tail. Without the fix,
+    // the trailing @js: content makes the JSON options invalid.
+    let raw = "https://example.test/search,{\"method\":\"POST\",\"body\":\"q=test\"}@js:java.webView(null,baseUrl,null)\nurl=String(result)";
+    let result = UrlDslParser::parse(raw).expect("URL+JSON+@js: parses");
+    assert_eq!(result.url, "https://example.test/search");
+    assert_eq!(result.options.method, "POST");
+    assert_eq!(result.options.body.as_deref(), Some("q=test"));
+    assert!(result.has_js_expression);
+    let js = result.js_expression.as_deref().expect("js expression set");
+    assert!(js.contains("java.webView"), "js expression was: {js}");
+    assert!(js.contains("url=String(result)"), "js expression was: {js}");
+}
+
+#[test]
+fn parse_url_with_json_options_and_js_tag_suffix_strips_js_tail() {
+    let raw = r#"https://example.test/search,{"method":"POST","body":"q=test"}<js>result.replace(' ', '+')</js>"#;
+    let result = UrlDslParser::parse(raw).expect("URL+JSON+<js> parses");
+    assert_eq!(result.url, "https://example.test/search");
+    assert_eq!(result.options.method, "POST");
+    assert_eq!(result.options.body.as_deref(), Some("q=test"));
+    assert!(result.has_js_expression);
+    assert_eq!(
+        result.js_expression.as_deref(),
+        Some("result.replace(' ', '+')")
+    );
+}
+
+#[test]
+fn build_request_with_js_handles_dsl_json_with_at_js_tail() {
+    // End-to-end: build_request_with_js should parse the JSON options,
+    // evaluate the JS tail, and use the JS result as the final URL.
+    let ctx = AnalyzeUrlContext::for_search("斗破苍穹", 1);
+    let raw = "https://placeholder.test,{\"method\":\"POST\",\"body\":\"q={{key}}\"}@js:buildUrl(key)";
+    let request = AnalyzeUrl::build_request_with_js(
+        raw,
+        &ctx,
+        "https://example.test",
+        &Default::default(),
+        |expr, context| {
+            assert_eq!(expr, "buildUrl(key)");
+            assert_eq!(context["key"], "斗破苍穹");
+            Ok("https://built.example.test/api".to_string())
+        },
+    )
+    .expect("JS tail URL builds");
+    assert_eq!(request.url, "https://built.example.test/api");
+    assert_eq!(request.method, "GET");
+}
+
+#[test]
+fn parse_url_with_at_js_inside_body_string_is_not_stripped() {
+    // Regression guard: @js: inside a quoted body string must NOT be treated
+    // as the JS tail separator.
+    let raw = r#"https://example.test/search,{"method":"POST","body":"q=test@js:foo"}"#;
+    let result = UrlDslParser::parse(raw).expect("URL with @js: inside body parses");
+    assert_eq!(result.url, "https://example.test/search");
+    assert_eq!(result.options.body.as_deref(), Some("q=test@js:foo"));
+    assert!(!result.has_js_expression);
+}

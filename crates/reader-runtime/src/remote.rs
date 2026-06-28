@@ -442,26 +442,22 @@ pub fn dispatch_remote(
         contract::methods::READ_RECORD_DELETE => {
             read_record_delete(cmd, state).map(RemoteCommandResult::Complete)
         }
-        // TEMPORARILY DISABLED: source.explore / txt.tocRule.* dispatch cases
-        // require handler functions (source_explore_kinds, source_explore,
-        // txt_toc_rule_*) being added by other agents but not yet in the work
-        // tree. Re-enable once the reader-content updates land.
-        // contract::methods::SOURCE_EXPLORE_KINDS => {
-        //     source_explore_kinds(cmd, state).map(RemoteCommandResult::Complete)
-        // }
-        // contract::methods::SOURCE_EXPLORE => source_explore(cmd, state),
-        // contract::methods::TXT_TOC_RULE_CREATE => {
-        //     txt_toc_rule_create(cmd, state).map(RemoteCommandResult::Complete)
-        // }
-        // contract::methods::TXT_TOC_RULE_LIST => {
-        //     txt_toc_rule_list(cmd, state).map(RemoteCommandResult::Complete)
-        // }
-        // contract::methods::TXT_TOC_RULE_UPDATE => {
-        //     txt_toc_rule_update(cmd, state).map(RemoteCommandResult::Complete)
-        // }
-        // contract::methods::TXT_TOC_RULE_DELETE => {
-        //     txt_toc_rule_delete(cmd, state).map(RemoteCommandResult::Complete)
-        // }
+        contract::methods::SOURCE_EXPLORE_KINDS => {
+            source_explore_kinds(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::SOURCE_EXPLORE => source_explore(cmd, state),
+        contract::methods::TXT_TOC_RULE_CREATE => {
+            txt_toc_rule_create(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::TXT_TOC_RULE_LIST => {
+            txt_toc_rule_list(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::TXT_TOC_RULE_UPDATE => {
+            txt_toc_rule_update(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::TXT_TOC_RULE_DELETE => {
+            txt_toc_rule_delete(cmd, state).map(RemoteCommandResult::Complete)
+        }
         _ => return RemoteDispatch::NotHandled,
     };
     match result {
@@ -1197,15 +1193,50 @@ fn finish_chapter_content_result(
     content: String,
     state: &RemoteState,
 ) -> Result<RemoteCommandResult, CoreError> {
+    let processed = apply_content_processor(&content, &params, state);
     let cache_key = format!("chapter:{}:{}", params.book_id, params.chapter_title);
-    let _ = state.storage().put_cache(cache_key, content.clone());
+    let _ = state.storage().put_cache(cache_key, processed.clone());
     Ok(RemoteCommandResult::Complete(serde_json::json!({
         "sourceId": params.source_id,
         "bookId": params.book_id,
         "chapterTitle": params.chapter_title,
-        "content": content,
+        "content": processed,
         "via": "rule",
     })))
+}
+
+/// Apply the Legado `ContentProcessor` pipeline (替换规则 + 繁简转换) to raw
+/// chapter content. Mirrors Legado `ContentProcessor.kt:91 getContent()`:
+/// the rule-fetched content is run through the user's `ReplaceRule` set and
+/// chineseConverter before being returned to the host.
+///
+/// Storage / source lookup failures are tolerated — content is returned with
+/// whatever rules could be loaded (or verbatim if all lookups fail) rather
+/// than propagating an error that would block the chapter_content happy path.
+fn apply_content_processor(
+    content: &str,
+    params: &ChapterContentParams,
+    state: &RemoteState,
+) -> String {
+    let replace_rules = state.storage().list_replace_rules().unwrap_or_default();
+    let converter = state.pipeline().chinese_converter_type();
+    let processor = reader_content::ContentProcessor::new(replace_rules)
+        .with_chinese_converter(converter);
+    // Best-effort book name / source URL for scope matching — fall back to
+    // empty strings so non-scoped rules still apply even if the book or
+    // source has been evicted from storage.
+    let book_name = state
+        .storage()
+        .get_book(&params.book_id)
+        .ok()
+        .flatten()
+        .map(|book| book.title)
+        .unwrap_or_default();
+    let book_origin = resolve_source(state.storage(), &params.source_id, &params.source)
+        .ok()
+        .map(|source| source.base_url)
+        .unwrap_or_default();
+    processor.process_content(content, &book_name, &book_origin)
 }
 
 /// Kick off the first next-page fetch for `chapter.content`. Registers the

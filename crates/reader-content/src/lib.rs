@@ -1337,31 +1337,63 @@ impl RemoteContentPipeline {
     /// `<js>...</js>` expressions found in Legado `searchUrl`/`bookUrl`/
     /// `tocUrl`/`chapterUrl` fields.
     ///
-    /// Exposes `key`, `page`, and `baseUrl` as top-level JS variables, mirroring
-    /// Legado `AnalyzeUrl.kt`'s `evalJS` variable scope. The result is coerced
+    /// Exposes the full Legado `AnalyzeUrl.kt` `evalJS` variable scope as
+    /// top-level JS variables: `key`, `page`, `baseUrl`, `bookUrl`,
+    /// `chapterUrl`, `sourceId`, `result`, and `cookie`. String values are
+    /// read from `context` and injected as JS string literals; `result` uses
+    /// JSON string encoding (robust against newlines/quotes in response
+    /// bodies) and `cookie` is injected as a JSON object literal (Legado
+    /// exposes the cookie store as a map-like object). The result is coerced
     /// to a string (matching Legado's `AnalyzeUrl` JS-result string coercion).
     pub fn evaluate_url_js(
         &self,
         expr: &str,
         context: &serde_json::Value,
     ) -> Result<String, String> {
-        let key = context
-            .get("key")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .replace('\\', "\\\\")
-            .replace('\'', "\\'");
+        // Single-quote-escape a string variable for embedding as a JS string
+        // literal. Suitable for URL-like values without newlines (mirrors the
+        // original Legado `evalJS` string-escape behavior).
+        let esc_str = |name: &str| -> String {
+            context
+                .get(name)
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .replace('\\', "\\\\")
+                .replace('\'', "\\'")
+        };
+        let key = esc_str("key");
+        let base_url = esc_str("baseUrl");
+        let book_url = esc_str("bookUrl");
+        let chapter_url = esc_str("chapterUrl");
+        let source_id = esc_str("sourceId");
         let page = context.get("page").and_then(|v| v.as_u64()).unwrap_or(1);
-        let base_url = context
-            .get("baseUrl")
+        // `result` is the raw search/detail response body and may contain
+        // newlines/quotes/backslashes — JSON string encoding produces a valid
+        // JS string literal regardless of content.
+        let result_literal = context
+            .get("result")
             .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .replace('\\', "\\\\")
-            .replace('\'', "\\'");
-        // Prepend variable bindings so the expression can reference `key`/
-        // `page`/`baseUrl` as top-level globals.
-        let script =
-            format!("var key = '{key}';\nvar page = {page};\nvar baseUrl = '{base_url}';\n{expr}");
+            .map(|s| serde_json::to_string(s).unwrap_or_else(|_| "\"\"".to_string()))
+            .unwrap_or_else(|| "\"\"".to_string());
+        // `cookie` is a map-like object (Legado cookie store). Inject as a JSON
+        // object literal so `cookie["key"]` / `cookie.key` access works.
+        let cookie_literal = match context.get("cookie") {
+            Some(value) if !value.is_null() => value.to_string(),
+            _ => "{}".to_string(),
+        };
+        // Prepend variable bindings so the expression can reference the full
+        // Legado `evalJS` variable scope as top-level globals.
+        let script = format!(
+            "var key = '{key}';\n\
+             var page = {page};\n\
+             var baseUrl = '{base_url}';\n\
+             var bookUrl = '{book_url}';\n\
+             var chapterUrl = '{chapter_url}';\n\
+             var sourceId = '{source_id}';\n\
+             var result = {result_literal};\n\
+             var cookie = {cookie_literal};\n\
+             {expr}"
+        );
         let evaluation = self.js.evaluate(&script).map_err(|e| e.to_string())?;
         Ok(match evaluation.value {
             serde_json::Value::String(s) => s,
@@ -1671,6 +1703,63 @@ fn expand_json_array_items(values: Vec<String>) -> Vec<String> {
     values
 }
 
+/// Detect the "bare keyword on JSON item" case and rewrite the rule to `$.<keyword>`.
+///
+/// Mirrors Legado `AnalyzeRule` mode inheritance: when the list rule was a
+/// JSONPath (so each item is a JSON object string), per-item field rules
+/// inherit JSON mode. A bare keyword like `title` / `text` / `name` / `id` is
+/// treated as `$.title` etc. Without this, `chapterName: "title"` on a JSON
+/// item falls through to CSS mode (`detect_legado_rule_mode` returns Default
+/// for any rule without `$.`/`$[`/`@`/`/`/`{{`) and is parsed as a `<title>`
+/// element selector against the JSON string, returning empty.
+///
+/// Closes rb-legado-bare-keyword-on-json-item (src-378/003/038/045 and other
+/// sources with `chapterList: <jsonpath>` + `chapterName: <bare keyword>`).
+///
+/// Returns `Some("$.<keyword>")` only when:
+/// - `rule` is a single identifier (no `@`/`$`/`/`/`{`/`<`/`:`/`#`/`,`/whitespace
+///   and no `&&`/`||`/`%%` separators) — i.e. cannot be a CSS/XPath/JSONPath
+///   rule as-is
+/// - `input.trim()` parses as a JSON object or array (so CSS extraction is
+///   meaningless anyway)
+fn rewrite_bare_keyword_for_json_input(rule: &str, input: &str) -> Option<String> {
+    if rule.is_empty() {
+        return None;
+    }
+    let is_bare_keyword = !rule.contains(|c: char| {
+        matches!(
+            c,
+            '@' | '$'
+                | '/'
+                | '{'
+                | '<'
+                | ':'
+                | '#'
+                | ','
+                | ' '
+                | '\t'
+                | '\n'
+                | '\r'
+                | '%'
+                | '&'
+                | '|'
+                | '!'
+        )
+    });
+    if !is_bare_keyword {
+        return None;
+    }
+    let trimmed = input.trim();
+    if !trimmed.starts_with('{') && !trimmed.starts_with('[') {
+        return None;
+    }
+    let parsed = serde_json::from_str::<serde_json::Value>(trimmed).ok()?;
+    if !parsed.is_object() && !parsed.is_array() {
+        return None;
+    }
+    Some(format!("$.{rule}"))
+}
+
 fn extract_rule_value(
     pipeline: &RemoteContentPipeline,
     input: &str,
@@ -1682,7 +1771,8 @@ fn extract_rule_value(
     let Some(rule) = rule.and_then(non_empty_string) else {
         return Ok(None);
     };
-    let rule = auto_complete_rule(&rule, pre_rule, rule_type);
+    let rule = rewrite_bare_keyword_for_json_input(&rule, input)
+        .unwrap_or_else(|| auto_complete_rule(&rule, pre_rule, rule_type));
     if rule.starts_with("@js") {
         return Ok(None);
     }
@@ -3102,6 +3192,60 @@ mod tests {
         assert_eq!(toc[0].title, "Ch 1");
         assert_eq!(toc[0].url, "/c/1");
         assert_eq!(toc[1].index, 1);
+    }
+
+    #[test]
+    fn toc_bare_keyword_chapter_name_on_jsonpath_item() {
+        // Closes rb-legado-bare-keyword-on-json-item.
+        //
+        // Mirrors src-378 (企鹅阅读): `chapterList: "$.data.chapters"` (bare
+        // JSONPath, no wildcard) + `chapterName: "title"` (bare keyword). Legado
+        // `AnalyzeRule` inherits JSON mode from the list rule to per-item rules,
+        // so `title` means `$.title`. Without the fix, `title` falls through to
+        // CSS mode (`detect_legado_rule_mode` returns Default) and is parsed as
+        // a `<title>` element selector against the JSON item string, returning
+        // empty — the chapter is dropped by the `title.is_empty() &&
+        // url.is_empty()` guard in `toc_book_source`.
+        //
+        // The same pattern affects any source with `chapterList: <jsonpath>` +
+        // `chapterName: <bare keyword>` (text/name/title/id/...).
+        let mut toc = reader_domain::BookSourceTocSemantics::default();
+        toc.list = Some("$.data.chapters".into());
+        toc.name = Some("title".into());
+        toc.url = Some("$.seq".into());
+        let semantics = BookSourceSemantics {
+            source_id: "json-bare-keyword-src".into(),
+            name: "JSON Bare Keyword Source".into(),
+            base_url: "https://json.example.test".into(),
+            search_url: None,
+            explore_url: None,
+            enabled: true,
+            enabled_explore: false,
+            rules: reader_domain::BookSourcePipelineRules {
+                search: reader_domain::BookSourceSearchSemantics::default(),
+                explore: reader_domain::BookSourceExploreSemantics::default(),
+                detail: reader_domain::BookSourceDetailSemantics::default(),
+                toc,
+                content: reader_domain::BookSourceContentSemantics::default(),
+            },
+        };
+        let context = BookSourceRequestContext::for_semantics(&semantics);
+        let pipeline = RemoteContentPipeline::new();
+
+        let resp = r#"{"data":{"chapters":[
+            {"title":"Ch 1","seq":1},
+            {"title":"Ch 2","seq":2}
+        ]}}"#;
+
+        let toc = pipeline
+            .toc_book_source(&semantics, resp, &context)
+            .unwrap();
+
+        assert_eq!(toc.chapters.len(), 2);
+        assert_eq!(toc.chapters[0].title, "Ch 1");
+        assert_eq!(toc.chapters[0].url, "https://1");
+        assert_eq!(toc.chapters[1].title, "Ch 2");
+        assert_eq!(toc.chapters[1].index, 1);
     }
 
     #[test]
