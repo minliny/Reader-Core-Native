@@ -1,0 +1,36 @@
+{
+  "source_id": "corpus-c2b1e5bae335",
+  "source_name": "爱发电网（优）",
+  "recorded_at": "1970-01-01T00:00:1782641950Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://afdian.com/api/creator/list?page=1&type=hot&category_id=&q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "alt-svc": "h3=\":443\"; ma=86400",
+        "cache-control": "no-cache, private",
+        "cf-cache-status": "DYNAMIC",
+        "cf-ray": "a12bf3977add12ad-LAX",
+        "connection": "keep-alive",
+        "content-type": "application/json; charset=UTF-8",
+        "date": "Sun, 28 Jun 2026 10:19:09 GMT",
+        "lang": "c,go",
+        "nel": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}",
+        "report-to": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=xhWYt5%2F9VZo3cudtj%2BK9%2BmFbH9bTvTHtbgO4ZHL2rJ7lAMLUX1wkGTOuj%2FKcrSz2%2BY3bu0li2GYvAZkXUMXxnISXWPGczwOuEWzCkS8wBpbFFmudion2w0x7fDRn\"}]}",
+        "server": "cloudflare",
+        "strict-transport-security": "max-age=86400; preload",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding"
+      },
+      "response_body": "{\"ec\":200,\"em\":\"search\",\"data\":{\"list\":[],\"has_more\":0}}",
+      "final_url": "https://afdian.com/api/creator/list?page=1&type=hot&category_id=&q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+    }
+  ]
+}

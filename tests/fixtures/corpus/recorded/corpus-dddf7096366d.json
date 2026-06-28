@@ -1,0 +1,65 @@
+{
+  "source_id": "corpus-dddf7096366d",
+  "source_name": "小米书城（优+）",
+  "recorded_at": "1970-01-01T00:00:1782639729Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://reader.browser.miui.com/api/v2/search/word?query=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&size=100",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "connection": "keep-alive",
+        "content-type": "text/plain;charset=UTF-8",
+        "date": "Sun, 28 Jun 2026 09:41:53 GMT",
+        "server": "openresty",
+        "transfer-encoding": "chunked"
+      },
+      "response_body": "{\"cost\":1,\"related\":[{\"id\":32360,\"image\":\"https://cdn.cnbj0.fds.api.mi-img.com/atlas/8be3a9b4ff40267dfad2da19025597ec?thumb=1&w=240&h=320\",\"author\":\"灬晓风残月灬\",\"price\":0,\"description\":\"失恋小伙进入【王朝】游戏，开创自己的王朝神话。进游戏三天，便得隐藏职业。强大的工会一次次的阻挠着他的升级，却又一次次的败在了他的箭下。难以捉摸的命运将他不断的从游戏的巅峰摔下，却又一次次的给他惊喜。箭无虚发，直中要害，如鬼魅般的追踪能力，令对手胆颤心惊。在虚拟的世界，追逐最真实人生。谁欺我兄弟，我必灭之，神挡射神，佛挡穿佛，天挡，破天！这是一段弓箭手的成长史，这是一个横亘古今的惊天神话！\",\"title\":\"网游之箭破苍穹\",\"free\":true,\"cp\":\"17K小说网\",\"tags\":[\"游戏\",\"勇猛\",\"热血\"],\"status\":\"完结\"},{\"id\":9385,\"image\":\"https://cdn.cnbj0.fds.api.mi-img.com/atlas/e794651e8637d0842fc6986274136bd4?thumb=1&w=240&h=320\",\"author\":\"云谁之思\",\"price\":0,\"description\":\"一觉睡了一千年来到未来不算什么稀奇事，莫名其妙有了老公成了弃妇也不算稀奇事，而当有人将四盆盆栽放在尤槿面前，说是她儿子的时候，这就是稀奇事了。星历691年某日的清晨，一条新闻席卷整个星盟——英俊多金的星盟少将傅承至今未娶的原因竟是男言之隐……顶着大肚子、抱着一捧娃的尤槿：“新闻果然是骗人的！”\",\"title\":\"我的老公帅破苍穹\",\"free\":true,\"cp\":\"阿里文学\",\"tags\":[\"专情\",\"宝宝\",\"穿越\",\"正剧\"],\"status\":\"完结\"},{\"id\":137017,\"image\":\"https://cdn.cnbj0.fds.api.mi-img.com/atlas/9fd7b6a4db03c9ba6b77dd681ac1eef1?thumb=1&w=240&h=320\",\"author\":\"风锋哥\",\"price\":0,\"description\":\"一剑在手，天下任走！剑在心间，笑傲苍穹……剑之极，逆天杀神！\",\"title\":\"剑破苍穹\",\"free\":true,\"cp\":\"红橙文学\",\"tags\":[\"勇猛\",\"嚣张\",\"特殊技能\",\"逆袭\",\"奋斗\",\"争霸流\",\"热血\",\"爽文\",\"铁血\"],\"status\":\"连载\"},{\"id\":100633,\"image\":\"https://cdn.cnbj0.fds.api.mi-img.com/atlas/1c7d3c88ffe2b329df9fc7383b25e643?thumb=1&w=240&h=320\",\"author\":\"咕噜咕噜碳\",\"price\":0,\"description\":\"在嗤笑质疑中拔足，于险难桎梏中前进，这就是少年的修途，这就是少年的斗路。\",\"title\":\"尘斗路\",\"free\":true,\"cp\":\"塔读文学\",\"tags\":[\"特殊技能\",\"修炼\",\"玄学\",\"技术流\",\"勇猛\",\"嚣张\",\"铁血\"],\"status\":\"完结\"},{\"id\":30284,\"image\":\"https://cdn.cnbj0.fds.api.mi-img.com/atlas/b3c9cdc54ab54fa92c67fcbc62e94680?thumb=1&w=240&h=320\",\"author\":\"狂飙的蜗牛\",\"price\":0,\"description\":\"一剑在手，天下任走！剑在心间，笑傲苍穹……剑之极，逆天杀神！\",\"title\":\"剑破苍穹\",\"free\":true,\"cp\":\"17K小说网\",\"tags\":[\"修炼\",\"坚毅\",\"热血\"],\"status\":\"连载\"},{\"id\":30090,\"image\":\"https://cdn.cnbj0.fds.api.mi-img.com/atlas/3e5dfe786dd800c9359ffc557978b735?thumb=1&w=240&h=320\",\"author\":\"西来\",\"price\":0,\"description\":\"这是个文明世界，但天界的仙人们，却限制着世界上一切高科技武器的发展。即使武士，才是世界上国家战争的主力，但人类只有成为修士，才有问鼎天道的可能，但从武士变成修士，有着无法逾越的天堑鸿沟！\\n\",\"title\":\"杀破苍穹\",\"free\":true,\"cp\":\"瑶池文化\",\"tags\":[\"修炼\",\"练功流\",\"勇猛\",\"热血\"],\"status\":\"完结\"},{\"id\":627796,\"image\":\"http://cover.read.duokan.com/mfsv2/download/fdsc3/p01mIEAcgi97/k9YGOjv3TeXzgc.jpg\",\"author\":\"君幻凤\",\"price\":0,\"description\":\"一场陷害，凤凰涅槃，异域重生\\r\\n一卷竹简，宁静生活，尽化灰烬\\r\\n一个阴谋，雏凤流离，何处为家；\\r\\n一次感悟，化身无数，掌控人间\\r\\n一双素手，翻手为云，覆手为雨；\\r\\n一朝天下，顷刻瞬间，倾覆殆尽。\\r\\n祸水如何，妖姬如何，\\r\\n我为情生，我为情坚，\\r\\n亲情难得，友情可贵，\\r\\n爱情神圣，我皆全要，\\r\\n若要无情，宁化修罗，\\r\\n佛摧神毁皆因情，魔亡天破尽为情\\r\\n傲啸人间我为尊，笑对苍穹留传奇\\r\\n莫笑我，彩凤双飞翼，莫笑我，彩凤入云间\\r\\n素问鉴语：\\r\\n你以为你掌控天下，拥有一切，可知道对于我来说，那不过是一个蝼蚁，我早说过，我不管这天下是谁，我要的一切，不能有任何阻拦，不然我遇神诛神，遇佛杀佛，遇魔灭魔，当然你若认为这一切是天注定，那么我就遇天破天。\\r\\n人敬我一尺我敬人一丈，人毁我一粟我夺人三斗，这个世界，没有所谓的和谐和平，只有强中更有强中手，你们要跟我谈判，除非你们有能力超越我，否则，任何人都不能阻止我毁天灭地。\\r\\n*********推挤区**********\\r\\n沐血夜\\r\\n《凤麟》\\r\\nhttp://read.xxsy.net/info/270835.html\\r\\n野蛮DE灵《权色》\\r\\nhttp://read.xxsy.net/info/291512.html \\r\\n君幻凤\\r\\n《凤破苍穹》http://read.xxsy.net/info/283637.html\\r\\n莲子儿\\r\\n《错惹贼妃》http://read.xxsy.net/info/284359.html\\r\\n倾城殇\\r\\n《风云皇后》http://read.xxsy.net/info/284130.html\\r\\n无意宝宝《绝色锋芒》http://read.xxsy.net/info/275679.html\\r\\n孤月如我《绝煞弃女》http://read.xxsy.net/info/284740.html\\r\\n轨迹图图《邪帝冷妻》http://read.xxsy.net/info/278604.html\\r\\n凤舞阁主《白发魔姬》http://read.xxsy.net/info/284395.html \\r\\n琉璃纹\\r\\n《无敌女夫子》http://read.xxsy.net/info/288724.html\\r\\n风间名香《狂女捕群夫》http://read.xxsy.net/info/278619.html\\r\\n明蓝风\\r\\n《狂揽男颜傲天下》http://read.xxsy.net/info/270940.html\\r\\n慕容雪馨《魅夜罂粟冷公主》http://read.xxsy.net/info/277916.html\",\"title\":\"凤破苍穹\",\"free\":true,\"cp\":\"海南阅文信息技术有限公司\",\"tags\":[\"穿越奇情\",\"古代言情\"],\"status\":\"完结\"},{\"id\":68582,\"image\":\"https://cdn.cnbj0.fds.api.mi-img.com/atlas/4711425652fce880c911f65e6ef2c8de?thumb=1&w=240&h=320\",\"author\":\"零无限\",\"price\":0,\"description\":\"\\\"她是天之骄女，却因政变流放边疆，跳井自杀。一眼醒来时，不是边疆井底，而是重生在了宫中浣衣局。为了家族冤案，为了与天子的旧情，她在后宫步步为营。枕边人的梦呓，让得知真相的她嘲讽，冷笑。若我还活着，你可会认回我？若我还活着，你可会再度逼死我？斗破宫墙，只为一日成为你的后，权倾天下。皇上，我的胡闹，我的算计，你可还满意？\\\"\",\"title\":\"斗破宫墙逆袭为后\",\"free\":true,\"cp\":\"17K小说网\",\"tags\":[\"斗智斗勇\",\"青楼宫廷\",\"复仇\",\"重生\",\"甜文\"],\"status\":\"完结\"},{\"id\":522334,\"image\":\"http://cover.read.duokan.com/mfsv2/download/fdsc3/p01lsVlMJ87E/qyBumnkzivYh0K.jpg\",\"author\":\"何无恨\",\"price\":0,\"description\":\"一把饮血魔刀，造就一个绝世武神的传奇。\\n现代宅男穿越异界，成为玉京城头号大纨绔，一个废物大少爷。\\n幸好，拥有饮血魔刀的他，杀妖兽、杀人都能升级变强，而且修炼没有瓶颈，更能偷取敌人的功力。\\n昔日的废物大少爷终于逆袭，踩绝顶天才，灭绝世强者，从此天下无敌，挥刀破苍穹！\",\"title\":\"刀破苍穹\",\"free\":true,\"cp\":\"海南阅文信息技术有限公司\",\"tags\":[\"龙\",\"热血\",\"特种兵\",\"异界\",\"系统流\",\"东方玄幻\",\"玄幻\",\"玄幻奇幻\"],\"status\":\"完结\"},{\"id\":14935,\"image\":\"https://cdn.cnbj0.fds.api.mi-img.com/atlas/5b880f42531423666dcd082aa06bba73?thumb=1&w=240&h=320\",\"author\":\"单纯的猫\",\"price\":0,\"description\":\"无上荣誉，笼罩万丈光环。人情冷暖，现实也是如此。不屈性格让他在重重挫折之前勇敢面对，少年心性，战就要一往无前。从青涩走向成熟，他需要不断地磨砺，最终的改变让他走上了魂动大陆之巅，不积跬步，无以至千里，看洛川如何主宰这万物天下。\\n\\n编辑：ksw-简简\",\"title\":\"魂斗破天\",\"free\":true,\"cp\":\"看书网\",\"tags\":[\"坚毅\",\"热血\"],\"status\":\"完结\"},{\"id\":522339,\"image\":\"http://cover.read.duokan.com/mfsv2/download/fdsc3/p01bm32ToGXA/jntLnylfN8Bvtn.jpg\",\"author\":\"无心论道\",\"price\":0,\"description\":\"新书《刀纵天穹》已经开始上传，欢迎各位品尝。\",\"title\":\"苍穹印\",\"free\":true,\"cp\":\"海南阅文信息技术有限公司\",\"tags\":[\"逆袭\",\"修炼\",\"坚毅\",\"异世大陆\",\"热血\",\"练功流\",\"天才流\",\"东方玄幻\",\"玄幻\",\"东方玄幻\",\"玄幻奇幻\"],\"status\":\"完结\"},{\"id\":32733,\"image\":\"https://cdn.cnbj0.fds.api.mi-img.com/atlas/3cffcf634730ba168fe273bac024ac5a?thumb=1&w=240&h=320\",\"author\":\"失落叶\",\"price\":0,\"description\":\"妙人轩窗，宣纸青墨残痕，隐龙青麟，踏破神魔法阵，聆听古刹梵音，化身青石镇神。魑魅魍魉叹一缕清魂，笑我一世轻狂，但凭三尺青刃，千年相守看秋雨纷纷。\",\"title\":\"斗神\",\"free\":true,\"cp\":\"17K小说网\",\"tags\":[\"修炼\",\"坚毅\",\"热血\"],\"status\":\"完结\"},{\"id\":137241,\"image\":\"https://cdn.cnbj0.fds.api.mi-img.com/atlas/7ff18667ade272eac62aa28c6f5945bb?thumb=1&w=240&h=320\",\"author\":\"泪落天涯\",\"price\":0,\"description\":\"作为一个资深流氓的最基本标准是什么：万千花丛过，片叶不沾身。美女蜂拥投，一个一个来。\",\"title\":\"乱苍穹\",\"free\":true,\"cp\":\"鲸鱼阅读\",\"tags\":[\"无赖\",\"机智\",\"潇洒\",\"狡猾\",\"腹黑\",\"特殊技能\",\"奇幻\",\"无敌文\",\"热血\",\"爽文\"],\"status\":\"连载\"},{\"id\":104661,\"image\":\"https://cdn.cnbj0.fds.api.mi-img.com/atlas/aaedff1b0c4141fea6ede07f139f8b03?thumb=1&w=240&h=320\",\"author\":\"我是片儿警\",\"price\":0,\"description\":\"      古有一剑，上可斩天，下能裂地，沉沦万载，只待今朝。\\r\\n      懵懂少年，背负宿命，一人一剑，闯地狱、走轮回，战天道。\\r\\n      万年的谋划，万载的等待，上古洪荒猛兽重现人间，仙魔妖道、人鬼神佛能共存否？\\r\\n      绝对是你猜不到的剧情，绝对是你想不到的结局，绝对是不一样的玄幻。\\r\\n      欢迎大家加群讨论，群号：297823641\",\"title\":\"剑破苍穹录\",\"free\":true,\"cp\":\"17K小说网\",\"tags\":[\"逆袭\",\"杀伐果断\",\"勇猛\",\"热血\",\"爽文\"],\"status\":\"完结\"},{\"id\":32274,\"image\":\"https://cdn.cnbj0.fds.api.mi-img.com/atlas/6d48fd11fa310f728893a8ad80b3292c?thumb=1&w=240&h=320\",\"author\":\"明朝有酒\",\"price\":0,\"description\":\"雷霆大陆风起云涌，少年雷羽破九幽，战雷霆，独领天下，逆天而行，走出自己的雷道，成就无上雷帝！\",\"title\":\"雷破苍穹\",\"free\":true,\"cp\":\"17K小说网\",\"tags\":[\"修炼\",\"坚毅\",\"热血\"],\"status\":\"完结\"},{\"id\":32835,\"image\":\"https://cdn.cnbj0.fds.api.mi-img.com/atlas/ab42e8bc73faacbb036f98241c537d30?thumb=1&w=240&h=320\",\"author\":\"裸露的松树\",\"price\":0,\"description\":\"少年苏生，襁褓被弃，少小离家，会闯出一番什么样的天地呢？.幽火熊熊，焚芸芸之众生；风雷阵阵，破无间之魍魉；.一生坎坷，只为与天争朝夕之命；终此一生，红颜却不过潇潇雨雪。\",\"title\":\"苍穹诀\",\"free\":true,\"cp\":\"17K小说网\",\"tags\":[\"修炼\",\"坚毅\",\"热血\"],\"status\":\"连载\"},{\"id\":32853,\"image\":\"https://cdn.cnbj0.fds.api.mi-img.com/atlas/b3bd226f788c9a7fbd0c2809fdd4de26?thumb=1&w=240&h=320\",\"author\":\"蘑菇123\",\"price\":0,\"description\":\"     小胖是21世纪现代人，是千千万万小学生最为平凡的一个，意外死亡穿越到企鹅大陆，这里QQ等级为尊，而小胖却天生废柴，无法申请QQ。\\n\\n\\n\\n    三十年河西，三十年河东，莫欺少年穷。看我小学生如何用QQ玩转农场，甩狙鬼步，越塔抢人头，甚至还要对抗神秘势力——盗号狗！\\n\\n\\n\\n    这里没有华丽的魔法，也没有绚烂的斗气，仅仅是繁衍到巅峰的Q气，和小学生间“铁与血”的厮杀，不是你死就是我亡。\",\"title\":\"Q破苍穹\",\"free\":true,\"cp\":\"17K小说网\",\"tags\":[\"逆袭\",\"穿越\",\"热血\",\"爽文\"],\"status\":\"完结\"}]}",
+      "final_url": "https://reader.browser.miui.com/api/v2/search/word?query=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&size=100"
+    },
+    {
+      "level": "L3-detail",
+      "url": "https://reader.browser.miui.com/api/v2/book/32360",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "connection": "keep-alive",
+        "content-type": "application/json;charset=UTF-8",
+        "date": "Sun, 28 Jun 2026 09:42:07 GMT",
+        "server": "openresty",
+        "transfer-encoding": "chunked"
+      },
+      "response_body": "{\"status\":0,\"data\":{\"bookInfo\":{\"bookId\":32360,\"cpName\":\"17K小说网\",\"name\":\"网游之箭破苍穹\",\"author\":\"灬晓风残月灬\",\"score\":4.0,\"tags\":[\"游戏\",\"勇猛\",\"热血\"],\"wordCount\":1212513,\"description\":\"失恋小伙进入【王朝】游戏，开创自己的王朝神话。进游戏三天，便得隐藏职业。强大的工会一次次的阻挠着他的升级，却又一次次的败在了他的箭下。难以捉摸的命运将他不断的从游戏的巅峰摔下，却又一次次的给他惊喜。箭无虚发，直中要害，如鬼魅般的追踪能力，令对手胆颤心惊。在虚拟的世界，追逐最真实人生。谁欺我兄弟，我必灭之，神挡射神，佛挡穿佛，天挡，破天！这是一段弓箭手的成长史，这是一个横亘古今的惊天神话！\",\"imgUrl\":\"https://cdn.cnbj0.fds.api.mi-img.com/atlas/8be3a9b4ff40267dfad2da19025597ec?thumb=1&w=240&h=320\",\"bookStatus\":\"完结\",\"updateTime\":1571623258,\"authorId\":23145,\"catId\":63,\"secondCategoryName\":\"游戏\",\"url\":\"#page=book&id=32360\",\"price\":0,\"like\":0,\"likeCount\":3954,\"readerCount\":3653,\"shield\":false,\"wholePrice\":0.0,\"source\":0,\"firstCategoryName\":\"男频\",\"thirdCategoryName\":\"虚拟网游\",\"auditStatus\":3,\"dkFictionId\":\"417522\"},\"lastChapter\":{\"chapterId\":84,\"chapterName\":\"第四百二十三章   尊重的英雄（大结局）\",\"updateTime\":1571623258000,\"volumeIndex\":4,\"volumeTitle\":\"卷三   乱世称雄\",\"free\":false,\"price\":0,\"bought\":false},\"firstChapter\":{\"chapterId\":1,\"chapterName\":\"第一章   荒唐的开始\",\"updateTime\":1514380014167,\"volumeIndex\":1,\"volumeTitle\":\"卷一 高手乍成\",\"free\":false,\"price\":0,\"bought\":false}}}",
+      "final_url": "https://reader.browser.miui.com/api/v2/book/32360"
+    },
+    {
+      "level": "L4-toc",
+      "url": "https://reader.browser.miui.com/api/v2/book/32360",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "connection": "keep-alive",
+        "content-type": "application/json;charset=UTF-8",
+        "date": "Sun, 28 Jun 2026 09:42:09 GMT",
+        "server": "openresty",
+        "transfer-encoding": "chunked"
+      },
+      "response_body": "{\"status\":0,\"data\":{\"bookInfo\":{\"bookId\":32360,\"cpName\":\"17K小说网\",\"name\":\"网游之箭破苍穹\",\"author\":\"灬晓风残月灬\",\"score\":4.0,\"tags\":[\"游戏\",\"勇猛\",\"热血\"],\"wordCount\":1212513,\"description\":\"失恋小伙进入【王朝】游戏，开创自己的王朝神话。进游戏三天，便得隐藏职业。强大的工会一次次的阻挠着他的升级，却又一次次的败在了他的箭下。难以捉摸的命运将他不断的从游戏的巅峰摔下，却又一次次的给他惊喜。箭无虚发，直中要害，如鬼魅般的追踪能力，令对手胆颤心惊。在虚拟的世界，追逐最真实人生。谁欺我兄弟，我必灭之，神挡射神，佛挡穿佛，天挡，破天！这是一段弓箭手的成长史，这是一个横亘古今的惊天神话！\",\"imgUrl\":\"https://cdn.cnbj0.fds.api.mi-img.com/atlas/8be3a9b4ff40267dfad2da19025597ec?thumb=1&w=240&h=320\",\"bookStatus\":\"完结\",\"updateTime\":1571623258,\"authorId\":23145,\"catId\":63,\"secondCategoryName\":\"游戏\",\"url\":\"#page=book&id=32360\",\"price\":0,\"like\":0,\"likeCount\":3954,\"readerCount\":3653,\"shield\":false,\"wholePrice\":0.0,\"source\":0,\"firstCategoryName\":\"男频\",\"thirdCategoryName\":\"虚拟网游\",\"auditStatus\":3,\"dkFictionId\":\"417522\"},\"lastChapter\":{\"chapterId\":84,\"chapterName\":\"第四百二十三章   尊重的英雄（大结局）\",\"updateTime\":1571623258000,\"volumeIndex\":4,\"volumeTitle\":\"卷三   乱世称雄\",\"free\":false,\"price\":0,\"bought\":false},\"firstChapter\":{\"chapterId\":1,\"chapterName\":\"第一章   荒唐的开始\",\"updateTime\":1514380014167,\"volumeIndex\":1,\"volumeTitle\":\"卷一 高手乍成\",\"free\":false,\"price\":0,\"bought\":false}}}",
+      "final_url": "https://reader.browser.miui.com/api/v2/book/32360"
+    }
+  ]
+}

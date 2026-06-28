@@ -1,0 +1,33 @@
+{
+  "source_id": "corpus-6124b315a8db",
+  "source_name": "书法小说（优+）",
+  "recorded_at": "1970-01-01T00:00:1782639741Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "http://www.sfwx.com/search.php?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9<,&p=1>",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "alt-svc": "h3=\":443\"; ma=86400",
+        "cf-cache-status": "DYNAMIC",
+        "cf-ray": "a12bbd8cce3d5578-LAX",
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 09:42:20 GMT",
+        "l-cache": "STALE",
+        "nel": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}",
+        "report-to": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=iNHmd0GndCc0MXNSftIne7rmKMm315rjGXDfwDsRBBTOVm6bUhmgNicUoQXZOSkekGbIotLvBa%2BT%2F%2FSMqQrx88Fd21fwCGlMS3MA%2BsZllnVZSrAj4jlJIZGGgOvFbOU%3D\"}]}",
+        "server": "cloudflare",
+        "transfer-encoding": "chunked"
+      },
+      "response_body": "\n<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <!-- 必须的 meta 标签 -->\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, shrink-to-fit=no\">\n  <meta name=\"applicable-device\" content=\"pc,mobile\">\n  <!-- Bootstrap 的 CSS 文件 -->\n  <link rel=\"stylesheet\" href=\"/css/bootstrap.min.css\">\n  <link rel=\"stylesheet\" href=\"/css/main.css?v=5\">\n  <link rel=\"stylesheet\" href=\"/font/iconfont.css\">\n  <script src=\"/js/addons.js\"></script>\n\n  <title>斗破苍穹,-搜索结果(共0条记录)-书坊文学网</title>\n    <meta name=\"keywords\" content=\"小说全文搜索引擎\">\n    <meta name=\"description\" content=\"书坊文学网全文搜索【斗破苍穹,】-搜索结果\">\n</head>\n<body>\n\n   \n<header>\n    <div class=\"container\">\n        <div class=\"row justify-content-between\">\n            <div class=\"col-12 col-sm-3 w-100 w-sm-auto\"><a href=\"http://www.sfwx.com/\" class=\"logo\">书坊文学网</a></div>\n            <div class=\"col-12 col-sm-9 col-md-6 search\">\n                <form class=\"d-block text-right\" action=\"/search.php\" method=\"get\">\n                    <div class=\"input-group input-g \">\n                        <input type=\"text\" name=\"q\" class=\"form-control\" placeholder=\"书名、作者、拼音\" aria-label=\"搜索的内容\" aria-describedby=\"button-addon2\">\n                        <div class=\"input-group-append\">\n                            <button class=\"btn\" type=\"submit\" id=\"button-addon2\">搜索</button>\n                        </div>\n                    </div>\n                </form>\n            </div>\n        </div>\n    </div>\n</header>\n\n<nav class=\"\">\n  <div class=\"container  nav\">\n    <a href=\"/\" class=\"act\">首页</a><a href=\"/list1/\">玄幻</a><a href=\"/list2/\">武侠</a><a href=\"/list3/\">都市</a><a href=\"/list4/\">历史</a><a href=\"/list5/\">网游</a><a href=\"/list6/\">科幻</a><a href=\"/list7/\">言情</a><a href=\"/list8/\">其他</a><a href=\"/top/\" >排行</a><a href=\"/full/\" >完本</a>\n  </div>\n</nav>\n\n<section>\n  <div class=\"container\">\n    <div class=\"box hot\">\n      <h1 class=\"title\"><b>斗破苍穹,-搜索结果(共0条记录)</b></h1>\n      <div class=\"row\">\n         \n      </div>\n\n      \n\n    </div>\n  </div>\n</section>\n\n\n<div id=\"footer\">\n<div class=\"container\">\n<p>本站所有收录的内容均来自互联网，如有侵权我们将尽快删除。</p>\n<p><a href=\"/sitemap.xml\">网站地图</p>\n<script>\nfooter();\n</script>\n</div>\n</div>\n\t\n\n<script src=\"/js/jquery-1.11.1.min.js\"></script>\n<script src=\"/js/bootstrap.bundle.min.js\"></script>\n<script src=\"/js/main.js\"></script>\n<script>\n    var pagebase=\"/search.php?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9%2C&amp;p=999\";\n  $(\"#jumppage\").change(function(){\n      window.location.href=pagebase.replace(\"999\",$(\"#jumppage\").val())\n  });\n</script>\n</body>\n</html>\n",
+      "final_url": "http://www.sfwx.com/search.php?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9%3C,&p=1%3E"
+    }
+  ]
+}

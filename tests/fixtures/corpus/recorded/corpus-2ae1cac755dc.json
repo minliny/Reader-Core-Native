@@ -1,0 +1,30 @@
+{
+  "source_id": "corpus-2ae1cac755dc",
+  "source_name": "猫耳广播（优）",
+  "recorded_at": "1970-01-01T00:00:1782641744Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://www.hhlqilongzhu.cn##猫耳FM广播剧/api/ximalaya/maoer_app.php?name=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "accept-ranges": "bytes",
+        "connection": "keep-alive",
+        "content-length": "957",
+        "content-type": "text/html",
+        "date": "Sun, 28 Jun 2026 10:15:44 GMT",
+        "etag": "\"69b7e40a-3bd\"",
+        "last-modified": "Mon, 16 Mar 2026 11:05:46 GMT",
+        "server": "nginx"
+      },
+      "response_body": "<!doctype html>\r\n<html>\r\n<head>\r\n    <meta charset=\"utf-8\">\r\n    <title>恭喜，站点创建成功！</title>\r\n    <style>\r\n\r\n        .container {\r\n            width: 60%;\r\n            margin: 10% auto 0;\r\n            background-color: #f0f0f0;\r\n            padding: 2% 5%;\r\n            border-radius: 10px\r\n        }\r\n\r\n        ul {\r\n            padding-left: 20px;\r\n        }\r\n\r\n            ul li {\r\n                line-height: 2.3\r\n            }\r\n\r\n        a {\r\n            color: #20a53a\r\n        }\r\n    </style>\r\n</head>\r\n<body>\r\n    <div class=\"container\">\r\n        <h1>恭喜, 站点创建成功！</h1>\r\n        <h3>这是默认index.html，本页面由系统自动生成</h3>\r\n        <ul>\r\n            <li>本页面在FTP根目录下的index.html</li>\r\n            <li>您可以修改、删除或覆盖本页面</li>\r\n            <li>FTP相关信息，请到“面板系统后台 > FTP” 查看</li>\r\n        </ul>\r\n    </div>\r\n</body>\r\n</html>",
+      "final_url": "https://www.hhlqilongzhu.cn/##%E7%8C%AB%E8%80%B3FM%E5%B9%BF%E6%92%AD%E5%89%A7/api/ximalaya/maoer_app.php?name=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+    }
+  ]
+}

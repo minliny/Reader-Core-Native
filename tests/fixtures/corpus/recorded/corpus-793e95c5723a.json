@@ -1,0 +1,28 @@
+{
+  "source_id": "corpus-793e95c5723a",
+  "source_name": "百度贴吧（优）",
+  "recorded_at": "1970-01-01T00:00:1782641960Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "http://tieba.baidu.com/f/search/res?isnew=1&kw=&qw=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&rn=10&un=&only_thread=1&sm=1&sd=&ed=&pn=1",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 403,
+      "response_headers": {
+        "content-type": "text/html; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 10:19:19 GMT",
+        "server": "bfe",
+        "x-bd-id": "9291844472142281247",
+        "x-bd-oc": "c4deb1a85a511d8cf1dee2e2f01c6edf",
+        "x-bd-ul": "2465bc8dd2bbe266814ee5cd63921462"
+      },
+      "response_body": "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta http-equiv=\"X-UA-Compatible\"content=\"IE=edge\"><meta name=\"viewport\"content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\"><title>百度安全验证</title><style>body{margin:0;padding:0}</style></head><body></body><!--loadScript--><script>function ieOnEnd(script,cb){script.onreadystatechange=function(){if(this.readyState!=='complete'&&this.readyState!=='loaded'){return}this.onreadystatechange=null;cb(null,script)}}function stdOnEnd(script,cb){script.onload=function(){this.onerror=this.onload=null;cb(null,script)};script.onerror=function(e){this.onerror=this.onload=null;cb(new Error(`Failed to load ${this.src}`),script)}}function loadScript(src,opts,cb){var script=document.createElement('script');if(typeof opts==='function'){cb=opts;opts={}}opts=opts||{};cb=cb||function(){};script.type=opts.type||'text/javascript';script.charset=opts.charset||'utf8';script.async='async'in opts?!!opts.async:true;script.src=src;if(opts.attrs){setAttributes(script,opts.attrs)}if(opts.text){script.text=''+opts.text}var onend='onload'in script?stdOnEnd:ieOnEnd;onend(script,cb);if(!script.onload){stdOnEnd(script,cb)}document.head.appendChild(script)}</script><script>window.BIOC_OPTIONS={ak:'MtwiTOYhbgACaxGXidGoCM3MjRimIPL1',subid:'tb_pc_search_res_acs',ext:'2XD65aGBe+BQ6AwGgii4qiprGUPxnGcHsP7HxHsbDv/mGYzuz0dXRIvIhcFT8PyLNpVtT7ms/gRmr08zIM8eASHMnJM+LIIl4m6uGb7n7q0=',backurl:'http://tieba.baidu.com/f/search/res?isnew=1&kw=&qw=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&rn=10&un=&only_thread=1&sm=1&sd=&ed=&pn=1',closeable:false};</script><script>(function(){var origins=['https://bioc-static.cdn.bcebos.com','https://bioc-static-standby.cdn.bcebos.com','https://seccaptcha.baidu.com/v1/webapi/static','https://seccaptcha-1.baidu.com/v1/webapi/static'];var biocFacadePath='/pages/BiocFacade.js';var bootstrapPath='/pages/bfe_captcha.js';var loadAssetsWithStandby=function(path,cb){var requestOrigins=origins.slice();var doRequest=function(){if(requestOrigins.length===0){cb(new Error('load assets failed'))}else{var origin=requestOrigins.shift();loadScript(origin+path,function(err){if(!err){cb()}else{doRequest()}})}};doRequest()};var loadBioc=function(cb){loadAssetsWithStandby(biocFacadePath,cb)};var loadBootstrap=function(cb){loadAssetsWithStandby(bootstrapPath,cb)};var handlerError=function(err){alert('页面加载失败，请刷新页面重试');console.error(err)};loadBioc(function(err){if(err){handlerError(err);return}loadBootstrap(function(err){if(err){handlerError(err)}})})})()</script></html>",
+      "final_url": "http://tieba.baidu.com/f/search/res?isnew=1&kw=&qw=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&rn=10&un=&only_thread=1&sm=1&sd=&ed=&pn=1"
+    }
+  ]
+}

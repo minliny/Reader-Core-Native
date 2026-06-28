@@ -1,7 +1,7 @@
 {
   "source_id": "corpus-ce0638ede7d7",
   "source_name": "五丁音乐（优+）",
-  "recorded_at": "1970-01-01T00:00:1782580208Z",
+  "recorded_at": "1970-01-01T00:00:1782641762Z",
   "keyword": "斗破苍穹",
   "steps": [
     {
@@ -16,9 +16,9 @@
       "response_headers": {
         "connection": "keep-alive",
         "content-type": "application/json; charset=utf-8",
-        "date": "Sat, 27 Jun 2026 17:10:08 GMT",
-        "kg-bc-ms": "54",
-        "kg-rs-ms": "1782580208514",
+        "date": "Sun, 28 Jun 2026 10:16:02 GMT",
+        "kg-bc-ms": "53",
+        "kg-rs-ms": "1782641762059",
         "kg-svr-version": "r20260331.226392.1_t_20260331155012",
         "server": "kws",
         "transfer-encoding": "chunked",

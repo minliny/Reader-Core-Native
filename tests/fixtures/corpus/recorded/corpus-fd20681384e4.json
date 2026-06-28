@@ -1,0 +1,30 @@
+{
+  "source_id": "corpus-fd20681384e4",
+  "source_name": "言情港吧（优）",
+  "recorded_at": "1970-01-01T00:00:1782639921Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://www.yanqinggang.com/modules/article/search.php",
+      "method": "POST",
+      "request_headers": {
+        "Content-Type": "application/x-www-form-urlencoded; charset=gbk",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": "searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "response_status": 200,
+      "response_headers": {
+        "cache-control": "no-cache",
+        "content-type": "text/html",
+        "date": "Sun, 28 Jun 2026 09:45:21 GMT",
+        "etag": "1782639921|",
+        "server": "Microsoft-IIS/10.0",
+        "set-cookie": "jieqiVisitTime=jieqiArticlesearchTime%3D1782639921; expires=Sun, 28-Jun-2026 10:45:21 GMT; path=/",
+        "vary": "Accept-Encoding"
+      },
+      "response_body": "<!DOCTYPE html>\r\n<html lang=\"zh\">\r\n<head>\r\n<meta charset=\"gbk\">\r\n<title>����_�����</title>\r\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, shrink-to-fit=no, user-scalable=no\">\r\n<meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge,chrome=1\">\r\n<link rel=\"shortcut icon\" type=\"image/x-icon\" href=\"/favicon.ico\" media=\"screen\">\r\n<link rel=\"stylesheet\" href=\"/static/style.css\">\r\n<script src=\"/static/jquery.min.js\"></script>\r\n<script src=\"/static/jquery.cookie.min.js\"></script>\r\n<script src=\"/static/jquery.lazyload.min.js\"></script>\r\n<script src=\"/static/common.js\"></script>\r\n</head>\r\n<body>\r\n<header>\n    <div class=\"logo\"><a href=\"https://www.yanqinggang.com\" title=\"�����\">�����</a></div>\n    <div class=\"diswap\">\n        <button id=\"menu-btn\" type=\"text\" onclick=\"javascript:menu_toggle();\" class=\"search_btn\">�˵�</button>\n    </div>\n\n    <div class=\"search dispc\"><script>search();</script></div>\n</header>\n<nav class=\"dispc\">\n    <a href=\"/\">��ҳ</a>\n    <a href=\"/list/1_1.html\">�������</a>\n    <a href=\"/list/2_1.html\">��������</a>\n    <a href=\"/list/3_1.html\">��������</a>\n    <a href=\"/list/4_1.html\">��ʷ��Խ</a>\n    <a href=\"/list/5_1.html\">���ξ���</a>\n    <a href=\"/list/6_1.html\">�ƻ�����</a>\n    <a href=\"/list/7_1.html\">�ֲ����</a>\n    <a href=\"/list/8_1.html\">��������</a>\n    <a href=\"/quanben_1.html\">�걾С˵</a>\n    <a href=\"/history.html\">�Ķ���¼</a>\n</nav>\r\n<div class=\"container flex flex-wrap mb20\">\r\n  <div style=\"margin:10px 5px;\">������斗破苍穹���Ľ��</div>\r\n  <div class=\"border3 commend flex flex-between category-commend\">\r\n    \r\n  </div>\r\n</div>\r\n<div class=\"container\">\n    <div class=\"footer gray\"><br>\n        <p>��վ����С˵Ϊת����Ʒ�������½ھ��������ϴ���ת������վֻ��Ϊ�����������ø���������͡�</p>\n        <p>Copyright 2021 ����� https://www.yanqinggang.com All Rights Reserved.��\n        </p>\n    </div>\n</div>\n<div style=\"display: none;\">\n<script src=\"/js/all.js\"></script>\n</div>\n<script>setEcho();</script>\n<script>\n    (function(){\n        var bp = document.createElement('script');\n        var curProtocol = window.location.protocol.split(':')[0];\n        if (curProtocol === 'https') {\n            bp.src = 'https://zz.bdstatic.com/linksubmit/push.js';\n        }\n        else {\n            bp.src = 'http://push.zhanzhang.baidu.com/push.js';\n        }\n        var s = document.getElementsByTagName(\"script\")[0];\n        s.parentNode.insertBefore(bp, s);\n    })();\n</script>\r\n</body>\r\n</html>",
+      "final_url": "https://www.yanqinggang.com/modules/article/search.php"
+    }
+  ]
+}

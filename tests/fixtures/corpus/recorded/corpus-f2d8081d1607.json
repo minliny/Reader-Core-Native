@@ -1,0 +1,31 @@
+{
+  "source_id": "corpus-f2d8081d1607",
+  "source_name": "网络漫画（优）",
+  "recorded_at": "1970-01-01T00:00:1782640925Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://mm.sfacg.com/ajax/Common.ashx?op=search",
+      "method": "POST",
+      "request_headers": {
+        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": "keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "response_status": 200,
+      "response_headers": {
+        "cache-control": "private",
+        "connection": "keep-alive",
+        "content-length": "26",
+        "content-type": "text/html; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 10:02:04 GMT",
+        "server": "nginx",
+        "x-aspnet-version": "4.0.30319",
+        "x-powered-by": "ASP.NET"
+      },
+      "response_body": "{\"status\":200,\"comics\":[]}",
+      "final_url": "https://mm.sfacg.com/ajax/Common.ashx?op=search"
+    }
+  ]
+}

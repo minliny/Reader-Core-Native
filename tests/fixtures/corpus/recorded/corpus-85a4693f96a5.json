@@ -1,0 +1,35 @@
+{
+  "source_id": "corpus-85a4693f96a5",
+  "source_name": "中华诗词（优+）",
+  "recorded_at": "1970-01-01T00:00:1782639479Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://m.zhonghuashici.com/e/search/index.php",
+      "method": "POST",
+      "request_headers": {
+        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": "keyboard=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&show=title&tempid=1",
+      "response_status": 200,
+      "response_headers": {
+        "alt-svc": "h3=\":443\"; ma=86400",
+        "cf-cache-status": "DYNAMIC",
+        "cf-ray": "a12bb7478c107db6-LAX",
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 09:37:59 GMT",
+        "nel": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}",
+        "report-to": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=UOHvH5uSa3VEHMGToX7KRIDwqDxkoguFlrK7q2qpNWTLGJuLKuEeS7cOPa89T6U9xZKczUhGxXzPCje1EpvbLnT3htEzJ1ADMS9pMTstTzs1jb58CqAZxKzz%2FucmjhokYD3UHqOH\"}]}",
+        "server": "cloudflare",
+        "set-cookie": "njdnwlastsearchtime=1782639414; expires=Mon, 29-Jun-2026 09:36:54 GMT; path=/",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding"
+      },
+      "response_body": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">\r\n<html>\r\n<head>\r\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\r\n<title>信息提示</title>\r\n<link href=\"/e/data/images/qcss.css\" rel=\"stylesheet\" type=\"text/css\">\r\n<SCRIPT language=javascript>\r\nvar secs=3;//3秒\r\nfor(i=1;i<=secs;i++) \r\n{ window.setTimeout(\"update(\" + i + \")\", i * 1000);} \r\nfunction update(num) \r\n{ \r\nif(num == secs) \r\n{ history.go(-1); } \r\nelse \r\n{ } \r\n}\r\n</SCRIPT>\r\n</head>\r\n\r\n<body>\r\n<br>\r\n<br>\r\n<br>\r\n<br>\r\n<br>\r\n<br>\r\n<table width=\"500\" border=\"0\" align=\"center\" cellpadding=\"3\" cellspacing=\"1\" class=\"tableborder\">\r\n  <tr class=\"header\"> \r\n    <td height=\"25\"><div align=\"center\">信息提示</div></td>\r\n  </tr>\r\n  <tr bgcolor=\"#FFFFFF\"> \r\n    <td height=\"80\"> \r\n      <div align=\"center\">\r\n\t  <br>\r\n        <b>没有搜索到相关的内容</b>\r\n        <br>\r\n        <br><a href=\"javascript:history.go(-1)\">如果您的浏览器没有自动跳转，请点击这里</a>\r\n<br><br>\r\n\t  </div></td>\r\n  </tr>\r\n</table>\r\n</body>\r\n</html>",
+      "final_url": "https://m.zhonghuashici.com/e/search/index.php"
+    }
+  ]
+}

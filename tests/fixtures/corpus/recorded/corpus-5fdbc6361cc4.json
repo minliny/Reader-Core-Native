@@ -1,0 +1,30 @@
+{
+  "source_id": "corpus-5fdbc6361cc4",
+  "source_name": "奇书网吧（导）",
+  "recorded_at": "1970-01-01T00:00:1782640678Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://www.qishu99.cc/e/search/index.php",
+      "method": "POST",
+      "request_headers": {
+        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": "show=title,softsay,softwriter&keyboard=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&tbname=download&tempid=1&Submit22=搜索",
+      "response_status": 200,
+      "response_headers": {
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 09:57:58 GMT",
+        "server": "nginx",
+        "strict-transport-security": "max-age=31536000",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding"
+      },
+      "response_body": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">\r\n<html>\r\n<head>\r\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\r\n<title>信息提示</title>\r\n<link href=\"/e/data/images/qcss.css\" rel=\"stylesheet\" type=\"text/css\">\r\n<SCRIPT language=javascript>\r\nvar secs=3;//3秒\r\nfor(i=1;i<=secs;i++) \r\n{ window.setTimeout(\"update(\" + i + \")\", i * 1000);} \r\nfunction update(num) \r\n{ \r\nif(num == secs) \r\n{ history.go(-1); } \r\nelse \r\n{ } \r\n}\r\n</SCRIPT>\r\n</head>\r\n\r\n<body>\r\n<br>\r\n<br>\r\n<br>\r\n<br>\r\n<br>\r\n<br>\r\n<table width=\"500\" border=\"0\" align=\"center\" cellpadding=\"3\" cellspacing=\"1\" class=\"tableborder\">\r\n  <tr class=\"header\"> \r\n    <td height=\"25\"><div align=\"center\">信息提示</div></td>\r\n  </tr>\r\n  <tr bgcolor=\"#FFFFFF\"> \r\n    <td height=\"80\"> \r\n      <div align=\"center\">\r\n\t  <br>\r\n        <b>没有搜索到相关的内容</b>\r\n        <br>\r\n        <br><a href=\"javascript:history.go(-1)\">如果您的浏览器没有自动跳转，请点击这里</a>\r\n<br><br>\r\n\t  </div></td>\r\n  </tr>\r\n</table>\r\n</body>\r\n</html>",
+      "final_url": "https://www.9qishu.com/e/search/index.php"
+    }
+  ]
+}

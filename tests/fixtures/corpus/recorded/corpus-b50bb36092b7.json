@@ -1,0 +1,35 @@
+{
+  "source_id": "corpus-b50bb36092b7",
+  "source_name": "狸猫故事（优+）",
+  "recorded_at": "1970-01-01T00:00:1782639541Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "http://m.limaogushi.com/search?type=story&kw=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 503,
+      "response_headers": {
+        "age": "0",
+        "ali-swift-global-savetime": "1782639541",
+        "connection": "keep-alive",
+        "content-length": "814",
+        "content-type": "text/html",
+        "date": "Sun, 28 Jun 2026 09:39:01 GMT",
+        "eagleid": "701dd01617826395414213632e",
+        "server": "Tengine",
+        "timing-allow-origin": "*",
+        "via": "cache26.l2cn1811[50,50,503-1281,M], cache38.l2cn1811[51,0], kunlun9.cn9543[0,0,503-0,H], kunlun2.cn9543[13,0,0]",
+        "x-cache": "HIT TCP_MEM_HIT dirn:-2:-2",
+        "x-swift-cachetime": "1",
+        "x-swift-savetime": "Sun, 28 Jun 2026 09:39:01 GMT"
+      },
+      "response_body": "<!DOCTYPE html><html><head><meta charset='utf-8'><meta name='viewport'content='width=device-width, initial-scale=1.0'><title>访问限制</title><style>*{margin:0;padding:0;box-sizing:border-box}html,body{height:100%;background:#f5f5f5;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}.container{height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:20px}.box{background:#fff;padding:40px 50px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.08);text-align:center}h2{color:#d32f2f;font-size:22px;margin-bottom:12px}p{color:#666;font-size:15px}</style></head><body><div class='container'><div class='box'><h2>狸猫故事网服务器正在遭受攻击</h2><p>当前访问频率过高，请稍后再试</p></div></div></body></html>",
+      "final_url": "https://m.limaogushi.com/search?type=story&kw=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1"
+    }
+  ]
+}

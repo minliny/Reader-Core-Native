@@ -1,0 +1,27 @@
+{
+  "source_id": "corpus-b55bcb8ae9d4",
+  "source_name": "九酷音乐（优）",
+  "recorded_at": "1970-01-01T00:00:1782641938Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "http://m.9ku.com/search/?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 404,
+      "response_headers": {
+        "connection": "keep-alive",
+        "content-length": "146",
+        "content-type": "text/html",
+        "date": "Sun, 28 Jun 2026 10:18:58 GMT",
+        "server": "nginx"
+      },
+      "response_body": "<html>\r\n<head><title>404 Not Found</title></head>\r\n<body>\r\n<center><h1>404 Not Found</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n",
+      "final_url": "http://m.9ku.com/search/?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+    }
+  ]
+}

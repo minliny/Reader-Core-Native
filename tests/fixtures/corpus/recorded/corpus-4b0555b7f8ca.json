@@ -1,0 +1,28 @@
+{
+  "source_id": "corpus-4b0555b7f8ca",
+  "source_name": "名著阅读（优++）",
+  "recorded_at": "1970-01-01T00:00:1782640728Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://api.520diandu.com/api/read/allReadBooks?uid=&key=&name=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1&cv=134&from=app",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "access-control-allow-origin": "*",
+        "access-control-expose-headers": "Date,x-fc-request-id",
+        "content-type": "text/html; charset=UTF-8",
+        "date": "Sun, 28 Jun 2026 09:58:47 GMT",
+        "transfer-encoding": "chunked",
+        "x-fc-request-id": "1-6a40f057-13587bb9-6e92a036adf6"
+      },
+      "response_body": "{\"code\":2001,\"msg\":\"\\u5185\\u5bb9\\u5236\\u4f5c\\u4e2d\",\"data\":null}",
+      "final_url": "https://api.520diandu.com/api/read/allReadBooks?uid=&key=&name=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1&cv=134&from=app"
+    }
+  ]
+}

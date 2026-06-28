@@ -1,0 +1,34 @@
+{
+  "source_id": "corpus-3d91c4bd7770",
+  "source_name": "起点男频（优）",
+  "recorded_at": "1970-01-01T00:00:1782641963Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://www.qidian.com/so/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9.html",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 202,
+      "response_headers": {
+        "cache-control": "no-store",
+        "connection": "keep-alive",
+        "content-length": "209",
+        "content-type": "text/html; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 10:19:23 GMT",
+        "pragma": "no-cache",
+        "server": "Lego Server",
+        "set-cookie": "x-waf-captcha-referer=; Path=/; Max-Age=60;",
+        "strict-transport-security": "max-age=31536000;",
+        "x-cache-lookup": "Cache Miss",
+        "x-nws-log-uuid": "751203792458896410",
+        "x-waf-uuid": "751203792458896410"
+      },
+      "response_body": "<!DOCTYPE html><html>\n<head>\n  <meta charset=\"UTF-8\">\n  <script>\n    var buid = \"fffffffffffffffffff\"\n  </script>\n  <script src=\"/C2WF946J0/probe.js?v=vc1jasc\"></script>\n</head>\n<body></body>\n</body>\n</html>\n ",
+      "final_url": "https://www.qidian.com/so/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9.html"
+    }
+  ]
+}

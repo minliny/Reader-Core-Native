@@ -1,0 +1,31 @@
+{
+  "source_id": "corpus-510d385bfa39",
+  "source_name": "爱推書君（优）",
+  "recorded_at": "1970-01-01T00:00:1782641953Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://pre-api.tuishujun.com#md冷魅/api/searchBook?search_value=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&sort_field=hot_value&page=1&pageSize=50",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "cache-control": "no-cache, private",
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=UTF-8",
+        "date": "Sun, 28 Jun 2026 10:19:13 GMT",
+        "server": "nginx",
+        "set-cookie": "XSRF-TOKEN=eyJpdiI6IlRMWi9GRnFNZVNMRGRJd2RhcW9pQlE9PSIsInZhbHVlIjoieDA4YU9KYnlMc24ySE9wWFg5UHU3MFZTLzRQUmQxNUxvVEtodlozVGdNWDVIemp2cmxtT01NSk9TcEVXazA4STBuS0RNQlFxeXU1cXB1dnhHaHhXTFcydjU4MkNtS1QwMzBiSklDbEh2eVp1aG4yZlVLQW9yWGhiUTM4ZlFwem4iLCJtYWMiOiIzM2E5YmRiZjJjZjhlNDlkNmQ2M2I3YWNlODY3MTRmYTJlMTViNzFlZGZhOWFkZjIyZDg5ODVmNmViNmE5ZjE2IiwidGFnIjoiIn0%3D; expires=Sun, 28-Jun-2026 12:19:13 GMT; Max-Age=7200; path=/; samesite=lax",
+        "strict-transport-security": "max-age=31536000",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding"
+      },
+      "response_body": "403",
+      "final_url": "https://pre-api.tuishujun.com/#md%E5%86%B7%E9%AD%85/api/searchBook?search_value=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&sort_field=hot_value&page=1&pageSize=50"
+    }
+  ]
+}

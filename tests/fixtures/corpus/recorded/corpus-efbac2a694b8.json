@@ -1,0 +1,29 @@
+{
+  "source_id": "corpus-efbac2a694b8",
+  "source_name": "速读谷子（优）",
+  "recorded_at": "1970-01-01T00:00:1782640318Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://www.sudugu.org/i/sor.aspx?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9<,&p=1>",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "cache-control": "private",
+        "content-type": "text/html; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 09:51:57 GMT",
+        "server": "Microsoft-IIS/10.0",
+        "vary": "Accept-Encoding",
+        "x-aspnet-version": "4.0.30319",
+        "x-powered-by": "ASP.NET"
+      },
+      "response_body": "\r\n<!DOCTYPE html>\r\n<html>\r\n<head>\r\n<meta http-equiv=\"Content-type\" name=\"viewport\" content=\"initial-scale=1.0, maximum-scale=1.0, user-scalable=no, width=device-width\" />\r\n<title>搜索：斗破苍穹<,-速读谷</title>\r\n<meta name=\"keywords\" content=\"搜索,斗破苍穹<,速读谷\"/>\r\n<meta name=\"description\" content=\"速读谷搜索结果页面,斗破苍穹<,,提供按小说名和作者名搜索功能,助您快速找到喜欢的作品。\"/>\r\n<link media=\"all\" type=\"text/css\" href=\"/css/g.css\" rel=\"stylesheet\"/>\r\n<script type=\"text/javascript\" src=\"/js/jquery.min.js\"></script>\r\n<meta http-equiv=\"content-language\" content=\"zh-CN\">\r\n<link media=\"all\" type=\"text/css\" href=\"/css/6/skin.css\" rel=\"stylesheet\"/>\r\n<script type=\"text/javascript\" src=\"/js/jquery.common.js\"></script>\r\n</head>\r\n\r\n<body>\r\n\r\n<div class=\"header\"><span class=\"home\"><a href=\"/\">首页</a></span><p><a href=\"/\">速读谷</a></p><span><a id=\"home\" href=\"javascript:menu()\" class=\"show\" style=\"display: block;\">菜单</a><a id=\"close\" href=\"javascript:closeMenu()\" class=\"close\" style=\"display: none;\">收起</a></span></div>\r\n<div id=\"gmenu\" class=\"gmenu\" style=\"display: none;\">\r\n<ul style=\"left: -33%;\">\r\n<li><a href=\"/\">首页</a></li>\r\n<li><a href=\"/paihang/\">排行榜</a></li>\r\n<li><a href=\"/wanjie/\">完结小说</a></li>\r\n<li><a href=\"/zuixin/\">最新更新</a></li>\r\n<li><a href=\"/fenlei/\">小说分类</a></li>\r\n<li><a href=\"/i/jilu.aspx\" rel=\"nofollow\">阅读记录</a></li>\r\n<li><a href=\"/i/so.aspx\" rel=\"nofollow\">搜索小说</a></li>\r\n<li><a href=\"/i/pifu.aspx\" rel=\"nofollow\">网站换肤</a></li>\r\n</ul>\r\n</div>\r\n<div class=\"menu\">\r\n<ul class=\"clear\">\r\n<li><a href=\"/xuanhuan/\">玄幻小说</a></li><li><a href=\"/xianxia/\">仙侠小说</a></li><li><a href=\"/dushi/\">都市小说</a></li><li><a href=\"/lishi/\">历史小说</a></li><li><a href=\"/junshi/\">军事小说</a></li><li><a href=\"/kehuan/\">科幻小说</a></li><li><a href=\"/yanqing/\">言情小说</a></li>\r\n<li><a href=\"/fenlei/\" title=\"更多分类\">···</a></li>\r\n</ul>\r\n</div>\r\n<div class=\"container\">\r\n<h2>搜索：<a href=\"###\">斗破苍穹<,</a></h2>\r\n\r\n<div class=\"page\">共0本小说</div>\r\n</div>\r\n\r\n\r\n<div class=\"footer\">\r\n&copy 2026 <a href=\"/\">速读谷</a> 谷内无错 可以速读\r\n</div>\r\n<div style=\"display:none;\"><script type=\"text/javascript\" src=\"/config/tj.js\"></script></div>\r\n<script type=\"text/javascript\" src=\"/config/v7.js\"></script>\r\n</body>\r\n</html>\r\n",
+      "final_url": "https://www.sudugu.org/i/sor.aspx?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9%3C,&p=1%3E"
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "source_id": "corpus-c90efa214ecb",
+  "source_name": "全免漫画（优）",
+  "recorded_at": "1970-01-01T00:00:1782640913Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://api-cdn.kaimanhua.com/comic-api/v1/comic/getsortlist?search_key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&orderby=shoucang&page=1&pagesize=20&young_mode=0&client-type=android&productname=qmmh&client-channel=xiaomi&platformname=android&client-version=1.4.8",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "accept-ranges": "bytes",
+        "access-control-allow-credentials": "true",
+        "access-control-allow-headers": "*",
+        "access-control-allow-methods": "PUT,POST,GET,DELETE,OPTIONS",
+        "access-control-allow-origin": "*",
+        "age": "1",
+        "connection": "keep-alive",
+        "content-type": "application/json; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 10:01:48 GMT",
+        "server": "openresty",
+        "vary": "Accept-Encoding",
+        "via": "CHN-JSyangzhou-CMCC16-CACHE8[44],CHN-JSyangzhou-CMCC16-CACHE9[10,TCP_MISS,41],CHN-JSwuxi-GLOBAL2-CACHE74[3],CHN-JSwuxi-GLOBAL2-CACHE9[0,TCP_HIT,0]",
+        "x-ccdn-cachettl": "1800",
+        "x-ccdn-expires": "1582",
+        "x-hcs-proxy-type": "1"
+      },
+      "response_body": "{\"data\":{\"page\":{\"current_page\":1,\"total_page\":1,\"orderby\":\"shoucang\",\"count\":5,\"comic_sort\":\"\",\"search_key\":\"斗破苍穹\",\"time\":8},\"data\":[{\"comic_id\":86351,\"comic_name\":\"沉香破\",\"last_chapter_name\":\"最终话\",\"comic_type\":\"lianai,恋爱|gufeng,古风|chuanyue,穿越\",\"comic_newid\":\"chenxiangpo\",\"comic_author\":\"三福动漫\",\"renqi\":111201766,\"update_time\":1485895775000,\"shoucang\":116422,\"comic_grade\":\"2\",\"cartoon_desc\":\"原本又聋又哑的二少奶奶突然开口说话！夫君腹黑，兄弟不合，妯娌相争，姐妹翻脸，外加妾室争宠……这一大家子，怎一个乱字了得？\",\"cover_img\":\"http://image.yqmh.com/mh/86351_3_4.jpg-noresize.webp\",\"has_video\":0},{\"comic_id\":108533,\"comic_name\":\"无限破狱者\",\"last_chapter_name\":\"第56话 新世界\",\"comic_type\":\"rexue,热血|dushi,都市|xuanyi,悬疑\",\"comic_newid\":\"wuxianpoyuzhe\",\"comic_author\":\"三福动漫\",\"renqi\":9259502,\"update_time\":1643622511000,\"shoucang\":7285,\"comic_grade\":\"2\",\"cartoon_desc\":\"【每周五更新】八狼因追寻哥哥的死亡原因而成为一名兢兢业业地狱管理员，直到某天新神上位六道原有体系崩溃，无辜女孩林小鹿也跌入地狱。为送林小鹿回家，也为了寻找哥哥的真相，八狼毅然收服了前神灵牙铸，和林小鹿一起踏上了寻觅之路。穿越六大世界，遇到种种奇怪事件，八狼一往无前，追寻至世界尽头，直面新神……\",\"cover_img\":\"http://image.yqmh.com/mh/108533_3_4.jpg-noresize.webp\",\"has_video\":0},{\"comic_id\":107042,\"comic_name\":\"宫斗不如跑江湖\",\"last_chapter_name\":\"第15话\",\"comic_type\":\"gaoxiao,搞笑|lianai,恋爱|gufeng,古风\",\"comic_newid\":\"gongdouburupaojianghu\",\"comic_author\":\"极漫文化\",\"renqi\":91303252,\"update_time\":1556287281000,\"shoucang\":73389,\"comic_grade\":\"2\",\"cartoon_desc\":\"【独家/每周四、六更新】号外！楚明镜身伴多位精品美男，这是道德的沦丧还是人性的扭曲！？咕咕咕咕日报组独家报道！\",\"cover_img\":\"http://image.yqmh.com/mh/107042_3_4.jpg-noresize.webp\",\"has_video\":0},{\"comic_id\":108431,\"comic_name\":\"宫斗高手在校园\",\"last_chapter_name\":\"预告\",\"comic_type\":\"lianai,恋爱|chuanyue,穿越|hougong,后宫\",\"comic_newid\":\"gdgszxy\",\"comic_author\":\"九夏动漫\",\"renqi\":10919326,\"update_time\":1604482482000,\"shoucang\":52738,\"comic_grade\":\"0\",\"cartoon_desc\":\"【每周六、七更新】前世，她踏着无数敌人的尸体，终于在残酷的宫斗中胜出，当上太后，垂帘听政。却被养子害死，意外穿越到现代，成了一个倍受迫害的16岁少女。\\n“想在我面前玩鬼把戏，哀家让你死都不知道怎么死！”\",\"cover_img\":\"http://image.yqmh.com/mh/108431_3_4.jpg-noresize.webp\",\"has_video\":0},{\"comic_id\":105856,\"comic_name\":\"刀剑斗神传\",\"last_chapter_name\":\"第2话\",\"comic_type\":\"gufeng,古风|wuxia,武侠|shenghuo,生活|dongzuo,动作\",\"comic_newid\":\"daojiandoushenchuan\",\"comic_author\":\"新漫画\",\"renqi\":6064189,\"update_time\":1512467478000,\"shoucang\":3616,\"comic_grade\":\"2\",\"cartoon_desc\":\"这是一个孤独的江湖人遇到绝望的小女孩的故事。所以，这是一个从“无双”到“有双”的故事。\",\"cover_img\":\"http://image.yqmh.com/mh/105856_3_4.jpg-noresize.webp\",\"has_video\":0}]},\"status\":0,\"message\":\"ok\",\"server_time\":1782640690454}",
+      "final_url": "https://api-cdn.kaimanhua.com/comic-api/v1/comic/getsortlist?search_key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&orderby=shoucang&page=1&pagesize=20&young_mode=0&client-type=android&productname=qmmh&client-channel=xiaomi&platformname=android&client-version=1.4.8"
+    },
+    {
+      "level": "L3-detail",
+      "url": "https://api-cdn.kaimanhua.com/generated:0:d6364087ecb7adfb-4228a1f3f3cefec2",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 404,
+      "response_headers": {
+        "access-control-allow-origin": "*",
+        "age": "1",
+        "connection": "keep-alive",
+        "content-length": "9",
+        "content-type": "text/plain; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 10:01:53 GMT",
+        "server": "openresty",
+        "vary": "Accept-Encoding",
+        "via": "CHN-JSyangzhou-CMCC16-CACHE2[56],CHN-JSyangzhou-CMCC16-CACHE5[49,TCP_MISS,53],CHN-JSwuxi-GLOBAL2-CACHE64[30],CHN-JSwuxi-GLOBAL2-CACHE85[19,TCP_MISS,24]",
+        "x-ccdn-cachettl": "1800",
+        "x-ccdn-origin-time": "16",
+        "x-hcs-proxy-type": "0"
+      },
+      "response_body": "Not Found",
+      "final_url": "https://api-cdn.kaimanhua.com/generated:0:d6364087ecb7adfb-4228a1f3f3cefec2"
+    }
+  ]
+}

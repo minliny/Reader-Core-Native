@@ -1,0 +1,30 @@
+{
+  "source_id": "corpus-40d721ef0cc4",
+  "source_name": "天天书吧（优+）",
+  "recorded_at": "1970-01-01T00:00:1782639456Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://m.ttshu8.com/search.html",
+      "method": "POST",
+      "request_headers": {
+        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": "searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "response_status": 500,
+      "response_headers": {
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=UTF-8",
+        "date": "Sun, 28 Jun 2026 09:37:36 GMT",
+        "server": "Tengine",
+        "set-cookie": "waf_sc=5889647726; expires=Sat, 24-Apr-2027 09:37:36 GMT; Max-Age=25920000; path=/",
+        "transfer-encoding": "chunked",
+        "x-powered-by": "ShuQi Team"
+      },
+      "response_body": "",
+      "final_url": "https://m.ttshu8.com/search.html"
+    }
+  ]
+}

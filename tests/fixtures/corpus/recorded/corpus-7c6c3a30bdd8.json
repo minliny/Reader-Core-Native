@@ -1,0 +1,28 @@
+{
+  "source_id": "corpus-7c6c3a30bdd8",
+  "source_name": "桔纸书屋（优+）",
+  "recorded_at": "1970-01-01T00:00:1782639743Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://m.juzhishuwu.com/modules/article/search.php",
+      "method": "POST",
+      "request_headers": {
+        "Content-Type": "application/x-www-form-urlencoded; charset=gbk",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": "searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&code=1234",
+      "response_status": 403,
+      "response_headers": {
+        "connection": "keep-alive",
+        "content-length": "146",
+        "content-type": "text/html",
+        "date": "Sun, 28 Jun 2026 09:42:22 GMT",
+        "server": "nginx"
+      },
+      "response_body": "<html>\r\n<head><title>403 Forbidden</title></head>\r\n<body>\r\n<center><h1>403 Forbidden</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n",
+      "final_url": "https://m.juzhishuwu.com/modules/article/search.php"
+    }
+  ]
+}

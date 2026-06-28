@@ -1,0 +1,32 @@
+{
+  "source_id": "corpus-657f2375eb28",
+  "source_name": "酷安应用（优+）",
+  "recorded_at": "1970-01-01T00:00:1782641940Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://api.coolapk.com/v6/search?type=apk&cat=&sort=default&searchValue=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1&lastItem=",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 403,
+      "response_headers": {
+        "age": "0",
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=UTF-8",
+        "date": "Sun, 28 Jun 2026 10:19:00 GMT",
+        "eo-cache-status": "MISS",
+        "eo-log-uuid": "4202280808667249358",
+        "server": "TencentEdgeOne",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding",
+        "x-powered-by": "PHP/7.4.33"
+      },
+      "response_body": "",
+      "final_url": "https://api.coolapk.com/v6/search?type=apk&cat=&sort=default&searchValue=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1&lastItem="
+    }
+  ]
+}

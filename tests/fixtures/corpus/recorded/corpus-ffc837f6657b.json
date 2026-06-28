@@ -1,0 +1,34 @@
+{
+  "source_id": "corpus-ffc837f6657b",
+  "source_name": "篱笆文学（优+++）",
+  "recorded_at": "1970-01-01T00:00:1782639218Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://m.libahao.com/sou?wd=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "cache-control": "private",
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 09:33:38 GMT",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "server": "openresty",
+        "set-cookie": "a6574377ab94a4a66a2afaf3=e9841f9e9c3b76dd13d76d1fdeb817c8; expires=Wed, 08-Jul-2026 09:33:38 GMT; Max-Age=864000; path=/; domain=.libahao.com",
+        "strict-transport-security": "max-age=31536000",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding",
+        "x-powered-by": "ThinkPHP",
+        "x-xss-protection": "1; mode=block"
+      },
+      "response_body": "<!DOCTYPE html>\n<html lang=\"zh\">\n<head>\n\t<meta charset=\"UTF-8\">\n\t<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">\n\t<title></title>\n\t<meta name=\"keywords\" content=\"\" />\n\t<meta name=\"description\" content=\"\" />\n\t<meta name=\"baiduspider\" content=\"all\">\n\t<link href=\"\" rel=\"canonical\">\n\t<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge,chrome=1\"/>\n\t<meta name=\"renderer\" content=\"webkit\"/>\n\t<meta http-equiv=\"Cache-Control\" content=\"no-transform\"/>\n\t<meta http-equiv=\"Cache-Control\" content=\"no-siteapp\"/>\n\t<link rel=\"stylesheet\" href=\"/static/mstyle.css\"/>\n\t<script src=\"/static/whole.js?v=8\"></script>\n</head>\n<body>\n<div class=\"navbar\">\n\t<a href=\"/\">首页</a>\n\t<a href=\"/bookshelf/\">书架</a>\n\t<a href=\"#\" id=\"categoryBtn\">分类</a>\n</div>\n\n<div class=\"search-box\">\n\t<div class=\"search-container\">\n\t\t<input type=\"text\" id=\"searchInput\" value=\"斗破苍穹\" placeholder=\"搜索书籍...\">\n\t\t<button id=\"searchBtn\">搜索</button>\n\t</div>\n</div>\n\n<div class=\"section-title\">搜索结果</div>\n<div class=\"book-list\">\n\t</div>\n\n<div class=\"category-modal\" id=\"categoryModal\">\n\t<div class=\"category-content\">\n\t\t<h2>选择分类</h2>\n\t\t<a href=\"/\">首页</a>\n\t\t<a href=\"/xuanhuan/\">玄幻魔法</a>\n\t\t<a href=\"/xiuzhen/\">武侠修真</a>\n\t\t<a href=\"/dushi/\">都市言情</a>\n\t\t<a href=\"/lishi/\">历史军事</a>\n\t\t<a href=\"/wangyou/\">游戏竞技</a>\n\t\t<a href=\"/kehuan/\">科幻灵异</a>\n\t\t<a href=\"/nvpin/\">女生言情</a>\n\t\t<a href=\"/qita/\">其他小说</a>\n\t\t<button onclick=\"closeModal()\">关闭</button>\n\t</div>\n</div>\n<script src=\"/static/style.js\"></script>\n<script>\n\tdocument.querySelector(\"#searchBtn\").addEventListener(\"click\", function() {\n\t\tconst keyword = document.querySelector(\"#searchInput\").value.trim();\n\t\tif (keyword) {\n\t\t\tconst url = window.location.protocol + \"//\" + window.location.host + `/sou?wd=${encodeURIComponent(keyword)}`;\n\t\t\twindow.location.href = url;\n\t\t\t//window.open(url, '_blank');\n\t\t} else {\n\t\t\talert(\"请输入搜索内容\");\n\t\t}\n\t});\n</script>\n</body>\n</html>",
+      "final_url": "https://m.libahao.com/sou?wd=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+    }
+  ]
+}

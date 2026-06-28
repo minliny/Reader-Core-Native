@@ -1,0 +1,29 @@
+{
+  "source_id": "corpus-829d05cb3ba6",
+  "source_name": "墨辰整理书源系列7.1版",
+  "recorded_at": "1970-01-01T00:00:1782639213Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://space.bilibili.com/501149848",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 412,
+      "response_headers": {
+        "connection": "keep-alive",
+        "content-type": "text/html",
+        "date": "Sun, 28 Jun 2026 09:33:33 GMT",
+        "server": "openresty",
+        "set-cookie": "X-BILI-SEC-TOKEN=3,eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJxIjoiM0U0eGdyY1JnY3pyVFdNRUtzbG1tVnpaRFBGMlUzWlciLCJyIjoiYzdjYTBkOTVlNjRhNWRjMDY4ZGVkOWM3ZDQ3ZmE0MmMyOGQyMjcxNDM0ZTI1MjMyZjg0MDgzNTEzYTRiMGM2NSIsImlwIjoiMTI0LjcwLjIzMS41NiIsImZwIjoiNzcyNGYyZTY1N2YwMzcwY2RkYjIzZWZhYmVmNGU1OTkiLCJ2ZXJpdHkiOjAsInR5cGUiOiIxIiwiZXhwIjoxNzgyNjQyODEzLCJpYXQiOjE3ODI2MzkyMTN9.yOzX-qeZ3DFd2GYOLHqrCz1QXr4m2n9dWriUwYuBts8; path=/; Expires=Sun, 28-Jun-26 10:03:33 GMT",
+        "transfer-encoding": "chunked",
+        "x-sec-request-id": "acf41b9c-c373-4f22-811e-6bcd9644eb13"
+      },
+      "response_body": "<!DOCTYPE html>\n<html lang=\"zh-cn\">\n\n<head>\n    <meta http-equiv=\"Access-Control-Allow-Origin\" content=\"*\" />\n    <meta http-equiv=\"Page-Enter\" content=\"blendTrans(Duration=0.5)\">\n    <meta http-equiv=\"Page-Exit\" content=\"blendTrans(Duration=0.5)\">\n    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n    <meta name=\"viewport\" content=\"width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0\">\n    <meta name=\"spm_prefix\" content=\"333.937\">\n    <title>出错啦! - bilibili.com</title>\n    <link rel=\"shortcut icon\" href=\"//static.hdslb.com/images/favicon.ico\">\n    <script type=\"text/javascript\" src=\"//s1.hdslb.com/bfs/static/jinkela/long/js/jquery/jquery1.7.2.min.js\"></script>\n    <style>\n        body {\n          margin: 0;\n          padding: 0;\n          width: 100vw;\n          height: 100vh;\n        }\n       .error-container {\n          height: 100%;\n          width: 100%;\n          display: flex;\n          justify-content: center;\n          align-items: center;\n        }\n        .captcha-content {\n          text-align: center;\n        }\n        .txt-wrap {\n          margin-top: 15px;\n          font-size: 12px;\n          line-height: 22px;\n          color: #999;\n          text-align: left;\n        }\n        .txt-item.err-code {\n          font-size: 28px;\n          font-weight: 700;\n          text-align: center;\n          color: #4c93ff;\n          margin-top: 16px;\n        }\n        \n        .captcha-img {\n          width: 160px;\n          height: 160px;\n          margin: auto;\n          background: url('https://i0.hdslb.com/bfs/static/jinkela/long/412/%E9%A1%B5%E9%9D%A2%E7%8A%B6%E6%80%81%E5%9B%BE.png') no-repeat center / cover;\n        }\n        .err-text {\n          color: #03a9f4;\n        }\n        .err-default {\n          font-size: 16px;\n          margin-top: 10px;\n        }\n      </style>\n</head>\n\n<body>\n    <noscript>\n          <strong>抱歉！我们需要允许JavaScript才能够正常运行。请打开后重试~</strong>\n          <strong>错误：412</strong>\n      </noscript>\n      <div class=\"error-container\">\n        <div class=\"captcha-content\">\n          <div class=\"captcha-img\"></div>\n          <div class=\"txt-item err-code\">错误号: 412</div>\n          <div class=\"txt-item err-text\"></div>\n          <div class=\"txt-item err-default\">由于触发哔哩哔哩安全风控策略，该次访问请求被拒绝。 \n            <div class=\"txt-item\">The request was rejected because of the bilibili security control policy.</div>\n          </div>\n          <div class=\"txt-wrap\">\n            <div class=\"txt-item datetime_now\"></div>\n            <div class=\"txt-item user_url\"></div>\n            <div class=\"txt-item user_ip\"></div>\n            <div class=\"txt-item user_id\"></div>\n          </div>\n          <div class=\"check-input\">\n              <div class=\"title\"></div>\n              <div class=\"box-pic\"></div>\n              <div class=\"box\"></div>\n              <div class=\"state\"></div>\n          </div>\n      </div>\n    </div>\n    <script type=\"text/javascript\" charset=\"utf-8\" src=\"//security.bilibili.com/static/js/sha256.min.js\"></script>\n    <script type=\"text/javascript\" charset=\"utf-8\" src=\"//security.bilibili.com/static/js/js.cookie.min.js\"></script>\n    <script type=\"text/javascript\" charset=\"utf-8\" src=\"//security.bilibili.com/static/js/412.js\"></script>\n</body>\n</html>",
+      "final_url": "https://space.bilibili.com/501149848"
+    }
+  ]
+}

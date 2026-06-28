@@ -1,0 +1,27 @@
+{
+  "source_id": "corpus-13e7f9805fd3",
+  "source_name": "闲看小说（优）",
+  "recorded_at": "1970-01-01T00:00:1782640221Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "http://nav.jijia-co.com/api/novel/book/search/result.do?like=0&page={{page-1}}&size=10&keywords=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&type=&vn=1.0.1.x&m=G8&t={{Date.now()}}&ch=xiaomi&pkg=com.smart.app.jiudianjiu.xin.leisureNovel",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 400,
+      "response_headers": {
+        "connection": "keep-alive",
+        "content-language": "en",
+        "content-length": "435",
+        "content-type": "text/html;charset=utf-8",
+        "date": "Sun, 28 Jun 2026 09:50:21 GMT"
+      },
+      "response_body": "<!doctype html><html lang=\"en\"><head><title>HTTP Status 400 – Bad Request</title><style type=\"text/css\">body {font-family:Tahoma,Arial,sans-serif;} h1, h2, h3, b {color:white;background-color:#525D76;} h1 {font-size:22px;} h2 {font-size:16px;} h3 {font-size:14px;} p {font-size:12px;} a {color:black;} .line {height:1px;background-color:#525D76;border:none;}</style></head><body><h1>HTTP Status 400 – Bad Request</h1></body></html>",
+      "final_url": "http://nav.jijia-co.com/api/novel/book/search/result.do?like=0&page={{page-1}}&size=10&keywords=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&type=&vn=1.0.1.x&m=G8&t={{Date.now()}}&ch=xiaomi&pkg=com.smart.app.jiudianjiu.xin.leisureNovel"
+    }
+  ]
+}

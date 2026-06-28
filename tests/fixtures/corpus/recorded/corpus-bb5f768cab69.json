@@ -1,0 +1,35 @@
+{
+  "source_id": "corpus-bb5f768cab69",
+  "source_name": "手机看书（优）",
+  "recorded_at": "1970-01-01T00:00:1782640321Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://www.sjks88.com/e/search/index.php",
+      "method": "POST",
+      "request_headers": {
+        "Content-Type": "application/x-www-form-urlencoded; charset=gbk",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": "keyboard=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&show=title&classid=0",
+      "response_status": 200,
+      "response_headers": {
+        "alt-svc": "h3=\":443\"; ma=86400",
+        "cf-cache-status": "DYNAMIC",
+        "cf-ray": "a12bcbd53aaf34db-LAX",
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=gb2312",
+        "date": "Sun, 28 Jun 2026 09:52:00 GMT",
+        "nel": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}",
+        "report-to": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=6yfhx5Glab200AD05M61eXLuu3m6J6OI4BD8aBMzzuPDvRRiNM6w00%2B69E2YcBHZA%2BN0h62SsKIl%2BGxhQdFnuoN6DMHRwz%2FsSwmtybakMf4QgjBIpgaaoFzkIW%2F6Nd56aw%3D%3D\"}]}",
+        "server": "cloudflare",
+        "set-cookie": "lizzvlastsearchtime=1782640320; expires=Mon, 29-Jun-2026 09:52:00 GMT; Max-Age=86400; path=/",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding"
+      },
+      "response_body": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">\n<html>\n<head>\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=gb2312\">\n<title>��Ϣ��ʾ</title>\n<link href=\"/e/data/images/qcss.css\" rel=\"stylesheet\" type=\"text/css\">\n<SCRIPT language=javascript>\nvar secs=3;//3��\nfor(i=1;i<=secs;i++) \n{ window.setTimeout(\"update(\" + i + \")\", i * 1000);} \nfunction update(num) \n{ \nif(num == secs) \n{ history.go(-1); } \nelse \n{ } \n}\n</SCRIPT>\n</head>\n\n<body>\n<br>\n<br>\n<br>\n<br>\n<br>\n<br>\n<table width=\"500\" border=\"0\" align=\"center\" cellpadding=\"3\" cellspacing=\"1\" class=\"tableborder\">\n  <tr class=\"header\"> \n    <td height=\"25\"><div align=\"center\">��Ϣ��ʾ</div></td>\n  </tr>\n  <tr bgcolor=\"#FFFFFF\"> \n    <td height=\"80\"> \n      <div align=\"center\">\n\t  <br>\n        <b>û����������ص�����</b>\n        <br>\n        <br><a href=\"javascript:history.go(-1)\">������������û���Զ���ת����������</a>\n<br><br>\n\t  </div></td>\n  </tr>\n</table>\n</body>\n</html>",
+      "final_url": "https://www.sjks88.com/e/search/index.php"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "source_id": "corpus-f99138f252ab",
+  "source_name": "三七小说（优+）",
+  "recorded_at": "1970-01-01T00:00:1782639486Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://www.37yq.com/so.html?searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1&searchtype=all",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "connection": "close",
+        "content-type": "text/html; charset=UTF-8",
+        "date": "Sun, 28 Jun 2026 09:38:06 GMT",
+        "server": "Apache",
+        "vary": "Accept-Encoding"
+      },
+      "response_body": "<html>\n<head>\n<title>37yq.com</title>\n<script type=\"text/javascript\" src=\"/js/fingerprint/iife.min.js\"></script>\n<script type=\"text/javascript\">\nvar redirect_link = 'http://www.37yq.com/so.html?searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1&searchtype=all&tr_uuid=20260628-1938-066a-8e6b-163d1b0261d3&';\nlet redirected = false;\n\nfunction redirect(suffix) {\n\tif (redirected) return;\n\tredirected = true;\n\twindow.location.replace(redirect_link + suffix);\n}\n\nconst rdrTimeout = setTimeout(() => redirect('fp=-7'), 300);\n\ntry {\n\tFingerprintJS.load({monitoring: false})\n\t\t.then(fp => fp.get())\n\t\t.then(result => {\n\t\t\tclearTimeout(rdrTimeout);\n\t\t\tredirect('fp=' + result.visitorId);\n\t\t});\n} catch (err) {\n\tredirect('fp=-7');\n}\n\n</script>\n<style> body { background:#101c36 } </style>\n</head>\n<body bgcolor=\"#ffffff\" text=\"#000000\">\n<div style='display: none;'><a href='http://www.37yq.com/so.html?searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1&searchtype=all&tr_uuid=20260628-1938-066a-8e6b-163d1b0261d3&fp=-3'>Click here to enter</a></div>\n<noscript><meta http-equiv=\"refresh\" content=\"0; URL=http://www.37yq.com/so.html?searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1&searchtype=all&tr_uuid=20260628-1938-066a-8e6b-163d1b0261d3&fp=-5\"></noscript>\n</body>\n</html>",
+      "final_url": "https://www.37yq.com/so.html?searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1&searchtype=all"
+    }
+  ]
+}

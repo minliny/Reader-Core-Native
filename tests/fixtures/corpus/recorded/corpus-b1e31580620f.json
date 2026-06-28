@@ -1,0 +1,32 @@
+{
+  "source_id": "corpus-b1e31580620f",
+  "source_name": "笔尚小说",
+  "recorded_at": "1970-01-01T00:00:1782642037Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://www.bsxiaoshuo.com/s.php?sid=3&k=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "cache-control": "no-store, no-cache, must-revalidate",
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 10:20:36 GMT",
+        "expires": "Thu, 19 Nov 1981 08:52:00 GMT",
+        "pragma": "no-cache",
+        "server": "nginx",
+        "set-cookie": "PHPSESSID=iiunic9v85a8tusfotbr6hlm75; path=/",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding"
+      },
+      "response_body": "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1,initial-scale=1.0,maximum-scale=1.0,user-scalable=no\"><meta name=\"format-detection\" content=\"telephone=no\"/><title>搜索“斗破苍穹”相关的标题</title><script src=\"/zd/js/common.js\"></script><link rel=\"stylesheet\" href=\"/zd/css/home.css\"></head><body onselectstart=\"return false\"><div class=\"top\"><dl><dt><a href=\"/\" class=\"g-ico g-ico-back\">书城</a><p>搜索</p></dt></dl></div><div class=\"search-f\"><dd><form id=\"fh\" method=\"get\" action=\"\" style=\"display:block; width:100%;\"><p class=\"nav1 ns_ nav1-new1 nav1-search\"><input type=\"hidden\" id=\"ns_sid\" name=\"sid\" value=\"3\" /><a href=\"\" id=\"ns_3\" onclick=\"shou2(3);return false;\" class=\"c\">综合</a><a href=\"\" id=\"ns_1\" onclick=\"shou2(1);return false;\" >找书</a><a href=\"\" id=\"ns_0\" onclick=\"shou2(0);return false;\" >找章节</a><a href=\"\" id=\"ns_2\" onclick=\"shou2(2);return false;\" >找作者</a></p><div style=\"display:-webkit-box;\"><input type=\"text\" placeholder=\"请输入关键字\" maxlength=\"20\" name=\"k\" value=\"斗破苍穹\"><i class=\"btn-search\" onclick=\"shou1();\">搜索</i></div><!-- <div class=\"ns_\"><input type=\"hidden\" id=\"ns_sid\" name=\"sid\" value=\"3\" /><label id=\"ns_3\" onclick=\"shou2(3);\" class=\"on_\">综合</label><label id=\"ns_1\" onclick=\"shou2(1);\" >找书</label><label id=\"ns_0\" onclick=\"shou2(0);\" >找文章</label><label id=\"ns_2\" onclick=\"shou2(2);\" >找作者</label></div>--><script type=\"text/javascript\">function shou1(){ document.getElementById(\"fh\").submit(); } function shou2(id){ document.getElementById(\"ns_sid\").value=id; for(var i=0;i<=3;i++){ var o=document.getElementById(\"ns_\"+i); var c=''; if (i==id) c='c'; o.className=c; } document.getElementById(\"fh\").submit(); } </script></form></dd></div><div class=\"box\"><b class=\"b1\">搜索书名“斗破苍穹” - 按结果自然排序</b><ul id=\"j\" class=\"u1 lazy p\"><li><p>抱歉，无相关作品……</p></li></ul><p id=\"pg\"></p><script>foot()</script></body></html>",
+      "final_url": "https://www.bsxiaoshuo.com/s.php?sid=3&k=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+    }
+  ]
+}

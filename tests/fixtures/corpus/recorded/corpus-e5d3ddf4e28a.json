@@ -1,0 +1,31 @@
+{
+  "source_id": "corpus-e5d3ddf4e28a",
+  "source_name": "爱久久网（优+）",
+  "recorded_at": "1970-01-01T00:00:1782639742Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "http://www.jjjxsw.com/e/search/index.php",
+      "method": "POST",
+      "request_headers": {
+        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": "show=title&keyboard=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "response_status": 200,
+      "response_headers": {
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 09:42:22 GMT",
+        "server": "openresty",
+        "strict-transport-security": "max-age=31536000",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding",
+        "x-powered-by": "PHP/7.4.33"
+      },
+      "response_body": "<!DOCTYPE html>\n<html>\n<head>\n    <meta http-equiv=\"content-type\" content=\"text/html;charset=utf-8\">\n    <title>没有搜索到相关的内容</title>\n    <meta name=\"keywords\" content=\"没有搜索到相关的内容\"/>\n    <meta name=\"description\" content=\"提示信息：没有搜索到相关的内容\"/>\n    <meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,user-scalable=0\">\n    <meta name=\"format-detection\" content=\"telephone=no,email=no,address=no\">\n    <meta name=\"applicable-device\" content=\"pc,mobile\">\n    <meta name=\"renderer\" content=\"webkit\">\n    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge,chrome=1\">\n    <link rel=\"stylesheet\" type=\"text/css\" href=\"/skin/css/message.css\">\n    <script type=\"text/javascript\" src=\"https://upcdn.b0.upaiyun.com/libs/jquery/jquery-1.10.2.min.js\"></script>\n</head>\n<body>\n<div class=\"shadow\"></div>\n<div class=\"layout error layui-anim layui-anim-scaleSpring\">\n    <ul>\n        <li></li>\n        <li></li>\n    </ul>\n    <p>没有搜索到相关的内容</p>\n    <a id=\"jump\" href=\"javascript:history.go(-1)\"></a>\n</div>\n<script>\n    $(document).ready(function(){\n        var url = $('#jump').attr('href');\n        var time = 2;\n        $('#jump').html('跳转 (<b>' + time + '</b>)');\n        if (url === '') $('#jump').attr('href', 'javascript:window.history.back();');\n        var t = setInterval(function () {\n            $('#jump').html('跳转 (<b>' + (--time) + '</b>)');\n            if (time < 0) {\n                clearInterval(t);\n                $('#jump').html('点击跳转');\n                if (url === '') {\n                    $('#jump').attr('href', '/');\n                    window.history.back();\n                } else {\n                    $(location).attr('href', url);\n                }\n            }\n        }, 1000);\n    });\n</script>\n</body>\n</html>",
+      "final_url": "https://www.ijjxsxzw.com/e/search/index.php"
+    }
+  ]
+}

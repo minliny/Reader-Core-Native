@@ -1,0 +1,27 @@
+{
+  "source_id": "corpus-8554df5ea9c3",
+  "source_name": "阅友小说（优+）",
+  "recorded_at": "1970-01-01T00:00:1782639460Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "http://sma.yueyouxs.com/api/book/search?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "connection": "keep-alive",
+        "content-type": "application/json; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 09:37:40 GMT",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding"
+      },
+      "response_body": "{\"code\":0,\"data\":{\"count\":439,\"list\":[{\"id\":229093,\"wapBookId\":229093,\"bookName\":\"灵破苍穹\",\"authorName\":\"心跳的瞬间\",\"bookPic\":\"https://cdn.p.yueyouxs.com/wap/229093/c6b23632fa2e3ea7d740305352f5d9eb.jpg\",\"fullFlag\":1,\"group\":0,\"words\":5005450,\"copyrightName\":\"逐浪\",\"classify\":11,\"classifySecond\":1101,\"isFee\":0,\"unitCprice\":0,\"chapterCount\":1649,\"extChapterCount\":0,\"maxFreeCount\":20,\"extendstr\":\"第1649章  前往大千世界（大结局） 下\\u003c:\\u003e230742\\u003c:\\u003e男频/玄幻奇幻\",\"extendstr2\":\"229094\",\"latestChapterId\":230742,\"latestChapterName\":\"第1649章  前往大千世界（大结局） 下\",\"createTime\":\"2021-02-08 20:46:02\",\"updateTime\":\"2021-06-23 17:21:22\",\"state\":21,\"classifyName\":\"男频\",\"classifySecondName\":\"玄幻奇幻\",\"intro\":\"一个从青叶小镇走出来的少年，偶然机会解除体内封印，从此文能一念惊天地，武能一掌碎山河。\\r\\n灵武兼修，踏遍诸天万界，踩踏无数天才，无数强者倒在了他的脚下！\"},{\"id\":236324,\"wapBookId\":236324,\"bookName\":\"破天\",\"authorName\":\"青铜\",\"bookPic\":\"https://cdn.p.yueyouxs.com/wap/236324/07e7dc57ce7b752727dbfa05aa36c6c4.jpg\",\"fullFlag\":1,\"group\":0,\"words\":3225174,\"copyrightName\":\"3G书城\",\"classify\":11,\"classifySecond\":1101,\"isFee\":0,\"unitCprice\":0,\"chapterCount\":1436,\"extChapterCount\":0,\"maxFreeCount\":20,\"extendstr\":\"第1436章 大结局\\u003c:\\u003e237760\\u003c:\\u003e男频/玄幻奇幻\",\"extendstr2\":\"236325\",\"latestChapterId\":237760,\"latestChapterName\":\"第1436章 大结局\",\"createTime\":\"2022-05-24 10:11:12\",\"updateTime\":\"2022-05-24 10:16:42\",\"state\":21,\"classifyName\":\"男频\",\"classifySecondName\":\"玄幻奇幻\",\"intro\":\"\\\"本已站在世界巅峰的神级人物，却因为一个古朴的戒指，成为异世界一个药师家族的废物公子。隐忍的锋芒，广博的学识，惊天的才学，高绝的曲艺！\\n万年的轮回是因为某种阴谋？还是真真正正的一种巧合？\\n顺我者强，逆我者亡，红尘滚滚，天地苍茫，看我如何一剑刺破天芒！\\\"\"},{\"id\":227310,\"wapBookId\":227310,\"bookName\":\"龙游苍穹\",\"authorName\":\"流风回雪\",\"bookPic\":\"https://cdn.p.yueyouxs.com/wap/227310/6a335964002fc67b66ab72d32cc44fe6.jpg\",\"fullFlag\":1,\"group\":0,\"words\":1769844,\"copyrightName\":\"恒言中文网\",\"classify\":11,\"classifySecond\":1101,\"isFee\":0,\"unitCprice\":0,\"chapterCount\":583,\"extChapterCount\":0,\"maxFreeCount\":20,\"extendstr\":\" 第583章      最后一战\\u003c:\\u003e227893\\u003c:\\u003e男频/玄幻奇幻\",\"extendstr2\":\"227311\",\"latestChapterId\":227893,\"latestChapterName\":\" 第583章      最后一战\",\"createTime\":\"2020-12-23 15:37:05\",\"updateTime\":\"2020-12-23 15:42:56\",\"state\":21,\"classifyName\":\"男频\",\"classifySecondName\":\"玄幻奇幻\",\"intro\":\"少年游龙，身世隐秘；十年隐忍，从未放弃！ 战雷家，解镇危，出蟠龙，创龙盟，坚毅少年闯天下！ 探黑石，进圣光，怀苍生，建帝国，痴情少年有傲魂！ 脚踏九州，声振寰宇；九鼎齐聚，龙游苍穹。 邪魔来袭生灵毁，守护之战惊天地！ 经此一役，幸存万民皆呼己为：龙的传人！\"},{\"id\":229057,\"wapBookId\":229057,\"bookName\":\"星核斗天\",\"authorName\":\"拎香雪碧\",\"bookPic\":\"https://cdn.p.yueyouxs.com/wap/229057/26a69552e4363e78707daa950fbe0cc2.jpg\",\"fullFlag\":1,\"group\":0,\"words\":3612977,\"copyrightName\":\"逐浪\",\"classify\":11,\"classifySecond\":1101,\"isFee\":0,\"unitCprice\":0,\"chapterCount\":1420,\"extChapterCount\":0,\"maxFreeCount\":20,\"extendstr\":\" 第1420章  传说 （大结局，结束了）\\u003c:\\u003e230477\\u003c:\\u003e男频/玄幻奇幻\",\"extendstr2\":\"229058\",\"latestChapterId\":230477,\"latestChapterName\":\" 第1420章  传说 （大结局，结束了）\",\"createTime\":\"2021-02-08 20:46:02\",\"updateTime\":\"2021-02-08 21:01:26\",\"state\":21,\"classifyName\":\"男频\",\"classifySecondName\":\"玄幻奇幻\",\"intro\":\"“什么，你说道德经没用。”\\r\\n    “我告诉你，用什么东西跟我换我都不换。”秦天如是说，他发现道德经不在只是一篇古文那么简单\\r\\n    ……\\r\\n    地球青年秦天来到了星核世界，觉醒原核，他发现人们都是一个原核，而他自己却身负两个原核……\\r\\n    煅经骨，九星圆，真核动，神冲天。\\r\\n    这是一个异常残酷的世界，异常凶险的世界，也是一个充满机遇的世界，人类修炼，排山倒海，崩山断水。\\r\\n    男儿自横行，十步杀一人。\\r\\n    看秦天如何横行在这个世界，过得多姿多彩。\"},{\"id\":232679,\"wapBookId\":232679,\"bookName\":\"苍穹战神\",\"authorName\":\"光明洛\",\"bookPic\":\"https://cdn.p.yueyouxs.com/wap/232679/0ea5945eae49e3d03a1dd2c117e7708d.jpg\",\"fullFlag\":1,\"group\":0,\"words\":865804,\"copyrightName\":\"复阅科技\",\"classify\":11,\"classifySecond\":1101,\"isFee\":0,\"unitCprice\":0,\"chapterCount\":363,\"extChapterCount\":0,\"maxFreeCount\":20,\"extendstr\":\"第363章 大结局\\u003c:\\u003e233042\\u003c:\\u003e男频/修真生活\",\"extendstr2\":\"232680\",\"latestChapterId\":233042,\"latestChapterName\":\"第363章 大结局\",\"createTime\":\"2021-09-01 18:32:05\",\"updateTime\":\"2022-02-07 11:32:22\",\"state\":21,\"classifyName\":\"男频\",\"classifySecondName\":\"玄幻奇幻\",\"intro\":\"在强者为尊的修行大陆中，少年石洛一度被认定为修炼废材。机缘巧合之下，石洛有幸获得一枚神秘古坠，从此逆转乾坤，傲视苍穹，万战成神！\"}]},\"errors\":[],\"msg\":\"Success\"}",
+      "final_url": "http://sma.yueyouxs.com/api/book/search?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1"
+    }
+  ]
+}

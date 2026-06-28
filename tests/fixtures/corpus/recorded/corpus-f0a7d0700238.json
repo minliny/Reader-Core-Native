@@ -1,0 +1,36 @@
+{
+  "source_id": "corpus-f0a7d0700238",
+  "source_name": "古诗文网（优+）",
+  "recorded_at": "1970-01-01T00:00:1782639483Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://m.gushiwen.cn/search.aspx?value=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&valuej={{key[0]}}",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "ali-swift-global-savetime": "1782639483",
+        "connection": "keep-alive",
+        "content-length": "61",
+        "date": "Sun, 28 Jun 2026 09:38:02 GMT",
+        "eagleid": "df6ff49917826394833508203e",
+        "server": "Tengine",
+        "timing-allow-origin": "*",
+        "via": "cache70.l2cn2648[35,35,200-0,M], cache60.l2cn2648[36,0], kunlun1.cn8683[41,41,200-0,M], kunlun5.cn8683[43,0]",
+        "x-cache": "MISS TCP_MISS dirn:-2:-2",
+        "x-frame-options": "sameorigin",
+        "x-native-sogou-proxy": "pass-rule",
+        "x-powered-by": "ASP.NET",
+        "x-swift-cachetime": "0",
+        "x-swift-savetime": "Sun, 28 Jun 2026 09:38:03 GMT"
+      },
+      "response_body": "<script>window.location.href='/app/DefaultGwd.aspx';</script>",
+      "final_url": "https://m.gushiwen.cn/search.aspx?value=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&valuej={{key[0]}}"
+    }
+  ]
+}

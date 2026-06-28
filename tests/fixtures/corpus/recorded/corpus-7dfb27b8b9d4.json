@@ -1,0 +1,34 @@
+{
+  "source_id": "corpus-7dfb27b8b9d4",
+  "source_name": "壹二小说（优）",
+  "recorded_at": "1970-01-01T00:00:1782640220Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://www.20xs.org/search.html",
+      "method": "POST",
+      "request_headers": {
+        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": "searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "response_status": 200,
+      "response_headers": {
+        "cache-control": "private",
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 09:50:19 GMT",
+        "server": "Tengine",
+        "set-cookie": "waf_sc=5889647726; expires=Sat, 24-Apr-2027 09:50:18 GMT; Max-Age=25920000; path=/",
+        "strict-transport-security": "max-age=31536000",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding",
+        "x-cache": "HIT",
+        "x-powered-by": "ShuQi Team"
+      },
+      "response_body": "<!DOCTYPE html><html><head><meta http-equiv=\"content-type\" content=\"text/html;charset=utf-8\"><title>错误提示</title><meta name=\"keywords\" content=\"错误提示\" /><meta name=\"description\" content=\"错误提示\" /><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,user-scalable=0\"><meta name=\"format-detection\" content=\"telephone=no,email=no,address=no\"><meta name=\"applicable-device\" content=\"pc,mobile\"><meta name=\"renderer\" content=\"webkit\"><meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge,chrome=1\"><link rel=\"stylesheet\" type=\"text/css\" href=\"/static/style/message.css\"><script type=\"text/javascript\" src=\"https://lf9-cdn-tos.bytecdntp.com/cdn/expire-1-M/layui/2.6.8/layui.min.js\"></script></head><body><div class=\"shadow\"></div><div class=\"layout error layui-anim layui-anim-scaleSpring\"><ul><li></li><li></li></ul><p>找不到您要搜索的内容，请重新搜索！</p><a id=\"jump\" href=\"/search.html?from=ban1\">点击跳转</a></div><script> layui.use(['jquery'], function(){ var $ = layui.jquery; var url = $('#jump').attr('href'); var time = 3; $('#jump').html('跳转 (<b>'+time+'</b>)'); if (url === '') $('#jump').attr('href', 'javascript:window.history.back();'); var t = setInterval(function(){ $('#jump').html('跳转 (<b>'+(--time)+'</b>)'); if(time < 0){ clearInterval(t); $('#jump').html('点击跳转'); if (url === '') { $('#jump').attr('href', '/'); window.history.back(); } else { $(location).attr('href', url); } } }, 1000); }); </script>",
+      "final_url": "https://www.20xs.org/search.html"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "source_id": "corpus-ff31de264d5d",
+  "source_name": "奥尔中文（优）",
+  "recorded_at": "1970-01-01T00:00:1782640572Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://www.83zws.com/{{cookie.removeCookie(source.key)}}https://www.83zws.com/soso/",
+      "method": "POST",
+      "request_headers": {
+        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": "searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&search=",
+      "response_status": 404,
+      "response_headers": {
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 09:56:11 GMT",
+        "server": "nginx",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding",
+        "x-powered-by": "PHP/7.4.33"
+      },
+      "response_body": "﻿    <!DOCTYPE html>\r\n    <html lang=\"zh\">\r\n    <head>\r\n    <meta charset=\"UTF-8\">\r\n    <meta http-equiv=\"refresh\" content='5; url=/'>\r\n    <title>404 Not Found</title>\r\n    </head>\r\n    <body>\r\n    <style>\r\n    div{text-align:center;font-size:2em;margin:20px auto;}\r\n    a{display:table;margin:0 auto;text-decoration: none;font-size:0.5em;color:#000;}\r\n    </style>\r\n    <div>404 Not Found</div>\r\n    <hr>\r\n    <a href=\"/\">5秒钟后返回首页</a>\r\n    </body>\r\n    </html>",
+      "final_url": "https://www.883zw.com/%7B%7Bcookie.removeCookie(source.key)%7D%7Dhttps:/www.83zws.com/soso/"
+    }
+  ]
+}

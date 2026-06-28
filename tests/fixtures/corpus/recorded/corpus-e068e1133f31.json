@@ -1,0 +1,34 @@
+{
+  "source_id": "corpus-e068e1133f31",
+  "source_name": "独阅读网",
+  "recorded_at": "1970-01-01T00:00:1782641980Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://www.duread8.com/index/get_search_book_list/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "cache-control": "no-store, no-cache, must-revalidate",
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=UTF-8",
+        "date": "Sun, 28 Jun 2026 10:19:40 GMT",
+        "expires": "Thu, 19 Nov 1981 08:52:00 GMT",
+        "pragma": "no-cache",
+        "server": "Kd Edge Scdn",
+        "set-cookie": "duread_web_session=sek27gqb0vteu0uhmepf1860ahsct78h; expires=Sun, 28-Jun-2026 12:19:40 GMT; Max-Age=7200; path=/; HttpOnly",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding",
+        "x-cache-status": "MISS",
+        "x-powered-by": "PHP/7.1.4"
+      },
+      "response_body": "<style>\n    .error-wrap{\n        min-height: 500px;\n        padding: 50px 0;\n    }\n    .error-img{\n        width: 60%;\n        margin: 0 auto;\n        padding:30px 0;\n    }\n    .error-img img{\n        width: 100%;\n    }\n    .error-text{\n        /*width: 60%;*/\n        margin: 0 auto;\n        text-align: center;\n    }\n\n    .error-text .btn.active {\n        background: #41495e;\n        color: #fff;\n    }\n    .error-text .btn {\n        height: 30px;\n        line-height: 30px;\n        font-size: 16px;\n        /*border: solid 1px #bbbbbb;*/\n        background: #fff;\n        width: 80px;\n        padding: 0;\n        border-radius: 3px;\n        margin-right: 20px;\n        text-align: center;\n        display: inline-block;\n    }\n\n</style>\n<div id=\"main_content\">\n    <div class=\"container white-bg\">\n\n        <div class=\"error-wrap\">\n            <div class=\"error-img\">\n                <img src=\"https://www.cddaoyue.cn/resources/images/weihu.png\">\n            </div>\n            <div class=\"error-text\">\n                <p><strong>本网址已停止使用，<a href=\"https://www.nkwwlkj.cn\">点击此处可前往</a></strong></p>\n<!--                <p><strong>系统维护升级中......</strong></p>-->\n            </div>\n        </div>\n\n    </div>\n</div>\n<a id=\"phone_code\" href=\"https://app.cddaoyue.cn\" target=\"_blank\"></a>\n<a id=\"J_GoTop\" href=\"javascript:;\"></a>",
+      "final_url": "https://www.cddaoyue.cn/reader/stopweb"
+    }
+  ]
+}

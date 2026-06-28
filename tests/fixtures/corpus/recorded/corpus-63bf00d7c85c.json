@@ -1,0 +1,33 @@
+{
+  "source_id": "corpus-63bf00d7c85c",
+  "source_name": "中华典藏（优+）",
+  "recorded_at": "1970-01-01T00:00:1782639463Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://www.diancang.xyz/e/search/index.php",
+      "method": "POST",
+      "request_headers": {
+        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": "tbname=bookname&show=title,writer&tempid=1&keyboard=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "response_status": 200,
+      "response_headers": {
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 09:37:43 GMT",
+        "eagleid": "b7cd002317826394631236907e",
+        "server": "ESA",
+        "set-cookie": "acw_tc=b7cd002317826394631236907e182ee8572bac4e9c5e43441a19172071;path=/;HttpOnly;Max-Age=3600",
+        "timing-allow-origin": "*",
+        "vary": "Accept-Encoding",
+        "via": "ens-cache43.l2nm125-7[23,0,DP], ens-cache30.cn8539[38,0,DP], ens-cache30.cn8539[39,0]",
+        "x-site-cache-status": "DYNAMIC"
+      },
+      "response_body": "﻿<!DOCTYPE HTML>\r\n<html>\r\n<head>\r\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\r\n<title>信息提示</title>\r\n<link href=\"https://www.diancang.xyz/e/message/images/mes.css\" rel=\"stylesheet\" type=\"text/css\">\r\n<SCRIPT language=javascript>\r\nvar secs=3;//3秒\r\nfor(i=1;i<=secs;i++) \r\n{ window.setTimeout(\"update(\" + i + \")\", i * 1000);} \r\nfunction update(num) \r\n{ \r\nif(num == secs) \r\n{ history.go(-1); } \r\nelse \r\n{ } \r\n}\r\n</SCRIPT>\r\n</head>\r\n\r\n<body>\r\n\t<div class=\"tip\">\r\n    \t<div class=\"closebox\"><a href=\"javascript:history.go(-1)\" title=\"点击关闭并跳转\"></a></div>\r\n    \t<div class=\"message\">没有搜索到相关的内容<a href=\"javascript:history.go(-1)\">如果您的浏览器没有自动跳转,请点击跳转......</a></div>\r\n        <div class=\"otherlink\"><div class=\"fr\"><a href=\"javascript:history.go(-1);\" class=\"return\">返回上页</a> <a href=\"javascript:history.go(-1)\" class=\"next\">快速跳转</a></div>快捷操作: <a href=\"/\" class=\"index\">返回首页</a> <a href=\"/\" class=\"error\" target=\"_blank\">错误提交</a></div>\r\n    </div>\r\n</body>\r\n</html>",
+      "final_url": "https://www.diancang.xyz/e/search/index.php"
+    }
+  ]
+}

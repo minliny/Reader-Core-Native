@@ -1,0 +1,30 @@
+{
+  "source_id": "corpus-e73efa62cc2b",
+  "source_name": "八一中文（优）",
+  "recorded_at": "1970-01-01T00:00:1782640316Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://www.blxs.info/modules/article/search.php",
+      "method": "POST",
+      "request_headers": {
+        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": "searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&searchtype=articlename",
+      "response_status": 200,
+      "response_headers": {
+        "cache-control": "max-age=600",
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=UTF-8",
+        "date": "Sun, 28 Jun 2026 09:51:56 GMT",
+        "server": "nginx",
+        "transfer-encoding": "chunked",
+        "x-cache-status": "HIT"
+      },
+      "response_body": "<!doctype html>\n<html>\n<head>\n<title>-搜索-八一中文网  </title>\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\n<meta name=\"keywords\" content=\"<title>标题、关键词、描述</title>\" />\n<meta name=\"description\" content=\"\" />\n<link rel=\"stylesheet\" type=\"text/css\" href=\"/images/yuedu.css\"/>\n<script type=\"text/javascript\" src=\"https://libs.baidu.com/jquery/1.4.2/jquery.min.js\"></script>\n<script type=\"text/javascript\" src=\"/images/bqg.js\"></script>\n<script src=\"/0YCVFwVP/KFLLRBZoI5.js\"></script>\n</head>\n<body>\n\t<div id=\"wrapper\">\n\t\t<script>login();</script><script type=\"text/javascript\" src=\"/images/yuedu.js\"></script> \n\t\t<div class=\"header\">\n\t\t\t<div class=\"header_logo\">\n\t\t\t\t<a href=\"http://www.81shuku.info\">八一中文网</a>\n\t\t\t</div>\n\t\t\t<script>bqg_panel();</script>            \n\t\t</div>\n\t\t<div class=\"nav\">\n\t\t\t<ul>\n\t\t\t\t<li><a href=\"http://www.81shuku.info/\">首页</a></li>\n                <li><a href=\"/modules/article/bookcase.php\">我的书架</a></li>\n\t\t\t\t<li><a href=\"/xuanhuanxiaoshuo/\">玄幻小说</a></li>\n\t\t\t\t<li><a href=\"/xiuzhenxiaoshuo/\">修真小说</a></li>\n\t\t\t\t<li><a href=\"/dushixiaoshuo/\">都市小说</a></li>\n\t\t\t\t<li><a href=\"/chuanyuexiaoshuo/\">穿越小说</a></li>\n\t\t\t\t<li><a href=\"/wangyouxiaoshuo/\">网游小说</a></li>\n\t\t\t\t<li><a href=\"/kehuanxiaoshuo/\">科幻小说</a></li>\n                                <li><a href=\"/qitaxiaoshuo/\">其他小说</a></li>\n\t\t\t\t<li><a href=\"/paihangbang/\">排行榜单</a></li>\n                <li><script type=\"text/javascript\">yuedu();</script></li>\n\t\t\t</ul>\n\t\t</div>\n        <div id=\"banner\" style=\"display:none\"></div>\n<div id=\"center_tip\"><b>最新网址：www.81shuku.info</b></div>        <div id=\"main\">\n        <div id=\"content\">\n<table class=\"grid\" width=\"100%\" align=\"center\">\n<caption>搜索结果</caption>\n  <tr align=\"center\" style=\"height:30px;\">\n    <th width=\"20%\">文章名称</th>\n    <th width=\"40%\">最新章节</th>\n    <th width=\"15%\">作者</th>\n\t<th width=\"9%\">字数</th>\n    <th width=\"10%\">更新</th>\n    <th width=\"6%\">状态</th>\n  </tr>\n \n  \n  \n</table>\n\n <div id=\"tips\" class=\"tips\">\n  \t抱歉，搜索没有结果^_^\n </div>\n\n\n<style>\n.pagelink{ text-align:center;margin-top:10px;}\n.pagelink a{border:1px solid #C3DFEA;padding:3px 7px;margin:2px; background-color:#E1ECED}\nkbd{ display:none}\nem{border:1px solid #C3DFEA;padding:3px 7px;margin:2px;background-color:#E1ECED}\n.first,.last,strong{border:1px solid #C3DFEA;padding:3px 7px;margin:2px;background-color:#E1ECED}\nstrong{ background-color:#88C6E5}\n.tips{ text-align:center; display:none; border:1px solid #C3DFEA;padding:10px 0px;margin-top:10px;margin-bottom:20px; background-color:#E1ECED; font-weight:bold}\n</style>\n<script>\n\tif(document.getElementById(\"nr\") == null ){ document.getElementById(\"tips\").style.display = \"block\";}\n</script>\n<div style=\"clear:both\"></div></div>\n        </div>\n\n\t\t</div>\n\n\t\t\n        <div class=\"dahengfu\"></div>\n<div class=\"footer\">\n\t\t\t<div class=\"footer_link\"></div>\n\t\t\t<div class=\"footer_cont\">\n\t\t\t\t<script>footer();tj();</script>\n\t\t\t</div>\n\t\t</div>\n        \n\t</div>\n</body>\n</html>",
+      "final_url": "http://www.81shuku.info/modules/article/search.php"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "source_id": "corpus-b2aa378f4e1a",
+  "source_name": "武芊漫画（优+）",
+  "recorded_at": "1970-01-01T00:00:1782640758Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://comic.mkzcdn.com/search/keyword/?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page_num=1&page_size=20",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "accept-ranges": "bytes",
+        "access-control-allow-credentials": "true",
+        "access-control-allow-headers": "app-id,app-version,device-name,device-resolution,device-udid,platform,system-name,system-version,device-utm",
+        "access-control-allow-methods": "GET,POST,OPTIONS",
+        "access-control-allow-origin": "*",
+        "age": "10382",
+        "connection": "keep-alive",
+        "content-length": "45",
+        "content-type": "application/json; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 09:59:18 GMT",
+        "nginx-hit": "1",
+        "server": "openresty",
+        "via": "CHN-JSyangzhou-CMCC16-CACHE1[5],CHN-JSyangzhou-CMCC16-CACHE9[0,TCP_HIT,2],CHN-JSwuxi-GLOBAL2-CACHE6[3],CHN-JSwuxi-GLOBAL2-CACHE85[0,TCP_HIT,1]",
+        "x-ccdn-cachettl": "10800",
+        "x-ccdn-expires": "418",
+        "x-ccdn-req-id-46b1": "4cb83e5463fcdeab63ffa6d4736841b0",
+        "x-hcs-proxy-type": "1",
+        "x-powered-by": "mkzhan-main-release"
+      },
+      "response_body": "{\"code\":\"199\",\"message\":\"搜索结果为空\"}",
+      "final_url": "https://comic.mkzcdn.com/search/keyword/?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page_num=1&page_size=20"
+    }
+  ]
+}

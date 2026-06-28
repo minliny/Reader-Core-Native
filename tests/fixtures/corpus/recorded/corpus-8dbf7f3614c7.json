@@ -1,0 +1,34 @@
+{
+  "source_id": "corpus-8dbf7f3614c7",
+  "source_name": "英文小说（英）",
+  "recorded_at": "1970-01-01T00:00:1782640710Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "http://novel.tingroom.com/wap/index.php?moduleid=1025&type=2&kw=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "alt-svc": "h3=\":443\"; ma=86400",
+        "cf-cache-status": "DYNAMIC",
+        "cf-ray": "a12bd5522e162b91-LAX",
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 09:58:29 GMT",
+        "nel": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}",
+        "report-to": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=pzz5rco3cNc4ojsMZiJQ1lMP0iYdZkixNpa%2FqYxd%2FHzOxJaUD3X8TGHO%2FI0hdlY4CZJ4VsBJYux%2Bia89F4pWbzsTzy76PAyl95Rz%2BlHbYvi0P%2FZBeKKNDuvx3EIUD9tEkPHcVnw%3D\"}]}",
+        "server": "cloudflare",
+        "strict-transport-security": "max-age=31536000",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding"
+      },
+      "response_body": "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n<meta charset=\"UTF-8\" />\r\n<title>斗破苍穹_小说_英文小说网手机版</title>\r\n<meta name=\"viewport\" content=\"initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=0, width=device-width\">\r\n<meta name=\"keywords\" content=\"英文小说网，英汉对照双语小说，经典英文小说，英文励志小说，英文宗教小说，儿童英文小说，英文科幻小说，英文短篇小说，英文名人传记。\" />\r\n<meta name=\"description\" content=\"英文小说网，提供英文小说在线阅读。英文小说网包含了必读英文原著经典以及辅助初中级英语爱好者学习的中英对照的双语小说等。所有英文小说都配有重难点单词注释，能有效提高英语阅读能力。\" />\r\n<link rel=\"shortcut icon\" type=\"image/x-icon\" href=\"http://novel.tingroom.com/favicon.ico\"/>\r\n<link rel=\"bookmark\" type=\"image/x-icon\" href=\"http://novel.tingroom.com/favicon.ico\"/>\r\n<link rel=\"apple-touch-icon-precomposed\" href=\"http://novel.tingroom.com/apple-touch-icon-precomposed.png\"/>\r\n<link rel=\"stylesheet\" type=\"text/css\" href=\"image/touch.css\"/>\r\n<script type=\"text/javascript\" src=\"image/touch.js\"></script>\r\n<script async src=\"//pagead2.googlesyndication.com/pagead/js/adsbygoogle.js\"></script>\r\n<script>\r\n     (adsbygoogle = window.adsbygoogle || []).push({\r\n          google_ad_client: \"ca-pub-0119746079916199\",\r\n          enable_page_level_ads: true\r\n     });\r\n</script>\r\n</head>\r\n<body id=\"nr_body\" style=\"background-color: rgb(251, 246, 236);\"><style>\r\n.navigator{\r\nmargin-top:6px;\r\nmargin-bottom:6px;\r\nline-height:24px;\r\nfont-weight:bold;\r\npadding:4px;\r\ncolor:#000;\r\n}\r\n</style>\r\n<div class=\"head_bar\">\r\n<table>\r\n<tr>\r\n<td class=\"head_bar_td_w5\">&nbsp;</td>\r\n<td class=\"head_bar_td_w50\"><div class=\"head_back\"><a href=\"index.php\"><span>&nbsp;&nbsp;&nbsp;&nbsp;</span></a></div></td>\r\n<td><div class=\"head_name\"><a href=\"index.php?moduleid=1025\"><span>小说</span></a></div></td>\r\n<td class=\"head_bar_td_w55 t_r\"><a href=\"index.php\"><img src=\"image/home.png\" width=\"40\" height=\"40\" alt=\"小说分类\"/></a></td>\r\n</tr>\r\n</table>\r\n</div>\r\n<div class=\"main\">\r\n<div class=\"navigator\">当前位置: <a href=\"/wap/index.php\">首页</a> &raquo; 小说 </div>\r\n<script language=\"javascript\" src=\"/wap/ad.js\" ></script>\r\n<div class=\"zong_list\">\r\n</div>\r\n<script language=\"javascript\" src=\"/wap/ad.js\" ></script>\r\n<div style=\"height:1px;clear:both;\"> </div>\r\n<div class=\"fm\">\r\n<form action=\"index.php\" method=\"get\">\r\n<input type=\"hidden\" name=\"moduleid\" value=\"1025\"/>\r\n<input type=\"hidden\" name=\"catid\" value=\"0\"/>\r\n<input type=\"hidden\" name=\"areaid\" value=\"0\"/>\r\n<input type=\"hidden\" name=\"type\" value=\"2\"/>\r\n<input type=\"text\" name=\"kw\" value=\"斗破苍穹\" size=\"15\" data-widget=\"quickdelete\" spellcheck=\"false\" autocomplete=\"off\" autocorrect=\"off\" autocapitalize=\"off\" class=\"fm_inp\"/>\r\n<input type=\"submit\" value=\"搜索\" class=\"fm_sbm\"/>\r\n</form>\r\n</div>\r\n</div>\r\n<div class=\"foot\">\n<a href=\"http://m.tingroom.com/\">英语听力</a>&nbsp;|&nbsp; <a href=\"./\"><span class=\"f_red\">手机版</span></a> &nbsp;|&nbsp; <a href=\"mobile.php?go=pc\">网页版</a>\n</div>\n<!--<div class=\"main lh20 t_c\">\n<small>06/28 17:58</small><br/>\n</div>-->\n<!--<div class=\"foot_bar\">\n<a href=\"./\"><img src=\"image/home.png\" alt=\"首页\"/></a>\n<a href=\"javascript:window.location.reload();\"><img src=\"image/load.png\" alt=\"刷新\"/></a>\n<a href=\"javascript:window.scrollTo(0,0);\"><img src=\"image/goto.png\" alt=\"顶部\"/></a>\n</div>\n<script type=\"text/javascript\">window.scrollTo(0,0);</script>-->\n<div class=\"dotoom\">&copy;英文小说网 2005-2010 </div>\n<script type=\"text/javascript\" src=\"https://js.users.51.la/21458025.js\"></script>\n<div style=\"display:none;\">\n<script src=\"/js/tongji.js\"></script>\n</div>\n</body>\n</html>",
+      "final_url": "http://novel.tingroom.com/wap/index.php?moduleid=1025&type=2&kw=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+    }
+  ]
+}

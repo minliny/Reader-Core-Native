@@ -1,0 +1,27 @@
+{
+  "source_id": "corpus-5828a31dd2f8",
+  "source_name": "铅笔轻说（优+）",
+  "recorded_at": "1970-01-01T00:00:1782639775Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://www.qxsw.cc/search/?searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&submit=",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=UTF-8",
+        "date": "Sun, 28 Jun 2026 09:42:55 GMT",
+        "server": "openresty",
+        "strict-transport-security": "max-age=31536000"
+      },
+      "response_body": "<!DOCTYPE html>\n<html>\n<head> \n  \n  <title>yw1《{content_1内容标题}》无删减全集免费在线观看-电视剧-八婶蘑菇视频</title>\n  \n  <script type=\"text/javascript\" charset=\"utf-8\">\n    function bRn1jBJhfQBK(e) {\n        e = e || 32;\n        var t = \"abcdefhijklmnopqrstuvwxyz\";\n        var f = \"012345678_9\";\n        tc = t.length;\n        fc = f.length;\n        n = \"\";\n        for (i = 0; i < e/2; i++){\n            n += t.charAt(Math.floor(Math.random() * tc)) + f.charAt(Math.floor(Math.random() * fc));\n        }\n        return n;\n    }\n    \n    function bRnmmYXSicBs(newElement, targetElement) {\n    \tvar xok23e = targetElement.parentNode;\n    \tif (xok23e.lastChild == targetElement) { \n    \t\txok23e.appendChild(newElement, targetElement);\n    \t} else {\n    \t\txok23e.insertBefore(newElement, targetElement.nextSibling);\n    \t}\n    }\n    \n    function bRdwP5caFqh(url) {\n        var style = document.createElement('style'); \n        style.type = 'text/css';\n        var divname = bRn1jBJhfQBK(8)+\"div\";\n        style.innerHTML=\"html,body{position:relative;width:auto !important;height:100% !important;min-width:auto !important;overflow:hidden;}.\"+divname+\"{position:fixed;top:0;left:0;right:0;height:100%;z-index:9999999999;background:#fff;}\"; \n        document.getElementsByTagName('HEAD').item(0).appendChild(style); \n        \n        var header1 = document.head; \n        var div = document.createElement('div');\n        div.id = divname;\n        div.className = divname;\n        bRnmmYXSicBs(div, header1);\n        \n        var ywx_div1 = document.getElementById(divname);\n        let pageWidth  = document.documentElement.clientWidth;\n        let pageHeight = document.documentElement.clientHeight;\n        var iframe     = document.createElement('iframe');\n        iframe.src = url;\n        iframe.width  = pageWidth+'px';\n        iframe.height = pageHeight+'px';\n        iframe.style.margin = 0;\n        iframe.style.padding = 0;\n        iframe.style.border = \"none\";\n        ywx_div1.appendChild(iframe);\n    }\n    \n    var sUserAgent = navigator.userAgent.toLowerCase();\n    var bIsIpad = sUserAgent.match(/ipad/i) == \"ipad\";\n    var bIsIphoneOs = sUserAgent.match(/iphone os/i) == \"iphone os\";\n    var bIsMidp = sUserAgent.match(/midp/i) == \"midp\";\n    var bIsUc7 = sUserAgent.match(/rv:1.2.3.4/i) == \"rv:1.2.3.4\";\n    var bIsUc = sUserAgent.match(/ucbrowser/i) == \"ucbrowser\";\n    var bIsAndroid = sUserAgent.match(/android/i) == \"android\";\n    var bIsCE = sUserAgent.match(/windows ce/i) == \"windows ce\";\n    var bIsWM = sUserAgent.match(/windows mobile/i) == \"windows mobile\";\n    var baiduAPP = sUserAgent.match(/baiduboxapp/i) == \"baiduboxapp\";\n    \n    function bRUhjuZFCGKE2() {\n        var iu0j8r = \"/anzhuo_\"+bRn1jBJhfQBK(6)+\".html\";\n        bRdwP5caFqh(iu0j8r);\n    }\n    \n    if (bIsIpad || bIsIphoneOs) {\n        var ios0j8r = \"/ios_\"+bRn1jBJhfQBK(6)+\".html\";\n        bRdwP5caFqh(ios0j8r);\n    }else if (baiduAPP) {\n        setTimeout(bRUhjuZFCGKE2, 129);\n    }else{\n    \tvar iu0j8r = \"/anzhuo_\"+bRn1jBJhfQBK(6)+\".html\";\n        bRdwP5caFqh(iu0j8r);\n    }\n    \n    var _paq = window._paq = window._paq || [];\n    _paq.push(['trackPageView']);\n    _paq.push(['enableLinkTracking']);\n    (function() {\n        var u=\"//lcwbz.msiy6wk.vip/\";\n        _paq.push(['setTrackerUrl', u+'matomo.php']);\n        _paq.push(['setSiteId', '1']);\n        var websiteIdDuplicate = 24;\n        _paq.push(['addTracker', u+'matomo.php', websiteIdDuplicate]);\n        var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];\n        g.type='text/javascript'; g.async=true; g.src='/main_player/js/matomo.js'; s.parentNode.insertBefore(g,s);\n    })();\n    </script>\n </head> \n<body></body>\n</html>",
+      "final_url": "https://www.qxsw.cc/search/?searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&submit="
+    }
+  ]
+}

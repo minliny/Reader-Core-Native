@@ -631,18 +631,48 @@
         "tests/fixtures/remote_source/legado_yodu_multirule_vertical.json",
         "tools/reader-cli/tests/fixture_vertical.rs:343"
       ]
+    },
+    {
+      "capability": "search-url-js-evaluation",
+      "evidence_status": "corpus-batch-v3",
+      "id": "rb-js-search-url-no-engine",
+      "mitigation": "Fix plan (priority: P0, blocks 56 sources at L2-search). Root cause: runtime JS classification (crates/reader-runtime/src/remote.rs:878-884) diverges from UrlDslParser's has_js_expression / options.js detection (crates/reader-content/src/analyze_url.rs:281-303, 372-376). For 56 sources (44 @js: + 12 <js>), the runtime routes to the non-JS AnalyzeUrl::build_request path (remote.rs:886) which returns AnalyzeUrlError::JsUnsupported, so build_request_with_js (analyze_url.rs:391-437) and pipeline.evaluate_url_js (crates/reader-content/src/lib.rs:1343-1370) are never invoked — the QuickJS engine (crates/reader-js/src/lib.rs:514) is bypassed. Fix: align runtime has_js classification with UrlDslParser classification so @js: / <js> search URLs route to build_request_with_js. Verification: re-run the 56 affected sources via reader-cli --test-source, L2-search must pass >=80%.",
+      "platform": "all",
+      "reason": "Corpus-batch-v3 (2026-06-28): 56 sources fail at L2-search with reason=js_unsupported. Breakdown: 44 sources use @js: prefix in searchUrl, 12 sources use <js>...</js> blocks. Core HAS a JS engine (QuickJS/rquickjs 0.8.1, vendored at third_party/rquickjs-sys-0.8.1/) and the JS search-URL path exists (AnalyzeUrl::build_request_with_js at crates/reader-content/src/analyze_url.rs:391-437, evaluate_url_js at crates/reader-content/src/lib.rs:1343-1370), but runtime dispatch (crates/reader-runtime/src/remote.rs:854-894) mis-classifies these URLs as non-JS and routes them to AnalyzeUrl::build_request which returns AnalyzeUrlError::JsUnsupported (analyze_url.rs:372-376). The 56 sources never reach the JS engine. All downstream levels (L3-detail/L4-toc/L5-content) skip. js_unsupported total = 96 (44 @js: + 12 <js> + 37 template + 3 other); this blocker covers the 56 explicit @js:/<js> search-URL sources.",
+      "severity": "high",
+      "sources": [
+        "reports/tooling/corpus-batch-v3.json",
+        "crates/reader-content/src/analyze_url.rs",
+        "crates/reader-runtime/src/remote.rs",
+        "crates/reader-js/src/lib.rs"
+      ]
+    },
+    {
+      "capability": "search-url-post-dsl",
+      "evidence_status": "corpus-batch-v3",
+      "id": "rb-search-url-post-dsl-unsupported",
+      "mitigation": "Investigation plan (priority: P1, blocks 31 sources at L2-search). POST DSL construction code exists (UrlDslParser::parse at crates/reader-content/src/analyze_url.rs:128-171, AnalyzeUrl::assemble at :439-515 auto-sets Content-Type for POST+body at :482-490, normalize_legado_json at :222-270) but 31 POST-DSL sources return empty books. Debug steps: (1) Capture the actual HostHttpRequest (method/headers/body/charset) produced for 3-5 sample POST DSL sources and diff against Legado AnalyzeUrl output for the same source. (2) Verify body template expansion (expand_static_templates at :657-666) substitutes {{key}}/{{page}} correctly for POST bodies. (3) Verify charset detection (content_type_charset at :592-599) for gbk/big5 sources. (4) Check whether response parsing silently returns empty books on non-200 or wrong Content-Type. Verification: re-run the 31 affected sources via reader-cli --test-source, L2-search must return >=1 book for >=80%.",
+      "platform": "all",
+      "reason": "Corpus-batch-v3 (2026-06-28): 31 sources with POST-method searchUrl + JSON body DSL fail at L2-search with reason=no_search_results (empty books array). POST DSL parsing code exists (UrlDslOptions.body/method at crates/reader-content/src/analyze_url.rs:24-43) and the request is assembled without error (not a construction-time failure), so the 31 sources return empty books — indicating POST body/charset/headers or response parsing is incorrect for these sources. Distinct from the 94 absolute-URL + 43 relative-GET no_search_results failures (168 total no_search_results, of which these 31 are POST DSL; the remaining 153 are likely network/keyword/site issues, not Core defects).",
+      "severity": "medium",
+      "sources": [
+        "reports/tooling/corpus-batch-v3.json",
+        "crates/reader-content/src/analyze_url.rs"
+      ]
     }
   ],
-  "generated_at": "2026-06-27T00:00:00Z",
+  "generated_at": "2026-06-28T00:00:00Z",
   "summary": {
-    "total": 50,
+    "total": 53,
     "resolved": 1,
     "by_severity": {
       "low": 44,
-      "medium": 6
+      "medium": 7,
+      "high": 1,
+      "blocker": 1
     },
     "by_platform": {
-      "all": 46,
+      "all": 49,
       "android": 2,
       "harmony": 2
     }

@@ -1,0 +1,46 @@
+{
+  "source_id": "corpus-3b0b2873ddcb",
+  "source_name": "新读小说（繁）",
+  "recorded_at": "1970-01-01T00:00:1782640706Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://m.dxs.tw/serch.html?siteid=m.dxs.tw&q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 403,
+      "response_headers": {
+        "accept-ch": "Sec-CH-UA-Bitness, Sec-CH-UA-Arch, Sec-CH-UA-Full-Version, Sec-CH-UA-Mobile, Sec-CH-UA-Model, Sec-CH-UA-Platform-Version, Sec-CH-UA-Full-Version-List, Sec-CH-UA-Platform, Sec-CH-UA, UA-Bitness, UA-Arch, UA-Full-Version, UA-Mobile, UA-Model, UA-Platform-Version, UA-Platform, UA",
+        "alt-svc": "h3=\":443\"; ma=86400",
+        "cf-mitigated": "challenge",
+        "cf-ray": "a12bd537eecf58d0-HKG",
+        "connection": "close",
+        "content-security-policy": "default-src 'none'; script-src 'nonce-aLr9YpyqRwBu7otJKgp8ip' 'unsafe-eval' https://challenges.cloudflare.com; script-src-attr 'none'; style-src 'unsafe-inline'; img-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; frame-src 'self' https://challenges.cloudflare.com blob:; child-src 'self' https://challenges.cloudflare.com blob:; worker-src blob:; form-action http: https:; base-uri 'self'",
+        "content-type": "text/html; charset=UTF-8",
+        "critical-ch": "Sec-CH-UA-Bitness, Sec-CH-UA-Arch, Sec-CH-UA-Full-Version, Sec-CH-UA-Mobile, Sec-CH-UA-Model, Sec-CH-UA-Platform-Version, Sec-CH-UA-Full-Version-List, Sec-CH-UA-Platform, Sec-CH-UA, UA-Bitness, UA-Arch, UA-Full-Version, UA-Mobile, UA-Model, UA-Platform-Version, UA-Platform, UA",
+        "cross-origin-embedder-policy": "require-corp",
+        "cross-origin-opener-policy": "same-origin",
+        "cross-origin-resource-policy": "same-origin",
+        "date": "Sun, 28 Jun 2026 09:58:25 GMT",
+        "expect-ct": "max-age=86400, enforce",
+        "nel": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}",
+        "origin-agent-cluster": "?1",
+        "permissions-policy": "accelerometer=(),camera=(),clipboard-read=(),clipboard-write=(),geolocation=(),gyroscope=(),hid=(),magnetometer=(),microphone=(),payment=(),publickey-credentials-get=(),screen-wake-lock=(),serial=(),sync-xhr=(),usb=(),xr-spatial-tracking=*",
+        "referrer-policy": "same-origin",
+        "report-to": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=0IWJ3KtkPtaqwkC4c1gH%2BDOpPCAftfMxCrf9jzCOp2YX3DZFxbJMy7bjKVAM5116FHuXt1jPFBCyUuul8mUzBOgDW0Ksql%2BBs2mFLClOz5%2FXTcGh5CjTCYt9QQ%3D%3D\"}]}",
+        "server": "cloudflare",
+        "server-timing": "chlray;desc=\"a12bd537eecf58d0\"",
+        "transfer-encoding": "chunked",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "SAMEORIGIN",
+        "x-xss-protection": "1; mode=block"
+      },
+      "response_body": "<!DOCTYPE html><html lang=\"en-US\"><head><title>Just a moment...</title><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\"><meta http-equiv=\"X-UA-Compatible\" content=\"IE=Edge\"><meta name=\"robots\" content=\"noindex,nofollow\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta http-equiv=\"content-security-policy\" content=\"default-src &#39;none&#39;; script-src &#39;nonce-aLr9YpyqRwBu7otJKgp8ip&#39; &#39;unsafe-eval&#39; https://challenges.cloudflare.com; script-src-attr &#39;none&#39;; style-src &#39;unsafe-inline&#39;; img-src &#39;self&#39; https://challenges.cloudflare.com; connect-src &#39;self&#39; https://challenges.cloudflare.com; frame-src &#39;self&#39; https://challenges.cloudflare.com blob:; child-src &#39;self&#39; https://challenges.cloudflare.com blob:; worker-src blob:; form-action http: https:; base-uri &#39;self&#39;\"><style>*{box-sizing:border-box;margin:0;padding:0}html{line-height:1.15;-webkit-text-size-adjust:100%;color:#313131;font-family:system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,\"Noto Sans\",sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\",\"Segoe UI Symbol\",\"Noto Color Emoji\"}body{display:flex;flex-direction:column;height:100vh;min-height:100vh}.main-content{margin:8rem auto;padding-left:1.5rem;max-width:60rem}@media (width <= 720px){.main-content{margin-top:4rem}}#challenge-error-text{background-image:url(\"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgZmlsbD0ibm9uZSI+PHBhdGggZmlsbD0iI0IyMEYwMyIgZD0iTTE2IDNhMTMgMTMgMCAxIDAgMTMgMTNBMTMuMDE1IDEzLjAxNSAwIDAgMCAxNiAzbTAgMjRhMTEgMTEgMCAxIDEgMTEtMTEgMTEuMDEgMTEuMDEgMCAwIDEtMTEgMTEiLz48cGF0aCBmaWxsPSIjQjIwRjAzIiBkPSJNMTcuMDM4IDE4LjYxNUgxNC44N0wxNC41NjMgOS41aDIuNzgzem0tMS4wODQgMS40MjdxLjY2IDAgMS4wNTcuMzg4LjQwNy4zODkuNDA3Ljk5NCAwIC41OTYtLjQwNy45ODQtLjM5Ny4zOS0xLjA1Ny4zODktLjY1IDAtMS4wNTYtLjM4OS0uMzk4LS4zODktLjM5OC0uOTg0IDAtLjU5Ny4zOTgtLjk4NS40MDYtLjM5NyAxLjA1Ni0uMzk3Ii8+PC9zdmc+\");background-repeat:no-repeat;background-size:contain;padding-left:34px}</style><meta http-equiv=\"refresh\" content=\"360\"></head><body><div class=\"main-wrapper\" role=\"main\"><div class=\"main-content\"><noscript><div class=\"h2\"><span id=\"challenge-error-text\">Enable JavaScript and cookies to continue</span></div></noscript></div></div><script nonce=\"aLr9YpyqRwBu7otJKgp8ip\">(function(){window._cf_chl_opt = {cFPWv: 'b',cH: '.BIFzpmq8TltF0B3sBVkYXR0Z7.hUUuo8voV207PFaY-1782640705-1.2.1.1-zXt.UwZVzNpUlgfnFCgf5lqq7WttECOmlFhPOOB4TnN02aJb834W2knGqOQLyK0X',cITimeS: '1782640705',cN: 'aLr9YpyqRwBu7otJKgp8ip',cRay: 'a12bd537eecf58d0',cTplB: '0',cTplC:0,cTplO:0,cTplV:5,cType: 'managed',cUPMDTk:\"/serch.html?siteid=m.dxs.tw\\u0026q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9\\u0026page=1\\u0026__cf_chl_tk=CmA7bTQG9Dn1TTU0DEMPBWEdXgPx4bd5NERz_veb1vk-1782640705-1.0.1.1-i6rxiW6tUCMenvzedmVzt5.iD22XoGZ8Py5xjytDIiE\",cvId: '3',cZone: 'm.dxs.tw',fa:\"/serch.html?siteid=m.dxs.tw\\u0026q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9\\u0026page=1\\u0026__cf_chl_f_tk=CmA7bTQG9Dn1TTU0DEMPBWEdXgPx4bd5NERz_veb1vk-1782640705-1.0.1.1-i6rxiW6tUCMenvzedmVzt5.iD22XoGZ8Py5xjytDIiE\",md: 'dTT4HC4OYe6TvhSlBKUiUm3qwSAubn5criBU8zNq..E-1782640705-1.2.1.1-MBkT0pCjMPGzCXVcWdvGEPbushrRWy286luom0jlEQ5TVHr3tac38AXEC5QspVIyTPJ9HkQX.MA_o5awhv_PqBEqCQ4qeaoSoBUSWcz._MsEnqmbRBAN.oF7Dg9djfxrAFp1eiC7z_i2f2sWRIN0QfjnmvZ.l8AR0D6JGwvytHoCbM5I68gwWdAajI_A9Y8xyPKBl_p6v8Hs8Sm72RHMcycEIHoR5zXm22kCQfGwzAwhOD.4IBegd3rtDeKCrhloCCXfZMUU2w7qTfy9Gm3FFaS01nTBpcVLWaDOOC73zQ923SrcLBARGIl8GI8lMl2Gix74o68aLzlOHKDALiyG4HJ90WHjRQ8wKII5LT2E2G_ZWuGYa_H5ifY6l8Ll8O0CCIIoS72tAfV2GZeaAUHq1lvmD4n4757UCsWJTcU1uGDaBoHv8SN4slERF6ZQKGeiiVm9bdzagTCIt6hkssnjXzNzPqIpsShNN8cHQ.QzemCla7bGN_I4Hwct2gcdz9R7ooFtAFqyX8FrRUME9lvK4Y7HSJCu_rVW65L.jP6pTJBazMNtZG3ir953Mytw3tOGqFL0gfwTgGDgtuzG_vav3mZa6e1jBBZ2eTaOaLICQ1_0lrpUAtUuyjjYkzK.AX_tYGtrs6PkHr_okAmntUrQmAdVx30wX34XnflSTZ0YvnmnXhBKYybaLlUFcuGiA2Mzi_EO4.CjEHRA9kOj5o5GJjn75PnFP4EUMCOVgJYEHYtqB5M921r0TIP.N7EvKO_B0mA9n7WRfzZQtXrsEkfKu2Vg7eALwHitPiLEmqt0mnC3LcwtdYMf1cVcvjAMIWJ0eAkH9328VdCPMRE3BrmiJ98nglqU91jGD2cu2DqapNqd5ptiQ8yYxJrEDPeHoCzjslriIFrmT_D2LYgHrYVShxn1MYWPRlF66eY_so7LwlL9ysonOJG.RSjA6OrpVbWwAup9Fj6EW_aU4QySovfrjgxMvzXyBKj7LmVtama1IWcjBpcvywuJR8Z89RzPlze4vbECooxds90QFLsT5LfPj7H3ezTY7onEp6mwICz1hBt0Vk0BKSGQqWIvqkbfPsMLCUrkQp08tvRg34Y88EBnugKcsl1ebiyD.QZOhmPMzhLvcmsJpelZ0QoeVIeCYZi__NWAcjMMNvywV9gweNNWUkZ.SS9DSoaBvAz12mTk_ZxYvzO3idUabSaZ1ma8UaybAaifKvj4ByYKbPP47Autqhw3hNjr.Ft1bgeSdcfu0TI3DhSRaMflwAFC.Xltt8t9Dpg4v_CVtB9VIXs8ZBKEeg',mdrd: 'rsfeXtQ.qxVDmuVQM5Kfb7O5lAI29hDhn7bnKWM9dsQ-1782640705-1.2.1.1-trqpT1pxpu6zGA8I9LR1zP8ONwfgF04VFiHQ4x7SH1swMYMBnksCyb80DDwOv1oplfgK.v5YiSPFCVFgfM9Whpu47pfXOwfZsiq.MhvOvhcLGt2fnTHFljvXHkVWNrzsXiB9llFzvcNv1eFygiJLq04EGohddEEZ5s09FJWjdd7axwUW.GKZUBYhgvo6OsRr6PXS0uU59oVdWLMoXO3ULQ7BMhj2CrBTn4I1wX.jsRJFNj4.45gEN_6u2j3fnI_SYxPMaLunLwAnkKMf7LX9Zy_QpjydaTyP8GyD_r16lMx5JSByMVgGIwYeFDjzGjmYqG1IWQeZxLxJLUFdCIY_8n2c9m8ILsA3y_TCj9oIfV4',};var a = document.createElement('script');a.nonce = 'aLr9YpyqRwBu7otJKgp8ip';a.src = '/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1?ray=a12bd537eecf58d0';window._cf_chl_opt.cOgUHash = location.hash === '' && location.href.indexOf('#') !== -1 ? '#' : location.hash;window._cf_chl_opt.cOgUQuery = location.search === '' && location.href.slice(0, location.href.length - window._cf_chl_opt.cOgUHash.length).indexOf('?') !== -1 ? '?' : location.search;if (window.history && window.history.replaceState) {var ogU = location.pathname + window._cf_chl_opt.cOgUQuery + window._cf_chl_opt.cOgUHash;history.replaceState(null, null,\"/serch.html?siteid=m.dxs.tw\\u0026q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9\\u0026page=1\\u0026__cf_chl_rt_tk=CmA7bTQG9Dn1TTU0DEMPBWEdXgPx4bd5NERz_veb1vk-1782640705-1.0.1.1-i6rxiW6tUCMenvzedmVzt5.iD22XoGZ8Py5xjytDIiE\"+ window._cf_chl_opt.cOgUHash);a.onload = function() {history.replaceState(null, null, ogU);}}document.getElementsByTagName('head')[0].appendChild(a);}());</script></body></html>",
+      "final_url": "https://m.dxs.tw/serch.html?siteid=m.dxs.tw&q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1"
+    }
+  ]
+}

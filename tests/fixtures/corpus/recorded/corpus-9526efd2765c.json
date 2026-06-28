@@ -1,7 +1,7 @@
 {
   "source_id": "corpus-9526efd2765c",
   "source_name": "速读谷吧（优）",
-  "recorded_at": "1970-01-01T00:00:1782579772Z",
+  "recorded_at": "1970-01-01T00:00:1782639988Z",
   "keyword": "斗破苍穹",
   "steps": [
     {
@@ -15,10 +15,10 @@
       "response_status": 200,
       "response_headers": {
         "cache-control": "private",
-        "content-length": "3098",
         "content-type": "text/html; charset=utf-8",
-        "date": "Sat, 27 Jun 2026 17:02:43 GMT",
+        "date": "Sun, 28 Jun 2026 09:46:04 GMT",
         "server": "Microsoft-IIS/10.0",
+        "vary": "Accept-Encoding",
         "x-aspnet-version": "4.0.30319",
         "x-powered-by": "ASP.NET"
       },
@@ -36,10 +36,10 @@
       "response_status": 200,
       "response_headers": {
         "cache-control": "private",
-        "content-length": "73846",
         "content-type": "text/html; charset=utf-8",
-        "date": "Sat, 27 Jun 2026 17:02:44 GMT",
+        "date": "Sun, 28 Jun 2026 09:46:06 GMT",
         "server": "Microsoft-IIS/10.0",
+        "vary": "Accept-Encoding",
         "x-aspnet-version": "4.0.30319",
         "x-powered-by": "ASP.NET"
       },
@@ -57,10 +57,10 @@
       "response_status": 200,
       "response_headers": {
         "cache-control": "private",
-        "content-length": "73846",
         "content-type": "text/html; charset=utf-8",
-        "date": "Sat, 27 Jun 2026 17:02:49 GMT",
+        "date": "Sun, 28 Jun 2026 09:46:11 GMT",
         "server": "Microsoft-IIS/10.0",
+        "vary": "Accept-Encoding",
         "x-aspnet-version": "4.0.30319",
         "x-powered-by": "ASP.NET"
       },

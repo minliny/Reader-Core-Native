@@ -1,0 +1,35 @@
+{
+  "source_id": "corpus-ab9e1bbc3705",
+  "source_name": "趣悦小说（优++）",
+  "recorded_at": "1970-01-01T00:00:1782639348Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://vreader.vivo.com.cn/book/search.do",
+      "method": "POST",
+      "request_headers": {
+        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": "{\"model\":\"MI PAD 4\",\"imei\":\"123456789012345\",\"clientVersion\":\"121020\",\"elapsedtime\":\"343343\",\"sysver\":\"\",\"nt\":\"wifi\",\"ver\":\"121020\",\"u\":\"\",\"pver\":\"0\",\"resolution\":\"1920*1200\",\"bookVersion\":\"30800\",\"vreaderVersion\":121020,\"pixel\":\"320\",\"av\":\"27\",\"adrVerName\":\"8.1.0\",\"timestamp\":\"1675854786926\",\"openudid\":\"b443cebc6f614746\",\"udid\":\"\",\"channel\":\"0\",\"personalRecommend\":1,\"bookshelfBookIds\":[],\"bookShelfListenBookIds\":[],\"packageName\":\"com.vivo.vreader\",\"featureValues\":\"2\",\"androidId\":\"b443cebc6f614746\",\"page\":0,\"size\":20,\"keyword\":\"%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9\",\"tab\":0}",
+      "response_status": 200,
+      "response_headers": {
+        "access-control-allow-credentials": "true",
+        "access-control-allow-headers": "Content-Type,Authorization,Accept,Origin,X-Requested-With,Cookie",
+        "access-control-allow-methods": "HEAD,GET,POST,PUT,DELETE,OPTIONS",
+        "connection": "keep-alive",
+        "content-type": "application/json;charset=UTF-8",
+        "date": "Sun, 28 Jun 2026 09:35:48 GMT",
+        "server": "nginx",
+        "tc_ann": "bookstore-api",
+        "tc_traceid": "4cea0a66a37bp17826393481639057",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding",
+        "x-xss-protection": "1; mode=block"
+      },
+      "response_body": "{\"thirdPartyCode\":2,\"code\":10001,\"msg\":\"小说搜索关键字为空！\"}",
+      "final_url": "https://vreader.vivo.com.cn/book/search.do"
+    }
+  ]
+}

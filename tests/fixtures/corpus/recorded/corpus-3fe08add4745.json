@@ -1,0 +1,30 @@
+{
+  "source_id": "corpus-3fe08add4745",
+  "source_name": "百度知道（优）",
+  "recorded_at": "1970-01-01T00:00:1782641958Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://zhidao.baidu.com/msearch/ajax/getsearchlist?word=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&pn=10",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "access-control-allow-headers": "X-ik-ssl,X-ik-token,X-ik-utdata,X-ik-appid,X-ik-cuid,X-ik-fc,X-swan-version,X-ik-tries,X-fail,X-ik-appversion,X-ik-appname,Content-Type,SWAN_UPGRADE_CHECK",
+        "connection": "keep-alive",
+        "content-type": "application/json; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 10:19:18 GMT",
+        "not-try": "0",
+        "server": "nginx",
+        "set-cookie": "ZD_ENTRY=empty; path=/; domain=.baidu.com",
+        "wait": "2"
+      },
+      "response_body": "{\"errno\":505,\"data\":{\"msg\":\"return data is null!\"}}",
+      "final_url": "https://zhidao.baidu.com/msearch/ajax/getsearchlist?word=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&pn=10"
+    }
+  ]
+}

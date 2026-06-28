@@ -1,0 +1,27 @@
+{
+  "source_id": "corpus-f65061510c32",
+  "source_name": "爱下电子（繁）",
+  "recorded_at": "1970-01-01T00:00:1782640703Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://ixdzs.tw/bsearch?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 403,
+      "response_headers": {
+        "connection": "keep-alive",
+        "content-length": "619",
+        "content-type": "text/html",
+        "date": "Sun, 28 Jun 2026 09:58:22 GMT",
+        "server": "Tengine/2.3.2"
+      },
+      "response_body": "<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">\r\n<html>\r\n<head><title>403 Forbidden</title></head>\r\n<body>\r\n<center><h1>403 Forbidden</h1></center>\r\n Sorry for the inconvenience.<br/>\r\nPlease report this message and include the following information to us.<br/>\r\nThank you very much!</p>\r\n<table>\r\n<tr>\r\n<td>URL:</td>\r\n<td>https://ixdzs.tw/bsearch?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9</td>\r\n</tr>\r\n<tr>\r\n<td>Server:</td>\r\n<td>li1836-22.members.linode.com</td>\r\n</tr>\r\n<tr>\r\n<td>Date:</td>\r\n<td>2026/06/28 17:58:22</td>\r\n</tr>\r\n</table>\r\n<hr/>Powered by Tengine/2.3.2<hr><center>tengine</center>\r\n</body>\r\n</html>\r\n",
+      "final_url": "https://ixdzs.tw/bsearch?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+    }
+  ]
+}

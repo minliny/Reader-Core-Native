@@ -1,0 +1,33 @@
+{
+  "source_id": "corpus-4c45765b0884",
+  "source_name": "独步小说（优+）",
+  "recorded_at": "1970-01-01T00:00:1782639730Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://www.dbxsd.com/plus/search.php?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "alt-svc": "h3=\":443\"; ma=86400",
+        "cf-cache-status": "DYNAMIC",
+        "cf-ray": "a12bbd6c3ecdc10b-LAX",
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 09:42:10 GMT",
+        "nel": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}",
+        "report-to": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=87lXS%2FAyw%2FQnY4JYy7XM5Qxlg5AKp%2BKBebvfNtqvEpafY5cqMI0ro%2FjIMYz4oyRmJ3Rh7wW8OuMuwU0DiSuEixbX4sq60Sprzf%2F%2FM19eM%2BBK8tN1W4nW64BfmdyEwPoI\"}]}",
+        "server": "cloudflare",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding"
+      },
+      "response_body": " \r\n\n<!DOCTYPE html>\n<html lang=\"zh-CN\">\n  <head>\n    <meta charset=\"utf-8\">\n    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n    <title>搜索：斗破苍穹 结果记录</title>\n    <link href=\"/static/css/bootstrap.min.css\" rel=\"stylesheet\">\n\t<link href=\"/static/css/font-awesome.min.css\" rel=\"stylesheet\" >\n\t<link href=\"/static/css/base.css\" rel=\"stylesheet\">\n\t<script src=\"/static/js/action.js\"></script>\n\t<!--[if lt IE 9]>\n      <script src=\"/static/js/html5shiv.min.js\"></script>\n      <script src=\"/static/js/respond.min.js\"></script>\n    <![endif]-->\n\n    \n  </head>\n  <body>\n    <div class=\"top\">\n\t<div class=\"container\">\n    \t<div class=\"logo-name\"><a href=\"/\">独步小说网</a></div>\n        <div class=\"float-right\"><script>play(\"lan\")</script></div>\n    </div>\n</div>\n<div class=\"container\">\n\t      <div class=\"search row\">\n        <div class=\"col-sm-4 col-xs-12\">\n          <form id=\"search-form\" action=\"/plus/search.php\">\n            <div class=\"input-group\">\n              <input type=\"text\" class=\"form-control\" placeholder=\"请输入书名\" id=\"bdcsMain\" name=\"q\" />\n              <div class=\"input-group-addon\" onclick=\"search();\"><span class=\"fa fa-search\"></span></div>\n            </div>\n          </form>\n        </div>\n\t\t<div class=\"col-sm-2 hidden-xs\">\n          \n        </div>\n        <div class=\"col-sm-6 hidden-xs\">\n         \n        </div>\n      </div>\n</div>\n    <div class=\"container\">\n        <div class=\"panel panel-info\">\n          <div class=\"panel-heading\">\n            <h1 class=\"panel-title\">搜索含有“<strong style=\"color: red;\">斗破苍穹</strong>”的书籍</h1>\n          </div>\n          <div class=\"panel-body\">\n            <table class=\"table table-condensed\">\n              <thead>\n                <tr>\n                  <th>书名</th>\n                  <th>作者</th>\n                  <th>下载</th>\n                </tr> \n              </thead>\n              <tbody>                <tr>\n                  <td><a href=\"/book/p1125/\" title=\"斗破之马气大陆（斗破苍穹之马气大陆）\" target=\"_blank\" class=\"orange\">《斗破之马气大陆（斗破苍穹之马气大陆）》</a></td>\n                  <td>江南夜色下</td>\n                  <td><a href=\"/txt/1125.html\" target=\"_blank\">TXT下载</a></td>\n                </tr>                <tr>\n                  <td><a href=\"/book/p6561/\" title=\"斗破苍穹前传之药老传奇\" target=\"_blank\" class=\"orange\">《斗破苍穹前传之药老传奇》</a></td>\n                  <td>天蚕土豆</td>\n                  <td><a href=\"/txt/6561.html\" target=\"_blank\">TXT下载</a></td>\n                </tr>                <tr>\n                  <td><a href=\"/book/p14228/\" title=\"斗破苍穹\" target=\"_blank\" class=\"orange\">《斗破苍穹》</a></td>\n                  <td>天蚕土豆</td>\n                  <td><a href=\"/txt/14228.html\" target=\"_blank\">TXT下载</a></td>\n                </tr>\n              </tbody>\n            </table>\n          </div>\n        </div>\n    </div>\n    <!-- Footer Begin -->\n<div class=\"footer\">\n  <div class = \"container\">\n    \n    <p class = \"hidden-xs\">如果版权人认为在本站放置您的作品有损您的利益，请发邮件至<script>play(\"email\")</script>，本站确认后将会无条件删除。</p>\n    <p class = \"hidden-xs\">本站所收录作品、社区话题、书库评论均属其个人行为，不代表本站立场。</p>\n    <p>有能力者，请一定订阅和购买正版书籍支持作者，这样作者才能写出更多更好的书！</p>\n    <p class = \"hidden-xs\">\n      <script>play(\"tongji\")</script> \n    </p>\n  </div>\n</div>\n<div class=\"fixed-btn\">\n    <a class=\"go-top\" href=\"javascript:void(0)\" title=\"返回顶部\"> <i class=\"fa fa-angle-up\"></i></a>\n</div>\n<!-- Footer End --> \n<script src=\"/static/js/jquery.min.js\"></script> \n<script src=\"/static/js/bootstrap.min.js\"></script> \n<script src=\"/static/js/comm.js\"></script>\n  </body>\n</html>",
+      "final_url": "https://www.dbxsz.com/plus/search.php?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+    }
+  ]
+}

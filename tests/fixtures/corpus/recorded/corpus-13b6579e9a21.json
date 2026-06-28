@@ -1,0 +1,36 @@
+{
+  "source_id": "corpus-13b6579e9a21",
+  "source_name": "百度网盘（优++）",
+  "recorded_at": "1970-01-01T00:00:1782641939Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://pan.baidu.com/api/search?clienttype=0&order=time&desc=1&num=100&page=1&recursion=1&key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "connection": "keep-alive",
+        "content-type": "application/json",
+        "date": "Sun, 28 Jun 2026 10:18:58 GMT",
+        "flow-level": "3",
+        "http-x-isis-logid": "8757708872828951263",
+        "logid": "8757708872828951263",
+        "p3p": "CP=\" OTI DSP COR IVA OUR IND COM \"",
+        "remote-ip": "pan.baidu.com",
+        "server": "nginx",
+        "set-cookie": "BAIDUID=28544AEB50E3CA2E3AC5F0BC0E2BD761:FG=1; expires=Mon, 28-Jun-27 10:18:58 GMT; max-age=31536000; path=/; domain=.baidu.com; version=1",
+        "vary": "Accept-Encoding",
+        "x-powered-by": "BaiduCloud",
+        "yld": "8757708872828951263",
+        "yme": "ZIGW/ikrXE4WdTcHSnb+qnFIuf8ATwPrrgZFwSCDmA=="
+      },
+      "response_body": "{\"errno\":-6,\"list\":[],\"request_id\":8757708872828951263,\"has_more\":0,\"display_count\":0,\"need_ai_search\":false}",
+      "final_url": "https://pan.baidu.com/api/search?clienttype=0&order=time&desc=1&num=100&page=1&recursion=1&key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+    }
+  ]
+}

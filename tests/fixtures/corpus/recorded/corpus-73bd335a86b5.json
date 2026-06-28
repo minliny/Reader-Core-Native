@@ -1,0 +1,24 @@
+{
+  "source_id": "corpus-73bd335a86b5",
+  "source_name": "全本小说（优++）",
+  "recorded_at": "1970-01-01T00:00:1782639347Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "http://119.45.176.116:5006/getsearchlist?keyWord=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 500,
+      "response_headers": {
+        "content-length": "265",
+        "content-type": "text/html; charset=utf-8"
+      },
+      "response_body": "<!doctype html>\n<html lang=en>\n<title>500 Internal Server Error</title>\n<h1>Internal Server Error</h1>\n<p>The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.</p>\n",
+      "final_url": "http://119.45.176.116:5006/getsearchlist?keyWord=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+    }
+  ]
+}

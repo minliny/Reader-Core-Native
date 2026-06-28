@@ -1,0 +1,28 @@
+{
+  "source_id": "corpus-239a4e859ca1",
+  "source_name": "潇社音乐（优+）",
+  "recorded_at": "1970-01-01T00:00:1782641763Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "http://fuciyuanbang.ciyuans.com/fuciyuanphp/search.php?act=search&type=music&key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&pagenum=1&plat=ar&ver=1.5.7.0&did=&sid=&channel=vivo&app=FuCiYuan&source=kon&iscover=false&forb=0&newu=1&appt=0&loginuid=0",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "connection": "close",
+        "content-type": "text/html; charset=UTF-8",
+        "date": "Sun, 28 Jun 2026 10:16:03 GMT",
+        "server": "Tengine/2.3.2",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding"
+      },
+      "response_body": "{\"success\":\"ok\",\"result\":{\"pages\":1,\"currentpage\":1,\"list\":[{\"id\":\"1340133\",\"uid\":\"143889\",\"uname\":\"次元酱\",\"upic\":\"http:\\/\\/fuciyuanuserpic.fuciyuan7.com\\/userdefault.png\",\"des\":\"您的版本不再维护，更多轻音请在应用市场下载最新版<轻音社>\",\"artist\":\"轻音社官方\",\"title\":\"轻音社\",\"prefer\":\"27\",\"dur\":\"247\",\"url\":\"http://uploadanimtt.fuciyuan7.com/music/20200911/14/7661061438891.mp3\",\"thumb\":\"http://uploadanimtt.fuciyuan7.com/music/20200911/14/thumb/7661061438891.png?x-oss-process=style/thumb\"}]}}",
+      "final_url": "http://fuciyuanbang.ciyuans.com/fuciyuanphp/search.php?act=search&type=music&key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&pagenum=1&plat=ar&ver=1.5.7.0&did=&sid=&channel=vivo&app=FuCiYuan&source=kon&iscover=false&forb=0&newu=1&appt=0&loginuid=0"
+    }
+  ]
+}
