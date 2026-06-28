@@ -592,11 +592,13 @@ pub fn test_source(config: &TestSourceConfig) -> SourceTestResult {
                 .and_then(Value::as_str)
                 .unwrap_or("")
                 .to_string();
-            if content.is_empty() {
+            // L5 通过条件: content >50 字符(对照 AGENTS.md 5 级通过定义).
+            // 旧实现仅判 is_empty(),无法识别"返回但内容过短"的假通过.
+            if content.chars().count() <= 50 {
                 result
                     .levels
-                    .insert("L5-content".into(), LevelResult::fail("empty_content"));
-                result.failure_reason = Some("empty_content".into());
+                    .insert("L5-content".into(), LevelResult::fail("content_too_short"));
+                result.failure_reason = Some("content_too_short".into());
             } else {
                 result
                     .levels
