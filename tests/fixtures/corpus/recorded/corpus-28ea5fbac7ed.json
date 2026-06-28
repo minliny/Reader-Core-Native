@@ -1,0 +1,82 @@
+{
+  "source_id": "corpus-28ea5fbac7ed",
+  "source_name": "安轻小说",
+  "recorded_at": "1970-01-01T00:00:1782644950Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://m.sfacg.com/API/HTML5.ashx?op=search&keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "cache-control": "private",
+        "connection": "keep-alive",
+        "content-type": "text/html; charset=utf-8",
+        "date": "Sun, 28 Jun 2026 11:08:54 GMT",
+        "server": "nginx",
+        "set-cookie": "msearch2=%e6%96%97%e7%a0%b4%e8%8b%8d%e7%a9%b9; expires=Tue, 28-Jul-2026 11:08:54 GMT; path=/",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding",
+        "x-aspnet-version": "4.0.30319",
+        "x-powered-by": "ASP.NET"
+      },
+      "response_body": "{\"Status\":200,\"Novels\":[{\"NovelName\":\"斗破苍穹之魂玉\",\"AuthorName\":\"赤月之瞳\",\"TypeName\":\"玄幻\",\"Point\":9.1,\"NovelCover\":\"2019/10/068aa7df-fc2f-45b4-b6db-29738e6e6ace.jpg\",\"NovelID\":249775,\"Tags\":null},{\"NovelName\":\"斗破苍穹之冰雪绝恋\",\"AuthorName\":\"溯源轮回\",\"TypeName\":\"玄幻\",\"Point\":9.0,\"NovelCover\":\"2019/06/ec48160f-742a-4a05-af94-4b34303869d9.jpg\",\"NovelID\":136931,\"Tags\":null},{\"NovelName\":\"斗破苍穹之魂清\",\"AuthorName\":\"江韶云\",\"TypeName\":\"玄幻\",\"Point\":10.0,\"NovelCover\":\"2020/11/2297cb03-f1d8-4b7e-90e9-14c0f1bb013c.jpg\",\"NovelID\":392410,\"Tags\":null},{\"NovelName\":\"re斗破苍穹\",\"AuthorName\":\"玄幻之狂龙\",\"TypeName\":\"玄幻\",\"Point\":7.7,\"NovelCover\":\"2022/02/5ec255f1-ced0-4ee1-874d-b4f9298c2474.jpg\",\"NovelID\":142361,\"Tags\":null},{\"NovelName\":\"斗破苍穹之火凤凰\",\"AuthorName\":\"笛i\",\"TypeName\":\"玄幻\",\"Point\":10.0,\"NovelCover\":\"2020/05/f5e10c17-3df9-4414-997c-31ed4faaca3a.jpg\",\"NovelID\":330749,\"Tags\":null},{\"NovelName\":\"斗破苍穹之倾心于你\",\"AuthorName\":\"乾曙螖螸\",\"TypeName\":\"同人\",\"Point\":7.0,\"NovelCover\":\"2021/07/d1612376-bef7-41f0-afa3-7f0b4424205e.jpg\",\"NovelID\":469726,\"Tags\":null},{\"NovelName\":\"我用方舟角色穿越斗破苍穹\",\"AuthorName\":\"米哈游咩\",\"TypeName\":\"玄幻\",\"Point\":6.0,\"NovelCover\":\"2021/12/9a8bf1ea-2009-4b88-922d-a73e37f035e2.jpg\",\"NovelID\":506403,\"Tags\":null},{\"NovelName\":\"斗破蒼穹之逆天改命\",\"AuthorName\":\"玄宇天\",\"TypeName\":\"魔幻\",\"Point\":5.6,\"NovelCover\":\"2018/05/8c431f0e-035b-4262-ba0a-819f0d000acb.jpg\",\"NovelID\":96856,\"Tags\":null},{\"NovelName\":\"重生在斗破苍穹\",\"AuthorName\":\"帝鼠\",\"TypeName\":\"玄幻\",\"Point\":7.0,\"NovelCover\":\"defaultNew.jpg\",\"NovelID\":165659,\"Tags\":null},{\"NovelName\":\"琪亚娜在斗破苍穹\",\"AuthorName\":\"食蜂操祈4C\",\"TypeName\":\"玄幻\",\"Point\":6.0,\"NovelCover\":\"2021/11/bdbcafda-e7d7-463a-8933-9b560ec18dee.jpg\",\"NovelID\":504964,\"Tags\":null},{\"NovelName\":\"斗破苍穹：从怒怼网瘾少女开始\",\"AuthorName\":\"飞好71\",\"TypeName\":\"玄幻\",\"Point\":6.0,\"NovelCover\":\"2024/11/1d665744-39fb-4045-b497-83c0b30dfcb4.jpg\",\"NovelID\":725834,\"Tags\":null},{\"NovelName\":\"斗破苍穹之纳兰天凤\",\"AuthorName\":\"荣耀十绝\",\"TypeName\":\"同人\",\"Point\":6.0,\"NovelCover\":\"2022/09/2e49db1a-2760-4dd4-a3a8-ce9b0c73db45.jpg\",\"NovelID\":591621,\"Tags\":null},{\"NovelName\":\"斗破苍穹之仙帝降临\",\"AuthorName\":\"执掌诸天\",\"TypeName\":\"玄幻\",\"Point\":6.0,\"NovelCover\":\"2021/12/b9634ed8-5554-4c68-a843-7eb6129f82e3.jpg\",\"NovelID\":509390,\"Tags\":null},{\"NovelName\":\"斗破苍穹之幻梦双星\",\"AuthorName\":\"海侓迦娜\",\"TypeName\":\"同人\",\"Point\":6.0,\"NovelCover\":\"2021/10/9f952c55-173c-4df3-82ee-beafaee117b5.jpg\",\"NovelID\":494782,\"Tags\":null},{\"NovelName\":\"斗破苍穹之魂珏\",\"AuthorName\":\"心塞紫荆\",\"TypeName\":\"玄幻\",\"Point\":6.0,\"NovelCover\":\"defaultNew.jpg\",\"NovelID\":685910,\"Tags\":null}]}",
+      "final_url": "https://m.sfacg.com/API/HTML5.ashx?op=search&keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+    },
+    {
+      "level": "L3-detail",
+      "url": "https://minipapi.sfacg.com/pas/mpapi/novels/249775?expand=latestchapter,chapterCount,typeName,intro,fav,ticket,pointCount,tags,sysTags,signlevel,discount,discountExpireDate,totalNeedFireMoney,originTotalNeedFireMoney",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 401,
+      "response_headers": {
+        "cache-control": "no-cache",
+        "connection": "keep-alive",
+        "content-type": "application/json;charset=utf-8",
+        "date": "Sun, 28 Jun 2026 11:09:08 GMT",
+        "expires": "-1",
+        "pragma": "no-cache",
+        "server": "nginx",
+        "transfer-encoding": "chunked",
+        "vary": "Origin",
+        "x-aspnet-version": "4.0.30319",
+        "x-powered-by": "ASP.NET"
+      },
+      "response_body": "{\"status\":{\"httpCode\":401,\"errorCode\":507,\"msgType\":0,\"msg\":\"没有访问接口的权限\"},\"data\":null}",
+      "final_url": "https://minipapi.sfacg.com/pas/mpapi/novels/249775?expand=latestchapter,chapterCount,typeName,intro,fav,ticket,pointCount,tags,sysTags,signlevel,discount,discountExpireDate,totalNeedFireMoney,originTotalNeedFireMoney"
+    },
+    {
+      "level": "L4-toc",
+      "url": "https://minipapi.sfacg.com/pas/mpapi/novels/249775?expand=latestchapter,chapterCount,typeName,intro,fav,ticket,pointCount,tags,sysTags,signlevel,discount,discountExpireDate,totalNeedFireMoney,originTotalNeedFireMoney",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 401,
+      "response_headers": {
+        "cache-control": "no-cache",
+        "connection": "keep-alive",
+        "content-type": "application/json;charset=utf-8",
+        "date": "Sun, 28 Jun 2026 11:09:10 GMT",
+        "expires": "-1",
+        "pragma": "no-cache",
+        "server": "nginx",
+        "transfer-encoding": "chunked",
+        "vary": "Origin",
+        "x-aspnet-version": "4.0.30319",
+        "x-powered-by": "ASP.NET"
+      },
+      "response_body": "{\"status\":{\"httpCode\":401,\"errorCode\":507,\"msgType\":0,\"msg\":\"没有访问接口的权限\"},\"data\":null}",
+      "final_url": "https://minipapi.sfacg.com/pas/mpapi/novels/249775?expand=latestchapter,chapterCount,typeName,intro,fav,ticket,pointCount,tags,sysTags,signlevel,discount,discountExpireDate,totalNeedFireMoney,originTotalNeedFireMoney"
+    }
+  ]
+}

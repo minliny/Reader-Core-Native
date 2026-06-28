@@ -1,0 +1,28 @@
+{
+  "source_id": "corpus-85610ff65143",
+  "source_name": "安之原创",
+  "recorded_at": "1970-01-01T00:00:1782644933Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "http://www.azycjd.com#yc1101/webnovelmis/mobile/msearchresult",
+      "method": "POST",
+      "request_headers": {
+        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": "searchtxts=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "response_status": 200,
+      "response_headers": {
+        "content-length": "1722",
+        "content-type": "text/html",
+        "date": "Sun, 28 Jun 2026 11:08:50 GMT",
+        "server": "Apache-Coyote/1.1",
+        "x-frame-options": "SAMEORIGIN"
+      },
+      "response_body": "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\"\n   \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\">\n\n​​​​​​​\n<html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\">\n\t<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n\t<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n\t<meta name=\"baidu-site-verification\" content=\"2e0jfdwpDy\" />\n\t<title>安之原创|安之原创基地</title>\n\t<meta name=\"keywords\" content=\"安之原创基地、安之原创、小说、小说排行榜、言情小说、玄幻都市、免费小说\">\n\t<meta name=\"description\" content=\"安之原创、安之原创基地、小说、小说排行榜、言情小说、玄幻都市、免费小说、安之原创首页\">\n    <SCRIPT LANGUAGE=\"JavaScript\">\n    function redirect(){\n\t\tvar sUserAgent= navigator.userAgent.toLowerCase(); \n\t\tvar bIsIpad= sUserAgent.match(/ipad/i) == \"ipad\"; \n\t\tvar bIsIphoneOs= sUserAgent.match(/iphone os/i) == \"iphone os\"; \n\t\tvar bIsMidp= sUserAgent.match(/midp/i) == \"midp\"; \n\t\tvar bIsUc7= sUserAgent.match(/rv:1.2.3.4/i) == \"rv:1.2.3.4\"; \n\t\tvar bIsUc= sUserAgent.match(/ucweb/i) == \"ucweb\"; \n\t\tvar bIsAndroid= sUserAgent.match(/android/i) == \"android\"; \n\t\tvar bIsCE= sUserAgent.match(/windows ce/i) == \"windows ce\"; \n\t\tvar bIsWM= sUserAgent.match(/windows mobile/i) == \"windows mobile\"; \n\t\t\n\t\tif (bIsIpad || bIsIphoneOs || bIsMidp || bIsUc7 || bIsUc || bIsAndroid || bIsCE || bIsWM) { \n\t\t\twindow.location.href= 'http://www.azycjd.com/webnovelmis/mobile/index'; \n\t\t}else{\n\t\t\twindow.location.href = 'http://www.azycjd.com/webnovelmis/front/index';\n\t\t}\n    }\n    </SCRIPT>    \n</head>\n<body onload=\"redirect()\">\n</body>\n</html>",
+      "final_url": "http://www.azycjd.com/#yc1101/webnovelmis/mobile/msearchresult"
+    }
+  ]
+}

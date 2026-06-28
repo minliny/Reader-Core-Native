@@ -1,0 +1,38 @@
+{
+  "source_id": "corpus-0b382541907d",
+  "source_name": "刺猬猫说",
+  "recorded_at": "1970-01-01T00:00:1782644951Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://wap.ciweimao.com:443/book_list?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "cache-control": "no-store, no-cache, must-revalidate",
+        "connection": "keep-alive",
+        "content-security-policy": "upgrade-insecure-requests;connect-src *",
+        "content-type": "text/html; charset=UTF-8",
+        "date": "Sun, 28 Jun 2026 11:09:11 GMT",
+        "expires": "Thu, 19 Nov 1981 08:52:00 GMT",
+        "pragma": "no-cache",
+        "server": "nginx",
+        "set-cookie": "ci_session=er12uud62orjlojqto4ovi6nbcefu4bf; expires=Sun, 28-Jun-2026 13:09:11 GMT; Max-Age=7200; path=/; HttpOnly",
+        "strict-transport-security": "max-age=63072000; includeSubdomains; always",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "SAMEORIGIN",
+        "x-powered-by": "PHP/7.4.33",
+        "x-xss-protection": "1; mode=block"
+      },
+      "response_body": "<!DOCTYPE html>\n<html>\n<head>\n    <meta charset=\"UTF-8\">\n    <title>验证</title>\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">\n    <style>\n        * { margin: 0; padding: 0; box-sizing: border-box; }\n        body {\n            display: flex;\n            align-items: center;\n            justify-content: center;\n            min-height: 100vh;\n            background: #f5f5f5;\n            font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif;\n        }\n        .verify-box {\n            width: 90%;\n            max-width: 360px;\n            padding: 24px;\n            background: #fff;\n            border-radius: 8px;\n        }\n        .code-group {\n            position: relative;\n            display: flex;\n            align-items: center;\n            flex-wrap: wrap;\n        }\n        .code-group input {\n            flex: 1;\n            min-width: 0;\n            height: 44px;\n            padding: 0 12px;\n            border: 1px solid #e6e6e6;\n            border-radius: 4px;\n            font-size: 16px;\n            outline: none;\n        }\n        .code-group input.error {\n            border-color: #e74c3c;\n        }\n        .code-group img {\n            width: 100px;\n            height: 40px;\n            margin-left: 10px;\n            cursor: pointer;\n        }\n        .error-tip {\n            width: 100%;\n            margin-top: 8px;\n            font-size: 14px;\n            color: #e74c3c;\n            display: none;\n        }\n        #geetest-notice-login { display: none; }\n    </style>\n</head>\n<body>\n    <div class=\"verify-box\">\n        <form name=\"J_ManMachineVerify\" id=\"J_ManMachineVerify\">\n            <input type=\"hidden\" name=\"redirect\" id=\"redirect\" value=\"https://wap.ciweimao.com/book_list?keyword=斗破苍穹\">\n            <div class=\"code-group\">\n                                        <input type=\"text\" placeholder=\"验证码\" id=\"code\" name=\"code\" maxlength=\"4\" autocomplete=\"off\">\n                        <img id=\"verify-img\" src=\"https://wap.ciweimao.com/signup/verifyimg\" alt=\"请点击刷新验证码\">\n                        <p class=\"error-tip\" id=\"code-error\"></p>\n                                </div>\n        </form>\n    </div>\n        <script>\n    (function () {\n        var rootPath = 'https://wap.ciweimao.com/';\n        var form = document.getElementById('J_ManMachineVerify');\n        var codeInput = document.getElementById('code');\n        var errorEl = document.getElementById('code-error');\n        var verifyImg = document.getElementById('verify-img');\n        var redirectEl = document.getElementById('redirect');\n        var source = 'book_list';\n        var verifying = false;\n\n        function showError(msg) {\n            errorEl.textContent = msg;\n            errorEl.style.display = 'block';\n            codeInput.classList.add('error');\n        }\n\n        function hideError() {\n            errorEl.textContent = '';\n            errorEl.style.display = 'none';\n            codeInput.classList.remove('error');\n        }\n\n        function checkCode(callback) {\n            var code = codeInput.value.replace(/^\\s+|\\s+$/g, '');\n            if (!code) {\n                showError('请输入验证码');\n                callback(false);\n                return;\n            }\n            if (verifying) return;\n            verifying = true;\n            var url = rootPath + 'signup/checkManVerify?code=' + encodeURIComponent(code) + '&source=' + encodeURIComponent(source);\n            var xhr = new XMLHttpRequest();\n            xhr.open('GET', url, true);\n            xhr.onreadystatechange = function () {\n                if (xhr.readyState !== 4) return;\n                verifying = false;\n                if (xhr.responseText === 'true') {\n                    hideError();\n                    callback(true);\n                } else {\n                    showError('验证码不正确');\n                    callback(false);\n                }\n            };\n            xhr.send();\n        }\n\n        verifyImg.addEventListener('click', function () {\n            this.src = 'https://wap.ciweimao.com/signup/verifyimg?d=' + Math.random();\n            hideError();\n        });\n\n        form.addEventListener('submit', function (e) {\n            e.preventDefault();\n            checkCode(function (ok) {\n                if (ok) window.location.href = redirectEl.value;\n            });\n        });\n\n        codeInput.addEventListener('blur', function () {\n            if (codeInput.value.replace(/^\\s+|\\s+$/g, '')) {\n                checkCode(function () {});\n            }\n        });\n    })();\n    </script>\n    </body>\n</html>\n",
+      "final_url": "https://wap.ciweimao.com/signup/man_machine_verify?redirect=https%3A%2F%2Fwap.ciweimao.com%2Fbook_list%3Fkeyword%3D%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&source=book_list"
+    }
+  ]
+}

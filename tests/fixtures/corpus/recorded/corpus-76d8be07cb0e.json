@@ -1,0 +1,33 @@
+{
+  "source_id": "corpus-76d8be07cb0e",
+  "source_name": "铁血读书",
+  "recorded_at": "1970-01-01T00:00:1782644695Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "https://book.tiexue.net/SearchResults.aspx?PageSize=3&keywords=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&noveltype=0",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 404,
+      "response_headers": {
+        "access-control-allow-origin": "*",
+        "cache-control": "private",
+        "connection": "keep-alive",
+        "content-length": "3507",
+        "content-type": "text/html; charset=gb2312",
+        "date": "Sun, 28 Jun 2026 11:04:54 GMT",
+        "server": "Microsoft-IIS/10.0",
+        "x-aspnet-version": "4.0.30319",
+        "x-cache-lookup": "Cache Miss",
+        "x-nws-log-uuid": "1726108883384628470",
+        "x-powered-by": "ASP.NET"
+      },
+      "response_body": "<!DOCTYPE html>\r\n<html>\r\n    <head>\r\n        <title>�޷��ҵ���Դ��</title>\r\n        <meta name=\"viewport\" content=\"width=device-width\" />\r\n        <style>\r\n         body {font-family:\"Verdana\";font-weight:normal;font-size: .7em;color:black;} \r\n         p {font-family:\"Verdana\";font-weight:normal;color:black;margin-top: -5px}\r\n         b {font-family:\"Verdana\";font-weight:bold;color:black;margin-top: -5px}\r\n         H1 { font-family:\"Verdana\";font-weight:normal;font-size:18pt;color:red }\r\n         H2 { font-family:\"Verdana\";font-weight:normal;font-size:14pt;color:maroon }\r\n         pre {font-family:\"Consolas\",\"Lucida Console\",Monospace;font-size:11pt;margin:0;padding:0.5em;line-height:14pt}\r\n         .marker {font-weight: bold; color: black;text-decoration: none;}\r\n         .version {color: gray;}\r\n         .error {margin-bottom: 10px;}\r\n         .expandable { text-decoration:underline; font-weight:bold; color:navy; cursor:pointer; }\r\n         @media screen and (max-width: 639px) {\r\n          pre { width: 440px; overflow: auto; white-space: pre-wrap; word-wrap: break-word; }\r\n         }\r\n         @media screen and (max-width: 479px) {\r\n          pre { width: 280px; }\r\n         }\r\n        </style>\r\n    </head>\r\n\r\n    <body bgcolor=\"white\">\r\n\r\n            <span><H1>��/��Ӧ�ó����еķ���������<hr width=100% size=1 color=silver></H1>\r\n\r\n            <h2> <i>�޷��ҵ���Դ��</i> </h2></span>\r\n\r\n            <font face=\"Arial, Helvetica, Geneva, SunSans-Regular, sans-serif \">\r\n\r\n            <b> ˵��: </b>HTTP 404�������ڲ��ҵ���Դ(��������һ��������)�����ѱ��Ƴ������������Ѹ��ģ�����ʱ�����á��������� URL ��ȷ����ƴд��ȷ��\r\n            <br><br>\r\n\r\n            <b> ����� URL: </b>/SearchResults.aspx<br><br>\r\n\r\n            <hr width=100% size=1 color=silver>\r\n\r\n            <b>�汾��Ϣ:</b>&nbsp;Microsoft .NET Framework �汾:4.0.30319; ASP.NET �汾:4.8.4797.0\r\n\r\n            </font>\r\n\r\n    </body>\r\n</html>\r\n<!-- \r\n[HttpException]: �ļ���/SearchResults.aspx�������ڡ�\r\n   �� System.Web.UI.Util.CheckVirtualFileExists(VirtualPath virtualPath)\r\n   �� System.Web.Compilation.BuildManager.GetVPathBuildResultInternal(VirtualPath virtualPath, Boolean noBuild, Boolean allowCrossApp, Boolean allowBuildInPrecompile, Boolean throwIfNotFound, Boolean ensureIsUpToDate)\r\n   �� System.Web.Compilation.BuildManager.GetVPathBuildResultWithNoAssert(HttpContext context, VirtualPath virtualPath, Boolean noBuild, Boolean allowCrossApp, Boolean allowBuildInPrecompile, Boolean throwIfNotFound, Boolean ensureIsUpToDate)\r\n   �� System.Web.Compilation.BuildManager.GetVirtualPathObjectFactory(VirtualPath virtualPath, HttpContext context, Boolean allowCrossApp, Boolean throwIfNotFound)\r\n   �� System.Web.Compilation.BuildManager.CreateInstanceFromVirtualPath(VirtualPath virtualPath, Type requiredBaseType, HttpContext context, Boolean allowCrossApp)\r\n   �� System.Web.UI.PageHandlerFactory.GetHandlerHelper(HttpContext context, String requestType, VirtualPath virtualPath, String physicalPath)\r\n   �� System.Web.HttpApplication.MaterializeHandlerExecutionStep.System.Web.HttpApplication.IExecutionStep.Execute()\r\n   �� System.Web.HttpApplication.ExecuteStepImpl(IExecutionStep step)\r\n   �� System.Web.HttpApplication.ExecuteStep(IExecutionStep step, Boolean& completedSynchronously)\r\n--><!-- \r\n�˴���ҳ���ܰ���������Ϣ����Ϊ ASP.NET ͨ�� &lt;customErrors mode=\"Off\"/&gt; ������Ϊ��ʾ��ϸ������Ϣ���뿼��������������ʹ�� &lt;customErrors mode=\"On\"/&gt; �� &lt;customErrors mode=\"RemoteOnly\"/&gt;��-->",
+      "final_url": "https://book.tiexue.net/SearchResults.aspx?PageSize=3&keywords=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&noveltype=0"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "source_id": "corpus-09a658371c11",
+  "source_name": "安之原创",
+  "recorded_at": "1970-01-01T00:00:1782644933Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "http://www.azycjd.com/webnovelmis/mobile/msearchresult",
+      "method": "POST",
+      "request_headers": {
+        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": "searchtxts=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "response_status": 200,
+      "response_headers": {
+        "content-language": "zh-CN",
+        "content-length": "4102",
+        "content-security-policy": "frame-ancestors'self'",
+        "content-type": "text/html;charset=UTF-8",
+        "csrftoken": "df97b598bb1a44abadd54a629251f361",
+        "date": "Sun, 28 Jun 2026 11:08:50 GMT",
+        "server": "Apache-Coyote/1.1",
+        "set-cookie": "JSESSIONID=EB8C6491330423F53138D4DC0C28D08C; Path=/webnovelmis; HttpOnly",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "SAMEORIGIN",
+        "x-xss-protection": "1; mode=block"
+      },
+      "response_body": "<!DOCTYPE html>\r\n<html>\r\n<head lang=\"en\">\r\n    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\r\n    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\r\n    <title>安之原创|安之原创基地</title>\r\n    <meta content=\"width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no\" name=\"viewport\">\r\n    <meta name=\"keywords\" content=\"安之原创基地、安之原创、小说、小说排行榜、言情小说、玄幻都市、免费小说\">\r\n    <meta name=\"description\" content=\"安之原创|安之原创基地|小说|小说排行榜|言情小说|玄幻都市|免费小说\">\r\n    <link rel=\"icon\" href=\"/webnovelmis/styles/moblie/images/common/favicon.ico\" type=\"image/x-icon\">\r\n    <link rel=\"stylesheet\" href=\"/webnovelmis/styles/moblie/css/common.css\"/>\r\n    <link rel=\"stylesheet\" href=\"/webnovelmis/styles/moblie/css/header.css\"/>\r\n    <link rel=\"stylesheet\" href=\"/webnovelmis/styles/moblie/css/search_result.css\"/>\r\n</head>\r\n<body>\r\n\r\n\r\n\r\n\r\n\n\n\n\n\n\n\n​​​​​​​\n\n\n\n\n\n\n\n\n\n\r\n\r\n    <header>\r\n        <div class=\"header_top\">\r\n            <img src=\"/webnovelmis/styles/moblie/images/common/logo1.png\" alt=\"\"/>\r\n            <a href=\"/webnovelmis/mobile/msearchresult\"></a>\r\n        </div>\r\n        <div class=\"header_bottom\">\r\n            <div>\r\n                <a href=\"/webnovelmis/mobile/index\" class=\"\">首页</a>\r\n                <b></b>\r\n            </div>\r\n            <div>\r\n                <a href=\"/webnovelmis/mobile/mstackslistright/0/0/0/0/0/0/0/1\" class=\"\">书库</a>\r\n                <b></b>\r\n            </div>\r\n            <div>\r\n                <a href=\"/webnovelmis/mobile/mranklistright/monthnum/1\" class=\"\">榜单</a>\r\n                <b></b>\r\n            </div>\r\n            <div>\r\n                <a href=\"/webnovelmis/mobile/muserpay/index\" class=\"\">充值</a>\r\n            </div>\r\n        </div>\r\n    </header>\r\n<!--搜索功能区-->\r\n    <div class=\"search_group\">\r\n        <div class=\"search\">\r\n            <form method=\"post\" action=\"/webnovelmis/mobile/msearchresult\">\r\n                <input type=\"text\" id=\"searchtxts\" name=\"searchtxts\" placeholder=\"请输入作品/作者/标签\"/>\r\n                <button type=\"submit\">搜索</button>\r\n            </form>\r\n        </div>\r\n        <div class=\"search_prompt\">\r\n         \r\n        \r\n\t           \t没有找到相关书籍！！\r\n\t\t</div>\r\n        <div class=\"list_main\">\r\n            <ul>\r\n            </ul>\r\n        </div>\r\n    </div>\r\n\t\r\n\r\n\r\n\r\n\n\n\n\n\n\n\n​​​​​​​\n\n\n\n\n\n\n\n\n\n\r\n\r\n <footer>\r\n        <div>\r\n            <a href=\"/webnovelmis/mobile/index\">\r\n                <img src=\"/webnovelmis/styles/moblie/images/common/shouye.png\" alt=\"\"/>\r\n            </a>\r\n        </div>\r\n        <div>\r\n            <a href=\"/webnovelmis/mobile/mstackslistright/0/0/0/0/0/0/0/1\">\r\n                <img src=\"/webnovelmis/styles/moblie/images/common/shuku.png\" alt=\"\"/>\r\n            </a>\r\n        </div>\r\n        <div>\r\n            <a href=\"/webnovelmis/mobile/mcenterbookshelf/1\">\r\n                <img src=\"/webnovelmis/styles/moblie/images/common/shujia.png\" alt=\"\"/>\r\n            </a>\r\n        </div>\r\n        <div>\r\n        \t\r\n\t\t\t\t<a href=\"/webnovelmis/mobile/mlogin\">\r\n\t\t\t\t\t<img src=\"/webnovelmis/styles/moblie/images/common/wode.png\" />\r\n\t\t\t\t</a>\r\n\t\t\t\r\n\t\t\t\r\n        </div>\r\n\t\t<!--\r\n\t\t<div style=\"display:none\">\r\n\t\t\t<script src=\"http://s95.cnzz.com/stat.php?id=1257561986&web_id=1257561986\" language=\"JavaScript\"></script>\r\n\t\t</div>\r\n\t\t-->\r\n    </footer>\r\n\t<script>\r\n\t\t(function(){\r\n\t\t    var bp = document.createElement('script');\r\n\t\t    var curProtocol = window.location.protocol.split(':')[0];\r\n\t\t    if (curProtocol === 'https') {\r\n\t\t        bp.src = 'https://zz.bdstatic.com/linksubmit/push.js';\r\n\t\t    }\r\n\t\t    else {\r\n\t\t        bp.src = 'http://push.zhanzhang.baidu.com/push.js';\r\n\t\t    }\r\n\t\t    var s = document.getElementsByTagName(\"script\")[0];\r\n\t\t    s.parentNode.insertBefore(bp, s);\r\n\t\t})();\r\n\t</script><script src=\"/webnovelmis/styles/moblie/js/jquery1.7.js\"></script>\r\n    <script src=\"/webnovelmis/styles/moblie/js/index.js\"></script>\r\n</body>\r\n</html>",
+      "final_url": "http://www.azycjd.com/webnovelmis/mobile/msearchresult"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "source_id": "corpus-417ae995679c",
+  "source_name": "快看漫画",
+  "recorded_at": "1970-01-01T00:00:1782645307Z",
+  "keyword": "斗破苍穹",
+  "steps": [
+    {
+      "level": "L2-search",
+      "url": "http://m.kuaikanmanhua.com/search/mini/topic/title_and_author?page=1&size=24&q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+      "method": "GET",
+      "request_headers": {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+      },
+      "request_body": null,
+      "response_status": 200,
+      "response_headers": {
+        "connection": "keep-alive",
+        "content-type": "application/json;charset=UTF-8",
+        "date": "Sun, 28 Jun 2026 11:15:07 GMT",
+        "server": "openresty",
+        "set-cookie": "kk_s_t=1782645307264; Domain=.kuaikanmanhua.com; Expires=Mon, 29 Jun 2026 11:15:07 GMT; Path=/",
+        "transfer-encoding": "chunked",
+        "vary": "Accept-Encoding",
+        "x-envoy-upstream-service-time": "28",
+        "x-request-id": "29016a41-023b-4533-a82e-026aa9f828c4"
+      },
+      "response_body": "{\n  \"code\" : 200,\n  \"message\" : \"OK\",\n  \"total\" : 0,\n  \"hits\" : [ ]\n}",
+      "final_url": "https://m.kuaikanmanhua.com/search/mini/topic/title_and_author?page=1&size=24&q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+    }
+  ]
+}
