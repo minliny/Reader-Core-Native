@@ -1,0 +1,1374 @@
+{
+  "version": "corpus-batch-result/1",
+  "mode": "live",
+  "keyword": "斗破苍穹",
+  "generated_at": "2026-06-28T16:47:41Z",
+  "total": 50,
+  "summary": {
+    "fully_passed": 0,
+    "partially_passed": 0,
+    "fully_failed": 50,
+    "pass_rate": 0.0,
+    "by_level": {
+      "L1-import": {
+        "passed": 0,
+        "failed": 50,
+        "skipped": 0
+      },
+      "L2-search": {
+        "passed": 0,
+        "failed": 0,
+        "skipped": 50
+      },
+      "L3-detail": {
+        "passed": 0,
+        "failed": 0,
+        "skipped": 50
+      },
+      "L4-toc": {
+        "passed": 0,
+        "failed": 0,
+        "skipped": 50
+      },
+      "L5-content": {
+        "passed": 0,
+        "failed": 0,
+        "skipped": 50
+      }
+    },
+    "by_form": {
+      "css-explicit": {
+        "passed": 0,
+        "failed": 8
+      },
+      "css-shorthand": {
+        "passed": 0,
+        "failed": 41
+      },
+      "inline-js": {
+        "passed": 0,
+        "failed": 11
+      },
+      "js": {
+        "passed": 0,
+        "failed": 19
+      },
+      "json-jsonpath": {
+        "passed": 0,
+        "failed": 19
+      },
+      "multirule": {
+        "passed": 0,
+        "failed": 34
+      },
+      "plain": {
+        "passed": 0,
+        "failed": 45
+      },
+      "regex-suffix": {
+        "passed": 0,
+        "failed": 28
+      },
+      "template": {
+        "passed": 0,
+        "failed": 26
+      }
+    },
+    "by_priority": {
+      "P0": {
+        "passed": 0,
+        "failed": 27
+      },
+      "P1": {
+        "passed": 0,
+        "failed": 23
+      }
+    },
+    "failure_reasons": {
+      "read_source_file": 50
+    }
+  },
+  "sources": [
+    {
+      "source_id": "",
+      "source_file": "src-400-51a0136bf6d9.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-401-ab82d7465fcb.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "js",
+        "multirule",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-402-2a08f3702f13.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "js",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-403-aaff4dd37922.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-explicit",
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-404-97a5dadda7bf.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-explicit",
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-405-76d8be07cb0e.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "js",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-406-db60026d55bc.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-407-c441b040e90e.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "js",
+        "multirule",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-408-1452724d04d8.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "js",
+        "json-jsonpath",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-409-62b50a988208.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-410-96df50da60d4.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "json-jsonpath",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-411-20e555e68a94.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-412-a1f17aa3c4d5.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-413-90e1b37f3438.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-explicit",
+        "css-shorthand",
+        "js",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-414-e827d0dd5f60.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "js",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-415-ea9816134b9d.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-416-10b9aee024dc.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-417-6426c4dd896c.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-418-c673ef1691bd.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "json-jsonpath",
+        "multirule",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-419-c7a70ab745fa.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-420-113c3424fdf1.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-421-46926b1e0137.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-422-8a2d569f0c91.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-423-1fde6981491c.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-424-77010b5a0624.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-425-a67b3d52d73e.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "json-jsonpath",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-426-22058c58937c.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "json-jsonpath",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-427-99fbebbe8a24.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-428-82228df0c4c0.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "plain"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-429-31868d407e7c.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-430-85610ff65143.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-431-09a658371c11.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-432-28ea5fbac7ed.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "json-jsonpath",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-433-0b382541907d.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-434-92e931cf93cf.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-435-b89b90394732.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-explicit",
+        "css-shorthand",
+        "js",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-436-c8d8b0c4458c.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-437-d7601e6b3b25.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-438-c91bb3558fb6.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "inline-js",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-439-b501ea32970d.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-explicit",
+        "css-shorthand",
+        "js",
+        "multirule",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-440-7608630be341.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-explicit",
+        "css-shorthand",
+        "js",
+        "multirule",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-441-cb2ce15859ea.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-442-7853e4d2d690.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-443-19bf9db0d290.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "js",
+        "json-jsonpath",
+        "plain",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-444-5f02c2a134cc.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-445-9c4c93914002.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-explicit",
+        "css-shorthand",
+        "js",
+        "multirule",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-446-7e422275f056.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-explicit",
+        "css-shorthand",
+        "js",
+        "multirule",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-447-120b0160c2f3.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P1",
+      "rule_forms": [
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-448-002335120473.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "",
+      "source_file": "src-449-417ae995679c.json",
+      "source_name": "",
+      "source_url": "",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "fail",
+          "reason": "read_source_file",
+          "detail": "No such file or directory (os error 2)"
+        }
+      },
+      "failure_reason": "read_source_file",
+      "duration_ms": 0
+    }
+  ]
+}

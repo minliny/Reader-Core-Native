@@ -1,0 +1,2096 @@
+{
+  "version": "corpus-batch-result/1",
+  "mode": "live",
+  "keyword": "斗破苍穹",
+  "generated_at": "2026-06-28T16:56:30Z",
+  "total": 50,
+  "summary": {
+    "fully_passed": 0,
+    "partially_passed": 50,
+    "fully_failed": 0,
+    "pass_rate": 0.0,
+    "by_level": {
+      "L1-import": {
+        "passed": 50,
+        "failed": 0,
+        "skipped": 0
+      },
+      "L2-search": {
+        "passed": 6,
+        "failed": 44,
+        "skipped": 0
+      },
+      "L3-detail": {
+        "passed": 4,
+        "failed": 2,
+        "skipped": 44
+      },
+      "L4-toc": {
+        "passed": 1,
+        "failed": 3,
+        "skipped": 46
+      },
+      "L5-content": {
+        "passed": 0,
+        "failed": 1,
+        "skipped": 49
+      }
+    },
+    "by_form": {
+      "css-explicit": {
+        "passed": 0,
+        "failed": 1
+      },
+      "css-shorthand": {
+        "passed": 0,
+        "failed": 34
+      },
+      "inline-js": {
+        "passed": 0,
+        "failed": 21
+      },
+      "js": {
+        "passed": 0,
+        "failed": 13
+      },
+      "json-jsonpath": {
+        "passed": 0,
+        "failed": 20
+      },
+      "multirule": {
+        "passed": 0,
+        "failed": 34
+      },
+      "plain": {
+        "passed": 0,
+        "failed": 46
+      },
+      "put-get": {
+        "passed": 0,
+        "failed": 9
+      },
+      "regex-suffix": {
+        "passed": 0,
+        "failed": 16
+      },
+      "template": {
+        "passed": 0,
+        "failed": 26
+      },
+      "xpath": {
+        "passed": 0,
+        "failed": 1
+      }
+    },
+    "by_priority": {
+      "P0": {
+        "passed": 0,
+        "failed": 38
+      },
+      "P1": {
+        "passed": 0,
+        "failed": 12
+      }
+    },
+    "failure_reasons": {
+      "core_error": 4,
+      "http_error": 16,
+      "js_unsupported": 8,
+      "no_chapter_url": 1,
+      "no_search_results": 19,
+      "no_toc_entries": 1,
+      "parse_error": 1
+    }
+  },
+  "sources": [
+    {
+      "source_id": "corpus-0b78c9f24888",
+      "source_file": "src-200-0b78c9f24888.json",
+      "source_name": "万通蜡笔（优）",
+      "source_url": "https://wtr-lab.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "js_unsupported",
+          "detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: cannot read property 'Jsoup' of undefined"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "js_unsupported",
+      "duration_ms": 698
+    },
+    {
+      "source_id": "corpus-a77eebbe314e",
+      "source_file": "src-201-a77eebbe314e.json",
+      "source_name": "三叉小说（优）",
+      "source_url": "http://m.xxxbiquge.info",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] http://{{url=source.getkey();cookie.removecookie(url)java.ajax(url).match(/action=%22(.+?)%22/)[1]}}: Dns Failed: resolve dns name '{{url=source.getkey();cookie.removecookie(url)java.ajax(url).match(:80': failed to lookup address information: nodename nor servname provided, or not known details={\"host\":{\"capability\":\"http.execute\",\"operationId\":1,\"requestId\":2}}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 3
+    },
+    {
+      "source_id": "corpus-504f637cfbed",
+      "source_file": "src-202-504f637cfbed.json",
+      "source_name": "火球书库（优）",
+      "source_url": "http://www.huoqwk.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "js",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] http://{{url=source.getkey();cookie.removecookie(url);java.ajax(url).match(/action=%22(.+?)%22/)[1]}}?keyWord=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9: Dns Failed: resolve dns name '{{url=source.getkey();cookie.removecookie(url);java.ajax(url).match(:80': failed to lookup address information: nodename nor servname provided, or not known details={\"host\":{\"capability\":\"http.execute\",\"operationId\":1,\"requestId\":2}}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 1
+    },
+    {
+      "source_id": "corpus-fb38a2a5b249",
+      "source_file": "src-203-fb38a2a5b249.json",
+      "source_name": "存档书库（优）",
+      "source_url": "https://archive.org",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "json-jsonpath",
+        "multirule",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "js_unsupported",
+          "detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: Get is not defined"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "js_unsupported",
+      "duration_ms": 1
+    },
+    {
+      "source_id": "corpus-9bf80fd46111",
+      "source_file": "src-204-9bf80fd46111.json",
+      "source_name": "八零电子（导）",
+      "source_url": "https://m.txt80.cc/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "multirule",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "pass"
+        },
+        "L3-detail": {
+          "status": "fail",
+          "reason": "core_error",
+          "detail": "[Internal] rule engine error: invalid CSS selector `.gray.1:3`: UnexpectedToken(Number { has_sign: false, value: 0.1, int_value: None })"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "core_error",
+      "duration_ms": 8834
+    },
+    {
+      "source_id": "corpus-5e2eca05b561",
+      "source_file": "src-205-5e2eca05b561.json",
+      "source_name": "爱去小说（导）",
+      "source_url": "https://www.527txt.com",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 4940
+    },
+    {
+      "source_id": "corpus-5fdbc6361cc4",
+      "source_file": "src-206-5fdbc6361cc4.json",
+      "source_name": "奇书网吧（导）",
+      "source_url": "https://www.qishu99.cc",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] https://www.qishu99.cc/e/search/index.php: Connection Failed: Connect error: Connection refused (os error 61) details={\"host\":{\"capability\":\"http.execute\",\"operationId\":1,\"requestId\":2}}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 19
+    },
+    {
+      "source_id": "corpus-c1be23cbaf91",
+      "source_file": "src-207-c1be23cbaf91.json",
+      "source_name": "贼吧网玩（导）",
+      "source_url": "https://www.zei8.vip",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "js",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 1348
+    },
+    {
+      "source_id": "corpus-4fde9a31053a",
+      "source_file": "src-208-4fde9a31053a.json",
+      "source_name": "知轩藏书（导）",
+      "source_url": "https://zxcs.zip/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "pass"
+        },
+        "L3-detail": {
+          "status": "fail",
+          "reason": "core_error",
+          "detail": "[Internal] rule engine error: invalid CSS selector `p.3:4:5:6:7`: UnexpectedToken(Number { has_sign: false, value: 0.3, int_value: None })"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "core_error",
+      "duration_ms": 2386
+    },
+    {
+      "source_id": "corpus-77c09b72358b",
+      "source_file": "src-209-77c09b72358b.json",
+      "source_name": "秋风书屋（导）",
+      "source_url": "https://www.qiufengshuwu.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 1815
+    },
+    {
+      "source_id": "corpus-369541794ca6",
+      "source_file": "src-210-369541794ca6.json",
+      "source_name": "请看小说（导）",
+      "source_url": "https://www.qinkan.net",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 1802
+    },
+    {
+      "source_id": "corpus-2950b06a1dd0",
+      "source_file": "src-211-2950b06a1dd0.json",
+      "source_name": "鸠摩搜书（导）",
+      "source_url": "https://www.jiumodiary.com#",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "js_unsupported",
+          "detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: url1 is not defined"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "js_unsupported",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "corpus-e5d47fa80f47",
+      "source_file": "src-212-e5d47fa80f47.json",
+      "source_name": "爱去小说（导）",
+      "source_url": "https://www.aqxsw555.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 1916
+    },
+    {
+      "source_id": "corpus-9725b42627d4",
+      "source_file": "src-213-9725b42627d4.json",
+      "source_name": "苦瓜书盘（导）",
+      "source_url": "https://kgbook.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 874
+    },
+    {
+      "source_id": "corpus-636ebc3eda03",
+      "source_file": "src-214-636ebc3eda03.json",
+      "source_name": "爱去小说（导）",
+      "source_url": "https://www.279txt.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "js",
+        "multirule",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 3547
+    },
+    {
+      "source_id": "corpus-374fc56679d0",
+      "source_file": "src-215-374fc56679d0.json",
+      "source_name": "爱去小说（导）",
+      "source_url": "https://www.aiqu999.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 1821
+    },
+    {
+      "source_id": "corpus-80f596484b84",
+      "source_file": "src-216-80f596484b84.json",
+      "source_name": "趣书网吧（导）",
+      "source_url": "https://www.qushu123.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "js_unsupported",
+          "detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: so is not defined"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "js_unsupported",
+      "duration_ms": 3
+    },
+    {
+      "source_id": "corpus-5ca425bc5553",
+      "source_file": "src-217-5ca425bc5553.json",
+      "source_name": "奇书网吧（导）",
+      "source_url": "https://m.qishu99.cc/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] https://m.qishu99.cc/e/search/index.php: Connection Failed: Connect error: Connection refused (os error 61) details={\"host\":{\"capability\":\"http.execute\",\"operationId\":1,\"requestId\":2}}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 58
+    },
+    {
+      "source_id": "corpus-f65061510c32",
+      "source_file": "src-218-f65061510c32.json",
+      "source_name": "爱下电子（繁）",
+      "source_url": "https://ixdzs.tw/",
+      "priority": "P0",
+      "rule_forms": [
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "put-get",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "pass"
+        },
+        "L3-detail": {
+          "status": "pass"
+        },
+        "L4-toc": {
+          "status": "fail",
+          "reason": "js_unsupported",
+          "detail": "[Internal] rule engine error: invalid JSON input: expected value at line 1 column 1"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "js_unsupported",
+      "duration_ms": 943
+    },
+    {
+      "source_id": "corpus-3b0b2873ddcb",
+      "source_file": "src-219-3b0b2873ddcb.json",
+      "source_name": "新读小说（繁）",
+      "source_url": "https://m.dxs.tw/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 692
+    },
+    {
+      "source_id": "corpus-9894319ba502",
+      "source_file": "src-220-9894319ba502.json",
+      "source_name": "爱写小说（日）",
+      "source_url": "https://ncode.syosetu.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] https://yomou.syosetu.com/search.php?word=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&p=1: Connection Failed: Connect error: connection timed out details={\"host\":{\"capability\":\"http.execute\",\"operationId\":1,\"requestId\":2}}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 22508
+    },
+    {
+      "source_id": "corpus-d677bb837f20",
+      "source_file": "src-221-d677bb837f20.json",
+      "source_name": "全英文学（英）",
+      "source_url": "https://novelnext.net",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "xpath"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "parse_error",
+          "detail": "[Internal] rule engine error: invalid XPath `div[2]/div/h3/a/@title@text`: ExtraUnparsedTokens"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "parse_error",
+      "duration_ms": 2217
+    },
+    {
+      "source_id": "corpus-8dbf7f3614c7",
+      "source_file": "src-222-8dbf7f3614c7.json",
+      "source_name": "英文小说（英）",
+      "source_url": "http://novel.tingroom.com/wap",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 620
+    },
+    {
+      "source_id": "corpus-1fd243a7684d",
+      "source_file": "src-223-1fd243a7684d.json",
+      "source_name": "英文小说（英）",
+      "source_url": "https://www.yingyuxiaoshuo.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-explicit",
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 158
+    },
+    {
+      "source_id": "corpus-846a80a5861d",
+      "source_file": "src-224-846a80a5861d.json",
+      "source_name": "英语阅读（英）",
+      "source_url": "http://m.enread.com#",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "js",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] http://m.enread.com/index.php?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&mid=4&page=1: Network Error: Network Error: Error encountered in the status line: timed out reading response details={\"host\":{\"capability\":\"http.execute\",\"operationId\":1,\"requestId\":2}}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 15032
+    },
+    {
+      "source_id": "corpus-33822f688091",
+      "source_file": "src-225-33822f688091.json",
+      "source_name": "双语小说（英）",
+      "source_url": "http://www.shubang.net/book#",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 268
+    },
+    {
+      "source_id": "corpus-aefa7d25bc14",
+      "source_file": "src-226-aefa7d25bc14.json",
+      "source_name": "拷贝漫画（优++）",
+      "source_url": "https://www.mangacopy.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "json-jsonpath",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] https://api.mangacopy.com/api/v3/search/comic?platform=1&q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&limit=20&offset={{20*(page-1)}}&q_type=&_update=true: Connection Failed: tls connection init failed: Connection reset by peer (os error 54) details={\"host\":{\"capability\":\"http.execute\",\"operationId\":1,\"requestId\":2}}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 218
+    },
+    {
+      "source_id": "corpus-454f025d6ede",
+      "source_file": "src-227-454f025d6ede.json",
+      "source_name": "蓝批漫画（优+++）",
+      "source_url": "https://www.pixiv.net/manga",
+      "priority": "P0",
+      "rule_forms": [
+        "js",
+        "multirule",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "js_unsupported",
+          "detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: java.put key and value arguments must be strings"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "js_unsupported",
+      "duration_ms": 1
+    },
+    {
+      "source_id": "corpus-c2b0309a7596",
+      "source_file": "src-228-c2b0309a7596.json",
+      "source_name": "美女图站（优++）",
+      "source_url": "这是一个图集",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "core_error",
+          "detail": "[InvalidParams] cannot auto-build searchRequest: source.searchUrl is empty details={\"sourceId\":\"corpus-c2b0309a7596\"}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "core_error",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "corpus-4b0555b7f8ca",
+      "source_file": "src-229-4b0555b7f8ca.json",
+      "source_name": "名著阅读（优++）",
+      "source_url": "https://api.520diandu.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "json-jsonpath",
+        "plain",
+        "put-get",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 218
+    },
+    {
+      "source_id": "corpus-5b3647cea15b",
+      "source_file": "src-230-5b3647cea15b.json",
+      "source_name": "萌图社团（优++）",
+      "source_url": "https://moetu.club",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "plain",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 131
+    },
+    {
+      "source_id": "corpus-6ced494d3186",
+      "source_file": "src-231-6ced494d3186.json",
+      "source_name": "包子漫画（优++）",
+      "source_url": "https://manhuafree.com",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] https://{{bhost()}}/s/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9?page=1: Dns Failed: resolve dns name '{{bhost()}}:443': failed to lookup address information: nodename nor servname provided, or not known details={\"host\":{\"capability\":\"http.execute\",\"operationId\":1,\"requestId\":2}}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 34
+    },
+    {
+      "source_id": "corpus-928b9e1146da",
+      "source_file": "src-232-928b9e1146da.json",
+      "source_name": "爱轻写真（优+）",
+      "source_url": "http://www.635k.com/##@Mengteen",
+      "priority": "P1",
+      "rule_forms": [
+        "js",
+        "plain",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "pass"
+        },
+        "L3-detail": {
+          "status": "pass"
+        },
+        "L4-toc": {
+          "status": "pass"
+        },
+        "L5-content": {
+          "status": "fail",
+          "reason": "no_chapter_url"
+        }
+      },
+      "failure_reason": "no_chapter_url",
+      "duration_ms": 1255
+    },
+    {
+      "source_id": "corpus-91141567628d",
+      "source_file": "src-233-91141567628d.json",
+      "source_name": "笔趣漫画（优+）",
+      "source_url": "https://www.biqug.org/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "core_error",
+          "detail": "[InvalidParams] cannot auto-build searchRequest: source.searchUrl is empty details={\"sourceId\":\"corpus-91141567628d\"}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "core_error",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "corpus-eb82fac79ef1",
+      "source_file": "src-234-eb82fac79ef1.json",
+      "source_name": "爱看漫画（优+）",
+      "source_url": "https://m.kanman.com#♤Haxc",
+      "priority": "P0",
+      "rule_forms": [
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "put-get",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 68
+    },
+    {
+      "source_id": "corpus-760bada228f9",
+      "source_file": "src-235-760bada228f9.json",
+      "source_name": "爱看漫画（优+）",
+      "source_url": "https://m.kanman.com#Haxc1107",
+      "priority": "P0",
+      "rule_forms": [
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "put-get",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 76
+    },
+    {
+      "source_id": "corpus-224658bc98d8",
+      "source_file": "src-236-224658bc98d8.json",
+      "source_name": "如漫画网（优+）",
+      "source_url": "http://m.rumanhua1.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "put-get",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] http://m.rumanhua1.com/s: Connection Failed: Connect error: connection timed out details={\"host\":{\"capability\":\"http.execute\",\"operationId\":1,\"requestId\":2}}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 22505
+    },
+    {
+      "source_id": "corpus-d1561382e8fe",
+      "source_file": "src-237-d1561382e8fe.json",
+      "source_name": "好看漫画（优+）",
+      "source_url": "https://www.9comic.cn/",
+      "priority": "P0",
+      "rule_forms": [
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] https://www.9comic.cn/comic22/so/comic?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&p=&ver=2.0: Connection Failed: tls connection init failed: Connection reset by peer (os error 54) details={\"host\":{\"capability\":\"http.execute\",\"operationId\":1,\"requestId\":2}}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 876
+    },
+    {
+      "source_id": "corpus-b2aa378f4e1a",
+      "source_file": "src-238-b2aa378f4e1a.json",
+      "source_name": "武芊漫画（优+）",
+      "source_url": "https://comic.mkzcdn.com",
+      "priority": "P0",
+      "rule_forms": [
+        "json-jsonpath",
+        "put-get",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 66
+    },
+    {
+      "source_id": "corpus-7b94d9e198e7",
+      "source_file": "src-239-7b94d9e198e7.json",
+      "source_name": "光社漫畫（优+）",
+      "source_url": "https://m.g-mh.org/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "js",
+        "json-jsonpath",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "pass"
+        },
+        "L3-detail": {
+          "status": "pass"
+        },
+        "L4-toc": {
+          "status": "fail",
+          "reason": "no_toc_entries"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_toc_entries",
+      "duration_ms": 2777
+    },
+    {
+      "source_id": "corpus-4f2074c70b38",
+      "source_file": "src-240-4f2074c70b38.json",
+      "source_name": "漫画搬运（优+）",
+      "source_url": "https://www.antbyw.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 1144
+    },
+    {
+      "source_id": "corpus-f44dc94001fd",
+      "source_file": "src-241-f44dc94001fd.json",
+      "source_name": "开心漫画（优+）",
+      "source_url": "https://www.kaixinman.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] https://{{cookie.removecookie(source.getkey())}}/search?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1: Dns Failed: resolve dns name '{{cookie.removecookie(source.getkey())}}:443': failed to lookup address information: nodename nor servname provided, or not known details={\"host\":{\"capability\":\"http.execute\",\"operationId\":1,\"requestId\":2}}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 2
+    },
+    {
+      "source_id": "corpus-8a53f133b3bc",
+      "source_file": "src-242-8a53f133b3bc.json",
+      "source_name": "新爱漫画（优+）",
+      "source_url": "https://xapi.xinmanhua.net#♤Haxc",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 237
+    },
+    {
+      "source_id": "corpus-3f35bb095bc6",
+      "source_file": "src-243-3f35bb095bc6.json",
+      "source_name": "爱优漫吧（优+）",
+      "source_url": "https://m.iyouman.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "put-get",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] rule engine error: invalid CSS selector `https://m.iyouman.com/api/getcomicinfo_body/?comic_id={$.comic_id}&productname=aym&platformname=wap`: ExpectedIdentityOnPseudoElement(Delim('/'))"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 148
+    },
+    {
+      "source_id": "corpus-c9a30b94f68c",
+      "source_file": "src-244-c9a30b94f68c.json",
+      "source_name": "爱优漫吧（优+）",
+      "source_url": "https://m.iyouman.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "put-get",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] rule engine error: invalid CSS selector `https://m.iyouman.com/api/getcomicinfo_body/?comic_id={$.comic_id}&productname=aym&platformname=wap`: ExpectedIdentityOnPseudoElement(Delim('/'))"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 94
+    },
+    {
+      "source_id": "corpus-6447d8695b16",
+      "source_file": "src-245-6447d8695b16.json",
+      "source_name": "曼哈漫画（优+）",
+      "source_url": "https://mangadex.org",
+      "priority": "P0",
+      "rule_forms": [
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "js_unsupported",
+          "detail": "[Internal] rule engine error: invalid JSON input: expected value at line 1 column 1"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "js_unsupported",
+      "duration_ms": 1055
+    },
+    {
+      "source_id": "corpus-9f25b6480061",
+      "source_file": "src-246-9f25b6480061.json",
+      "source_name": "曼哈漫画（优+）",
+      "source_url": "https://www.mangabz.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "js",
+        "multirule",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] https://www.mangabz.com/search?title=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9: Connection Failed: Connect error: Connection refused (os error 61) details={\"host\":{\"capability\":\"http.execute\",\"operationId\":1,\"requestId\":2}}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 15057
+    },
+    {
+      "source_id": "corpus-174a73b04afa",
+      "source_file": "src-247-174a73b04afa.json",
+      "source_name": "曼哈漫画（优+）",
+      "source_url": "https://www.mangabz.com/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "js",
+        "json-jsonpath",
+        "plain",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] http://www.mangabz.com/search?title=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9: Connection Failed: Connect error: Connection refused (os error 61) details={\"host\":{\"capability\":\"http.execute\",\"operationId\":1,\"requestId\":2}}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 15045
+    },
+    {
+      "source_id": "corpus-f207298c577e",
+      "source_file": "src-248-f207298c577e.json",
+      "source_name": "酷看漫画（优+）",
+      "source_url": "https://www.kukk.net#Haxc1107",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[InvalidParams] http.execute request charset must not be blank details={\"charset\":\"\",\"field\":\"charset\"}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "corpus-96294887c25e",
+      "source_file": "src-249-96294887c25e.json",
+      "source_name": "吉站漫画（优+）",
+      "source_url": "https://manhuafree.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "json-jsonpath",
+        "plain",
+        "put-get",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "pass"
+        },
+        "L3-detail": {
+          "status": "pass"
+        },
+        "L4-toc": {
+          "status": "fail",
+          "reason": "js_unsupported",
+          "detail": "[Internal] rule engine error: invalid JSON input: expected value at line 1 column 1"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "js_unsupported",
+      "duration_ms": 2705
+    }
+  ]
+}

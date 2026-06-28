@@ -77,3 +77,69 @@
 - concurrency=1 时 100源/200源可正常完成
 - **推测**：concurrency>1 时某些源的并发处理触发 panic（可能是 JS 沙箱非线程安全）
 - **临时方案**：用 concurrency=1 跑全量（慢但稳）
+
+## 测试工具链优化（2026-06-29 v6）
+
+### 已修复的问题
+
+1. **单源详细日志（`--verbose`/`-v`）**：`test_source` 现在输出每步的详细诊断
+   - L1-L5 每步的 HTTP 请求 URL、状态码、响应大小
+   - Core 返回的书籍数、章节数
+   - 失败原因和错误详情
+   - 用法：`reader-cli --test-source <path> --keyword "斗破苍穹" --verbose`
+
+2. **panic 隔离**：`test_corpus` 中每个源在 `catch_unwind` 中运行
+   - 单个源 panic 不会终止整个批量测试
+   - panic 信息记录到结果中
+
+3. **中间结果保存（`--save-interval N`）**：每 N 个源写一次 checkpoint
+   - 即使进程被杀，也有部分结果
+   - 默认值 10
+
+4. **Runtime::new panic 修复**：`Runtime::new` → `Runtime::new_with_config`
+   - worker thread 创建失败不再 panic 终止进程
+   - 返回 `runtime_spawn_failed` 错误结果
+
+5. **HTTP method allowlist**：只允许 GET/POST/PUT/DELETE/HEAD/PATCH
+   - 防止 CRLF 注入
+
+6. **UTF-8 安全 truncate**：`&s[..max]` → `s.chars().take(max).collect()`
+   - 防止中文书源名 panic
+
+### 已知遗留问题
+
+1. **Runtime drop 阻塞**：worker thread 在 JS host callback 中阻塞时，
+   `Drop` 的 `join()` 会阻塞直到超时。导致批量测试在270/459处卡住。
+   - 修复方向：在 `Drop` 中加超时 join 或 force-kill worker thread
+2. **concurrency=1 串行**：太慢，459源需要20+分钟
+   - 未来需要实现并发（每源独立 Runtime，用线程池）
+
+### v6 批量测试结果（270/459 源，部分运行）
+
+| 级别 | 通过 | 通过率 |
+|------|------|--------|
+| L1-import | 270/270 | 100% |
+| L2-search | 41/270 | 15.2% |
+| L3-detail | 27/270 | 10.0% |
+| L4-toc | 11/270 | 4.1% |
+| L5-content | 7/270 | 2.6% |
+| fully_passed | 7/270 | 2.6% |
+
+失败原因分布：
+- no_search_results: 103 (38%) — HTTP 成功但规则解析返回空
+- http_error: 61 (23%) — TLS/网络/IDN 问题
+- js_unsupported: 54 (20%) — JS 沙箱能力不足
+- core_error: 29 (11%) — CSS 选择器/JSONPath 解析错误
+- no_toc_entries: 9 (3%)
+- content_too_short: 3, parse_error: 3, no_chapter_url: 1
+
+### v4 vs v6 对比
+
+| 指标 | v4 (459源) | v6 (270源) | 变化 |
+|------|-----------|-----------|------|
+| L2-search | 75 (16.3%) | 41 (15.2%) | ~持平(不同源集) |
+| L5-content | 5 (1.1%) | 7 (2.6%) | +136% |
+| fully_passed | 5 (1.1%) | 7 (2.6%) | +136% |
+
+L5 和 fully_passed 有明显提升，说明 TOC/content 修复生效。
+L2 持平说明规则解析问题（no_search_results 38%）仍是最大瓶颈。

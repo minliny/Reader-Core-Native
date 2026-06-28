@@ -1,0 +1,306 @@
+{
+  "version": "corpus-batch-result/1",
+  "mode": "live",
+  "keyword": "斗破苍穹",
+  "generated_at": "2026-06-28T16:15:14Z",
+  "total": 5,
+  "summary": {
+    "fully_passed": 0,
+    "partially_passed": 5,
+    "fully_failed": 0,
+    "pass_rate": 0.0,
+    "by_level": {
+      "L1-import": {
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0
+      },
+      "L2-search": {
+        "passed": 0,
+        "failed": 5,
+        "skipped": 0
+      },
+      "L3-detail": {
+        "passed": 0,
+        "failed": 0,
+        "skipped": 5
+      },
+      "L4-toc": {
+        "passed": 0,
+        "failed": 0,
+        "skipped": 5
+      },
+      "L5-content": {
+        "passed": 0,
+        "failed": 0,
+        "skipped": 5
+      }
+    },
+    "by_form": {
+      "css-shorthand": {
+        "passed": 0,
+        "failed": 3
+      },
+      "inline-js": {
+        "passed": 0,
+        "failed": 4
+      },
+      "js": {
+        "passed": 0,
+        "failed": 4
+      },
+      "json-jsonpath": {
+        "passed": 0,
+        "failed": 3
+      },
+      "multirule": {
+        "passed": 0,
+        "failed": 4
+      },
+      "plain": {
+        "passed": 0,
+        "failed": 4
+      },
+      "put-get": {
+        "passed": 0,
+        "failed": 2
+      },
+      "regex-suffix": {
+        "passed": 0,
+        "failed": 4
+      },
+      "template": {
+        "passed": 0,
+        "failed": 4
+      }
+    },
+    "by_priority": {
+      "P0": {
+        "passed": 0,
+        "failed": 4
+      },
+      "P1": {
+        "passed": 0,
+        "failed": 1
+      }
+    },
+    "failure_reasons": {
+      "http_error": 1,
+      "js_unsupported": 3,
+      "no_search_results": 1
+    }
+  },
+  "sources": [
+    {
+      "source_id": "corpus-829d05cb3ba6",
+      "source_file": "src-000-829d05cb3ba6.json",
+      "source_name": "墨辰整理书源系列7.1版",
+      "source_url": "墨辰整理书源大全",
+      "priority": "P1",
+      "rule_forms": [
+        "js"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 401
+    },
+    {
+      "source_id": "corpus-5ba6c58f3dd3",
+      "source_file": "src-001-5ba6c58f3dd3.json",
+      "source_name": "起点读书（优+++）",
+      "source_url": "https://api-x.shrtxs.cn/qd/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "js_unsupported",
+          "detail": "[Internal] rule engine error: invalid JSON input: expected value at line 1 column 1"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "js_unsupported",
+      "duration_ms": 179
+    },
+    {
+      "source_id": "corpus-55dd939a661d",
+      "source_file": "src-002-55dd939a661d.json",
+      "source_name": "番茄小说（优+++）",
+      "source_url": "https://reading.snssdk.com#lcs",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "js_unsupported",
+          "detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: java.put key and value arguments must be strings"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "js_unsupported",
+      "duration_ms": 3
+    },
+    {
+      "source_id": "corpus-752f07e02faf",
+      "source_file": "src-003-752f07e02faf.json",
+      "source_name": "阅读助手（优+++）",
+      "source_url": "https://api-bc.wtzw.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "put-get",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "js_unsupported",
+          "detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: headers is not defined"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "js_unsupported",
+      "duration_ms": 1
+    },
+    {
+      "source_id": "corpus-6b03705724d4",
+      "source_file": "src-004-6b03705724d4.json",
+      "source_name": "天天小说（优+++）",
+      "source_url": "http://ttk.tw",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "multirule",
+        "plain",
+        "put-get",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] Bad URL: failed to parse URL: IdnaError: invalid international domain name details={\"host\":{\"capability\":\"http.execute\",\"operationId\":1,\"requestId\":2}}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 0
+    }
+  ]
+}

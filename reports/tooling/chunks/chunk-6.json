@@ -1,0 +1,2103 @@
+{
+  "version": "corpus-batch-result/1",
+  "mode": "live",
+  "keyword": "斗破苍穹",
+  "generated_at": "2026-06-28T17:02:03Z",
+  "total": 50,
+  "summary": {
+    "fully_passed": 0,
+    "partially_passed": 50,
+    "fully_failed": 0,
+    "pass_rate": 0.0,
+    "by_level": {
+      "L1-import": {
+        "passed": 50,
+        "failed": 0,
+        "skipped": 0
+      },
+      "L2-search": {
+        "passed": 6,
+        "failed": 44,
+        "skipped": 0
+      },
+      "L3-detail": {
+        "passed": 4,
+        "failed": 2,
+        "skipped": 44
+      },
+      "L4-toc": {
+        "passed": 0,
+        "failed": 4,
+        "skipped": 46
+      },
+      "L5-content": {
+        "passed": 0,
+        "failed": 0,
+        "skipped": 50
+      }
+    },
+    "by_form": {
+      "css-explicit": {
+        "passed": 0,
+        "failed": 5
+      },
+      "css-shorthand": {
+        "passed": 0,
+        "failed": 24
+      },
+      "inline-js": {
+        "passed": 0,
+        "failed": 24
+      },
+      "js": {
+        "passed": 0,
+        "failed": 28
+      },
+      "json-jsonpath": {
+        "passed": 0,
+        "failed": 30
+      },
+      "multirule": {
+        "passed": 0,
+        "failed": 33
+      },
+      "plain": {
+        "passed": 0,
+        "failed": 47
+      },
+      "put-get": {
+        "passed": 0,
+        "failed": 4
+      },
+      "regex-suffix": {
+        "passed": 0,
+        "failed": 22
+      },
+      "template": {
+        "passed": 0,
+        "failed": 26
+      }
+    },
+    "by_priority": {
+      "P0": {
+        "passed": 0,
+        "failed": 32
+      },
+      "P1": {
+        "passed": 0,
+        "failed": 18
+      }
+    },
+    "failure_reasons": {
+      "core_error": 4,
+      "http_error": 7,
+      "js_unsupported": 8,
+      "no_search_results": 27,
+      "no_toc_entries": 4
+    }
+  },
+  "sources": [
+    {
+      "source_id": "corpus-a0ba9418d332",
+      "source_file": "src-300-a0ba9418d332.json",
+      "source_name": "猫耳有声（优）",
+      "source_url": "https://www.hhlqilongzhu.cn",
+      "priority": "P1",
+      "rule_forms": [
+        "json-jsonpath",
+        "plain",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "core_error",
+          "detail": "[Internal] rule engine error: invalid CSS selector `data[*]`: EndOfLine"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "core_error",
+      "duration_ms": 609
+    },
+    {
+      "source_id": "corpus-0a1e7e533485",
+      "source_file": "src-301-0a1e7e533485.json",
+      "source_name": "猫耳听书（优）",
+      "source_url": "https://www.missevan.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "js_unsupported",
+          "detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: java.put key and value arguments must be strings"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "js_unsupported",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "corpus-d11238143a5b",
+      "source_file": "src-302-d11238143a5b.json",
+      "source_name": "猫耳听书（优）",
+      "source_url": "https://www.missevan.com#活力宝",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "js_unsupported",
+          "detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: java.put key and value arguments must be strings"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "js_unsupported",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "corpus-2ae1cac755dc",
+      "source_file": "src-303-2ae1cac755dc.json",
+      "source_name": "猫耳广播（优）",
+      "source_url": "https://www.hhlqilongzhu.cn##猫耳FM广播剧",
+      "priority": "P1",
+      "rule_forms": [
+        "json-jsonpath",
+        "plain",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "core_error",
+          "detail": "[Internal] rule engine error: invalid CSS selector `data[*]`: EndOfLine"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "core_error",
+      "duration_ms": 480
+    },
+    {
+      "source_id": "corpus-fa9e3f29d464",
+      "source_file": "src-304-fa9e3f29d464.json",
+      "source_name": "海洋听书（优）",
+      "source_url": "http://www.ychy.org",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 15788
+    },
+    {
+      "source_id": "corpus-b664f56aeac2",
+      "source_file": "src-305-b664f56aeac2.json",
+      "source_name": "漫播听书（优）",
+      "source_url": "https://api.kilamanbo.com",
+      "priority": "P0",
+      "rule_forms": [
+        "json-jsonpath",
+        "multirule",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 342
+    },
+    {
+      "source_id": "corpus-52b265e7cf89",
+      "source_file": "src-306-52b265e7cf89.json",
+      "source_name": "爱上听书（优）",
+      "source_url": "https://www.230ts.net/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "multirule",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] https://www.230ts.net/search.html?searchtype=name&searchword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1: Network Error: Network Error: Error encountered in the status line: timed out reading response details={\"host\":{\"capability\":\"http.execute\",\"operationId\":1,\"requestId\":2}}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 15396
+    },
+    {
+      "source_id": "corpus-9a268251290f",
+      "source_file": "src-307-9a268251290f.json",
+      "source_name": "面包聆听（优）",
+      "source_url": "http://wx.voxpie.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 233
+    },
+    {
+      "source_id": "corpus-a5ed29c2bb35",
+      "source_file": "src-308-a5ed29c2bb35.json",
+      "source_name": "企鹅音乐（优++）",
+      "source_url": "云智api",
+      "priority": "P1",
+      "rule_forms": [
+        "json-jsonpath",
+        "plain",
+        "template"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] https://api.jkyai.top/API/qqmusic.php?msg=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9: Connection Failed: tls connection init failed: Connection reset by peer (os error 54) details={\"host\":{\"capability\":\"http.execute\",\"operationId\":1,\"requestId\":2}}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 110
+    },
+    {
+      "source_id": "corpus-ce0638ede7d7",
+      "source_file": "src-309-ce0638ede7d7.json",
+      "source_name": "五丁音乐（优+）",
+      "source_url": "http://5sing.kugou.com",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "js",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 153
+    },
+    {
+      "source_id": "corpus-8ed1a297c618",
+      "source_file": "src-310-8ed1a297c618.json",
+      "source_name": "潇社音乐（优+）",
+      "source_url": "http://fuciyuanbang.ciyuans.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 65
+    },
+    {
+      "source_id": "corpus-239a4e859ca1",
+      "source_file": "src-311-239a4e859ca1.json",
+      "source_name": "潇社音乐（优+）",
+      "source_url": "http://fuciyuanbang.ciyuans.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 46
+    },
+    {
+      "source_id": "corpus-fec3d325284f",
+      "source_file": "src-312-fec3d325284f.json",
+      "source_name": "时代音乐（优+）",
+      "source_url": "http://www.78497.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "js",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "pass"
+        },
+        "L3-detail": {
+          "status": "pass"
+        },
+        "L4-toc": {
+          "status": "fail",
+          "reason": "no_toc_entries"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_toc_entries",
+      "duration_ms": 1234
+    },
+    {
+      "source_id": "corpus-95a715ff78f5",
+      "source_file": "src-313-95a715ff78f5.json",
+      "source_name": "听蛙音乐（优+）",
+      "source_url": "https://so.itingwa.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 357
+    },
+    {
+      "source_id": "corpus-771e7a79b9dc",
+      "source_file": "src-314-771e7a79b9dc.json",
+      "source_name": "魔陌音乐（优）",
+      "source_url": "魔音-MORIN",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "js_unsupported",
+          "detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: getAPI is not defined"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "js_unsupported",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "corpus-30759c9a412b",
+      "source_file": "src-315-30759c9a412b.json",
+      "source_name": "荔枝音乐（优）",
+      "source_url": "https://m.lizhi.fm",
+      "priority": "P1",
+      "rule_forms": [
+        "json-jsonpath",
+        "plain"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "pass"
+        },
+        "L3-detail": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] Bad URL: failed to parse URL: InvalidPort: invalid port number details={\"host\":{\"capability\":\"http.execute\",\"operationId\":2,\"requestId\":4}}"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 593
+    },
+    {
+      "source_id": "corpus-382cc1c45562",
+      "source_file": "src-316-382cc1c45562.json",
+      "source_name": "荔枝有声（优）",
+      "source_url": "https://m.lizhi.fm/",
+      "priority": "P1",
+      "rule_forms": [
+        "json-jsonpath",
+        "plain"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "pass"
+        },
+        "L3-detail": {
+          "status": "fail",
+          "reason": "js_unsupported",
+          "detail": "[Internal] rule engine error: invalid JSON input: expected value at line 1 column 1"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "js_unsupported",
+      "duration_ms": 1571
+    },
+    {
+      "source_id": "corpus-88d6d0943a3d",
+      "source_file": "src-317-88d6d0943a3d.json",
+      "source_name": "网易音乐（优）",
+      "source_url": "https://网易云音乐.luoyacheng.ip-ddns.com",
+      "priority": "P0",
+      "rule_forms": [
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] https://music.cpp-prog.com/api.php: Connection Failed: Connect error: connection timed out details={\"host\":{\"capability\":\"http.execute\",\"operationId\":1,\"requestId\":2}}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 30002
+    },
+    {
+      "source_id": "corpus-037a4c643d59",
+      "source_file": "src-318-037a4c643d59.json",
+      "source_name": "网易音乐（优）",
+      "source_url": "http://music.163.com#芜恙",
+      "priority": "P0",
+      "rule_forms": [
+        "css-explicit",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "pass"
+        },
+        "L3-detail": {
+          "status": "pass"
+        },
+        "L4-toc": {
+          "status": "fail",
+          "reason": "no_toc_entries"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_toc_entries",
+      "duration_ms": 1273
+    },
+    {
+      "source_id": "corpus-b16d46316226",
+      "source_file": "src-319-b16d46316226.json",
+      "source_name": "酷我音乐（优）",
+      "source_url": "https://www.kuwo.cn",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "js_unsupported",
+          "detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: mat is not defined"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "js_unsupported",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "corpus-c6d28af97839",
+      "source_file": "src-320-c6d28af97839.json",
+      "source_name": "猫耳音乐（优）",
+      "source_url": "https://www.missevan.com已校验",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "js_unsupported",
+          "detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: java.put key and value arguments must be strings"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "js_unsupported",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "corpus-b55bcb8ae9d4",
+      "source_file": "src-321-b55bcb8ae9d4.json",
+      "source_name": "九酷音乐（优）",
+      "source_url": "http://m.9ku.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 119
+    },
+    {
+      "source_id": "corpus-21c5ab789222",
+      "source_file": "src-322-21c5ab789222.json",
+      "source_name": "坚果云盘（优++）",
+      "source_url": "https://www.jianguoyun.com",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "put-get",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "core_error",
+          "detail": "[InvalidParams] cannot auto-build searchRequest: source.searchUrl is empty details={\"sourceId\":\"corpus-21c5ab789222\"}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "core_error",
+      "duration_ms": 2
+    },
+    {
+      "source_id": "corpus-13b6579e9a21",
+      "source_file": "src-323-13b6579e9a21.json",
+      "source_name": "百度网盘（优++）",
+      "source_url": "https://pan.baidu.com",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "json-jsonpath",
+        "plain",
+        "put-get",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 214
+    },
+    {
+      "source_id": "corpus-f52f9e42bacd",
+      "source_file": "src-324-f52f9e42bacd.json",
+      "source_name": "百度贴吧（优+）",
+      "source_url": "https://tieba.baidu.com#guaner",
+      "priority": "P0",
+      "rule_forms": [
+        "css-explicit",
+        "css-shorthand",
+        "inline-js",
+        "js",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 102
+    },
+    {
+      "source_id": "corpus-41c0c21c0867",
+      "source_file": "src-325-41c0c21c0867.json",
+      "source_name": "吾爱破解（优+）",
+      "source_url": "https://www.52pojie.cn",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "js",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "core_error",
+          "detail": "[Internal] rule engine error: invalid CSS selector `class.result f s0!0`: UnexpectedToken(Delim('!'))"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "core_error",
+      "duration_ms": 752
+    },
+    {
+      "source_id": "corpus-657f2375eb28",
+      "source_file": "src-326-657f2375eb28.json",
+      "source_name": "酷安应用（优+）",
+      "source_url": "https://api.coolapk.com",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "js_unsupported",
+          "detail": "[Internal] rule engine error: invalid JSON input: EOF while parsing a value at line 1 column 0"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "js_unsupported",
+      "duration_ms": 87
+    },
+    {
+      "source_id": "corpus-33f723615e8f",
+      "source_file": "src-327-33f723615e8f.json",
+      "source_name": "微博书源（优+）",
+      "source_url": "https://m.weibo.cn",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] https://null/: Dns Failed: resolve dns name 'null:443': failed to lookup address information: nodename nor servname provided, or not known details={\"host\":{\"capability\":\"http.execute\",\"operationId\":1,\"requestId\":2}}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 11
+    },
+    {
+      "source_id": "corpus-089d4b047a5d",
+      "source_file": "src-328-089d4b047a5d.json",
+      "source_name": "微博评论（优+）",
+      "source_url": "https://m.weibo.cn#",
+      "priority": "P1",
+      "rule_forms": [
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[Internal] https://null/: Dns Failed: resolve dns name 'null:443': failed to lookup address information: nodename nor servname provided, or not known details={\"host\":{\"capability\":\"http.execute\",\"operationId\":1,\"requestId\":2}}"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 4
+    },
+    {
+      "source_id": "corpus-11320beb3a02",
+      "source_file": "src-329-11320beb3a02.json",
+      "source_name": "优品文档（导+）",
+      "source_url": "https://www.ypppt.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "js",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "pass"
+        },
+        "L3-detail": {
+          "status": "pass"
+        },
+        "L4-toc": {
+          "status": "fail",
+          "reason": "no_toc_entries"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_toc_entries",
+      "duration_ms": 603
+    },
+    {
+      "source_id": "corpus-b2e0cc78abe1",
+      "source_file": "src-330-b2e0cc78abe1.json",
+      "source_name": "书单推荐（优+）",
+      "source_url": "https://www.yuque.com/yuqueyonghun8txcr/psb8yc",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "http_error",
+          "detail": "[InvalidParams] AnalyzeUrl failed: invalid URL: missing host: https://"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "http_error",
+      "duration_ms": 1
+    },
+    {
+      "source_id": "corpus-955bb3e4a37f",
+      "source_file": "src-331-955bb3e4a37f.json",
+      "source_name": "超星网站（优+）",
+      "source_url": "http://yz4.chaoxing.com#",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 160
+    },
+    {
+      "source_id": "corpus-7f5cd2c0faec",
+      "source_file": "src-332-7f5cd2c0faec.json",
+      "source_name": "个性说网（优+）",
+      "source_url": "https://www.gexingshuo.com/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 730
+    },
+    {
+      "source_id": "corpus-3c85445b7c5a",
+      "source_file": "src-333-3c85445b7c5a.json",
+      "source_name": "个性说网（优+）",
+      "source_url": "https://www.gexingshuo.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 270
+    },
+    {
+      "source_id": "corpus-8499163b43dc",
+      "source_file": "src-334-8499163b43dc.json",
+      "source_name": "个性说网（优+）",
+      "source_url": "https://www.gexingshuo.com#一程",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 1294
+    },
+    {
+      "source_id": "corpus-55e8770c62c0",
+      "source_file": "src-335-55e8770c62c0.json",
+      "source_name": "治能寄算（优+）",
+      "source_url": "https://你觉得还有网址?",
+      "priority": "P0",
+      "rule_forms": [
+        "js",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 299
+    },
+    {
+      "source_id": "corpus-5dff1a893cb7",
+      "source_file": "src-336-5dff1a893cb7.json",
+      "source_name": "优品学习（优）",
+      "source_url": "https://www.ypppt.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "js",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "pass"
+        },
+        "L3-detail": {
+          "status": "pass"
+        },
+        "L4-toc": {
+          "status": "fail",
+          "reason": "no_toc_entries"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_toc_entries",
+      "duration_ms": 660
+    },
+    {
+      "source_id": "corpus-bdeaa8132c97",
+      "source_file": "src-337-bdeaa8132c97.json",
+      "source_name": "爱推书君（优）",
+      "source_url": "https://pre-api.tuishujun.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 554
+    },
+    {
+      "source_id": "corpus-c9e9adfbdfab",
+      "source_file": "src-338-c9e9adfbdfab.json",
+      "source_name": "爱推书君（优）",
+      "source_url": "https://pre-api.tuishujun.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 481
+    },
+    {
+      "source_id": "corpus-c2b1e5bae335",
+      "source_file": "src-339-c2b1e5bae335.json",
+      "source_name": "爱发电网（优）",
+      "source_url": "https://afdian.com",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 2272
+    },
+    {
+      "source_id": "corpus-53034b1d1c00",
+      "source_file": "src-340-53034b1d1c00.json",
+      "source_name": "爱发电网（优）",
+      "source_url": "https://afdian.com#",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 1586
+    },
+    {
+      "source_id": "corpus-b9b41b856756",
+      "source_file": "src-341-b9b41b856756.json",
+      "source_name": "青花鱼评（优）",
+      "source_url": "http://45.79.102.135/allcp.org/###",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "js",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 396
+    },
+    {
+      "source_id": "corpus-d76adeb6372e",
+      "source_file": "src-342-d76adeb6372e.json",
+      "source_name": "乐乎文章（优）",
+      "source_url": "https://newsmiss.lofter.com",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "put-get",
+        "regex-suffix",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": true,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "js_unsupported",
+          "detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: HostCallback: host callback java.androidId failed: unregistered host callback: java.androidId"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "js_unsupported",
+      "duration_ms": 1
+    },
+    {
+      "source_id": "corpus-031ecbd7e40e",
+      "source_file": "src-343-031ecbd7e40e.json",
+      "source_name": "天涯知识（优）",
+      "source_url": "http://book.sbkk8.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "has_js": false,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 395
+    },
+    {
+      "source_id": "corpus-f5c138e0c38f",
+      "source_file": "src-344-f5c138e0c38f.json",
+      "source_name": "我爱读者（优）",
+      "source_url": "https://www.52dzxy.com/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "has_js": false,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 299
+    },
+    {
+      "source_id": "corpus-510d385bfa39",
+      "source_file": "src-345-510d385bfa39.json",
+      "source_name": "爱推書君（优）",
+      "source_url": "https://pre-api.tuishujun.com#md冷魅",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "json-jsonpath",
+        "multirule",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": true,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 463
+    },
+    {
+      "source_id": "corpus-c754d85937a6",
+      "source_file": "src-346-c754d85937a6.json",
+      "source_name": "海词木稽（优）",
+      "source_url": "http://dict.cn已整理",
+      "priority": "P1",
+      "rule_forms": [
+        "css-explicit",
+        "js",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 339
+    },
+    {
+      "source_id": "corpus-3cc2c0288cf6",
+      "source_file": "src-347-3cc2c0288cf6.json",
+      "source_name": "海词精选（优）",
+      "source_url": "http://dict.cn",
+      "priority": "P1",
+      "rule_forms": [
+        "css-explicit",
+        "js",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 230
+    },
+    {
+      "source_id": "corpus-4bc629a4db27",
+      "source_file": "src-348-4bc629a4db27.json",
+      "source_name": "海词词典（优）",
+      "source_url": "http://dict.cn/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-explicit",
+        "js",
+        "plain"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 323
+    },
+    {
+      "source_id": "corpus-f0f7d89f1f98",
+      "source_file": "src-349-f0f7d89f1f98.json",
+      "source_name": "百度图片（优）",
+      "source_url": "https://image.baidu.com#guaner",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "plain",
+        "put-get",
+        "template"
+      ],
+      "has_js": true,
+      "has_multirule": false,
+      "has_regex": false,
+      "levels": {
+        "L1-import": {
+          "status": "pass"
+        },
+        "L2-search": {
+          "status": "fail",
+          "reason": "no_search_results"
+        },
+        "L3-detail": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L4-toc": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        },
+        "L5-content": {
+          "status": "skip",
+          "reason": "previous_level_failed"
+        }
+      },
+      "failure_reason": "no_search_results",
+      "duration_ms": 393
+    }
+  ]
+}
