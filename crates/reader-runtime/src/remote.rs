@@ -805,7 +805,15 @@ fn build_search_request_from_source(
         .and_then(|h| h.as_object())
         .cloned()
         .unwrap_or_default();
-    build_analyze_url_request(state, search_url, &ctx, &source.base_url, &source_headers)
+    // corpus 导入的源 baseUrl 经常为空但 bookSourceUrl 保留;相对路径 searchUrl
+    // 需要一个 base 来 resolve,否则 resolve_url 返回空 → no_search_results。
+    // 回退到 legado.bookSourceUrl(等同 Legado `source.bookSourceUrl`)。
+    let base_url = if source.base_url.trim().is_empty() {
+        legado.book_source_url.as_deref().unwrap_or("")
+    } else {
+        &source.base_url
+    };
+    build_analyze_url_request(state, search_url, &ctx, base_url, &source_headers)
 }
 
 /// Build a `HostHttpRequest` from an explicit URL field (`bookUrl` /
@@ -850,6 +858,21 @@ fn build_analyze_url_request(
     base_url: &str,
     source_headers: &serde_json::Map<String, serde_json::Value>,
 ) -> Result<HostHttpRequest, CoreError> {
+    // Legado `{{source.key}}` / `{{source.bookSourceUrl}}` resolve to the
+    // source's `bookSourceUrl` (== `base_url` here). Substitute before static
+    // template expansion so the URL is not misclassified as a JS expression
+    // by `classify_js_expression` (which would force the JS path and fail
+    // when no evaluator is wired). Mirrors Legado `AnalyzeUrl.initUrl`'s
+    // `source` variable scope. The `{{source.getKey()}}` form is a JS
+    // function call and remains handled by the JS path below, not here.
+    // Covers the corpus variants: `{{source.key}}`, `{{source.bookSourceUrl}}`
+    // (Legado canonical), and `{{source.booksourceurl}}` (lowercase typo).
+    let resolved: String = raw_url
+        .replace("{{source.key}}", base_url)
+        .replace("{{source.bookSourceUrl}}", base_url)
+        .replace("{{source.booksourceurl}}", base_url);
+    let raw_url: &str = resolved.as_str();
+
     // Quick pre-check: classify the URL (after static template expansion) for
     // embedded JS. If no JS, use the cheaper non-JS path.
     let expanded = reader_content::analyze_url::expand_static_templates(raw_url, ctx);

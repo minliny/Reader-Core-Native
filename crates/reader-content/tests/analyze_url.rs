@@ -81,6 +81,28 @@ fn parse_malformed_json_returns_error() {
     assert!(result.is_err());
 }
 
+#[test]
+fn classify_static_variable_placeholders_are_not_js() {
+    // {{source.key}} / {{source.booksourceurl}} / {{cookie.*}} are static
+    // variable references, not JS expressions — they must NOT be classified
+    // as RequiresJsSandbox (would route to JS path → no evaluator → error).
+    for raw in &[
+        "{{source.key}}",
+        "{{source.bookSourceUrl}}",
+        "{{cookie.token}}",
+        "search.php?keyword={{key}}",
+        "https://host.test/{{source.key}}/path",
+    ] {
+        let (expr, class) = UrlDslParser::classify_js_expression(raw);
+        assert_eq!(
+            class,
+            JsExpressionClassification::None,
+            "static placeholder {raw:?} must not be classified as JS"
+        );
+        assert!(expr.is_none(), "no JS expression for static {raw:?}");
+    }
+}
+
 // ===== Task 2: Static template expander + page list =====
 
 #[test]

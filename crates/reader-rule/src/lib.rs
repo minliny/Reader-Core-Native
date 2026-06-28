@@ -108,14 +108,15 @@ impl RuleEngine {
     /// 2. `@put:{...}` extraction → `scope` (splitPutRule 408-431).
     /// 3. `@get:{key}` substitution from `scope` (makeUpRule getRuleType 698).
     /// 4. `{{expr}}` JS template substitution (makeUpRule jsRuleType 606-609,
-    ///    AppPattern.EXP_PATTERN). If `js` is None and templates are present,
-    ///    returns empty output (graceful degradation — Legado catches the JS
-    ///    eval failure at a higher level).
+    ///    AppPattern.EXP_PATTERN). If `js` is None the raw template text is
+    ///    kept and passed downstream (mirrors Legado catching JS eval
+    ///    failures and falling back to the unexpanded string).
     /// 5. `##regex##replacement` suffix parsing (splitRegex 627-654).
     /// 6. `<js>...</js>` / `@js:...` segment splitting (splitSourceRule
     ///    498-518, AppPattern.JS_PATTERN). Non-JS segments execute on the
     ///    previous output; JS segments transform each value with `result`
-    ///    bound to the current value.
+    ///    bound to the current value. When `js` is None the JS segments are
+    ///    stripped and the remaining plain-text selector is executed.
     /// 7. `##` regex applied to each final output value (replaceRegex 436-460).
     pub fn execute_legado_rule(
         &self,
@@ -134,21 +135,29 @@ impl RuleEngine {
         // stored by an earlier @put:{...} in the same rule.
         let body = extract_put_rules(body, scope);
         let body = substitute_get_rules(&body, scope);
-        // {{expr}} templates: if present but no evaluator, degrade gracefully
-        // to empty output (mirrors Legado catching JS eval failures).
-        if body.contains("{{") && js.is_none() {
-            return Ok(RuleOutput::new(Vec::new()));
-        }
+        // {{expr}} templates: if no evaluator is available, keep the raw
+        // template text and continue down the pipeline. Mirrors Legado
+        // catching JS eval failures and falling back to the unexpanded
+        // string (e.g. a search URL with `{{key}}` still reaches the HTTP
+        // layer instead of being dropped to empty).
         let body = substitute_js_templates(&body, js);
         let suffix = LegadoRegexSuffix::parse(&body);
         let segments = split_js_segments(suffix.selector);
         let has_js_segment = segments.iter().any(|(_, is_js)| *is_js);
-        if has_js_segment && js.is_none() {
-            // <js>/@js: present but no evaluator → cannot transform → empty.
-            return Ok(RuleOutput::new(Vec::new()));
-        }
-        let values = if has_js_segment {
+        let values = if has_js_segment && js.is_some() {
             execute_js_pipeline(self, input, mode, &segments, js.unwrap())?
+        } else if has_js_segment && js.is_none() {
+            // <js>/@js: present but no evaluator → strip the JS segments
+            // and execute the remaining plain-text selector. Mirrors
+            // Legado catching JS eval failures and continuing with the
+            // raw selector text rather than dropping to empty.
+            let stripped: String = segments
+                .iter()
+                .filter(|(_, is_js)| !is_js)
+                .map(|(s, _)| s.as_str())
+                .collect();
+            self.execute_mode(input, mode, &stripped)?
+                .into_values()
         } else {
             self.execute_mode(input, mode, suffix.selector)?
                 .into_values()
@@ -616,8 +625,9 @@ fn substitute_get_rules(body: &str, scope: &dyn RuleVariableScope) -> String {
 /// with no `result` context (the expression runs against the scope, not the
 /// extracted value) and its string result replaces the template in the body.
 ///
-/// If `js` is None the body is returned unchanged — callers should check for
-/// remaining `{{` and degrade gracefully (see `execute_legado_rule`).
+/// If `js` is None the body is returned unchanged — `execute_legado_rule`
+/// keeps the unexpanded template text and passes it downstream (mirrors
+/// Legado catching JS eval failures and falling back to the raw string).
 fn substitute_js_templates(body: &str, js: Option<&dyn RuleJsEvaluator>) -> String {
     let Some(js) = js else {
         return body.to_string();

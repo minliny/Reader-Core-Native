@@ -355,6 +355,109 @@ fn book_search_auto_builds_from_dsl_js_option_via_sandbox() {
     assert_eq!(url, "https://built.example.test/k=test");
 }
 
+/// `{{source.key}}` in `searchUrl` must be substituted with the source's
+/// `bookSourceUrl` (== `baseUrl`) before static template expansion. This is
+/// the Legado `AnalyzeUrl.initUrl` `source` variable scope. Without the
+/// substitution, `{{source.key}}` leaks into the URL and the host fails DNS
+/// resolution (`{{source.key}}:443` is not a valid hostname). See corpus
+/// `src-035`, `src-092`, `src-198` for real affected sources.
+#[test]
+fn book_search_auto_build_substitutes_source_key_placeholder() {
+    let state = RemoteState::new();
+    let source = inline_search_source(
+        "{{source.key}}/search.php?keyword={{key}}&page={{page}}",
+        "https://api.example.test",
+    );
+    let params = serde_json::json!({
+        "sourceId": "src-1",
+        "source": source,
+        "keyword": "斗破苍穹",
+        "page": 1,
+    });
+
+    let dispatch = dispatch_book_search(&state, params);
+    let (url, method) = pending_url_method(dispatch);
+
+    assert_eq!(method, "GET");
+    assert!(
+        url.starts_with("https://api.example.test/search.php?keyword="),
+        "{{source.key}} should be replaced by baseUrl, got: {url}"
+    );
+    assert!(
+        url.contains("page=1"),
+        "page template should still expand, got: {url}"
+    );
+    assert!(
+        !url.contains("{{source."),
+        "no {{source.*}} placeholder should remain, got: {url}"
+    );
+}
+
+/// `{{source.bookSourceUrl}}` is the Legado canonical form (used by corpus
+/// `src-018`, `src-047`). It must resolve to `baseUrl` exactly like
+/// `{{source.key}}`.
+#[test]
+fn book_search_auto_build_substitutes_source_book_source_url_canonical() {
+    let state = RemoteState::new();
+    let source = inline_search_source(
+        "{{source.bookSourceUrl}}/search?keyword={{key}}&page={{page}}",
+        "https://api.example.test",
+    );
+    let params = serde_json::json!({
+        "sourceId": "src-1",
+        "source": source,
+        "keyword": "test",
+        "page": 2,
+    });
+
+    let dispatch = dispatch_book_search(&state, params);
+    let (url, _) = pending_url_method(dispatch);
+
+    assert!(
+        url.starts_with("https://api.example.test/search?keyword="),
+        "{{source.bookSourceUrl}} should be replaced by baseUrl, got: {url}"
+    );
+    assert!(
+        url.contains("page=2"),
+        "page template should still expand, got: {url}"
+    );
+    assert!(
+        !url.contains("{{source."),
+        "no {{source.*}} placeholder should remain, got: {url}"
+    );
+}
+
+/// `{{source.booksourceurl}}` (all-lowercase typo variant, observed in
+/// `reports/tooling/corpus-batch-*.json` error details) must also resolve to
+/// `baseUrl`. Legado's substitution is field-name based and corpus sources
+/// occasionally lowercase the placeholder.
+#[test]
+fn book_search_auto_build_substitutes_source_book_source_url_lowercase() {
+    let state = RemoteState::new();
+    let source = inline_search_source(
+        "{{source.booksourceurl}}/search?keyword={{key}}",
+        "https://api.example.test",
+    );
+    let params = serde_json::json!({
+        "sourceId": "src-1",
+        "source": source,
+        "keyword": "test",
+        "page": 1,
+    });
+
+    let dispatch = dispatch_book_search(&state, params);
+    let (url, _) = pending_url_method(dispatch);
+
+    assert!(
+        url.starts_with("https://api.example.test/search?keyword="),
+        "{{source.booksourceurl}} should be replaced by baseUrl, got: {url}"
+    );
+    assert!(
+        !url.contains("{{source."),
+        "no {{source.*}} placeholder should remain, got: {url}"
+    );
+}
+
 /// A JS expression that throws surfaces as a Finished (error) dispatch.
 #[test]
 fn book_search_auto_build_js_error_surfaces_as_finished() {

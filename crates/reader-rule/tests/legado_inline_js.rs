@@ -66,13 +66,19 @@ fn js_template_substitutes_result_into_selector() {
 }
 
 #[test]
-fn js_template_without_evaluator_leaves_rule_unchanged() {
+fn js_template_without_evaluator_passes_raw_body_downstream() {
     // No JS evaluator → {{...}} is not substituted; the raw "{{div}}" reaches
-    // the CSS engine which returns no matches (graceful, no panic).
-    let out = exec(r#"{{div}}@text"#, None);
+    // the CSS engine unchanged (instead of being dropped to empty up front).
+    // The CSS engine rejects `{{div}}` as a selector-syntax error — the test
+    // verifies that the unexpanded template propagates downstream rather
+    // than being silently swallowed.
+    let engine = RuleEngine::new();
+    let mut scope = NoopVariableScope;
+    let result =
+        engine.execute_legado_rule(HTML, r#"{{div}}@text"#, &mut scope, None);
     assert!(
-        out.is_empty(),
-        "without a JS evaluator {{...}} yields no matches"
+        result.is_err(),
+        "without a JS evaluator the raw template reaches the CSS engine and surfaces its selector-syntax error"
     );
 }
 
@@ -119,8 +125,11 @@ fn at_js_segment_post_processes_output() {
 }
 
 #[test]
-fn inline_js_without_evaluator_yields_empty() {
-    // <js> present but no evaluator → cannot transform → empty output.
+fn inline_js_without_evaluator_strips_js_segments() {
+    // <js> present but no evaluator → strip the JS segments and execute
+    // the remaining plain-text selector ("div@text") instead of dropping
+    // to empty. Mirrors Legado catching JS eval failures and continuing
+    // with the raw selector text.
     let html = r#"<div>hello</div>"#;
     let engine = RuleEngine::new();
     let mut scope = NoopVariableScope;
@@ -128,7 +137,56 @@ fn inline_js_without_evaluator_yields_empty() {
         .execute_legado_rule(html, "div@text<js>result</js>", &mut scope, None)
         .unwrap()
         .into_values();
-    assert!(out.is_empty());
+    assert_eq!(out, vec!["hello".to_string()]);
+}
+
+#[test]
+fn qidian_source_url_template_no_longer_drops_to_empty() {
+    // Regression: the 起点读书 (corpus-5ba6c58f3dd3) source previously
+    // reported `js_unsupported` at L2-search because its searchUrl rule
+    // `{{source.key}}/search.php?keyword={{key}}&page={{page}}` was dropped
+    // to empty by execute_legado_rule when no JS evaluator was wired in.
+    //
+    // After the fix, the unexpanded template is preserved and passed
+    // downstream — the rule engine no longer short-circuits to empty.
+    // We verify this by calling execute_legado_rule with the exact rule
+    // pattern and asserting the result is NOT an empty-values success
+    // (it propagates a downstream selector/parse error instead).
+    let engine = RuleEngine::new();
+    let mut scope = NoopVariableScope;
+    let result = engine.execute_legado_rule(
+        HTML,
+        "{{source.key}}/search.php?keyword={{key}}&page={{page}}",
+        &mut scope,
+        None,
+    );
+    assert!(
+        result.is_err(),
+        "unexpanded URL template should propagate downstream, not silently return empty"
+    );
+}
+
+#[test]
+fn qidian_source_kind_rule_strips_js_and_keeps_template_text() {
+    // Regression: the 起点读书 `kind` rule combines `{{...}}` templates
+    // with a trailing `<js>##(?m)\\|$</js>` segment. Previously this
+    // returned empty when no JS evaluator was wired in. After the fix:
+    //   - `{{...}}` templates stay raw (unexpanded)
+    //   - the `<js>...</js>` segment is stripped
+    //   - the remaining plain text is passed downstream (and surfaces a
+    //     downstream error rather than an empty success).
+    let engine = RuleEngine::new();
+    let mut scope = NoopVariableScope;
+    let result = engine.execute_legado_rule(
+        HTML,
+        "{{$.ActionStatusString||$.BookStatus##完本##完结}}\n{{$.SubCategoryName}}\n<js>##(?m)\\|$</js>",
+        &mut scope,
+        None,
+    );
+    assert!(
+        result.is_err(),
+        "kind rule with mixed {{}} and <js> should strip <js> and pass plain text downstream, not return empty"
+    );
 }
 
 #[test]
