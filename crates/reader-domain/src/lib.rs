@@ -996,6 +996,54 @@ pub struct DictRule {
     pub sort_number: i32,
 }
 
+/// 书架分组（对照 Legado `BookGroup.kt`）。
+///
+/// Swift Reader-Core 不存在该实体，对照 Legado 新建。主键 `group_id`
+/// 为整数 id（Legado 默认 `System.currentTimeMillis()`）。`group_name`
+/// 是用户可见名称；`cover` 为分组封面 URL；`order` 控制排序（小的在前）；
+/// `enable_refresh` 标记是否参与自动刷新；`show` 控制是否在书架显示。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookGroup {
+    /// 主键；分组 id。Legado 默认 `System.currentTimeMillis()`。
+    pub group_id: i64,
+    #[serde(default)]
+    pub group_name: String,
+    /// 分组封面 URL（可空）。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover: Option<String>,
+    /// 排序序号；小的在前。Legado 默认 0。
+    #[serde(default)]
+    pub order: i32,
+    /// 是否参与自动刷新。Legado 默认 true。
+    #[serde(default = "default_true")]
+    pub enable_refresh: bool,
+    /// 是否在书架显示。Legado 默认 true。
+    #[serde(default = "default_true")]
+    pub show: bool,
+}
+
+/// 阅读时长记录（对照 Legado `ReadRecord.kt`）。
+///
+/// Swift Reader-Core 不存在该实体，对照 Legado 新建。复合主键
+/// `(device_id, book_name)`：每个设备对每本书维护一条记录。
+/// `read_time` 为累计阅读时长（毫秒）；`last_read` 为上次阅读时间戳（毫秒）。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReadRecord {
+    /// 设备 id（Legado 用 `androidId`/`deviceId`）。
+    #[serde(default)]
+    pub device_id: String,
+    /// 书名（与 Bookmark.bookName 同语义）。
+    pub book_name: String,
+    /// 累计阅读时长（毫秒）。
+    #[serde(default)]
+    pub read_time: i64,
+    /// 上次阅读时间戳（毫秒）。
+    #[serde(default)]
+    pub last_read: i64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

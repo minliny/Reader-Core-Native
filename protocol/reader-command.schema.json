@@ -101,7 +101,19 @@
         "txt-toc-rule.create",
         "txt-toc-rule.list",
         "txt-toc-rule.update",
-        "txt-toc-rule.delete"
+        "txt-toc-rule.delete",
+        "bookmark.create",
+        "bookmark.list",
+        "bookmark.update",
+        "bookmark.delete",
+        "book-group.create",
+        "book-group.list",
+        "book-group.update",
+        "book-group.delete",
+        "read-record.create",
+        "read-record.list",
+        "read-record.update",
+        "read-record.delete"
       ]
     },
     "params": {

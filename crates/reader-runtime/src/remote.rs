@@ -17,15 +17,21 @@ use reader_content::{JsOutcome, RemoteContentPipeline};
 use reader_contract::{
     self as contract,
     remote::{
-        parse_params, BookDetailParams, BookSearchParams, BookTocParams, BookshelfEntryData,
-        BookshelfGetData, BookshelfGetParams, BookshelfListData, BookshelfListParams,
-        ChapterContentParams, HostHttpRequest, HostHttpResponse, LocalBookCatalogData,
-        LocalBookCatalogParams, LocalBookParseData, LocalBookParseParams,
-        ReadingProgressUpdateParams, ReplaceRuleCreateData, ReplaceRuleCreateParams,
-        ReplaceRuleData, ReplaceRuleDeleteData, ReplaceRuleDeleteParams, ReplaceRuleListData,
-        ReplaceRuleListParams, ReplaceRuleUpdateData, ReplaceRuleUpdateParams, RssParseData,
-        RssParseEntryData, RssParseParams, RssRefreshData, RssRefreshParams,
-        SourceExploreKindEntry, SourceExploreKindsData, SourceExploreKindsParams,
+        parse_params, BookDetailParams, BookSearchParams, BookTocParams, BookmarkCreateData,
+        BookmarkCreateParams, BookmarkData, BookmarkDeleteData, BookmarkDeleteParams,
+        BookmarkListData, BookmarkListParams, BookmarkUpdateData, BookmarkUpdateParams,
+        BookGroupCreateData, BookGroupCreateParams, BookGroupData, BookGroupDeleteData,
+        BookGroupDeleteParams, BookGroupListData, BookGroupListParams, BookGroupUpdateData,
+        BookGroupUpdateParams, BookshelfEntryData, BookshelfGetData, BookshelfGetParams,
+        BookshelfListData, BookshelfListParams, ChapterContentParams, HostHttpRequest,
+        HostHttpResponse, LocalBookCatalogData, LocalBookCatalogParams, LocalBookParseData,
+        LocalBookParseParams, ReadRecordCreateData, ReadRecordCreateParams, ReadRecordData,
+        ReadRecordDeleteData, ReadRecordDeleteParams, ReadRecordListData, ReadRecordListParams,
+        ReadRecordUpdateData, ReadRecordUpdateParams, ReadingProgressUpdateParams,
+        ReplaceRuleCreateData, ReplaceRuleCreateParams, ReplaceRuleData, ReplaceRuleDeleteData,
+        ReplaceRuleDeleteParams, ReplaceRuleListData, ReplaceRuleListParams, ReplaceRuleUpdateData,
+        ReplaceRuleUpdateParams, RssParseData, RssParseEntryData, RssParseParams, RssRefreshData,
+        RssRefreshParams, SourceExploreKindEntry, SourceExploreKindsData, SourceExploreKindsParams,
         SourceExploreParams, SourceImportParams, SyncBackupData, SyncBackupParams, SyncMergeData,
         SyncMergeParams, TxtTocRuleCreateData, TxtTocRuleCreateParams, TxtTocRuleData,
         TxtTocRuleDeleteData, TxtTocRuleDeleteParams, TxtTocRuleListData, TxtTocRuleListParams,
@@ -34,7 +40,8 @@ use reader_contract::{
     CoreError, Event, HostCapability,
 };
 use reader_domain::{
-    Book, ReadingProgress, ReplaceRule, Source, SourceRules, TocEntry, TxtTocRule,
+    Book, Bookmark, BookGroup, ReadRecord, ReadingProgress, ReplaceRule, Source, SourceRules,
+    TocEntry, TxtTocRule,
 };
 use reader_storage::{BookshelfEntry, BookshelfQuery, BookshelfSortBy, BookshelfSortDirection};
 use reader_storage::{BookshelfStore, InMemoryStorage};
@@ -398,6 +405,42 @@ pub fn dispatch_remote(
         }
         contract::methods::REPLACE_RULE_DELETE => {
             replace_rule_delete(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::BOOKMARK_CREATE => {
+            bookmark_create(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::BOOKMARK_LIST => {
+            bookmark_list(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::BOOKMARK_UPDATE => {
+            bookmark_update(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::BOOKMARK_DELETE => {
+            bookmark_delete(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::BOOK_GROUP_CREATE => {
+            book_group_create(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::BOOK_GROUP_LIST => {
+            book_group_list(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::BOOK_GROUP_UPDATE => {
+            book_group_update(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::BOOK_GROUP_DELETE => {
+            book_group_delete(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::READ_RECORD_CREATE => {
+            read_record_create(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::READ_RECORD_LIST => {
+            read_record_list(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::READ_RECORD_UPDATE => {
+            read_record_update(cmd, state).map(RemoteCommandResult::Complete)
+        }
+        contract::methods::READ_RECORD_DELETE => {
+            read_record_delete(cmd, state).map(RemoteCommandResult::Complete)
         }
         // TEMPORARILY DISABLED: source.explore / txt.tocRule.* dispatch cases
         // require handler functions (source_explore_kinds, source_explore,
@@ -1775,6 +1818,386 @@ fn replace_rule_delete(
     }
     let data = ReplaceRuleDeleteData {
         id: params.id,
+        deleted: existed,
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+// ===========================================================================
+// bookmark.* CRUD (Legado Bookmark.kt + BookmarkDao.kt parity)
+// ===========================================================================
+
+fn bookmark_to_data(b: Bookmark) -> BookmarkData {
+    BookmarkData {
+        time: b.time,
+        book_name: b.book_name,
+        book_author: b.book_author,
+        chapter_index: b.chapter_index,
+        chapter_pos: b.chapter_pos,
+        chapter_name: b.chapter_name,
+        book_text: b.book_text,
+        content: b.content,
+    }
+}
+
+fn next_bookmark_time(state: &RemoteState) -> Result<i64, CoreError> {
+    let bookmarks = state
+        .storage()
+        .list_bookmarks()
+        .map_err(storage_internal)?;
+    Ok(bookmarks.iter().map(|b| b.time).max().unwrap_or(0) + 1)
+}
+
+fn bookmark_create(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: BookmarkCreateParams =
+        parse_params(contract::methods::BOOKMARK_CREATE, &cmd.params)?;
+    let time = params
+        .time
+        .unwrap_or_else(|| next_bookmark_time(state).unwrap_or(1));
+    let bookmark = Bookmark {
+        time,
+        book_name: params.book_name,
+        book_author: params.book_author,
+        chapter_index: params.chapter_index,
+        chapter_pos: params.chapter_pos,
+        chapter_name: params.chapter_name,
+        book_text: params.book_text,
+        content: params.content,
+    };
+    let stored = state
+        .storage()
+        .put_bookmark(bookmark)
+        .map_err(storage_internal)?;
+    let data = BookmarkCreateData {
+        bookmark: bookmark_to_data(stored),
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+fn bookmark_list(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: BookmarkListParams =
+        parse_params(contract::methods::BOOKMARK_LIST, &cmd.params)?;
+    let bookmarks = match (params.book_name, params.book_author) {
+        (Some(name), Some(author)) => state
+            .storage()
+            .list_bookmarks_by_book(&name, &author)
+            .map_err(storage_internal)?,
+        _ => state.storage().list_bookmarks().map_err(storage_internal)?,
+    };
+    let data = BookmarkListData {
+        bookmarks: bookmarks.into_iter().map(bookmark_to_data).collect(),
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+fn bookmark_update(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: BookmarkUpdateParams =
+        parse_params(contract::methods::BOOKMARK_UPDATE, &cmd.params)?;
+    let existing = state
+        .storage()
+        .get_bookmark(params.time)
+        .map_err(storage_internal)?
+        .ok_or_else(|| {
+            CoreError::invalid_params(format!("bookmark not found: time={}", params.time))
+        })?;
+    let updated = Bookmark {
+        time: existing.time,
+        book_name: params.book_name.unwrap_or(existing.book_name),
+        book_author: params.book_author.unwrap_or(existing.book_author),
+        chapter_index: params.chapter_index.unwrap_or(existing.chapter_index),
+        chapter_pos: params.chapter_pos.unwrap_or(existing.chapter_pos),
+        chapter_name: params.chapter_name.unwrap_or(existing.chapter_name),
+        book_text: params.book_text.unwrap_or(existing.book_text),
+        content: params.content.unwrap_or(existing.content),
+    };
+    let stored = state
+        .storage()
+        .put_bookmark(updated)
+        .map_err(storage_internal)?;
+    let data = BookmarkUpdateData {
+        bookmark: bookmark_to_data(stored),
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+fn bookmark_delete(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: BookmarkDeleteParams =
+        parse_params(contract::methods::BOOKMARK_DELETE, &cmd.params)?;
+    let existed = state
+        .storage()
+        .get_bookmark(params.time)
+        .map_err(storage_internal)?
+        .is_some();
+    if existed {
+        state
+            .storage()
+            .delete_bookmark(params.time)
+            .map_err(storage_internal)?;
+    }
+    let data = BookmarkDeleteData {
+        time: params.time,
+        deleted: existed,
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+// ===========================================================================
+// book-group.* CRUD (Legado BookGroup.kt + BookGroupDao.kt parity)
+// ===========================================================================
+
+fn book_group_to_data(g: BookGroup) -> BookGroupData {
+    BookGroupData {
+        group_id: g.group_id,
+        group_name: g.group_name,
+        cover: g.cover,
+        order: g.order,
+        enable_refresh: g.enable_refresh,
+        show: g.show,
+    }
+}
+
+fn next_book_group_id(state: &RemoteState) -> Result<i64, CoreError> {
+    let groups = state
+        .storage()
+        .list_book_groups()
+        .map_err(storage_internal)?;
+    Ok(groups.iter().map(|g| g.group_id).max().unwrap_or(0) + 1)
+}
+
+fn book_group_create(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: BookGroupCreateParams =
+        parse_params(contract::methods::BOOK_GROUP_CREATE, &cmd.params)?;
+    let group_id = params
+        .group_id
+        .unwrap_or_else(|| next_book_group_id(state).unwrap_or(1));
+    let group = BookGroup {
+        group_id,
+        group_name: params.group_name,
+        cover: params.cover,
+        order: params.order,
+        enable_refresh: params.enable_refresh,
+        show: params.show,
+    };
+    let stored = state
+        .storage()
+        .put_book_group(group)
+        .map_err(storage_internal)?;
+    let data = BookGroupCreateData {
+        group: book_group_to_data(stored),
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+fn book_group_list(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: BookGroupListParams =
+        parse_params(contract::methods::BOOK_GROUP_LIST, &cmd.params)?;
+    let groups = state
+        .storage()
+        .list_book_groups()
+        .map_err(storage_internal)?;
+    let groups = if params.show_only == Some(true) {
+        groups.into_iter().filter(|g| g.show).collect()
+    } else {
+        groups
+    };
+    let data = BookGroupListData {
+        groups: groups.into_iter().map(book_group_to_data).collect(),
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+fn book_group_update(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: BookGroupUpdateParams =
+        parse_params(contract::methods::BOOK_GROUP_UPDATE, &cmd.params)?;
+    let existing = state
+        .storage()
+        .get_book_group(params.group_id)
+        .map_err(storage_internal)?
+        .ok_or_else(|| {
+            CoreError::invalid_params(format!(
+                "book-group not found: groupId={}",
+                params.group_id
+            ))
+        })?;
+    let updated = BookGroup {
+        group_id: existing.group_id,
+        group_name: params.group_name.unwrap_or(existing.group_name),
+        cover: params.cover.or(existing.cover),
+        order: params.order.unwrap_or(existing.order),
+        enable_refresh: params.enable_refresh.unwrap_or(existing.enable_refresh),
+        show: params.show.unwrap_or(existing.show),
+    };
+    let stored = state
+        .storage()
+        .put_book_group(updated)
+        .map_err(storage_internal)?;
+    let data = BookGroupUpdateData {
+        group: book_group_to_data(stored),
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+fn book_group_delete(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: BookGroupDeleteParams =
+        parse_params(contract::methods::BOOK_GROUP_DELETE, &cmd.params)?;
+    let existed = state
+        .storage()
+        .get_book_group(params.group_id)
+        .map_err(storage_internal)?
+        .is_some();
+    if existed {
+        state
+            .storage()
+            .delete_book_group(params.group_id)
+            .map_err(storage_internal)?;
+    }
+    let data = BookGroupDeleteData {
+        group_id: params.group_id,
+        deleted: existed,
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+// ===========================================================================
+// read-record.* CRUD (Legado ReadRecord.kt + ReadRecordDao.kt parity)
+// ===========================================================================
+
+fn read_record_to_data(r: ReadRecord) -> ReadRecordData {
+    ReadRecordData {
+        device_id: r.device_id,
+        book_name: r.book_name,
+        read_time: r.read_time,
+        last_read: r.last_read,
+    }
+}
+
+fn read_record_create(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: ReadRecordCreateParams =
+        parse_params(contract::methods::READ_RECORD_CREATE, &cmd.params)?;
+    if params.book_name.trim().is_empty() {
+        return Err(CoreError::invalid_params(
+            "read-record.create bookName must be non-empty",
+        ));
+    }
+    let record = ReadRecord {
+        device_id: params.device_id,
+        book_name: params.book_name,
+        read_time: params.read_time,
+        last_read: params.last_read,
+    };
+    let stored = state
+        .storage()
+        .put_read_record(record)
+        .map_err(storage_internal)?;
+    let data = ReadRecordCreateData {
+        record: read_record_to_data(stored),
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+fn read_record_list(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: ReadRecordListParams =
+        parse_params(contract::methods::READ_RECORD_LIST, &cmd.params)?;
+    let records = state
+        .storage()
+        .list_read_records()
+        .map_err(storage_internal)?;
+    let records = if let Some(device_id) = params.device_id {
+        records
+            .into_iter()
+            .filter(|r| r.device_id == device_id)
+            .collect()
+    } else {
+        records
+    };
+    let data = ReadRecordListData {
+        records: records.into_iter().map(read_record_to_data).collect(),
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+fn read_record_update(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: ReadRecordUpdateParams =
+        parse_params(contract::methods::READ_RECORD_UPDATE, &cmd.params)?;
+    let existing = state
+        .storage()
+        .get_read_record(&params.device_id, &params.book_name)
+        .map_err(storage_internal)?
+        .ok_or_else(|| {
+            CoreError::invalid_params(format!(
+                "read-record not found: deviceId={}, bookName={}",
+                params.device_id, params.book_name
+            ))
+        })?;
+    let updated = ReadRecord {
+        device_id: existing.device_id,
+        book_name: existing.book_name,
+        read_time: params.read_time.unwrap_or(existing.read_time),
+        last_read: params.last_read.unwrap_or(existing.last_read),
+    };
+    let stored = state
+        .storage()
+        .put_read_record(updated)
+        .map_err(storage_internal)?;
+    let data = ReadRecordUpdateData {
+        record: read_record_to_data(stored),
+    };
+    Ok(serde_json::to_value(data).map_err(serde_internal)?)
+}
+
+fn read_record_delete(
+    cmd: &reader_contract::Command,
+    state: &RemoteState,
+) -> Result<serde_json::Value, CoreError> {
+    let params: ReadRecordDeleteParams =
+        parse_params(contract::methods::READ_RECORD_DELETE, &cmd.params)?;
+    let existed = state
+        .storage()
+        .get_read_record(&params.device_id, &params.book_name)
+        .map_err(storage_internal)?
+        .is_some();
+    if existed {
+        state
+            .storage()
+            .delete_read_record(&params.device_id, &params.book_name)
+            .map_err(storage_internal)?;
+    }
+    let data = ReadRecordDeleteData {
+        device_id: params.device_id,
+        book_name: params.book_name,
         deleted: existed,
     };
     Ok(serde_json::to_value(data).map_err(serde_internal)?)

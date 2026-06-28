@@ -1783,6 +1783,339 @@ pub struct ReplaceRuleDeleteData {
     pub deleted: bool,
 }
 
+// ===========================================================================
+// Bookmark vertical (V1 minimal) — pure CRUD, no host callback
+// ===========================================================================
+//
+// Mirrors Legado `Bookmark.kt` (entity) + `BookmarkDao.kt` (CRUD). Core owns
+// the `bookmarks` table; the entity already exists in `reader-domain`.
+
+/// Wire shape of a bookmark. Mirrors `reader_domain::Bookmark`
+/// (which itself mirrors Legado `Bookmark.kt`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookmarkData {
+    /// Primary key: creation timestamp (ms).
+    pub time: i64,
+    #[serde(default)]
+    pub book_name: String,
+    #[serde(default)]
+    pub book_author: String,
+    #[serde(default)]
+    pub chapter_index: i32,
+    #[serde(default)]
+    pub chapter_pos: i32,
+    #[serde(default)]
+    pub chapter_name: String,
+    #[serde(default)]
+    pub book_text: String,
+    #[serde(default)]
+    pub content: String,
+}
+
+/// Parameters for `bookmark.create`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookmarkCreateParams {
+    /// Optional caller-supplied primary key. When omitted, Core assigns a
+    /// monotonically increasing `time`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time: Option<i64>,
+    #[serde(default)]
+    pub book_name: String,
+    #[serde(default)]
+    pub book_author: String,
+    #[serde(default)]
+    pub chapter_index: i32,
+    #[serde(default)]
+    pub chapter_pos: i32,
+    #[serde(default)]
+    pub chapter_name: String,
+    #[serde(default)]
+    pub book_text: String,
+    #[serde(default)]
+    pub content: String,
+}
+
+/// Result data for `bookmark.create`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookmarkCreateData {
+    pub bookmark: BookmarkData,
+}
+
+/// Parameters for `bookmark.list`. All filters optional.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookmarkListParams {
+    /// When both `bookName` and `bookAuthor` are supplied, return only
+    /// bookmarks for that book. Mirrors Legado's `findByBookNameAndBookAuthor`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub book_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub book_author: Option<String>,
+}
+
+/// Result data for `bookmark.list`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookmarkListData {
+    pub bookmarks: Vec<BookmarkData>,
+}
+
+/// Parameters for `bookmark.update`. `time` identifies the bookmark to
+/// update; all other fields are optional partial updates.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookmarkUpdateParams {
+    pub time: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub book_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub book_author: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chapter_index: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chapter_pos: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chapter_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub book_text: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+}
+
+/// Result data for `bookmark.update`. Returns the updated bookmark.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookmarkUpdateData {
+    pub bookmark: BookmarkData,
+}
+
+/// Parameters for `bookmark.delete`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookmarkDeleteParams {
+    pub time: i64,
+}
+
+/// Result data for `bookmark.delete`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookmarkDeleteData {
+    pub time: i64,
+    /// `true` when a bookmark was actually removed; `false` when the id was
+    /// not present (idempotent delete).
+    pub deleted: bool,
+}
+
+// ===========================================================================
+// BookGroup vertical (V1 minimal) — pure CRUD, no host callback
+// ===========================================================================
+//
+// Mirrors Legado `BookGroup.kt` (entity) + `BookGroupDao.kt` (CRUD). Core
+// owns the `book_groups` table.
+
+/// Wire shape of a bookshelf group. Mirrors `reader_domain::BookGroup`
+/// (which itself mirrors Legado `BookGroup.kt`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookGroupData {
+    pub group_id: i64,
+    #[serde(default)]
+    pub group_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover: Option<String>,
+    #[serde(default)]
+    pub order: i32,
+    #[serde(default = "default_true")]
+    pub enable_refresh: bool,
+    #[serde(default = "default_true")]
+    pub show: bool,
+}
+
+/// Parameters for `book-group.create`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookGroupCreateParams {
+    #[serde(default)]
+    pub group_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover: Option<String>,
+    #[serde(default)]
+    pub order: i32,
+    #[serde(default = "default_true")]
+    pub enable_refresh: bool,
+    #[serde(default = "default_true")]
+    pub show: bool,
+    /// Optional caller-supplied id. When omitted, Core assigns a
+    /// monotonically increasing id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_id: Option<i64>,
+}
+
+/// Result data for `book-group.create`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookGroupCreateData {
+    pub group: BookGroupData,
+}
+
+/// Parameters for `book-group.list`. All filters optional.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookGroupListParams {
+    /// When `true`, returns only groups with `show = true`.
+    #[serde(default)]
+    pub show_only: Option<bool>,
+}
+
+/// Result data for `book-group.list`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookGroupListData {
+    pub groups: Vec<BookGroupData>,
+}
+
+/// Parameters for `book-group.update`. `groupId` identifies the group to
+/// update; all other fields are optional partial updates.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookGroupUpdateParams {
+    pub group_id: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub order: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enable_refresh: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub show: Option<bool>,
+}
+
+/// Result data for `book-group.update`. Returns the updated group.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookGroupUpdateData {
+    pub group: BookGroupData,
+}
+
+/// Parameters for `book-group.delete`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookGroupDeleteParams {
+    pub group_id: i64,
+}
+
+/// Result data for `book-group.delete`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookGroupDeleteData {
+    pub group_id: i64,
+    /// `true` when a group was actually removed; `false` when the id was
+    /// not present (idempotent delete).
+    pub deleted: bool,
+}
+
+// ===========================================================================
+// ReadRecord vertical (V1 minimal) — pure CRUD, no host callback
+// ===========================================================================
+//
+// Mirrors Legado `ReadRecord.kt` (entity) + `ReadRecordDao.kt` (CRUD). Core
+// owns the `read_records` table; composite key `(deviceId, bookName)`.
+
+/// Wire shape of a reading-time record. Mirrors `reader_domain::ReadRecord`
+/// (which itself mirrors Legado `ReadRecord.kt`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReadRecordData {
+    #[serde(default)]
+    pub device_id: String,
+    pub book_name: String,
+    #[serde(default)]
+    pub read_time: i64,
+    #[serde(default)]
+    pub last_read: i64,
+}
+
+/// Parameters for `read-record.create`. Acts as upsert by composite key
+/// `(deviceId, bookName)`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReadRecordCreateParams {
+    #[serde(default)]
+    pub device_id: String,
+    pub book_name: String,
+    #[serde(default)]
+    pub read_time: i64,
+    #[serde(default)]
+    pub last_read: i64,
+}
+
+/// Result data for `read-record.create`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReadRecordCreateData {
+    pub record: ReadRecordData,
+}
+
+/// Parameters for `read-record.list`. All filters optional.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReadRecordListParams {
+    /// When supplied, returns only records for that device.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_id: Option<String>,
+}
+
+/// Result data for `read-record.list`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReadRecordListData {
+    pub records: Vec<ReadRecordData>,
+}
+
+/// Parameters for `read-record.update`. `(deviceId, bookName)` identifies
+/// the record to update; all other fields are optional partial updates.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReadRecordUpdateParams {
+    pub device_id: String,
+    pub book_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read_time: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_read: Option<i64>,
+}
+
+/// Result data for `read-record.update`. Returns the updated record.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReadRecordUpdateData {
+    pub record: ReadRecordData,
+}
+
+/// Parameters for `read-record.delete`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReadRecordDeleteParams {
+    pub device_id: String,
+    pub book_name: String,
+}
+
+/// Result data for `read-record.delete`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReadRecordDeleteData {
+    pub device_id: String,
+    pub book_name: String,
+    /// `true` when a record was actually removed; `false` when the composite
+    /// key was not present (idempotent delete).
+    pub deleted: bool,
+}
+
 /// Helper: parse a typed params object from a `Command`'s free-form params,
 /// producing a structured `INVALID_PARAMS` error on failure.
 pub fn parse_params<T: for<'de> Deserialize<'de>>(

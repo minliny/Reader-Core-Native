@@ -36,21 +36,27 @@ pub use host::{
     RuntimeStatus, RuntimeStatusParams,
 };
 pub use remote::{
-    BookDetailBookData, BookDetailData, BookDetailParams, BookSearchBookData, BookSearchData,
-    BookSearchParams, BookTocData, BookTocEntryData, BookTocParams, BookshelfEntryData,
-    BookshelfGetData, BookshelfGetParams, BookshelfListData, BookshelfListParams,
-    ChapterContentData, ChapterContentParams, ChapterContentVia, HostHttpCookie, HostHttpRedirect,
-    HostHttpRequest, HostHttpResponse, LocalBookCatalogData, LocalBookCatalogParams,
-    LocalBookParseData, LocalBookParseParams, ReadingProgressUpdateData,
-    ReadingProgressUpdateParams, RemoteHttpDiagnosticsData, ReplaceRuleCreateData,
-    ReplaceRuleCreateParams, ReplaceRuleData, ReplaceRuleDeleteData, ReplaceRuleDeleteParams,
-    ReplaceRuleListData, ReplaceRuleListParams, ReplaceRuleUpdateData, ReplaceRuleUpdateParams,
-    RssParseData, RssParseEntryData, RssParseParams, RssRefreshData, RssRefreshParams,
-    SourceExploreData, SourceExploreKindEntry, SourceExploreKindsData, SourceExploreKindsParams,
-    SourceExploreParams, SourceImportData, SourceImportParams, SyncBackupData, SyncBackupParams,
-    SyncMergeData, SyncMergeParams, TxtTocRuleCreateData, TxtTocRuleCreateParams, TxtTocRuleData,
-    TxtTocRuleDeleteData, TxtTocRuleDeleteParams, TxtTocRuleListData, TxtTocRuleListParams,
-    TxtTocRuleUpdateData, TxtTocRuleUpdateParams,
+    BookDetailBookData, BookDetailData, BookDetailParams, BookGroupCreateData, BookGroupCreateParams,
+    BookGroupData, BookGroupDeleteData, BookGroupDeleteParams, BookGroupListData,
+    BookGroupListParams, BookGroupUpdateData, BookGroupUpdateParams, BookmarkCreateData,
+    BookmarkCreateParams, BookmarkData, BookmarkDeleteData, BookmarkDeleteParams,
+    BookmarkListData, BookmarkListParams, BookmarkUpdateData, BookmarkUpdateParams, BookSearchBookData,
+    BookSearchData, BookSearchParams, BookTocData, BookTocEntryData, BookTocParams,
+    BookshelfEntryData, BookshelfGetData, BookshelfGetParams, BookshelfListData,
+    BookshelfListParams, ChapterContentData, ChapterContentParams, ChapterContentVia,
+    HostHttpCookie, HostHttpRedirect, HostHttpRequest, HostHttpResponse, LocalBookCatalogData,
+    LocalBookCatalogParams, LocalBookParseData, LocalBookParseParams, ReadRecordCreateData,
+    ReadRecordCreateParams, ReadRecordData, ReadRecordDeleteData, ReadRecordDeleteParams,
+    ReadRecordListData, ReadRecordListParams, ReadRecordUpdateData, ReadRecordUpdateParams,
+    ReadingProgressUpdateData, ReadingProgressUpdateParams, RemoteHttpDiagnosticsData,
+    ReplaceRuleCreateData, ReplaceRuleCreateParams, ReplaceRuleData, ReplaceRuleDeleteData,
+    ReplaceRuleDeleteParams, ReplaceRuleListData, ReplaceRuleListParams, ReplaceRuleUpdateData,
+    ReplaceRuleUpdateParams, RssParseData, RssParseEntryData, RssParseParams, RssRefreshData,
+    RssRefreshParams, SourceExploreData, SourceExploreKindEntry, SourceExploreKindsData,
+    SourceExploreKindsParams, SourceExploreParams, SourceImportData, SourceImportParams,
+    SyncBackupData, SyncBackupParams, SyncMergeData, SyncMergeParams, TxtTocRuleCreateData,
+    TxtTocRuleCreateParams, TxtTocRuleData, TxtTocRuleDeleteData, TxtTocRuleDeleteParams,
+    TxtTocRuleListData, TxtTocRuleListParams, TxtTocRuleUpdateData, TxtTocRuleUpdateParams,
 };
 pub use tts::{
     TtsChapterPlanData, TtsChapterPlanParams, TtsChapterRef, TtsChapterTransition,
@@ -176,6 +182,40 @@ pub mod methods {
     pub const REPLACE_RULE_UPDATE: &str = "replace-rule.update";
     /// Delete a replace rule by `id` (idempotent).
     pub const REPLACE_RULE_DELETE: &str = "replace-rule.delete";
+
+    // --- Bookmark vertical (V1 minimal) -----------------------------------
+    /// Create a bookmark. Mirrors Legado `Bookmark.kt` (entity) +
+    /// `BookmarkDao.kt` (CRUD). Core owns the `bookmarks` table.
+    pub const BOOKMARK_CREATE: &str = "bookmark.create";
+    /// List bookmarks (optionally filtered by `(bookName, bookAuthor)`).
+    pub const BOOKMARK_LIST: &str = "bookmark.list";
+    /// Update a bookmark (partial update by `time`).
+    pub const BOOKMARK_UPDATE: &str = "bookmark.update";
+    /// Delete a bookmark by `time` (idempotent).
+    pub const BOOKMARK_DELETE: &str = "bookmark.delete";
+
+    // --- BookGroup vertical (V1 minimal) ----------------------------------
+    /// Create a bookshelf group. Mirrors Legado `BookGroup.kt` (entity) +
+    /// `BookGroupDao.kt` (CRUD). Core owns the `book_groups` table.
+    pub const BOOK_GROUP_CREATE: &str = "book-group.create";
+    /// List bookshelf groups (optionally show-only).
+    pub const BOOK_GROUP_LIST: &str = "book-group.list";
+    /// Update a bookshelf group (partial update by `groupId`).
+    pub const BOOK_GROUP_UPDATE: &str = "book-group.update";
+    /// Delete a bookshelf group by `groupId` (idempotent).
+    pub const BOOK_GROUP_DELETE: &str = "book-group.delete";
+
+    // --- ReadRecord vertical (V1 minimal) ---------------------------------
+    /// Create/upsert a reading-time record. Mirrors Legado `ReadRecord.kt`
+    /// (entity) + `ReadRecordDao.kt` (CRUD). Core owns the `read_records`
+    /// table; composite key `(deviceId, bookName)`.
+    pub const READ_RECORD_CREATE: &str = "read-record.create";
+    /// List reading-time records (optionally filtered by `deviceId`).
+    pub const READ_RECORD_LIST: &str = "read-record.list";
+    /// Update a reading-time record (partial update by composite key).
+    pub const READ_RECORD_UPDATE: &str = "read-record.update";
+    /// Delete a reading-time record by composite key (idempotent).
+    pub const READ_RECORD_DELETE: &str = "read-record.delete";
 }
 
 /// Non-method capability names advertised by `core.info` in v1.
@@ -328,6 +368,18 @@ mod tests {
                 methods::TXT_TOC_RULE_LIST,
                 methods::TXT_TOC_RULE_UPDATE,
                 methods::TXT_TOC_RULE_DELETE,
+                methods::BOOKMARK_CREATE,
+                methods::BOOKMARK_LIST,
+                methods::BOOKMARK_UPDATE,
+                methods::BOOKMARK_DELETE,
+                methods::BOOK_GROUP_CREATE,
+                methods::BOOK_GROUP_LIST,
+                methods::BOOK_GROUP_UPDATE,
+                methods::BOOK_GROUP_DELETE,
+                methods::READ_RECORD_CREATE,
+                methods::READ_RECORD_LIST,
+                methods::READ_RECORD_UPDATE,
+                methods::READ_RECORD_DELETE,
             ]
         );
         assert!(!schema_examples.contains(&methods::LEGACY_CORE_PING));

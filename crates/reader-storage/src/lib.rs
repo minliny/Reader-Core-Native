@@ -9,7 +9,9 @@ use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::sync::Mutex;
 
-use reader_domain::{Book, Bookmark, DictRule, ReadingProgress, ReplaceRule, Source, TxtTocRule};
+use reader_domain::{
+    Book, BookGroup, Bookmark, DictRule, ReadRecord, ReadingProgress, ReplaceRule, Source, TxtTocRule,
+};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "sqlite")]
@@ -19,7 +21,7 @@ pub mod sqlite_backend;
 pub use sqlite_backend::{SqliteStorage, SQLITE_SCHEMA_VERSION};
 
 /// Current storage snapshot schema version.
-pub const STORAGE_SNAPSHOT_SCHEMA_VERSION: u32 = 2;
+pub const STORAGE_SNAPSHOT_SCHEMA_VERSION: u32 = 3;
 
 /// In-memory cache + source registry + progress store.
 ///
@@ -46,6 +48,10 @@ struct StorageInner {
     bookmarks: HashMap<i64, Bookmark>,
     replace_rules: HashMap<i64, ReplaceRule>,
     dict_rules: HashMap<String, DictRule>,
+    // v3 independent entities (Legado data/entities). BookGroup keyed by group_id;
+    // ReadRecord keyed by composite (device_id, book_name).
+    book_groups: HashMap<i64, BookGroup>,
+    read_records: HashMap<ReadRecordKey, ReadRecord>,
 }
 
 /// A minimal cached entry: an opaque JSON payload keyed by a string cache key.
@@ -95,6 +101,12 @@ pub struct StorageSnapshot {
     /// 字典规则（对照 Legado `DictRule`）。v2 新增。
     #[serde(default)]
     pub dict_rules: Vec<DictRule>,
+    /// 书架分组（对照 Legado `BookGroup`）。v3 新增。
+    #[serde(default)]
+    pub book_groups: Vec<BookGroup>,
+    /// 阅读时长记录（对照 Legado `ReadRecord`）。v3 新增。
+    #[serde(default)]
+    pub read_records: Vec<ReadRecord>,
 }
 
 impl StorageSnapshot {
@@ -115,6 +127,8 @@ impl StorageSnapshot {
             bookmarks: Vec::new(),
             replace_rules: Vec::new(),
             dict_rules: Vec::new(),
+            book_groups: Vec::new(),
+            read_records: Vec::new(),
         }
     }
 
@@ -221,6 +235,32 @@ impl StorageSnapshot {
             ensure_unique_snapshot_key(&mut unique_dict_names, rule.name.clone(), "dict_rules")?;
         }
 
+        // v3 independent entities — enforce PK uniqueness at the snapshot level.
+        let mut unique_book_group_ids = HashMap::<i64, ()>::new();
+        for group in &self.book_groups {
+            ensure_unique_snapshot_key(
+                &mut unique_book_group_ids,
+                group.group_id,
+                "book_groups",
+            )?;
+        }
+        let mut unique_read_record_keys = HashMap::<ReadRecordKey, ()>::new();
+        for record in &self.read_records {
+            if record.book_name.trim().is_empty() {
+                return Err(StorageError::InvalidKey {
+                    field: "read_records.book_name".into(),
+                });
+            }
+            ensure_unique_snapshot_key(
+                &mut unique_read_record_keys,
+                ReadRecordKey {
+                    device_id: record.device_id.clone(),
+                    book_name: record.book_name.clone(),
+                },
+                "read_records",
+            )?;
+        }
+
         Ok(())
     }
 }
@@ -319,6 +359,19 @@ fn migrate_snapshot_step(
             // succeeds. We insert explicitly to be robust against snapshots
             // that happen to carry a `null` for these fields.
             for field in ["txtTocRules", "bookmarks", "replaceRules", "dictRules"] {
+                object
+                    .entry(field.to_string())
+                    .or_insert_with(|| serde_json::Value::Array(Vec::new()));
+            }
+            Ok(())
+        }
+        2 => {
+            // v3 adds BookGroup + ReadRecord collections ported from Legado.
+            // A v2 snapshot has no such fields; default them to empty arrays
+            // so the typed v3 deserialize (which marks them #[serde(default)])
+            // succeeds. We insert explicitly to be robust against snapshots
+            // that happen to carry a `null` for these fields.
+            for field in ["bookGroups", "readRecords"] {
                 object
                     .entry(field.to_string())
                     .or_insert_with(|| serde_json::Value::Array(Vec::new()));
@@ -1548,6 +1601,16 @@ struct ChapterDownloadKey {
     source_id: String,
     book_id: String,
     chapter_index: u32,
+}
+
+/// Composite key for ReadRecord: `(device_id, book_name)`. Mirrors Legado
+/// `ReadRecord.kt` which uses `deviceId` + `bookName` as the logical primary
+/// key (Legado's Room DAO uses an auto-increment `id` but lookups always
+/// filter by these two columns).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct ReadRecordKey {
+    device_id: String,
+    book_name: String,
 }
 
 /// Chapter item used by legacy bookshelf update/source-switch matching.
@@ -2803,6 +2866,8 @@ impl StorageSnapshotStore for InMemoryStorage {
             bookmarks: inner.bookmarks.values().cloned().collect(),
             replace_rules: inner.replace_rules.values().cloned().collect(),
             dict_rules: inner.dict_rules.values().cloned().collect(),
+            book_groups: inner.book_groups.values().cloned().collect(),
+            read_records: inner.read_records.values().cloned().collect(),
         };
         sort_storage_snapshot(&mut snapshot);
         snapshot.validate()?;
@@ -2854,6 +2919,16 @@ pub(crate) fn sort_storage_snapshot(snapshot: &mut StorageSnapshot) {
         .replace_rules
         .sort_by(|a, b| a.order.cmp(&b.order).then_with(|| a.id.cmp(&b.id)));
     snapshot.dict_rules.sort_by(|a, b| a.name.cmp(&b.name));
+    // v3 independent entities — sort to match SqliteStorage export ORDER BY
+    // clauses so backend↔backend snapshot round-trips are byte-stable.
+    snapshot
+        .book_groups
+        .sort_by(|a, b| a.order.cmp(&b.order).then_with(|| a.group_id.cmp(&b.group_id)));
+    snapshot.read_records.sort_by(|a, b| {
+        a.device_id
+            .cmp(&b.device_id)
+            .then_with(|| a.book_name.cmp(&b.book_name))
+    });
 }
 
 fn storage_inner_from_snapshot(snapshot: StorageSnapshot) -> Result<StorageInner, StorageError> {
@@ -2903,6 +2978,16 @@ fn storage_inner_from_snapshot(snapshot: StorageSnapshot) -> Result<StorageInner
     }
     for rule in snapshot.dict_rules {
         inner.dict_rules.insert(rule.name.clone(), rule);
+    }
+    for group in snapshot.book_groups {
+        inner.book_groups.insert(group.group_id, group);
+    }
+    for record in snapshot.read_records {
+        let key = ReadRecordKey {
+            device_id: record.device_id.clone(),
+            book_name: record.book_name.clone(),
+        };
+        inner.read_records.insert(key, record);
     }
 
     Ok(inner)
@@ -4534,6 +4619,91 @@ impl InMemoryStorage {
 
     pub fn delete_dict_rule(&self, name: &str) -> Result<(), StorageError> {
         self.lock()?.dict_rules.remove(name);
+        Ok(())
+    }
+
+    // ----- BookGroup -----
+    pub fn put_book_group(&self, group: BookGroup) -> Result<BookGroup, StorageError> {
+        let mut inner = self.lock()?;
+        inner.book_groups.insert(group.group_id, group.clone());
+        Ok(group)
+    }
+
+    pub fn get_book_group(&self, group_id: i64) -> Result<Option<BookGroup>, StorageError> {
+        Ok(self.lock()?.book_groups.get(&group_id).cloned())
+    }
+
+    pub fn list_book_groups(&self) -> Result<Vec<BookGroup>, StorageError> {
+        let mut groups: Vec<BookGroup> = self
+            .lock()?
+            .book_groups
+            .values()
+            .cloned()
+            .collect();
+        groups.sort_by(|a, b| a.order.cmp(&b.order).then_with(|| a.group_id.cmp(&b.group_id)));
+        Ok(groups)
+    }
+
+    pub fn delete_book_group(&self, group_id: i64) -> Result<(), StorageError> {
+        self.lock()?.book_groups.remove(&group_id);
+        Ok(())
+    }
+
+    // ----- ReadRecord -----
+    pub fn put_read_record(&self, record: ReadRecord) -> Result<ReadRecord, StorageError> {
+        if record.book_name.trim().is_empty() {
+            return Err(StorageError::InvalidKey {
+                field: "read_records.book_name".into(),
+            });
+        }
+        let mut inner = self.lock()?;
+        let key = ReadRecordKey {
+            device_id: record.device_id.clone(),
+            book_name: record.book_name.clone(),
+        };
+        inner.read_records.insert(key, record.clone());
+        Ok(record)
+    }
+
+    pub fn get_read_record(
+        &self,
+        device_id: &str,
+        book_name: &str,
+    ) -> Result<Option<ReadRecord>, StorageError> {
+        Ok(self
+            .lock()?
+            .read_records
+            .get(&ReadRecordKey {
+                device_id: device_id.to_string(),
+                book_name: book_name.to_string(),
+            })
+            .cloned())
+    }
+
+    pub fn list_read_records(&self) -> Result<Vec<ReadRecord>, StorageError> {
+        let mut records: Vec<ReadRecord> = self
+            .lock()?
+            .read_records
+            .values()
+            .cloned()
+            .collect();
+        records.sort_by(|a, b| {
+            a.device_id
+                .cmp(&b.device_id)
+                .then_with(|| a.book_name.cmp(&b.book_name))
+        });
+        Ok(records)
+    }
+
+    pub fn delete_read_record(
+        &self,
+        device_id: &str,
+        book_name: &str,
+    ) -> Result<(), StorageError> {
+        self.lock()?.read_records.remove(&ReadRecordKey {
+            device_id: device_id.to_string(),
+            book_name: book_name.to_string(),
+        });
         Ok(())
     }
 }

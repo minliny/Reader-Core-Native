@@ -33,7 +33,9 @@ use std::sync::Mutex;
 
 use rusqlite::{params, Connection, OptionalExtension};
 
-use reader_domain::{Book, Bookmark, DictRule, ReadingProgress, ReplaceRule, Source, TxtTocRule};
+use reader_domain::{
+    Book, BookGroup, Bookmark, DictRule, ReadRecord, ReadingProgress, ReplaceRule, Source, TxtTocRule,
+};
 
 use crate::{
     chapter_cache_coverage_from_entries, chapter_cache_stats_from_entries, paginate_shelf,
@@ -53,7 +55,7 @@ use crate::{
 /// in [`SCHEMA_V1_DDL`] (or its successors) changes. The JSON snapshot
 /// `schemaVersion` ([`STORAGE_SNAPSHOT_SCHEMA_VERSION`]) is a separate
 /// numbering space and must NOT be coupled to this constant.
-pub const SQLITE_SCHEMA_VERSION: u32 = 2;
+pub const SQLITE_SCHEMA_VERSION: u32 = 3;
 
 /// DDL for schema v1. Executed verbatim when a database is created at v0.
 ///
@@ -225,6 +227,42 @@ CREATE TABLE IF NOT EXISTS dict_rules (
 );
 "#;
 
+/// DDL for schema v3. Adds the two independent entities ported from Legado
+/// `data/entities/`: `BookGroup`, `ReadRecord`. Executed as a forward
+/// migration from v2.
+///
+/// Design notes (mirrors SCHEMA_V2_DDL conventions):
+/// - Column names are snake_case mirrors of the Rust struct fields in
+///   `reader-domain`. Legado uses camelCase column names; we normalize to
+///   snake_case for SQL ergonomics.
+/// - Booleans are `INTEGER` 0/1 (SQLite has no native bool).
+/// - `book_groups.group_id` is `INTEGER PRIMARY KEY` — Legado defaults to
+///   `System.currentTimeMillis()`, Rust leaves id assignment to the caller.
+/// - `read_records` has a composite PK `(device_id, book_name)` matching
+///   Legado's lookup pattern (Legado's Room DAO uses an auto-increment `id`
+///   but every query filters by `deviceId` + `bookName`). Using the composite
+///   PK directly is more idiomatic for our table-per-entity shape.
+/// - No foreign keys: these entities are independent configuration rows.
+pub const SCHEMA_V3_DDL: &str = r#"
+CREATE TABLE IF NOT EXISTS book_groups (
+    group_id         INTEGER PRIMARY KEY,
+    group_name       TEXT NOT NULL DEFAULT '',
+    cover            TEXT,
+    sort_order       INTEGER NOT NULL DEFAULT 0,
+    enable_refresh   INTEGER NOT NULL DEFAULT 1,
+    show             INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS idx_book_groups_order ON book_groups(sort_order, group_id);
+
+CREATE TABLE IF NOT EXISTS read_records (
+    device_id   TEXT NOT NULL DEFAULT '',
+    book_name   TEXT NOT NULL,
+    read_time   INTEGER NOT NULL DEFAULT 0,
+    last_read   INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (device_id, book_name)
+);
+"#;
+
 /// SQLite-backed reader storage. Holds a single connection guarded by a `Mutex`,
 /// mirroring the `InMemoryStorage` concurrency model.
 pub struct SqliteStorage {
@@ -287,7 +325,10 @@ impl SqliteStorage {
         if current < 2 {
             conn.execute_batch(SCHEMA_V2_DDL).map_err(rusqlite_error)?;
         }
-        // Future migrations: `if current < 3 { conn.execute_batch(SCHEMA_V3_DDL)?; }`
+        if current < 3 {
+            conn.execute_batch(SCHEMA_V3_DDL).map_err(rusqlite_error)?;
+        }
+        // Future migrations: `if current < 4 { conn.execute_batch(SCHEMA_V4_DDL)?; }`
 
         if current != SQLITE_SCHEMA_VERSION {
             conn.pragma_update(None, "user_version", SQLITE_SCHEMA_VERSION)
@@ -652,6 +693,26 @@ fn row_to_dict_rule(row: &rusqlite::Row<'_>) -> rusqlite::Result<DictRule> {
         show_rule: row.get("show_rule")?,
         enabled: row.get::<_, i64>("enabled")? != 0,
         sort_number: row.get::<_, i64>("sort_number")? as i32,
+    })
+}
+
+fn row_to_book_group(row: &rusqlite::Row<'_>) -> rusqlite::Result<BookGroup> {
+    Ok(BookGroup {
+        group_id: row.get("group_id")?,
+        group_name: row.get("group_name")?,
+        cover: row.get("cover")?,
+        order: row.get::<_, i64>("sort_order")? as i32,
+        enable_refresh: row.get::<_, i64>("enable_refresh")? != 0,
+        show: row.get::<_, i64>("show")? != 0,
+    })
+}
+
+fn row_to_read_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<ReadRecord> {
+    Ok(ReadRecord {
+        device_id: row.get("device_id")?,
+        book_name: row.get("book_name")?,
+        read_time: row.get("read_time")?,
+        last_read: row.get("last_read")?,
     })
 }
 
@@ -1926,6 +1987,134 @@ impl SqliteStorage {
             .map_err(rusqlite_error)?;
         Ok(())
     }
+
+    // ----- BookGroup -----
+    pub fn put_book_group(&self, group: BookGroup) -> Result<BookGroup, StorageError> {
+        let conn = self.lock()?;
+        conn.execute(
+            "INSERT OR REPLACE INTO book_groups \
+             (group_id, group_name, cover, sort_order, enable_refresh, show) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                group.group_id,
+                group.group_name,
+                group.cover,
+                group.order,
+                group.enable_refresh as i64,
+                group.show as i64,
+            ],
+        )
+        .map_err(rusqlite_error)?;
+        Ok(group)
+    }
+
+    pub fn get_book_group(&self, group_id: i64) -> Result<Option<BookGroup>, StorageError> {
+        let conn = self.lock()?;
+        conn.query_row(
+            "SELECT group_id, group_name, cover, sort_order, enable_refresh, show \
+             FROM book_groups WHERE group_id = ?1",
+            params![group_id],
+            row_to_book_group,
+        )
+        .optional()
+        .map_err(rusqlite_error)
+    }
+
+    pub fn list_book_groups(&self) -> Result<Vec<BookGroup>, StorageError> {
+        let conn = self.lock()?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT group_id, group_name, cover, sort_order, enable_refresh, show \
+                 FROM book_groups ORDER BY sort_order, group_id",
+            )
+            .map_err(rusqlite_error)?;
+        let rows = stmt
+            .query_map([], row_to_book_group)
+            .map_err(rusqlite_error)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.map_err(rusqlite_error)?);
+        }
+        Ok(out)
+    }
+
+    pub fn delete_book_group(&self, group_id: i64) -> Result<(), StorageError> {
+        let conn = self.lock()?;
+        conn.execute("DELETE FROM book_groups WHERE group_id = ?1", params![group_id])
+            .map_err(rusqlite_error)?;
+        Ok(())
+    }
+
+    // ----- ReadRecord -----
+    pub fn put_read_record(&self, record: ReadRecord) -> Result<ReadRecord, StorageError> {
+        if record.book_name.trim().is_empty() {
+            return Err(StorageError::InvalidKey {
+                field: "read_records.book_name".into(),
+            });
+        }
+        let conn = self.lock()?;
+        conn.execute(
+            "INSERT OR REPLACE INTO read_records \
+             (device_id, book_name, read_time, last_read) \
+             VALUES (?1, ?2, ?3, ?4)",
+            params![
+                record.device_id,
+                record.book_name,
+                record.read_time,
+                record.last_read,
+            ],
+        )
+        .map_err(rusqlite_error)?;
+        Ok(record)
+    }
+
+    pub fn get_read_record(
+        &self,
+        device_id: &str,
+        book_name: &str,
+    ) -> Result<Option<ReadRecord>, StorageError> {
+        let conn = self.lock()?;
+        conn.query_row(
+            "SELECT device_id, book_name, read_time, last_read \
+             FROM read_records WHERE device_id = ?1 AND book_name = ?2",
+            params![device_id, book_name],
+            row_to_read_record,
+        )
+        .optional()
+        .map_err(rusqlite_error)
+    }
+
+    pub fn list_read_records(&self) -> Result<Vec<ReadRecord>, StorageError> {
+        let conn = self.lock()?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT device_id, book_name, read_time, last_read \
+                 FROM read_records ORDER BY device_id, book_name",
+            )
+            .map_err(rusqlite_error)?;
+        let rows = stmt
+            .query_map([], row_to_read_record)
+            .map_err(rusqlite_error)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.map_err(rusqlite_error)?);
+        }
+        Ok(out)
+    }
+
+    pub fn delete_read_record(
+        &self,
+        device_id: &str,
+        book_name: &str,
+    ) -> Result<(), StorageError> {
+        let conn = self.lock()?;
+        conn.execute(
+            "DELETE FROM read_records WHERE device_id = ?1 AND book_name = ?2",
+            params![device_id, book_name],
+        )
+        .map_err(rusqlite_error)?;
+        Ok(())
+    }
 }
 
 // ===== StorageSnapshotStore =====
@@ -1949,6 +2138,8 @@ impl StorageSnapshotStore for SqliteStorage {
             bookmarks: Vec::new(),
             replace_rules: Vec::new(),
             dict_rules: Vec::new(),
+            book_groups: Vec::new(),
+            read_records: Vec::new(),
         };
 
         let mut stmt = conn
@@ -2143,6 +2334,35 @@ impl StorageSnapshotStore for SqliteStorage {
         }
         drop(stmt);
 
+        // v3 independent entities — read columns directly via row mappers.
+        let mut stmt = conn
+            .prepare(
+                "SELECT group_id, group_name, cover, sort_order, enable_refresh, show \
+                 FROM book_groups ORDER BY sort_order, group_id",
+            )
+            .map_err(rusqlite_error)?;
+        let group_rows = stmt.query_map([], row_to_book_group);
+        for group in group_rows.map_err(rusqlite_error)? {
+            snapshot
+                .book_groups
+                .push(group.map_err(rusqlite_error)?);
+        }
+        drop(stmt);
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT device_id, book_name, read_time, last_read \
+                 FROM read_records ORDER BY device_id, book_name",
+            )
+            .map_err(rusqlite_error)?;
+        let record_rows = stmt.query_map([], row_to_read_record);
+        for record in record_rows.map_err(rusqlite_error)? {
+            snapshot
+                .read_records
+                .push(record.map_err(rusqlite_error)?);
+        }
+        drop(stmt);
+
         sort_storage_snapshot(&mut snapshot);
         snapshot.validate()?;
         Ok(snapshot)
@@ -2158,7 +2378,8 @@ impl StorageSnapshotStore for SqliteStorage {
              DELETE FROM reading_progress; DELETE FROM reading_progress_history; \
              DELETE FROM chapter_download_queue; \
              DELETE FROM txt_toc_rules; DELETE FROM bookmarks; \
-             DELETE FROM replace_rules; DELETE FROM dict_rules;",
+             DELETE FROM replace_rules; DELETE FROM dict_rules; \
+             DELETE FROM book_groups; DELETE FROM read_records;",
         )
         .map_err(rusqlite_error)?;
 
@@ -2380,6 +2601,37 @@ impl StorageSnapshotStore for SqliteStorage {
             )
             .map_err(rusqlite_error)?;
         }
+        // v3 independent entities — direct column insert.
+        for group in &snapshot.book_groups {
+            tx.execute(
+                "INSERT OR REPLACE INTO book_groups \
+                 (group_id, group_name, cover, sort_order, enable_refresh, show) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![
+                    group.group_id,
+                    group.group_name,
+                    group.cover,
+                    group.order,
+                    group.enable_refresh as i64,
+                    group.show as i64,
+                ],
+            )
+            .map_err(rusqlite_error)?;
+        }
+        for record in &snapshot.read_records {
+            tx.execute(
+                "INSERT OR REPLACE INTO read_records \
+                 (device_id, book_name, read_time, last_read) \
+                 VALUES (?1, ?2, ?3, ?4)",
+                params![
+                    record.device_id,
+                    record.book_name,
+                    record.read_time,
+                    record.last_read,
+                ],
+            )
+            .map_err(rusqlite_error)?;
+        }
         tx.commit().map_err(rusqlite_error)?;
         Ok(())
     }
@@ -2399,10 +2651,10 @@ mod tests {
     }
 
     #[test]
-    fn open_in_memory_migrates_to_v2() {
+    fn open_in_memory_migrates_to_v3() {
         let storage = SqliteStorage::open_in_memory().unwrap();
         let version = storage.user_version().unwrap();
-        assert_eq!(version, 2);
+        assert_eq!(version, 3);
     }
 
     #[test]
@@ -2413,6 +2665,14 @@ mod tests {
         assert!(table_exists(&conn, "bookmarks"));
         assert!(table_exists(&conn, "replace_rules"));
         assert!(table_exists(&conn, "dict_rules"));
+    }
+
+    #[test]
+    fn v3_creates_book_group_and_read_record_tables() {
+        let storage = SqliteStorage::open_in_memory().unwrap();
+        let conn = storage.lock().unwrap();
+        assert!(table_exists(&conn, "book_groups"));
+        assert!(table_exists(&conn, "read_records"));
     }
 
     #[test]
@@ -2440,7 +2700,7 @@ mod tests {
     #[test]
     fn v1_to_v2_migration_adds_entity_tables() {
         // Create a v1 database by running only SCHEMA_V1_DDL and setting
-        // user_version=1, then migrate to v2.
+        // user_version=1, then migrate to current.
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(SCHEMA_V1_DDL).unwrap();
         conn.pragma_update(None, "user_version", 1u32).unwrap();
@@ -2452,13 +2712,16 @@ mod tests {
         SqliteStorage::migrate(&conn).unwrap();
         assert_eq!(
             conn.query_row("PRAGMA user_version", [], |row| row.get::<_, u32>(0)),
-            Ok(2)
+            Ok(SQLITE_SCHEMA_VERSION)
         );
         // v2 tables must now exist.
         assert!(table_exists(&conn, "txt_toc_rules"));
         assert!(table_exists(&conn, "bookmarks"));
         assert!(table_exists(&conn, "replace_rules"));
         assert!(table_exists(&conn, "dict_rules"));
+        // v3 tables must now exist.
+        assert!(table_exists(&conn, "book_groups"));
+        assert!(table_exists(&conn, "read_records"));
         // v1 tables must still exist.
         assert!(table_exists(&conn, "sources"));
         assert!(table_exists(&conn, "books"));
