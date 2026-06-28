@@ -165,10 +165,11 @@ fn vlog(config: &TestSourceConfig, level: &str, status: &str, msg: &str) {
 
 /// 截断字符串到指定长度,末尾加 "..."
 fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max {
+    if s.chars().count() <= max {
         s.to_string()
     } else {
-        format!("{}...", &s[..max])
+        let truncated: String = s.chars().take(max).collect();
+        format!("{truncated}...")
     }
 }
 
@@ -274,7 +275,20 @@ pub fn test_source(config: &TestSourceConfig) -> SourceTestResult {
     // 构造 Runtime
     let (tx, rx) = std::sync::mpsc::channel();
     let sink = Arc::new(ChannelSink { tx });
-    let runtime = Runtime::new(sink);
+    let runtime = match Runtime::new_with_config(sink, reader_contract::RuntimeConfig::default()) {
+        Ok(rt) => rt,
+        Err(err) => {
+            return failed_result(
+                &config.source_path,
+                &source_id,
+                &source_name,
+                "L1-import",
+                "runtime_spawn_failed",
+                &format!("{err:?}"),
+                start,
+            );
+        }
+    };
 
     // 构造 Source wrapper:rules 留空,全部规则走 bookSource
     let source_wrapper = json!({
@@ -844,7 +858,8 @@ fn execute_http(params: &Value, timeout: Duration) -> Result<HostHttpResponse, S
         "PUT" => agent.put(url),
         "DELETE" => agent.delete(url),
         "HEAD" => agent.head(url),
-        other => agent.request(other, url),
+        "PATCH" => agent.request("PATCH", url),
+        _ => return Err(format!("unsupported HTTP method: {method}")),
     };
 
     // 设置 headers
