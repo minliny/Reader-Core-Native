@@ -27,7 +27,11 @@ pub struct UrlDslOptions {
     pub method: String,
     #[serde(default = "default_charset")]
     pub charset: String,
-    #[serde(default)]
+    /// Legado `headers` accepts either a JSON object (`{"k":"v"}`) or, in some
+    /// sources, a string containing a single-quoted JSON object
+    /// (`"{os:'pc'}"`). The custom deserializer normalizes the string form
+    /// back into a map so downstream code always sees `Map<String, Value>`.
+    #[serde(default, deserialize_with = "deserialize_headers")]
     pub headers: Map<String, Value>,
     /// Legado `body` accepts either a string (`"k=v"`) or a JSON object
     /// (`{"k":"v"}`). When a JSON object is supplied, it is serialized back
@@ -93,6 +97,46 @@ fn json_value_type_name(v: &Value) -> &'static str {
         Value::String(_) => "string",
         Value::Array(_) => "array",
         Value::Object(_) => "object",
+    }
+}
+
+/// Deserialize the Legado `headers` field. Accepts either a JSON object
+/// (`{"k":"v"}`) or a string containing a (possibly single-quoted / unquoted-
+/// key) JSON object (`"{os:'pc'}"`). The string form is normalized via
+/// [`normalize_legado_json`] and re-parsed into a map. Non-object JSON types
+/// (numbers, arrays, bools) are rejected; an empty or unparseable string
+/// yields an empty map rather than failing the whole DSL parse.
+fn deserialize_headers<'de, D>(deserializer: D) -> Result<Map<String, Value>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    let value = Value::deserialize(deserializer)?;
+    match value {
+        Value::Object(map) => Ok(map),
+        Value::String(s) => {
+            let trimmed = s.trim();
+            if trimmed.is_empty() {
+                return Ok(Map::new());
+            }
+            // Normalize single quotes / unquoted keys, then parse.
+            let normalized = normalize_legado_json(trimmed);
+            match serde_json::from_str::<Map<String, Value>>(&normalized) {
+                Ok(map) => Ok(map),
+                Err(_) => {
+                    // If the string isn't a parseable JSON object, treat it as
+                    // a single header with an empty key (mirrors Legado's
+                    // lenient fallback for malformed header strings).
+                    Ok(Map::new())
+                }
+            }
+        }
+        Value::Null => Ok(Map::new()),
+        other => Err(Error::custom(format!(
+            "headers must be an object or string, got {}",
+            json_value_type_name(&other)
+        ))),
     }
 }
 
@@ -321,21 +365,36 @@ fn has_legacy_method_prefix(raw: &str) -> bool {
 
 /// Find the comma that separates URL from JSON options. Mirrors Legado
 /// `paramPattern = \s*,\s*(?=\{)`: the comma must be outside quotes/brackets
-/// AND followed by optional whitespace + `{`.
+/// AND followed by optional whitespace + `{`. `{{...}}` Legado JS templates
+/// in the URL are treated as opaque so a comma inside or right before them
+/// is not mistaken for the DSL separator.
 fn find_dsl_separator(input: &str) -> Option<usize> {
     let mut in_double = false;
     let mut in_single = false;
     let mut bracket_depth: i32 = 0;
+    let mut in_js_template = false;
     for (idx, ch) in input.char_indices() {
+        // Inside a {{...}} JS template: skip everything until the closing }}.
+        if in_js_template {
+            if input[idx..].starts_with("}}") {
+                in_js_template = false;
+            }
+            continue;
+        }
         match ch {
             '"' if !in_single => in_double = !in_double,
             '\'' if !in_double => in_single = !in_single,
             '[' if !in_double && !in_single => bracket_depth += 1,
             ']' if !in_double && !in_single => bracket_depth -= 1,
+            '{' if !in_double && !in_single && input[idx..].starts_with("{{") => {
+                in_js_template = true;
+                continue;
+            }
             ',' if !in_double && !in_single && bracket_depth == 0 => {
                 let rest = &input[idx + 1..];
                 let trimmed = rest.trim_start();
-                if trimmed.starts_with('{') {
+                // Must be followed by `{` but NOT `{{` (which is a JS template).
+                if trimmed.starts_with('{') && !trimmed.starts_with("{{") {
                     return Some(idx);
                 }
             }
@@ -345,26 +404,134 @@ fn find_dsl_separator(input: &str) -> Option<usize> {
     None
 }
 
-/// Normalize Legado JSON quirks: single quotes → double quotes, semicolons
-/// between key-value pairs → commas. Ports Swift `normalizeLegadoJSON`.
+/// Normalize Legado JSON quirks. Ports Swift `normalizeLegadoJSON` and
+/// extends it to handle real-world Legado sources:
+/// - Single quotes → double quotes (`{'k':'v'}` → `{"k":"v"}`)
+/// - Semicolons between pairs → commas (`{"k":"v";"k2":"v2"}`)
+/// - Unquoted keys → quoted keys (`{method: "POST"}` → `{"method": "POST"}`)
+/// - Bare string values → quoted strings (`{"k":%E6}` → `{"k":"%E6"}`)
+/// - Trailing characters after the matching `}` are truncated (e.g. trailing
+///   JS expressions accidentally included in the DSL options).
 fn normalize_legado_json(input: &str) -> String {
-    let mut result = String::with_capacity(input.len() + 16);
+    let truncated = truncate_at_matching_brace(input);
+    let chars: Vec<char> = truncated.chars().collect();
+    let mut result = String::with_capacity(truncated.len() + 16);
     let mut state = QuoteState::Normal;
-    for ch in input.chars() {
+    // `ExpectKey` = after `{` or `,` at object depth; `ExpectValue` = after `:`.
+    let mut position = ValuePosition::Other;
+    let mut i = 0usize;
+
+    while i < chars.len() {
         match state {
-            QuoteState::Normal => match ch {
-                '\'' => {
-                    state = QuoteState::InSingle;
-                    result.push('"');
+            QuoteState::Normal => {
+                let ch = chars[i];
+                match ch {
+                    '\'' => {
+                        state = QuoteState::InSingle;
+                        result.push('"');
+                    }
+                    '"' => {
+                        state = QuoteState::InDouble;
+                        result.push('"');
+                    }
+                    ';' => {
+                        // Semicolon between pairs → comma (Legado quirk).
+                        result.push(',');
+                        position = ValuePosition::ExpectKey;
+                    }
+                    '{' => {
+                        result.push(ch);
+                        position = ValuePosition::ExpectKey;
+                    }
+                    '[' => {
+                        result.push(ch);
+                        position = ValuePosition::Other;
+                    }
+                    '}' | ']' => {
+                        result.push(ch);
+                        position = ValuePosition::Other;
+                    }
+                    ',' => {
+                        result.push(ch);
+                        position = ValuePosition::ExpectKey;
+                    }
+                    ':' => {
+                        result.push(ch);
+                        position = ValuePosition::ExpectValue;
+                    }
+                    c if c.is_whitespace() => {
+                        result.push(ch);
+                    }
+                    _ => {
+                        match position {
+                            ValuePosition::ExpectKey => {
+                                // Unquoted key: read an identifier (letter/_ start)
+                                // and wrap it in double quotes.
+                                if is_ident_start(ch) {
+                                    let start = i;
+                                    while i < chars.len() {
+                                        let c = chars[i];
+                                        if is_ident_continue(c) {
+                                            i += 1;
+                                        } else {
+                                            break;
+                                        }
+                                    }
+                                    let key: String = chars[start..i].iter().collect();
+                                    result.push('"');
+                                    result.push_str(&key);
+                                    result.push('"');
+                                    position = ValuePosition::Other;
+                                    continue; // `i` already at next char
+                                }
+                                result.push(ch);
+                            }
+                            ValuePosition::ExpectValue => {
+                                // Bare value: if it's not a JSON literal start
+                                // (digit, `t`/`f`/`n` for true/false/null, `"`,
+                                // `'`, `{`, `[`), treat it as an unquoted string
+                                // and read until the next `,` or `}`.
+                                if is_bare_value_start(ch) {
+                                    result.push(ch);
+                                } else {
+                                    let start = i;
+                                    while i < chars.len() {
+                                        let c = chars[i];
+                                        if c == ',' || c == '}' || c == ']' {
+                                            break;
+                                        }
+                                        i += 1;
+                                    }
+                                    // Trim trailing whitespace from the bare value.
+                                    let mut end = i;
+                                    while end > start && chars[end - 1].is_whitespace() {
+                                        end -= 1;
+                                    }
+                                    let value: String = chars[start..end].iter().collect();
+                                    result.push('"');
+                                    // Escape any embedded double quotes.
+                                    for vc in value.chars() {
+                                        if vc == '"' {
+                                            result.push('\\');
+                                        }
+                                        result.push(vc);
+                                    }
+                                    result.push('"');
+                                    position = ValuePosition::Other;
+                                    continue; // `i` already at delimiter
+                                }
+                                position = ValuePosition::Other;
+                            }
+                            ValuePosition::Other => {
+                                result.push(ch);
+                            }
+                        }
+                    }
                 }
-                '"' => {
-                    state = QuoteState::InDouble;
-                    result.push('"');
-                }
-                ';' => result.push(','),
-                _ => result.push(ch),
-            },
-            QuoteState::InSingle => match ch {
+                // NOTE: do NOT `i += 1` here — the shared `i += 1` at the
+                // end of the while loop advances for all non-`continue` arms.
+            }
+            QuoteState::InSingle => match chars[i] {
                 '\'' => {
                     state = QuoteState::Normal;
                     result.push('"');
@@ -375,9 +542,9 @@ fn normalize_legado_json(input: &str) -> String {
                 '\\' => {
                     result.push_str("\\\\");
                 }
-                _ => result.push(ch),
+                _ => result.push(chars[i]),
             },
-            QuoteState::InDouble => match ch {
+            QuoteState::InDouble => match chars[i] {
                 '"' => {
                     state = QuoteState::Normal;
                     result.push('"');
@@ -386,15 +553,44 @@ fn normalize_legado_json(input: &str) -> String {
                     state = QuoteState::EscapeDouble;
                     result.push('\\');
                 }
-                _ => result.push(ch),
+                _ => result.push(chars[i]),
             },
             QuoteState::EscapeDouble => {
-                result.push(ch);
+                result.push(chars[i]);
                 state = QuoteState::InDouble;
             }
         }
+        i += 1;
     }
     result
+}
+
+/// Truncate `input` at the matching `}` for the first `{`, accounting for
+/// nested braces, brackets, and quoted strings. This strips trailing junk
+/// like JS expressions accidentally appended after the JSON object.
+fn truncate_at_matching_brace(input: &str) -> String {
+    let mut depth: i32 = 0;
+    let mut in_double = false;
+    let mut in_single = false;
+    let mut end = input.len();
+    for (i, ch) in input.char_indices() {
+        match ch {
+            '"' if !in_single => in_double = !in_double,
+            '\'' if !in_double => in_single = !in_single,
+            '{' if !in_double && !in_single => depth += 1,
+            '}' if !in_double && !in_single => {
+                if depth > 0 {
+                    depth -= 1;
+                    if depth == 0 {
+                        end = i + ch.len_utf8();
+                        break;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    input[..end].to_string()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -403,6 +599,40 @@ enum QuoteState {
     InSingle,
     InDouble,
     EscapeDouble,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ValuePosition {
+    /// Default state — not expecting a key or value.
+    Other,
+    /// After `{` or `,` — expecting a key (or closing `}`).
+    ExpectKey,
+    /// After `:` — expecting a value.
+    ExpectValue,
+}
+
+fn is_ident_start(ch: char) -> bool {
+    ch.is_ascii_alphabetic() || ch == '_' || ch == '$'
+}
+
+fn is_ident_continue(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || ch == '_' || ch == '$' || ch == '-'
+}
+
+/// Whether `ch` starts a recognized JSON literal value that should NOT be
+/// treated as a bare string (digits, `true`, `false`, `null`, or a quoted/
+/// nested value start). Anything else is treated as a bare string.
+fn is_bare_value_start(ch: char) -> bool {
+    ch.is_ascii_digit()
+        || ch == '-'
+        || ch == '+'
+        || ch == '"'
+        || ch == '\''
+        || ch == '{'
+        || ch == '['
+        || ch == 't'
+        || ch == 'f'
+        || ch == 'n'
 }
 
 /// Detect `@js:` and `<js>...</js>` patterns in a URL.
@@ -692,7 +922,12 @@ fn has_url_scheme(url: &str) -> bool {
 
 fn url_origin(value: &str) -> Option<String> {
     let (scheme, rest) = value.split_once("://")?;
-    let host = rest.split('/').next()?;
+    // Per RFC 3986, host terminates at first `/`, `?`, or `#`. Legado
+    // `bookSourceUrl` commonly appends `#<remark>` (source-key
+    // disambiguator, e.g. `http://example.com#yc`); without stripping it,
+    // absolute-path URL resolution produces `http://example.com#yc/path`
+    // where the fragment swallows the path — the server serves the homepage.
+    let host = rest.split(['/', '?', '#']).next()?;
     if host.is_empty() {
         None
     } else {

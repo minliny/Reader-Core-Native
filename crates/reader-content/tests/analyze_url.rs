@@ -451,3 +451,80 @@ fn parse_url_with_at_js_inside_body_string_is_not_stripped() {
     assert_eq!(result.options.body.as_deref(), Some("q=test@js:foo"));
     assert!(!result.has_js_expression);
 }
+
+// ===========================================================================
+// Issue 3 (batch v4 dsl_parse_error): Legado JSON quirks
+// ===========================================================================
+
+#[test]
+fn parse_url_with_unquoted_json_keys_normalizes() {
+    // From corpus-batch-v4 src-084: `{\nmethod: "post",\nbody: "searchkey=..."}`
+    let raw = "{\nmethod: \"post\",\nbody: \"searchkey=test\"\n}";
+    let result = UrlDslParser::parse(&format!(
+        "https://example.test/search, {raw}"
+    ))
+    .expect("unquoted JSON keys parse");
+    assert_eq!(result.options.method, "post");
+    assert_eq!(result.options.body.as_deref(), Some("searchkey=test"));
+}
+
+#[test]
+fn parse_url_with_unquoted_headers_key_normalizes() {
+    // From corpus-batch-v4: `{\n  headers: { \"User-Agent\": \"...\" }}`
+    let raw = "{\n  headers: { \"User-Agent\": \"ReaderCoreTest\" }\n}";
+    let result = UrlDslParser::parse(&format!(
+        "https://example.test/search, {raw}"
+    ))
+    .expect("unquoted headers key parses");
+    assert_eq!(
+        result.options.headers["User-Agent"].as_str(),
+        Some("ReaderCoreTest")
+    );
+}
+
+#[test]
+fn parse_url_with_bare_unquoted_body_value_normalizes() {
+    // From corpus-batch-v4 src-017: body value `{"keyword":%E6...}` is a bare
+    // unquoted value. The normalizer wraps it in quotes so the JSON parses.
+    let raw = r#"https://example.test/search, {"method":"POST","body":{"keyword":%E6%B5%8B%E8%AF%95}}"#;
+    let result = UrlDslParser::parse(raw).expect("bare unquoted body value parses");
+    assert_eq!(result.options.method, "POST");
+    // The body becomes a JSON string containing the (now-quoted) object.
+    let body = result.options.body.as_deref().expect("body present");
+    assert!(body.contains("keyword"), "body was: {body}");
+}
+
+#[test]
+fn parse_url_with_trailing_js_after_json_is_truncated() {
+    // From corpus-batch-v4 src-034: trailing `).raw().request().url}).replace(...)`
+    // after the JSON object. The normalizer truncates at the matching `}`.
+    let raw = r#"https://example.test/search, {"method":"POST","body":"q=test"}).raw().request().url}).replace("a","b")}"#;
+    let result = UrlDslParser::parse(raw).expect("trailing JS after JSON truncates");
+    assert_eq!(result.url, "https://example.test/search");
+    assert_eq!(result.options.method, "POST");
+    assert_eq!(result.options.body.as_deref(), Some("q=test"));
+}
+
+#[test]
+fn parse_url_with_headers_as_string_with_single_quotes_normalizes() {
+    // From corpus-batch-v4 src-021: headers is a string `"{os:'pc'}"` rather
+    // than an object. The custom deserializer normalizes it into a map.
+    let raw = r#"https://example.test/search, {"method":"POST","headers":"{os:'pc'}"}"#;
+    let result = UrlDslParser::parse(raw).expect("headers-as-string with single quotes parses");
+    assert_eq!(result.options.method, "POST");
+    assert_eq!(result.options.headers["os"].as_str(), Some("pc"));
+}
+
+#[test]
+fn parse_url_with_js_template_in_value_not_treated_as_separator() {
+    // From corpus-batch-v4 src-017: searchUrl contains `{{java.base64Encode(...)}}`
+    // inside a body value. The `{{` Legado JS template must not be confused
+    // with a JSON object brace, and a comma before `{{` must not be treated
+    // as the DSL separator.
+    let raw = "https://example.test/search,{\"method\":\"POST\",\"body\":\"{{java.base64Encode('test')}},{\\\"type\\\":\\\"maoyankanshu\\\"}\"}";
+    let result = UrlDslParser::parse(raw).expect("JS template inside body value parses");
+    assert_eq!(result.url, "https://example.test/search");
+    assert_eq!(result.options.method, "POST");
+    let body = result.options.body.as_deref().expect("body present");
+    assert!(body.contains("java.base64Encode"), "body was: {body}");
+}
