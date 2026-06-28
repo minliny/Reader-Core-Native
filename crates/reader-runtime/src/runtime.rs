@@ -3109,13 +3109,13 @@ mod tests {
 
     #[test]
     fn js_rule_unsupported_is_structured_not_fake_network() {
-        // S6: with the JS host-callback bridge wired (the default since
-        // `Runtime::new` now calls `RemoteState::with_sink`), a `java.get`
-        // call inside a JS rule no longer returns "unregistered host callback".
-        // Instead it emits a structured `host.request` event that the Host
-        // must complete. This test asserts the new correct behavior: the
-        // runtime emits `HostRequest` (structured, not a fake network result)
-        // rather than an "unsupported" error.
+        // jsRule evaluation uses an isolated (no-bridge) sandbox: a `java.get`
+        // call inside a chapter-content jsRule returns `JsOutcome::Unsupported`
+        // because no host callback is registered on the jsRule sandbox. The
+        // bridge is reserved for URL-building (`@js:`/`<js>` in searchUrl/
+        // bookUrl/tocUrl/chapterUrl), not chapter-content jsRules. The error
+        // is structured (`details.unsupported = true`), never a fake network
+        // result.
         let sink = Arc::new(CollectSink::new());
         let rt = Runtime::new(sink.clone());
         let event = send_and_wait(
@@ -3135,17 +3135,16 @@ mod tests {
             ),
         );
         match event {
-            Event::HostRequest {
-                capability, params, ..
-            } => {
-                assert_eq!(capability, HostCapability::HttpExecute);
-                assert_eq!(params["url"], "https://books.example.test/protected");
-                assert_eq!(params["method"], "GET");
-                // Must never claim a network result happened — this is a
-                // request descriptor, not a fake response.
-                assert!(params.get("body").is_some());
+            Event::Error { error, .. } => {
+                assert_eq!(error.code, ErrorCode::Internal);
+                assert_eq!(
+                    error.details["unsupported"],
+                    serde_json::Value::Bool(true),
+                    "error should carry structured unsupported flag, got details: {:?}",
+                    error.details
+                );
             }
-            other => panic!("expected HostRequest (structured), got {other:?}"),
+            other => panic!("expected structured unsupported error, got {other:?}"),
         }
     }
 

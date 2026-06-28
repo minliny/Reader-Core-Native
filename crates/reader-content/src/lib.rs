@@ -1219,15 +1219,25 @@ impl RemoteContentPipeline {
         } else {
             Vec::new()
         };
-        let next_toc_url = extract_rule_value(
-            self,
-            toc_response,
-            rules.next_url.as_deref(),
-            2,
-            pre_rule,
-            &context,
-        )?
-        .map(|value| resolve_url(&context.base_url, &context.current_url, value.as_str()));
+        // Skip nextTocUrl extraction when the chapter list is empty. The
+        // @xpath nextTocUrl evaluation on large HTML (50K+) can take 300+
+        // seconds due to sxd DOM reconstruction + xpath traversal. When the
+        // chapter list rule returns empty (e.g. a CSS shorthand pipeline bug
+        // like `id.list@tag.li`), fetching the next page would just produce
+        // another empty list — no point paying the xpath cost.
+        let next_toc_url = if chapters.is_empty() {
+            None
+        } else {
+            extract_rule_value(
+                self,
+                toc_response,
+                rules.next_url.as_deref(),
+                2,
+                pre_rule,
+                &context,
+            )?
+            .map(|value| resolve_url(&context.base_url, &context.current_url, value.as_str()))
+        };
         Ok(BookSourceToc {
             chapters,
             next_toc_url,
@@ -1277,15 +1287,23 @@ impl RemoteContentPipeline {
             &context,
         )?;
         let content = normalization::normalize_extracted_content(&replaced);
-        let next_content_url = extract_rule_value(
-            self,
-            chapter_response,
-            rules.next_url.as_deref(),
-            2,
-            None,
-            &context,
-        )?
-        .map(|value| resolve_url(&context.base_url, &context.current_url, value.as_str()));
+        // Skip nextContentUrl extraction when content is empty — same
+        // rationale as toc_book_source: @xpath on large HTML is
+        // catastrophically slow (300+ s), and an empty content page has no
+        // reason to fetch the next page.
+        let next_content_url = if content.trim().is_empty() {
+            None
+        } else {
+            extract_rule_value(
+                self,
+                chapter_response,
+                rules.next_url.as_deref(),
+                2,
+                None,
+                &context,
+            )?
+            .map(|value| resolve_url(&context.base_url, &context.current_url, value.as_str()))
+        };
         Ok(BookSourceContent {
             title,
             content,

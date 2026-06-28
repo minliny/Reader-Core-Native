@@ -73,6 +73,14 @@ const MAX_NEXT_PAGES: u32 = 50;
 #[derive(Clone)]
 pub struct RemoteState {
     pipeline: Arc<RemoteContentPipeline>,
+    /// Isolated pipeline (no host-callback bridge) for `jsRule` evaluation in
+    /// `chapter.content`. A `java.get`/`java.post` call inside a chapter-content
+    /// `jsRule` returns `JsOutcome::Unsupported` against this sandbox (no host
+    /// callback registered), rather than emitting a `host.request` event that
+    /// the bridge would block on. The bridge is reserved for URL-building
+    /// (`@js:`/`<js>` in `searchUrl`/`bookUrl`/`tocUrl`/`chapterUrl`), not for
+    /// chapter-content jsRules.
+    js_rule_pipeline: Arc<RemoteContentPipeline>,
     storage: Arc<InMemoryStorage>,
     bridge: Option<HostCallbackBridge>,
 }
@@ -87,6 +95,7 @@ impl RemoteState {
     pub fn new() -> Self {
         Self {
             pipeline: Arc::new(RemoteContentPipeline::new()),
+            js_rule_pipeline: Arc::new(RemoteContentPipeline::new()),
             storage: Arc::new(InMemoryStorage::new()),
             bridge: None,
         }
@@ -105,6 +114,10 @@ impl RemoteState {
         let sandbox = bridge.build_sandbox();
         Self {
             pipeline: Arc::new(RemoteContentPipeline::with_js_sandbox(sandbox)),
+            // jsRule evaluation always uses an isolated (no-bridge) sandbox so
+            // `java.get` in a chapter-content jsRule returns Unsupported rather
+            // than emitting a host.request the caller cannot fulfill.
+            js_rule_pipeline: Arc::new(RemoteContentPipeline::new()),
             storage: Arc::new(InMemoryStorage::new()),
             bridge: Some(bridge),
         }
@@ -112,6 +125,13 @@ impl RemoteState {
 
     pub fn pipeline(&self) -> &RemoteContentPipeline {
         &self.pipeline
+    }
+
+    /// Isolated pipeline (no host-callback bridge) for `jsRule` evaluation.
+    /// Used by `chapter.content` so `java.get` in a jsRule returns
+    /// `JsOutcome::Unsupported` instead of emitting a `host.request`.
+    pub fn js_rule_pipeline(&self) -> &RemoteContentPipeline {
+        &self.js_rule_pipeline
     }
 
     pub fn storage(&self) -> &InMemoryStorage {
@@ -1148,7 +1168,14 @@ fn chapter_content_from_params(
     let pipeline = state.pipeline();
 
     if let Some(js_rule) = params.js_rule.as_ref() {
-        match pipeline.evaluate_js_rule(js_rule) {
+        // Use the isolated (no-bridge) sandbox for jsRule evaluation: a
+        // `java.get`/`java.post` call inside a chapter-content jsRule returns
+        // `JsOutcome::Unsupported` (no host callback registered) rather than
+        // emitting a `host.request` event the caller cannot fulfill. The
+        // bridge is reserved for URL-building (`@js:`/`<js>` in searchUrl/
+        // bookUrl/tocUrl/chapterUrl), not chapter-content jsRules.
+        let js_rule_pipeline = state.js_rule_pipeline();
+        match js_rule_pipeline.evaluate_js_rule(js_rule) {
             JsOutcome::Ok(value) => {
                 let cache_key = format!("chapter:{}:{}", params.book_id, params.chapter_title);
                 let _ = state.storage().put_cache(

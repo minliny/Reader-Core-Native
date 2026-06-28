@@ -3,8 +3,16 @@
     "sourceId": "legado-css-src",
     "name": "Legado CSS Test Source",
     "baseUrl": "https://books.example.test",
+    "bookSource": {
+      "bookSourceName": "Legado CSS Test Source",
+      "bookSourceUrl": "https://books.example.test",
+      "ruleSearch": {
+        "bookList": "class.item",
+        "name": "class.name@tag.a@text",
+        "bookUrl": "class.name@tag.a@href"
+      }
+    },
     "rules": {
-      "search": "div.list&&div.item;div.name&&a@text",
       "detail": ".detail span@text",
       "toc": "div.toc@text",
       "chapter": "article.chapter@html"

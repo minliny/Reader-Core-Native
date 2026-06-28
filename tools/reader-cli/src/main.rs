@@ -664,7 +664,9 @@ fn run_fixture_vertical(
     ))?;
     print_next_event(rx)?;
 
-    // 5. book.toc
+    // 5. book.toc — may emit a host.request for nextTocUrl pagination. When
+    //    it does, complete with an empty body so pagination stops and Core
+    //    returns the first page's chapters.
     runtime.send(Command::new(
         6,
         methods::BOOK_TOC,
@@ -675,9 +677,10 @@ fn run_fixture_vertical(
             "source": source,
         }),
     ))?;
-    print_next_event(rx)?;
+    print_next_event_or_complete_pagination(rx, &runtime)?;
 
-    // 6. chapter.content (rule path)
+    // 6. chapter.content (rule path) — may emit a host.request for
+    //    nextContentUrl pagination. Same empty-body completion as toc.
     runtime.send(Command::new(
         7,
         methods::CHAPTER_CONTENT,
@@ -689,7 +692,7 @@ fn run_fixture_vertical(
             "source": source,
         }),
     ))?;
-    print_next_event(rx)?;
+    print_next_event_or_complete_pagination(rx, &runtime)?;
 
     // 7. reading.progress.update
     runtime.send(Command::new(
@@ -1176,6 +1179,46 @@ fn print_next_event(rx: &Receiver<Event>) -> Result<(), CoreError> {
     let event = recv_event(rx)?;
     print_event(&event);
     Ok(())
+}
+
+/// Receive the next event. If it is a `host.request` (e.g. toc/chapter
+/// pagination), complete it with an empty body so Core returns the
+/// accumulated result. Loops until a non-host-request event is received.
+fn print_next_event_or_complete_pagination(
+    rx: &Receiver<Event>,
+    runtime: &Runtime,
+) -> Result<(), CoreError> {
+    loop {
+        let event = recv_event(rx)?;
+        let operation_id = match &event {
+            Event::HostRequest {
+                operation_id,
+                capability: HostCapability::HttpExecute,
+                ..
+            } => *operation_id,
+            _ => {
+                print_event(&event);
+                return Ok(());
+            }
+        };
+        print_event(&event);
+        // Complete with an empty body — no next-page content, so
+        // pagination stops and Core emits the final result. Use a
+        // high requestId to avoid colliding with the main pipeline's
+        // sequential ids (1-9).
+        runtime.send(Command::new(
+            900 + operation_id,
+            methods::HOST_COMPLETE,
+            serde_json::json!({
+                "operationId": operation_id,
+                "result": {
+                    "status": 200,
+                    "headers": { "content-type": "text/html" },
+                    "body": ""
+                }
+            }),
+        ))?;
+    }
 }
 
 fn recv_event(rx: &Receiver<Event>) -> Result<Event, CoreError> {

@@ -11,8 +11,41 @@ use scraper::{ElementRef, Html, Node as ScraperNode, Selector};
 use serde_json::Value as JsonValue;
 use std::error::Error;
 use std::fmt;
+use std::sync::OnceLock;
 use sxd_document::Package;
 use sxd_xpath::{Context, Factory, Value as XPathValue};
+
+/// Cached regexes used in the `execute_legado_rule` hot path. Regex
+/// compilation is ~0.1-1ms per call; without caching, a 999-chapter TOC
+/// extraction compiles the same 4 regexes ~8000 times (999 items × 2 field
+/// rules × 4 regexes), adding ~240ms per chapter and turning a 0.1s
+/// extraction into a 240s timeout. `OnceLock` initializes each regex exactly
+/// once on first use; subsequent calls are a single atomic load.
+mod cached_regex {
+    use super::{OnceLock, Regex};
+
+    pub fn put_rules() -> &'static Regex {
+        static RE: OnceLock<Regex> = OnceLock::new();
+        RE.get_or_init(|| Regex::new(r"(?i)@put:(\{[^}]+?\})").expect("put regex"))
+    }
+
+    pub fn get_rules() -> &'static Regex {
+        static RE: OnceLock<Regex> = OnceLock::new();
+        RE.get_or_init(|| Regex::new(r"(?i)@get:\{([^}]+?)\}").expect("get regex"))
+    }
+
+    pub fn js_templates() -> &'static Regex {
+        static RE: OnceLock<Regex> = OnceLock::new();
+        RE.get_or_init(|| Regex::new(r"(?i)\{\{([\w\W]*?)\}\}").expect("js template regex"))
+    }
+
+    pub fn js_segments() -> &'static Regex {
+        static RE: OnceLock<Regex> = OnceLock::new();
+        RE.get_or_init(|| {
+            Regex::new(r"(?i)<js>([\w\W]*?)</js>|@js:([\w\W]*)").expect("js segment regex")
+        })
+    }
+}
 
 pub type RuleResult<T> = Result<T, RuleError>;
 
@@ -570,10 +603,7 @@ impl<'a> LegadoRegexSuffix<'a> {
 /// JSON-stringified. Parse failures are silently skipped (Legado logs a
 /// warning but continues) — the `@put:{...}` segment is still stripped.
 fn extract_put_rules(body: &str, scope: &mut dyn RuleVariableScope) -> String {
-    let regex = match Regex::new(r"(?i)@put:(\{[^}]+?\})") {
-        Ok(r) => r,
-        Err(_) => return body.to_string(),
-    };
+    let regex = cached_regex::put_rules();
     let mut cleaned = body.to_string();
     // Collect first, mutate scope after iteration to avoid borrowing issues.
     let mut to_store: Vec<(String, String)> = Vec::new();
@@ -606,10 +636,7 @@ fn extract_put_rules(body: &str, scope: &mut dyn RuleVariableScope) -> String {
 /// `@get:\{[^}]+?\}` case-insensitive) + `makeUpRule` getRuleType handling
 /// (line 698-699).
 fn substitute_get_rules(body: &str, scope: &dyn RuleVariableScope) -> String {
-    let regex = match Regex::new(r"(?i)@get:\{([^}]+?)\}") {
-        Ok(r) => r,
-        Err(_) => return body.to_string(),
-    };
+    let regex = cached_regex::get_rules();
     regex
         .replace_all(body, |caps: &regex::Captures| {
             let key = caps.get(1).map(|m| m.as_str()).unwrap_or("");
@@ -632,10 +659,7 @@ fn substitute_js_templates(body: &str, js: Option<&dyn RuleJsEvaluator>) -> Stri
     let Some(js) = js else {
         return body.to_string();
     };
-    let regex = match Regex::new(r"(?i)\{\{([\w\W]*?)\}\}") {
-        Ok(r) => r,
-        Err(_) => return body.to_string(),
-    };
+    let regex = cached_regex::js_templates();
     regex
         .replace_all(body, |caps: &regex::Captures| {
             let expr = caps.get(1).map(|m| m.as_str()).unwrap_or("");
@@ -655,10 +679,7 @@ fn substitute_js_templates(body: &str, js: Option<&dyn RuleJsEvaluator>) -> Stri
 /// Returns a vec of `(text, is_js)` tuples in source order. Non-JS segments
 /// may be empty (e.g. when the body starts with `<js>`).
 fn split_js_segments(body: &str) -> Vec<(String, bool)> {
-    let regex = match Regex::new(r"(?i)<js>([\w\W]*?)</js>|@js:([\w\W]*)") {
-        Ok(r) => r,
-        Err(_) => return vec![(body.to_string(), false)],
-    };
+    let regex = cached_regex::js_segments();
     let mut segments = Vec::new();
     let mut last_end = 0;
     for caps in regex.captures_iter(body) {
