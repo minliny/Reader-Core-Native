@@ -218,7 +218,11 @@ impl HostCallbackBridge {
     }
 
     /// Build a `HostCallbackRegistry` with `java.get`/`java.post`/`java.connect`/
-    /// `java.ajax`/`java.ajaxAll` registered to route through this bridge.
+    /// `java.ajax`/`java.ajaxAll` registered to route through this bridge, plus
+    /// the non-HTTP `java.*` helpers (`java.put`/`java.getCookie`/
+    /// `java.getSource`/`java.webView`) registered with Core-side semantics so
+    /// URL-building JS no longer fails with "unregistered host callback".
+    ///
     /// The returned registry is used to construct a
     /// `QuickJsSandbox::with_host_callbacks` that `RemoteContentPipeline`
     /// consumes via `with_js_sandbox`.
@@ -248,6 +252,73 @@ impl HostCallbackBridge {
         let bridge = self.clone();
         registry.register("java.ajaxAll", move |descriptor| {
             bridge.execute_ajax_all(descriptor)
+        });
+
+        // `java.put(key, value)` — Legado stores key-value in the source/book/
+        // chapter variable map and returns `value`. Core has no cross-evaluation
+        // variable store (each URL-building JS runs in a single evaluation), so
+        // we accept the call, drop the key, and return `value` — this lets JS
+        // that uses `var x = java.put("k", v)` or `java.put("k", v); ...v...`
+        // proceed instead of failing with "unregistered host callback: java.put".
+        // Sources that rely on cross-evaluation retrieval (`java.get("k")` in a
+        // later evaluation) are out of scope for URL-building JS.
+        registry.register("java.put", move |descriptor| {
+            let HostDescriptor::Put { key, value } = descriptor else {
+                return Err(HostError::new(
+                    "java.put expected HostDescriptor::Put".to_string(),
+                ));
+            };
+            let _ = key; // key accepted; Core has no variable store to persist into
+            Ok(JsonValue::String(value))
+        });
+
+        // `java.getCookie(tag, key?)` — Legado reads from the host cookie jar.
+        // Core does not manage cookies (host-managed per red line 4). Return an
+        // empty string so cookie-dependent JS degrades gracefully rather than
+        // failing with "unregistered host callback".
+        registry.register("java.getCookie", move |descriptor| {
+            let HostDescriptor::GetCookie { tag, key } = descriptor else {
+                return Err(HostError::new(
+                    "java.getCookie expected HostDescriptor::GetCookie".to_string(),
+                ));
+            };
+            let _ = (tag, key);
+            Ok(JsonValue::String(String::new()))
+        });
+
+        // `java.getSource()` — Legado returns the currently-bound book-source
+        // object. Core exposes the source as a JS global (`source`) via
+        // `evaluate_url_js`'s prelude; `java.getSource()` is a separate API
+        // surface that Legado JS may call. Return an empty object so
+        // `java.getSource().bookSourceUrl` resolves to undefined (no crash)
+        // rather than throwing "unregistered host callback: java.getSource".
+        registry.register("java.getSource", move |descriptor| {
+            let HostDescriptor::GetSource = descriptor else {
+                return Err(HostError::new(
+                    "java.getSource expected HostDescriptor::GetSource".to_string(),
+                ));
+            };
+            Ok(JsonValue::Object(serde_json::Map::new()))
+        });
+
+        // `java.webView(html?, url?, js?)` — Legado loads a WebView, runs JS,
+        // and returns the body. Core never touches WebView (red line 4: Core
+        // does not open sockets, touch WebView, or store plaintext credentials).
+        // Register the callback so the error is a clean "unsupported" signal
+        // rather than "unregistered host callback" — the source still fails,
+        // but with a message that explains why (red line 4) instead of looking
+        // like a wiring gap.
+        registry.register("java.webView", move |descriptor| {
+            let HostDescriptor::WebView { .. } = descriptor else {
+                return Err(HostError::new(
+                    "java.webView expected HostDescriptor::WebView".to_string(),
+                ));
+            };
+            Err(HostError::new(
+                "java.webView is unsupported in Core (red line 4: Core does not touch WebView) \
+                 — host platforms handle WebView; sources requiring WebView cannot run in Core"
+                    .to_string(),
+            ))
         });
 
         registry
@@ -639,5 +710,130 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(body_str).unwrap();
         assert_eq!(parsed["body"], "{\"ok\":true}");
         assert_eq!(parsed["status"], 200);
+    }
+
+    /// `java.put(key, value)` returns the value (Legado contract) instead of
+    /// failing with "unregistered host callback". Batch v4 had 10 sources
+    /// failing on this; the registration lets URL-building JS proceed.
+    #[test]
+    fn java_put_returns_value_without_network() {
+        let sink = Arc::new(CapturingSink::new());
+        let bridge = HostCallbackBridge::new(sink.clone());
+        bridge.set_current_request_id(1);
+        let registry = bridge.build_registry();
+        let result = registry.call(
+            "java.put",
+            HostDescriptor::Put {
+                key: "sign".to_string(),
+                value: "abc123".to_string(),
+            },
+        );
+        let value = result.expect("java.put should succeed");
+        assert_eq!(value, serde_json::json!("abc123"));
+        // No host.request emitted — java.put is pure local state.
+        assert!(sink.drain().is_empty(), "java.put must not emit host.request");
+    }
+
+    /// `java.getCookie(tag, key)` returns an empty string (Core does not manage
+    /// cookies — host-managed per red line 4). Registered so cookie-dependent
+    /// JS degrades gracefully instead of failing "unregistered".
+    #[test]
+    fn java_get_cookie_returns_empty_string() {
+        let sink = Arc::new(CapturingSink::new());
+        let bridge = HostCallbackBridge::new(sink);
+        bridge.set_current_request_id(1);
+        let registry = bridge.build_registry();
+        let result = registry.call(
+            "java.getCookie",
+            HostDescriptor::GetCookie {
+                tag: "https://example.test".to_string(),
+                key: Some("session".to_string()),
+            },
+        );
+        let value = result.expect("java.getCookie should succeed");
+        assert_eq!(value, serde_json::json!(""));
+    }
+
+    /// `java.getSource()` returns an empty object (the source is exposed as a
+    /// JS global `source` via evaluate_url_js; java.getSource is a separate
+    /// Legado API). Registered so JS that calls it doesn't fail "unregistered".
+    #[test]
+    fn java_get_source_returns_empty_object() {
+        let sink = Arc::new(CapturingSink::new());
+        let bridge = HostCallbackBridge::new(sink);
+        bridge.set_current_request_id(1);
+        let registry = bridge.build_registry();
+        let result = registry.call("java.getSource", HostDescriptor::GetSource);
+        let value = result.expect("java.getSource should succeed");
+        assert_eq!(value, serde_json::json!({}));
+    }
+
+    /// `java.webView(...)` returns an error (red line 4: Core does not touch
+    /// WebView). The callback IS registered, so the error is a clean
+    /// "unsupported" signal explaining red line 4 — not "unregistered host
+    /// callback". Batch v4 had 1 source failing on the unregistered form.
+    #[test]
+    fn java_web_view_returns_unsupported_error() {
+        let sink = Arc::new(CapturingSink::new());
+        let bridge = HostCallbackBridge::new(sink);
+        bridge.set_current_request_id(1);
+        let registry = bridge.build_registry();
+        let result = registry.call(
+            "java.webView",
+            HostDescriptor::WebView {
+                html: None,
+                url: Some("https://example.test".to_string()),
+                js: None,
+            },
+        );
+        let err = result.expect_err("java.webView must error (red line 4)");
+        assert!(
+            err.message.contains("unsupported"),
+            "error should signal unsupported: {}",
+            err.message
+        );
+        assert!(
+            err.message.contains("WebView"),
+            "error should mention WebView: {}",
+            err.message
+        );
+    }
+
+    /// End-to-end: a JS sandbox built with the bridge's registry can call
+    /// `java.put` / `java.getSource` / `java.getCookie` without throwing
+    /// "unregistered host callback". `java.webView` throws an exception
+    /// carrying the red-line-4 message.
+    #[test]
+    fn build_sandbox_executes_js_with_non_http_host_callbacks() {
+        let sink = Arc::new(CapturingSink::new());
+        let bridge = HostCallbackBridge::new(sink);
+        bridge.set_current_request_id(1);
+        let sandbox = bridge.build_sandbox();
+
+        // java.put / java.getSource / java.getCookie succeed.
+        let result = sandbox.evaluate(
+            r#"
+            var putResult = java.put("k", "v");
+            var src = java.getSource();
+            var cookie = java.getCookie("https://example.test", "session");
+            JSON.stringify({ put: putResult, src: src, cookie: cookie });
+        "#,
+        );
+        let value = result.expect("non-HTTP callbacks should succeed");
+        let parsed: serde_json::Value =
+            serde_json::from_str(value.value.as_str().expect("result is string"))
+                .expect("result is valid JSON");
+        assert_eq!(parsed["put"], "v", "java.put returns value");
+        assert_eq!(parsed["src"], serde_json::json!({}), "java.getSource returns empty object");
+        assert_eq!(parsed["cookie"], "", "java.getCookie returns empty");
+
+        // java.webView throws an exception with the red-line-4 message.
+        let result = sandbox.evaluate(r#"java.webView(null, "https://example.test", null)"#);
+        let err = result.expect_err("java.webView must throw");
+        assert!(
+            err.message.contains("unsupported"),
+            "webView error should signal unsupported: {}",
+            err.message
+        );
     }
 }

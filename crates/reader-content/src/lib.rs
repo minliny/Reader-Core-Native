@@ -1356,13 +1356,25 @@ impl RemoteContentPipeline {
     /// `tocUrl`/`chapterUrl` fields.
     ///
     /// Exposes the full Legado `AnalyzeUrl.kt` `evalJS` variable scope as
-    /// top-level JS variables: `key`, `page`, `baseUrl`, `bookUrl`,
-    /// `chapterUrl`, `sourceId`, `result`, and `cookie`. String values are
-    /// read from `context` and injected as JS string literals; `result` uses
-    /// JSON string encoding (robust against newlines/quotes in response
-    /// bodies) and `cookie` is injected as a JSON object literal (Legado
-    /// exposes the cookie store as a map-like object). The result is coerced
-    /// to a string (matching Legado's `AnalyzeUrl` JS-result string coercion).
+    /// top-level JS globals: `key`, `page`, `baseUrl`, `bookUrl`,
+    /// `chapterUrl`, `sourceId`, `result`, `cookie`, plus the extended
+    /// Legado variables `source` (book-source object), `org` (baseUrl alias),
+    /// `time` (current epoch milliseconds), `sign_key`, `body`, and
+    /// `tab_type` (Fanqie-specific). String values are read from `context`
+    /// and injected as JS string literals; `result` uses JSON string encoding
+    /// (robust against newlines/quotes in response bodies); `cookie` and
+    /// `source` are injected as JSON object literals (Legado exposes both as
+    /// map-like objects). The result is coerced to a string (matching Legado's
+    /// `AnalyzeUrl` JS-result string coercion).
+    ///
+    /// Variables are bound via `globalThis.x = ...` (property assignment) rather
+    /// than `var x = ...` (variable declaration) so that source JS may legally
+    /// re-declare any of these names with `let`/`const` at the script's top
+    /// level. `var` declaration would create a global variable binding that
+    /// conflicts with a later `let x` ("Syntax: invalid redefinition of
+    /// global identifier", observed on the Lofter sources' `let baseUrl`).
+    /// Property assignment creates no lexical binding, so `let baseUrl` in
+    /// the source JS shadows the `globalThis.baseUrl` property cleanly.
     pub fn evaluate_url_js(
         &self,
         expr: &str,
@@ -1399,17 +1411,58 @@ impl RemoteContentPipeline {
             Some(value) if !value.is_null() => value.to_string(),
             _ => "{}".to_string(),
         };
-        // Prepend variable bindings so the expression can reference the full
-        // Legado `evalJS` variable scope as top-level globals.
+        // `source` is the Legado book-source object (bookSourceUrl/name/...).
+        // Inject as a JSON object literal so `source.bookSourceUrl` /
+        // `source.name` access works. Defaults to `{}` when the caller did not
+        // provide a source payload (URL-building JS rarely needs the full
+        // object; the few sources that read `source.xxx` get undefined fields
+        // rather than a `source is not defined` ReferenceError).
+        let source_literal = match context.get("source") {
+            Some(value) if !value.is_null() => value.to_string(),
+            _ => "{}".to_string(),
+        };
+        // `org` is Legado's alias for the request base URL. Default to the
+        // resolved `baseUrl` so sources that build URLs as
+        // `org + "/path"` keep working without an explicit `org` in context.
+        let org = esc_str("org");
+        let org_value = if org.is_empty() { base_url.clone() } else { org };
+        // `time` is Legado's `System.currentTimeMillis()` — epoch milliseconds.
+        // Default to the current wall clock so signature JS that reads `time`
+        // gets a fresh timestamp without the caller having to inject one.
+        let time = context
+            .get("time")
+            .and_then(|v| v.as_u64())
+            .unwrap_or_else(|| {
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis() as u64)
+                    .unwrap_or(0)
+            });
+        // `sign_key` / `body` / `tab_type` are source-specific variables used
+        // by signing JS (e.g. Fanqie novel's `tab_type`). Default to empty
+        // string — the source JS typically guards these with `||` fallbacks.
+        let sign_key = esc_str("sign_key");
+        let body = esc_str("body");
+        let tab_type = esc_str("tab_type");
+        // Bind variables as `globalThis.x = ...` (property assignment) so the
+        // source JS may re-declare any name with `let`/`const` without
+        // triggering "invalid redefinition of global identifier". See the
+        // method doc for the Lofter `let baseUrl` case.
         let script = format!(
-            "var key = '{key}';\n\
-             var page = {page};\n\
-             var baseUrl = '{base_url}';\n\
-             var bookUrl = '{book_url}';\n\
-             var chapterUrl = '{chapter_url}';\n\
-             var sourceId = '{source_id}';\n\
-             var result = {result_literal};\n\
-             var cookie = {cookie_literal};\n\
+            "globalThis.key = '{key}';\n\
+             globalThis.page = {page};\n\
+             globalThis.baseUrl = '{base_url}';\n\
+             globalThis.bookUrl = '{book_url}';\n\
+             globalThis.chapterUrl = '{chapter_url}';\n\
+             globalThis.sourceId = '{source_id}';\n\
+             globalThis.result = {result_literal};\n\
+             globalThis.cookie = {cookie_literal};\n\
+             globalThis.source = {source_literal};\n\
+             globalThis.org = '{org_value}';\n\
+             globalThis.time = {time};\n\
+             globalThis.sign_key = '{sign_key}';\n\
+             globalThis.body = '{body}';\n\
+             globalThis.tab_type = '{tab_type}';\n\
              {expr}"
         );
         let evaluation = self.js.evaluate(&script).map_err(|e| e.to_string())?;
@@ -1685,15 +1738,32 @@ fn extract_rule_items(
     // with a recognized extraction keyword, so `class.ser-ret@li` returns the
     // HTML of each `<li>` (for per-item rule processing) instead of being
     // misparsed as "extract `li` attribute from `.ser-ret`".
+    //
+    // Legado leading `-` = reverse iteration order (AnalyzeRule.kt
+    // `getElements`: `if (rule.startsWith("-")) { reverse = true; rule =
+    // rule.substring(1) }`). Without stripping it, `-class.chapter__list-box`
+    // is misparsed as a CSS class selector for `"-class"` (matches nothing)
+    // and the TOC returns 0 entries. Affects ~20 corpus sources that use
+    // `-` to present newest chapters first.
+    let (reverse, rule) = if let Some(stripped) = rule.strip_prefix('-') {
+        (true, stripped.to_string())
+    } else {
+        (false, rule)
+    };
     let rule = expand_template(&rule, context, pipeline, Some(input));
     let item_rule = auto_complete_list_rule(&rule);
     let out = pipeline.run_raw_legado_rule(input, &item_rule)?;
-    if !out.is_empty() {
-        return Ok(expand_json_array_items(out.into_values()));
+    let mut items = if !out.is_empty() {
+        expand_json_array_items(out.into_values())
+    } else {
+        expand_json_array_items(
+            pipeline.run_raw_legado_rule(input, &rule)?.into_values(),
+        )
+    };
+    if reverse {
+        items.reverse();
     }
-    Ok(expand_json_array_items(
-        pipeline.run_raw_legado_rule(input, &rule)?.into_values(),
-    ))
+    Ok(items)
 }
 
 /// Mirror Legado `AnalyzeRule.getElements` (Mode.Json → `AnalyzeByJSonPath.getList`):
@@ -2150,7 +2220,15 @@ fn has_url_scheme(value: &str) -> bool {
 
 fn url_origin(value: &str) -> Option<String> {
     let (scheme, rest) = value.split_once("://")?;
-    let host = rest.split('/').next()?;
+    // Per RFC 3986, the host terminates at the first `/`, `?`, or `#`.
+    // Legado `bookSourceUrl` frequently embeds a `#<remark>` suffix
+    // (e.g. `http://example.com#yc`, `https://m.ac.qq.com#Haxc`) used as a
+    // source key disambiguator, not as a real URL fragment. Without stripping
+    // it here, `url_origin("http://example.com#yc")` returns
+    // `http://example.com#yc` and every absolute-path resolution produces a
+    // URL whose fragment swallows the intended path — the server then serves
+    // the homepage instead of the chapter/TOC page.
+    let host = rest.split(['/', '?', '#']).next()?;
     if host.is_empty() {
         None
     } else {
@@ -3267,6 +3345,124 @@ mod tests {
     }
 
     #[test]
+    fn toc_chapter_list_leading_dash_reverses_order() {
+        // Legado `AnalyzeRule.getElements` strips a leading `-` and reverses
+        // the result list (newest-first presentation). Without this, a
+        // chapterList like `-class.chapter__list-box@tag.li` is misparsed as
+        // a CSS selector for `"-class"` (matches nothing) and the TOC returns
+        // 0 entries. Affects ~20 corpus sources (爱漫客栈, 爱看漫画, ...).
+        let mut toc = reader_domain::BookSourceTocSemantics::default();
+        toc.list = Some("-class.chapters@tag.li".into());
+        toc.name = Some("a@text".into());
+        toc.url = Some("a@href".into());
+        let semantics = BookSourceSemantics {
+            source_id: "dash-prefix-src".into(),
+            name: "Dash Prefix Source".into(),
+            base_url: "https://dash.example.test".into(),
+            search_url: None,
+            explore_url: None,
+            enabled: true,
+            enabled_explore: false,
+            rules: reader_domain::BookSourcePipelineRules {
+                search: reader_domain::BookSourceSearchSemantics::default(),
+                explore: reader_domain::BookSourceExploreSemantics::default(),
+                detail: reader_domain::BookSourceDetailSemantics::default(),
+                toc,
+                content: reader_domain::BookSourceContentSemantics::default(),
+            },
+        };
+        let context = BookSourceRequestContext::for_semantics(&semantics);
+        let pipeline = RemoteContentPipeline::new();
+
+        let resp = r#"<html><body><ul class="chapters">
+            <li><a href="/c/1">Ch 1</a></li>
+            <li><a href="/c/2">Ch 2</a></li>
+            <li><a href="/c/3">Ch 3</a></li>
+        </ul></body></html>"#;
+
+        let toc = pipeline
+            .toc_book_source(&semantics, resp, &context)
+            .unwrap();
+
+        assert_eq!(toc.chapters.len(), 3);
+        // Reversed: Ch 3 first, Ch 1 last.
+        assert_eq!(toc.chapters[0].title, "Ch 3");
+        assert_eq!(toc.chapters[0].url, "https://dash.example.test/c/3");
+        assert_eq!(toc.chapters[2].title, "Ch 1");
+        assert_eq!(toc.chapters[2].url, "https://dash.example.test/c/1");
+    }
+
+    #[test]
+    fn base_url_strips_fragment_from_book_source_url() {
+        // Legado `bookSourceUrl` frequently embeds `#<remark>` as a source
+        // key disambiguator (e.g. `http://example.com#yc`,
+        // `https://m.ac.qq.com#Haxc`). Per RFC 3986 the `#` introduces a
+        // fragment the server never sees; keeping it in `base_url` corrupts
+        // every resolved URL. `BookSourceSemantics::from_legado` must strip
+        // it so `base_url` is a clean request base.
+        let legado = reader_domain::LegadoBookSource {
+            book_source_name: Some("Fragment Source".into()),
+            book_source_url: Some("https://m.ac.qq.com#Haxc".into()),
+            ..Default::default()
+        };
+        let semantics = BookSourceSemantics::from_legado(
+            "frag-src",
+            Some("Fragment Source"),
+            None,
+            &legado,
+        );
+        assert_eq!(semantics.base_url, "https://m.ac.qq.com");
+    }
+
+    #[test]
+    fn toc_resolves_absolute_path_against_fragment_stripped_origin() {
+        // Without the `url_origin` fix, resolving `/book/all.html` against
+        // `http://www.maojiuxs.com#yc` produces
+        // `http://www.maojiuxs.com#yc/book/all.html` — the `#` swallows the
+        // path and the server serves the homepage. After stripping `#`/`?`
+        // from the host in `url_origin`, the resolved URL is clean.
+        let mut toc = reader_domain::BookSourceTocSemantics::default();
+        toc.list = Some(".books a".into());
+        toc.name = Some("text".into());
+        toc.url = Some("href".into());
+        let semantics = BookSourceSemantics {
+            source_id: "frag-origin-src".into(),
+            name: "Fragment Origin Source".into(),
+            // base_url is already fragment-stripped by from_legado; but
+            // current_url (from a recording) may still carry the fragment.
+            base_url: "http://www.maojiuxs.com".into(),
+            search_url: None,
+            explore_url: None,
+            enabled: true,
+            enabled_explore: false,
+            rules: reader_domain::BookSourcePipelineRules {
+                search: reader_domain::BookSourceSearchSemantics::default(),
+                explore: reader_domain::BookSourceExploreSemantics::default(),
+                detail: reader_domain::BookSourceDetailSemantics::default(),
+                toc,
+                content: reader_domain::BookSourceContentSemantics::default(),
+            },
+        };
+        let mut context = BookSourceRequestContext::for_semantics(&semantics);
+        // Simulate a current_url that still carries the Legado `#yc` remark.
+        context.current_url = "http://www.maojiuxs.com#yc/book/78094.html".into();
+        let pipeline = RemoteContentPipeline::new();
+
+        let resp = r#"<html><body>
+            <div class="books"><a href="/book/all.html">All Books</a></div>
+        </body></html>"#;
+
+        let toc = pipeline
+            .toc_book_source(&semantics, resp, &context)
+            .unwrap();
+
+        assert_eq!(toc.chapters.len(), 1);
+        // The href `/book/all.html` must resolve against the origin
+        // `http://www.maojiuxs.com`, NOT `http://www.maojiuxs.com#yc`.
+        assert_eq!(toc.chapters[0].url, "http://www.maojiuxs.com/book/all.html");
+    }
+
+    #[test]
     fn chapter_content_extracts_text() {
         let mut source = sample_source();
         source.rules.chapter = serde_json::json!([{ "kind": "cssText", "selector": "p.body" }]);
@@ -4083,6 +4279,99 @@ mod tests {
             JsOutcome::Ok(v) => assert_eq!(v["status"], "stubbed"),
             other => panic!("expected ok, got {other:?}"),
         }
+    }
+
+    /// Regression: Lofter sources (`立方体儿（优++）`, `乐乎文章（优）`) declare
+    /// `let baseUrl = "..."` in their `searchUrl` JS. The old `var baseUrl`
+    /// prelude created a global variable binding that conflicted with the
+    /// source's `let baseUrl`, producing "Syntax: invalid redefinition of
+    /// global identifier". The `globalThis.x = ...` prelude creates only a
+    /// global property (no lexical binding), so `let baseUrl` shadows it
+    /// cleanly. Verifies the syntax:redefinition fix.
+    #[test]
+    fn evaluate_url_js_let_redeclaration_does_not_trigger_syntax_error() {
+        let pipeline = RemoteContentPipeline::new();
+        // Mirrors the Lofter `searchUrl` shape: `let baseUrl = ...` after the
+        // prelude binds `globalThis.baseUrl`. The `let` must shadow cleanly.
+        let expr = r#"let baseUrl = "https://api.example.test/newsearch/"; baseUrl + "post.json?key=" + key"#;
+        let context = serde_json::json!({
+            "key": "测试",
+            "page": 1,
+            "baseUrl": "https://original.example.test",
+        });
+        let result = pipeline
+            .evaluate_url_js(expr, &context)
+            .expect("let baseUrl should not trigger redefinition error");
+        assert_eq!(
+            result, "https://api.example.test/newsearch/post.json?key=测试",
+            "let baseUrl must shadow the prelude's globalThis.baseUrl"
+        );
+    }
+
+    /// Verifies the extended Legado variable scope (`source`/`org`/`time`/
+    /// `sign_key`/`body`/`tab_type`) is injected. Without these, JS that
+    /// references them throws "X is not defined" (batch v4: 38 sources failed
+    /// with undefined_var). All must resolve to their defaults when the caller
+    /// does not provide them.
+    #[test]
+    fn evaluate_url_js_injects_extended_legado_variables() {
+        let pipeline = RemoteContentPipeline::new();
+        // Read every injected variable; none should throw "is not defined".
+        // `time` is a number (epoch ms); the rest are strings or objects.
+        let expr = r#"
+            [
+                typeof source,                  // object  (defaults to {})
+                typeof org,                     // string  (defaults to baseUrl)
+                typeof time,                    // number  (epoch ms)
+                typeof sign_key,                // string  (defaults to "")
+                typeof body,                    // string  (defaults to "")
+                typeof tab_type,                // string  (defaults to "")
+                org,                            // baseUrl fallback value
+                typeof source.bookSourceUrl     // "undefined" on {} default (no throw)
+            ].join("|")
+        "#;
+        let context = serde_json::json!({
+            "key": "kw",
+            "page": 1,
+            "baseUrl": "https://base.example.test",
+        });
+        let result = pipeline
+            .evaluate_url_js(expr, &context)
+            .expect("extended variables must be injected");
+        let parts: Vec<&str> = result.split('|').collect();
+        assert_eq!(parts[0], "object", "source defaults to object");
+        assert_eq!(parts[1], "string", "org is a string");
+        assert_eq!(parts[2], "number", "time is a number");
+        assert_eq!(parts[3], "string", "sign_key is a string");
+        assert_eq!(parts[4], "string", "body is a string");
+        assert_eq!(parts[5], "string", "tab_type is a string");
+        assert_eq!(
+            parts[6], "https://base.example.test",
+            "org falls back to baseUrl"
+        );
+        assert_eq!(parts[7], "undefined", "source.bookSourceUrl undefined on empty default");
+    }
+
+    /// `source` from the caller's context must flow through to JS as a real
+    /// object (not the `{}` default). Verifies the undefined_var:source fix for
+    /// sources whose JS reads `source.bookSourceUrl` / `source.name`.
+    #[test]
+    fn evaluate_url_js_injects_source_from_context() {
+        let pipeline = RemoteContentPipeline::new();
+        let expr = r#"source.bookSourceUrl + "/" + source.name"#;
+        let context = serde_json::json!({
+            "key": "kw",
+            "page": 1,
+            "baseUrl": "https://base.example.test",
+            "source": {
+                "bookSourceUrl": "https://src.example.test",
+                "name": "MySource"
+            }
+        });
+        let result = pipeline
+            .evaluate_url_js(expr, &context)
+            .expect("source object must be injected from context");
+        assert_eq!(result, "https://src.example.test/MySource");
     }
 
     /// S3 closure: real book-source JS rule fixture validation.
