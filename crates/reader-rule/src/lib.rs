@@ -1521,6 +1521,28 @@ fn zip_json_path_combination_results(results: Vec<Vec<String>>) -> Vec<String> {
 }
 
 fn evaluate_json_path_rule(value: &JsonValue, path: &str) -> Result<Vec<String>, String> {
+    // Legado template syntax: `{$<jsonpath>}<literal>` — evaluate the inner
+    // JSONPath and append the literal suffix to each result. e.g.
+    // `{$.crazy_rating}分` evaluates `$.crazy_rating` and appends "分".
+    if let Some((inner_path, literal_suffix)) = split_legado_template_path(path) {
+        let segments = parse_json_path(inner_path)?;
+        let results: Vec<String> = if json_path_segments_contain_function(&segments) {
+            evaluate_json_path_with_functions(&value, &segments)
+                .iter()
+                .map(json_value_to_rule_text)
+                .collect()
+        } else {
+            evaluate_json_path(&value, &segments)
+                .iter()
+                .map(|v| json_value_to_rule_text(*v))
+                .collect()
+        };
+        return Ok(results
+            .iter()
+            .map(|text| format!("{text}{literal_suffix}"))
+            .collect());
+    }
+
     let segments = parse_json_path(path)?;
     if json_path_segments_contain_function(&segments) {
         return Ok(evaluate_json_path_with_functions(&value, &segments)
@@ -1533,6 +1555,45 @@ fn evaluate_json_path_rule(value: &JsonValue, path: &str) -> Result<Vec<String>,
         .into_iter()
         .map(json_value_to_rule_text)
         .collect())
+}
+
+/// Split a Legado template path of the form `{$<jsonpath>}<literal>` into
+/// `(inner_jsonpath, literal_suffix)`. Returns `None` if `path` does not start
+/// with `{$` or has no matching `}`. The inner JSONPath is the text between
+/// `{$` and the matching `}`; the literal suffix is everything after the `}`.
+///
+/// Examples:
+/// - `{$.crazy_rating}分` → (`$.crazy_rating`, `分`)
+/// - `{$.rating}`        → (`$.rating`, ``)
+///
+/// String literals inside the JSONPath are respected so a `}` inside a quoted
+/// string does not close the template.
+fn split_legado_template_path(path: &str) -> Option<(&str, &str)> {
+    // Strip only the opening `{`; the inner JSONPath must start with `$`.
+    let rest = path.strip_prefix('{')?;
+    if !rest.starts_with('$') {
+        return None;
+    }
+    let mut in_double = false;
+    let mut in_single = false;
+    let mut depth = 1i32;
+    for (i, ch) in rest.char_indices() {
+        match ch {
+            '"' if !in_single => in_double = !in_double,
+            '\'' if !in_double => in_single = !in_single,
+            '{' if !in_double && !in_single => depth += 1,
+            '}' if !in_double && !in_single => {
+                depth -= 1;
+                if depth == 0 {
+                    let inner = &rest[..i];
+                    let suffix = &rest[i + ch.len_utf8()..];
+                    return Some((inner, suffix));
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 fn split_json_path_top_level_operator<'a>(
@@ -1682,6 +1743,16 @@ fn parse_json_path(path: &str) -> Result<Vec<JsonPathSegment>, String> {
                 if chars[index] == '*' {
                     segments.push(JsonPathSegment::Wildcard);
                     index += 1;
+                    continue;
+                }
+                // Legado variant: `$.[*]` / `$.[0]` / `$.['field']` — bracket
+                // directly after the dot. Treat the same as `$[*]` / `$[0]` /
+                // `$['field']` (the dot is effectively a no-op separator).
+                if chars[index] == '[' {
+                    index += 1;
+                    let (segment, next_index) = parse_json_path_bracket(&chars, index)?;
+                    segments.push(segment);
+                    index = next_index;
                     continue;
                 }
 
@@ -4564,7 +4635,26 @@ fn extract_legado_css_values(
                 }
             }
             LegadoCssExtraction::Attr(attr) => {
-                if let Some(value) = element.value().attr(attr) {
+                // Legado AnalyzeRule.kt: `@textNodes` returns direct text nodes
+                // (each as a separate string), `@ownText` returns the element's
+                // own text excluding children. Without this branch, both were
+                // misinterpreted as HTML attribute names (`element.attr("textNodes")`)
+                // and returned `None`, causing content extraction to silently
+                // produce empty output for sources like 快眼看书
+                // (`ruleContent.content = "id.chaptercontent@textNodes"`).
+                // Mirrors the same special-case already present in `apply_css`
+                // (the non-Legado CSS path) at the `CssExtraction::Attr` branch.
+                if attr == "textNodes" {
+                    let value = element_text(&element);
+                    if !value.is_empty() {
+                        output.push(value);
+                    }
+                } else if attr == "ownText" {
+                    let value = normalize_text(&element_own_text(&element));
+                    if !value.is_empty() {
+                        output.push(value);
+                    }
+                } else if let Some(value) = element.value().attr(attr) {
                     output.push(value.to_string());
                 }
             }

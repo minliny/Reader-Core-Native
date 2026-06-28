@@ -376,6 +376,7 @@ impl BookSourceSemantics {
             name: first_non_empty_str(&[source.book_source_name.as_deref(), fallback_name])
                 .unwrap_or_default(),
             base_url: first_non_empty_str(&[source.book_source_url.as_deref(), fallback_base_url])
+                .map(|url| strip_url_fragment(&url))
                 .unwrap_or_default(),
             search_url: clean_string(source.search_url.as_deref()),
             explore_url: clean_string(source.explore_url.as_deref()),
@@ -784,6 +785,26 @@ fn clean_string(value: Option<&str>) -> Option<String> {
         None
     } else {
         Some(value.to_string())
+    }
+}
+
+/// Strip the `#fragment` suffix from a URL used as `bookSourceUrl`.
+///
+/// Legado `bookSourceUrl` is the source's unique key, not a request URL.
+/// Sources routinely append `#<remark>` (e.g. `http://example.com#yc`,
+/// `https://m.ac.qq.com#Haxc`, `https://www.kukk.net#Haxc1107`) to
+/// disambiguate sources sharing the same origin. Per RFC 3986 the `#`
+/// introduces a fragment that the server never sees; if we keep it in the
+/// `base_url` used for URL resolution, every resolved URL carries the
+/// fragment and the server serves the homepage instead of the intended path.
+///
+/// This helper strips everything from the first `#` so `base_url` is a clean
+/// request base. The original `bookSourceUrl` remains the source identifier
+/// elsewhere (source_id, storage key).
+fn strip_url_fragment(url: &str) -> String {
+    match url.split_once('#') {
+        Some((before, _)) => before.to_string(),
+        None => url.to_string(),
     }
 }
 
