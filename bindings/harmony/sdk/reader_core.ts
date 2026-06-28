@@ -4,6 +4,7 @@ export type NativeRuntimeHandle = unknown;
 
 export type NativeReaderCoreModule = {
   abiVersion(): number;
+  lastError(): { code: number; message: string };
   createRuntime(config?: JsonObject | string): NativeRuntimeHandle;
   releaseRuntime(runtime: NativeRuntimeHandle): void;
   sendCommand(runtime: NativeRuntimeHandle, command: JsonObject | string): void;
@@ -26,6 +27,8 @@ export type NativeReaderCoreModule = {
   hostSmoke(): string;
   lifecycleSmoke(iterations?: number): string;
 };
+
+export type ReaderCoreLastError = { code: number; message: string };
 
 export type ReaderCoreCommand = {
   protocolVersion: 1;
@@ -79,6 +82,80 @@ export type RequestOptions = {
   hostRequest?: HostRequestHandler;
 };
 
+export type CapabilityHandler = (
+  event: ReaderCoreHostRequestEvent
+) => JsonObject | Promise<JsonObject>;
+
+export interface HttpFetch {
+  fetch(request: {
+    url: string;
+    method: string;
+    headers: Record<string, string>;
+    body?: string;
+  }): Promise<JsonObject>;
+}
+
+export class CapabilityRouter {
+  static readonly httpExecuteCapability = "http.execute";
+
+  private readonly handlers = new Map<string, CapabilityHandler>();
+  private readonly httpFetch: HttpFetch | null;
+
+  constructor(options: { httpFetch?: HttpFetch } = {}) {
+    this.httpFetch = options.httpFetch ?? null;
+    if (this.httpFetch !== null) {
+      this.register(
+        CapabilityRouter.httpExecuteCapability,
+        this.handleHttpExecute.bind(this)
+      );
+    }
+  }
+
+  register(capability: string, handler: CapabilityHandler): void {
+    if (typeof capability !== "string" || capability.length === 0) {
+      throw new Error("capability must be a non-empty string");
+    }
+    if (typeof handler !== "function") {
+      throw new Error("handler must be a function");
+    }
+    this.handlers.set(capability, handler);
+  }
+
+  has(capability: string): boolean {
+    return this.handlers.has(capability);
+  }
+
+  async route(event: ReaderCoreHostRequestEvent): Promise<JsonObject> {
+    const handler = this.handlers.get(event.capability);
+    if (handler === undefined) {
+      throw new Error(`no handler registered for capability: ${event.capability}`);
+    }
+    return handler(event);
+  }
+
+  private async handleHttpExecute(
+    event: ReaderCoreHostRequestEvent
+  ): Promise<JsonObject> {
+    if (this.httpFetch === null) {
+      throw new Error("http.execute requested but no httpFetch configured");
+    }
+    const params = event.params;
+    const url = typeof params.url === "string" ? params.url : "";
+    if (url.length === 0) {
+      throw new Error("http.execute requires non-empty url");
+    }
+    const method = typeof params.method === "string" ? params.method : "GET";
+    const headers: Record<string, string> = {};
+    if (isJsonObject(params.headers)) {
+      for (const [key, value] of Object.entries(params.headers)) {
+        headers[key] = typeof value === "string" ? value : String(value);
+      }
+    }
+    const body = typeof params.body === "string" ? params.body : undefined;
+    return this.httpFetch.fetch({ url, method, headers, body });
+  }
+}
+
 export class ReaderCoreRuntime {
   static readonly protocolVersion = 1;
 
@@ -87,14 +164,23 @@ export class ReaderCoreRuntime {
   private readonly pendingEvents: ReaderCoreEvent[] = [];
   private nextRequestId = 1;
   private closed = false;
+  private capabilityRouter: CapabilityRouter | null = null;
 
   constructor(nativeModule: NativeReaderCoreModule, config: JsonObject = {}) {
     this.native = nativeModule;
     this.runtime = nativeModule.createRuntime(config);
   }
 
+  setCapabilityRouter(router: CapabilityRouter | null): void {
+    this.capabilityRouter = router;
+  }
+
   get abiVersion(): number {
     return this.native.abiVersion();
+  }
+
+  lastError(): ReaderCoreLastError {
+    return this.native.lastError();
   }
 
   get pendingEventCount(): number {
@@ -210,12 +296,18 @@ export class ReaderCoreRuntime {
           await delay(0);
           continue;
         }
-        if (options.hostRequest === undefined) {
+        const routerHandler = this.capabilityRouter?.has(event.capability)
+          ? this.capabilityRouter
+          : undefined;
+        const inlineHandler = options.hostRequest;
+        if (routerHandler === undefined && inlineHandler === undefined) {
           this.pendingEvents.push(event);
           throw new Error(`Reader-Core host.request requires a handler: ${event.operationId}`);
         }
         try {
-          const result = await options.hostRequest(event);
+          const result = routerHandler !== undefined
+            ? await routerHandler.route(event)
+            : await inlineHandler!(event);
           this.completeHostRequest(event, result);
         } catch (error) {
           this.failHostRequest(event, normalizeHostError(error));

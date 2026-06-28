@@ -50,6 +50,25 @@ public enum ReaderCoreHostErrorCode: String, CaseIterable {
     }
 }
 
+/// Value-type mirror of Core's thread-local `rc_last_error` slot.
+///
+/// `code` follows the C ABI error code enum
+/// (`RC_OK=0, RC_ERR_UNKNOWN_METHOD=1, RC_ERR_INVALID_PARAMS=2,
+///   RC_ERR_INVALID_PROTOCOL_VERSION=3, RC_ERR_CANCELLED=4,
+///   RC_ERR_INVALID_MESSAGE=5, RC_ERR_INTERNAL=6`).
+/// `isPresent` is `true` when `code != 0`.
+public struct ReaderCoreLastError: Error, Equatable {
+    public let code: Int32
+    public let message: String
+
+    public init(code: Int32, message: String) {
+        self.code = code
+        self.message = message
+    }
+
+    public var isPresent: Bool { code != 0 }
+}
+
 public struct ReaderCoreEvent {
     public let rawData: Data
     public let object: [String: Any]
@@ -244,6 +263,52 @@ public final class URLSessionHostTransport: ReaderCoreHostTransport {
     }
 }
 
+/// Handler invoked when Core issues a `host.request` for a given capability.
+///
+/// The handler is responsible for performing the host-side work (HTTP fetch,
+/// cache lookup, persistence, etc.) and returning the `result` object that will
+/// be forwarded to Core via `host.complete`. Throwing surfaces as a
+/// `host.error` with code `INTERNAL`.
+public typealias HostCapabilityHandler = (ReaderCoreHostRequest) throws -> [String: Any]
+
+/// Routes `host.request` events to capability-specific handlers.
+///
+/// The default transport (when provided) is automatically registered for
+/// `http.execute`. Additional capabilities can be registered via `register`.
+/// Unknown capabilities throw `missingHostTransport` so callers fail fast
+/// instead of being forced through the HTTP transport.
+public final class CapabilityRouter {
+    public static let httpExecuteCapability = "http.execute"
+
+    private var handlers: [String: HostCapabilityHandler] = [:]
+    private let defaultTransport: ReaderCoreHostTransport?
+
+    public init(defaultTransport: ReaderCoreHostTransport? = nil) {
+        self.defaultTransport = defaultTransport
+        if let transport = defaultTransport {
+            register(Self.httpExecuteCapability) { request in
+                let response = try transport.perform(request)
+                return response.resultObject
+            }
+        }
+    }
+
+    public func register(_ capability: String, handler: @escaping HostCapabilityHandler) {
+        handlers[capability] = handler
+    }
+
+    public func handler(for capability: String) -> HostCapabilityHandler? {
+        handlers[capability]
+    }
+
+    public func route(_ request: ReaderCoreHostRequest) throws -> [String: Any] {
+        if let handler = handlers[request.capability] {
+            return try handler(request)
+        }
+        throw ReaderCoreClientError.missingHostTransport
+    }
+}
+
 private final class ReaderCoreEventSink {
     let onEvent: (Data) -> Void
 
@@ -335,6 +400,23 @@ public final class ReaderCoreRuntime {
         rc_abi_version()
     }
 
+    /// Reads Core's thread-local `rc_last_error` slot (errno-style).
+    ///
+    /// `rc_last_error` has NO runtime parameter — it is thread-local, so this
+    /// is a static method. The caller must be on the same thread that issued
+    /// the failing Core call. Allocates a 4096-byte `[CChar]` buffer, passes
+    /// it together with its capacity to `rc_last_error`, then reads the
+    /// NUL-terminated message via `String(cString:)`.
+    public static func lastError() -> ReaderCoreLastError {
+        var buffer = [CChar](repeating: 0, count: 4096)
+        let code = buffer.withUnsafeMutableBufferPointer { ptr -> Int32 in
+            // `rc_last_error(char *out_message, size_t message_capacity)`
+            rc_last_error(ptr.baseAddress, numericCast(ptr.count))
+        }
+        let message = String(cString: buffer)
+        return ReaderCoreLastError(code: code, message: message)
+    }
+
     private var handle: OpaquePointer?
     private var sinkContext: UnsafeMutableRawPointer?
 
@@ -424,6 +506,7 @@ public final class ReaderCoreClient {
     private let eventBuffer: ReaderCoreEventBuffer
     private let runtime: ReaderCoreRuntime
     private let hostTransport: ReaderCoreHostTransport?
+    public let capabilityRouter: CapabilityRouter
 
     private let commandIdLock = NSLock()
     private var commandIdCounter: UInt64 = 9_000_000_000_000_000
@@ -432,6 +515,7 @@ public final class ReaderCoreClient {
         let eventBuffer = ReaderCoreEventBuffer()
         self.eventBuffer = eventBuffer
         self.hostTransport = hostTransport
+        self.capabilityRouter = CapabilityRouter(defaultTransport: hostTransport)
         self.runtime = try ReaderCoreRuntime(configJSON: configJSON) { data in
             eventBuffer.append(data)
         }
@@ -569,16 +653,19 @@ public final class ReaderCoreClient {
                     rawData: event.rawData
                 ))
             case "host.request":
-                guard let transport = hostTransport else {
-                    throw ReaderCoreClientError.missingHostTransport
-                }
                 let hostRequest = try makeHostRequest(from: event)
                 do {
-                    let response = try transport.perform(hostRequest)
+                    let result = try capabilityRouter.route(hostRequest)
                     _ = try sendHostComplete(
                         operationId: hostRequest.operationId,
-                        result: response.resultObject
+                        result: result
                     )
+                } catch ReaderCoreClientError.missingHostTransport {
+                    // No handler registered for this capability (and no default
+                    // transport). Preserve the legacy synchronous throw so
+                    // callers distinguish "not configured" from "configured but
+                    // failed" — the latter surfaces as a core error via host.error.
+                    throw ReaderCoreClientError.missingHostTransport
                 } catch let error as ReaderCoreClientError {
                     _ = try sendHostError(
                         operationId: hostRequest.operationId,

@@ -27,6 +27,10 @@ class FakeNativeReaderCore implements NativeReaderCoreModule {
     return 1;
   }
 
+  lastError(): { code: number; message: string } {
+    return { code: 0, message: "" };
+  }
+
   createRuntime(_config?: JsonObject | string): NativeRuntimeHandle {
     const runtime: FakeRuntime = {
       released: false,

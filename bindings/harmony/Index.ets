@@ -16,10 +16,13 @@ import {
 } from './sdk/smoke_report';
 
 export {
+  CapabilityRouter,
   ReaderCoreRequestError,
   ReaderCoreRuntime,
   parseReaderCoreEvent,
+  type CapabilityHandler,
   type HostRequestHandler,
+  type HttpFetch,
   type JsonObject,
   type NativeReaderCoreModule,
   type NativeRuntimeHandle,
@@ -28,6 +31,7 @@ export {
   type ReaderCoreErrorEvent,
   type ReaderCoreEvent,
   type ReaderCoreHostRequestEvent,
+  type ReaderCoreLastError,
   type ReaderCoreResultEvent,
   type RequestOptions,
 } from './sdk/reader_core';

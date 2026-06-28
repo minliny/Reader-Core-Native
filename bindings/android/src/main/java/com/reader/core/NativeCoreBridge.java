@@ -12,6 +12,10 @@ public final class NativeCoreBridge {
         return nativeAbiVersion();
     }
 
+    public static ReaderCoreLastError lastError() {
+        return nativeLastError();
+    }
+
     public static native String pingSmoke();
 
     public static native long runtimeCreate(String configJson, Object listener);
@@ -53,4 +57,6 @@ public final class NativeCoreBridge {
     private static native int nativeCancel(long handle, long requestId);
 
     private static native byte[] nativePollEvent(long handle, long timeoutMillis);
+
+    private static native ReaderCoreLastError nativeLastError();
 }

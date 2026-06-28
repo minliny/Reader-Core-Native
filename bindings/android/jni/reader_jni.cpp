@@ -475,3 +475,41 @@ Java_com_reader_core_NativeCoreBridge_runtimeDestroy(JNIEnv *env,
   }
   delete state;
 }
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_com_reader_core_NativeCoreBridge_nativeLastError(JNIEnv *env,
+                                                      jclass /*clazz*/) {
+  constexpr size_t kBufSize = 4096;
+  char buffer[kBufSize] = {0};
+  int32_t code = rc_last_error(buffer, kBufSize);
+  // Defensive NUL-termination; Core contract guarantees it, but the host
+  // must never read past the buffer if a future Core revision truncates
+  // without a terminator.
+  buffer[kBufSize - 1] = '\0';
+
+  jclass cls = env->FindClass("com/reader/core/ReaderCoreLastError");
+  if (cls == nullptr) {
+    env->ExceptionClear();
+    return nullptr;
+  }
+  jmethodID ctor = env->GetMethodID(cls, "<init>", "(ILjava/lang/String;)V");
+  if (ctor == nullptr) {
+    env->ExceptionClear();
+    env->DeleteLocalRef(cls);
+    return nullptr;
+  }
+  jstring message = env->NewStringUTF(buffer);
+  if (message == nullptr) {
+    env->ExceptionClear();
+    env->DeleteLocalRef(cls);
+    return nullptr;
+  }
+  jobject result = env->NewObject(cls, ctor, static_cast<jint>(code), message);
+  env->DeleteLocalRef(message);
+  env->DeleteLocalRef(cls);
+  if (result == nullptr) {
+    env->ExceptionClear();
+    return nullptr;
+  }
+  return result;
+}

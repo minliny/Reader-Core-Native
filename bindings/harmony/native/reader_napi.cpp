@@ -10,6 +10,7 @@
 #include <mutex>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -318,6 +319,33 @@ napi_value AbiVersion(napi_env env, napi_callback_info /*info*/) {
   if (status != napi_ok) {
     return ThrowError(env, "failed to create ABI version value");
   }
+  return result;
+}
+
+napi_value LastError(napi_env env, napi_callback_info /*info*/) {
+  std::vector<char> buffer(4096, '\0');
+  int32_t code = rc_last_error(buffer.data(), buffer.size());
+  std::string message(buffer.data());
+
+  napi_value result = nullptr;
+  if (napi_create_object(env, &result) != napi_ok) {
+    return ThrowError(env, "failed to create lastError object");
+  }
+
+  napi_value code_value = nullptr;
+  if (napi_create_int32(env, code, &code_value) != napi_ok ||
+      napi_set_named_property(env, result, "code", code_value) != napi_ok) {
+    return ThrowError(env, "failed to set lastError code");
+  }
+
+  napi_value message_value = nullptr;
+  if (napi_create_string_utf8(env, message.c_str(), message.size(),
+                              &message_value) != napi_ok ||
+      napi_set_named_property(env, result, "message", message_value) !=
+          napi_ok) {
+    return ThrowError(env, "failed to set lastError message");
+  }
+
   return result;
 }
 
@@ -748,6 +776,8 @@ napi_value LifecycleSmoke(napi_env env, napi_callback_info info) {
 napi_value Init(napi_env env, napi_value exports) {
   napi_property_descriptor properties[] = {
       {"abiVersion", nullptr, AbiVersion, nullptr, nullptr, nullptr, napi_default,
+       nullptr},
+      {"lastError", nullptr, LastError, nullptr, nullptr, nullptr, napi_default,
        nullptr},
       {"createRuntime", nullptr, CreateRuntime, nullptr, nullptr, nullptr,
        napi_default, nullptr},
