@@ -27,8 +27,8 @@ use reader_domain::{
 };
 use reader_js::{JsError, JsErrorKind, JsEvaluation, JsSandbox as JsSandboxTrait, QuickJsSandbox};
 use reader_rule::{
-    auto_complete_rule, CaptureGroup, NoopVariableScope, RuleEngine, RuleError, RuleJsEvaluator,
-    RuleOutput, RuleStep, RuleVariableScope,
+    auto_complete_list_rule, auto_complete_rule, CaptureGroup, NoopVariableScope, RuleEngine,
+    RuleError, RuleJsEvaluator, RuleOutput, RuleStep, RuleVariableScope,
 };
 use serde::{Deserialize, Serialize};
 
@@ -963,9 +963,13 @@ impl RemoteContentPipeline {
         let out = self.run_chain(toc_response, &source.rules.toc)?;
         let mut entries = Vec::new();
 
-        // Try JSON array first.
+        // Try JSON array first. `@html` extraction returns the element's outer
+        // HTML (Legado `element.toString()`), so a JSON-bearing `<script>` tag
+        // yields `<script ...>[...]</script>` — strip the wrapper before JSON
+        // parsing so sources using `script.toc@html` round-trip correctly.
         if let Some(first) = out.first() {
-            if let Ok(arr) = serde_json::from_str::<serde_json::Value>(first) {
+            let json_candidate = strip_html_wrapper_for_json(first);
+            if let Ok(arr) = serde_json::from_str::<serde_json::Value>(json_candidate) {
                 if let Some(array) = arr.as_array() {
                     for (i, item) in array.iter().enumerate() {
                         entries.push(TocEntry {
@@ -1626,12 +1630,13 @@ fn extract_rule_items(
     // `RuleComplete.autoComplete` — list rules are element selectors, not
     // value extractors. Adding `@text` to `div.result` would break element
     // selection. Only `getString`/`getUrl` (field rules) call autoComplete.
+    //
+    // Each `||`/`&&`/`%%` branch gets `@html` appended unless it already ends
+    // with a recognized extraction keyword, so `class.ser-ret@li` returns the
+    // HTML of each `<li>` (for per-item rule processing) instead of being
+    // misparsed as "extract `li` attribute from `.ser-ret`".
     let rule = expand_template(&rule, context, pipeline, Some(input));
-    let item_rule = if legado_rule_has_extraction(&rule) {
-        rule.clone()
-    } else {
-        format!("{rule}@html")
-    };
+    let item_rule = auto_complete_list_rule(&rule);
     let out = pipeline.run_raw_legado_rule(input, &item_rule)?;
     if !out.is_empty() {
         return Ok(expand_json_array_items(out.into_values()));
@@ -1702,9 +1707,32 @@ fn extract_rule_value(
         .find_map(|value| non_empty_string(value)))
 }
 
+/// Strip a single outermost HTML element wrapper when the value looks like a
+/// tagged element (`<tag ...>...</tag>`). Returns the input unchanged when it
+/// is not wrapped. This lets JSON consumers handle `@html` output that carries
+/// the host element (Legado `element.toString()` = outer HTML), e.g. a
+/// `<script class="toc">[...]</script>` extraction yielding a JSON array.
+fn strip_html_wrapper_for_json(value: &str) -> &str {
+    let trimmed = value.trim_start();
+    if !trimmed.starts_with('<') {
+        return value;
+    }
+    // Find the matching closing tag for the outermost element.
+    let after_open = match trimmed.find('>') {
+        Some(index) if index + 1 < trimmed.len() => &trimmed[index + 1..],
+        _ => return value,
+    };
+    let last_close = match after_open.rfind("</") {
+        Some(index) => index,
+        _ => return value,
+    };
+    after_open[..last_close].trim()
+}
+
 fn parse_toc_output(values: &[String], context: &BookSourceRequestContext) -> Vec<TocEntry> {
     if let Some(first) = values.first() {
-        if let Ok(value) = serde_json::from_str::<serde_json::Value>(first) {
+        let json_candidate = strip_html_wrapper_for_json(first);
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(json_candidate) {
             if let Some(array) = value.as_array() {
                 return array
                     .iter()
@@ -2054,22 +2082,6 @@ fn slug_part(value: &str) -> String {
     } else {
         output
     }
-}
-
-fn legado_rule_has_extraction(rule: &str) -> bool {
-    // JSONPath rules ($. / $[ / @json:) and @xpath: rules carry their own
-    // extraction semantics — the path itself selects the value. Appending
-    // `@html` (the CSS extraction suffix) to them produces invalid paths
-    // like `$..chapters[*]@html` (rb-legado-jsonpath-html-suffix).
-    let lower = rule.to_lowercase();
-    if rule.starts_with("$.")
-        || rule.starts_with("$[")
-        || lower.starts_with("@json:")
-        || lower.starts_with("@xpath:")
-    {
-        return true;
-    }
-    rule.contains('@')
 }
 
 fn non_empty_string(value: &str) -> Option<String> {
@@ -2825,8 +2837,15 @@ mod tests {
 
     #[test]
     fn search_accepts_raw_legado_css_rule_string() {
+        // Raw CSS rule string with descendant selectors + `@text` extraction.
+        // Previously used `div.list&&div.item;div.name&&a@text` which relied on
+        // the old (incorrect) pipeline behavior where `&&` and `;` were treated
+        // as pipeline separators. After rb-legado-css-multirule-operator, `&&`
+        // is the AND-merge combination operator (Legado `RuleAnalyzer.splitRule`
+        // semantics); `;` is not a rule-engine separator. The rule now uses
+        // standard CSS descendant combinators.
         let mut source = sample_source();
-        source.rules.search = serde_json::json!("div.list&&div.item;div.name&&a@text");
+        source.rules.search = serde_json::json!("div.list div.item a@text");
         let pipeline = RemoteContentPipeline::new();
         let resp = r#"
             <main>

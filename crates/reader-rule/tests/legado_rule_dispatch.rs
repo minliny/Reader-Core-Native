@@ -14,7 +14,7 @@ const JSON: &str = r#"{"books":[{"name":"X","url":"/x"},{"name":"Y","url":"/y"}]
 #[test]
 fn dispatches_css_default_rule() {
     let out = RuleEngine::new()
-        .execute_legado_rule(HTML, "div.list&&a@text", &mut NoopVariableScope, None)
+        .execute_legado_rule(HTML, "div.list@a@text", &mut NoopVariableScope, None)
         .unwrap();
     assert_eq!(out.values(), &["Alpha", "Beta"]);
 }
@@ -22,7 +22,7 @@ fn dispatches_css_default_rule() {
 #[test]
 fn dispatches_at_css_prefix() {
     let out = RuleEngine::new()
-        .execute_legado_rule(HTML, "@CSS:div.list&&a@text", &mut NoopVariableScope, None)
+        .execute_legado_rule(HTML, "@CSS:div.list@a@text", &mut NoopVariableScope, None)
         .unwrap();
     assert_eq!(out.values(), &["Alpha", "Beta"]);
 }
@@ -30,7 +30,7 @@ fn dispatches_at_css_prefix() {
 #[test]
 fn dispatches_at_at_css_prefix() {
     let out = RuleEngine::new()
-        .execute_legado_rule(HTML, "@@div.list&&a@text", &mut NoopVariableScope, None)
+        .execute_legado_rule(HTML, "@@div.list@a@text", &mut NoopVariableScope, None)
         .unwrap();
     assert_eq!(out.values(), &["Alpha", "Beta"]);
 }

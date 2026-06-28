@@ -64,9 +64,11 @@ fn legado_css_extracts_text_html_and_href() {
     let html = engine
         .execute_legado_css(HTML, "article.chapter@html")
         .unwrap();
+    // Legado `@html` uses `element.toString()` = OUTER HTML (element tag +
+    // content), mirroring `AnalyzeByJSoup.kt` `getResultList`/`getString`.
     assert_eq!(
         html.values(),
-        &["\n            <h1>The Chapter</h1>\n            <p><b>First</b> paragraph.</p>\n        ".to_string()]
+        &["<article class=\"chapter\">\n            <h1>The Chapter</h1>\n            <p><b>First</b> paragraph.</p>\n        </article>".to_string()]
     );
 
     let href = engine.execute_legado_css(HTML, "a.book@href").unwrap();

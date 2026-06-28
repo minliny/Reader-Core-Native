@@ -163,12 +163,29 @@ impl RuleEngine {
 
     /// Dispatch a selector to the engine matching `mode`. Mirrors the `when`
     /// block in Legado `getStringList` (lines 206-212) / `getString` (293-304).
+    ///
+    /// Before dispatching, splits the selector on the first top-level
+    /// `||` / `&&` / `%%` combination operator — mirroring Legado
+    /// `RuleAnalyzer.splitRule` (`RuleAnalyzer.kt:165-237`) which every
+    /// analyzer (`AnalyzeByXPath` / `AnalyzeByJSoup` / `AnalyzeByRegex`)
+    /// calls. The first operator found fixes `elementsType`; the rule is
+    /// split on that operator only, and branches are combined per the
+    /// operator semantics (`||` OR-fallback, `&&` AND-merge, `%%` zip).
     fn execute_mode(
         &self,
         input: &str,
         mode: LegadoRuleMode,
         selector: &str,
     ) -> RuleResult<RuleOutput> {
+        if let Some((operator, branches)) = split_legado_combined_rule(selector) {
+            let mut branch_results = Vec::with_capacity(branches.len());
+            for branch in branches {
+                let out = self.execute_mode(input, mode, branch)?;
+                branch_results.push(out.into_values());
+            }
+            let combined = combine_legado_combined_results(operator, branch_results);
+            return Ok(RuleOutput::new(combined));
+        }
         match mode {
             LegadoRuleMode::Default => self.execute_legado_css(input, selector),
             LegadoRuleMode::Xpath => {
@@ -182,6 +199,154 @@ impl RuleEngine {
             LegadoRuleMode::Regex => self.execute_legado_css(input, selector),
             LegadoRuleMode::Js => Ok(RuleOutput::new(Vec::new())),
         }
+    }
+}
+
+/// Split a Legado combined rule on the first top-level `||` / `&&` / `%%`
+/// operator (outside quotes / brackets / parens / braces).
+///
+/// Mirrors Legado `RuleAnalyzer.splitRule` (`RuleAnalyzer.kt:165-237`):
+/// the first operator found fixes `elementsType`, and the rule is split on
+/// that operator only — subsequent operators of a different kind are
+/// treated as literal text inside their branch.
+///
+/// Returns `None` when no top-level operator is present.
+fn split_legado_combined_rule(rule: &str) -> Option<(&'static str, Vec<&str>)> {
+    const OPERATORS: [&'static str; 3] = ["||", "&&", "%%"];
+    let mut quote = None;
+    let mut escaped = false;
+    let mut bracket_depth = 0usize;
+    let mut paren_depth = 0usize;
+    let mut brace_depth = 0usize;
+    let mut branches = Vec::new();
+    let mut start = 0usize;
+    let mut index = 0usize;
+    let mut operator: Option<&'static str> = None;
+
+    while index < rule.len() {
+        let value = rule[index..].chars().next()?;
+
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if value == '\\' {
+                escaped = true;
+            } else if value == active_quote {
+                quote = None;
+            }
+            index += value.len_utf8();
+            continue;
+        }
+
+        if value == '\'' || value == '"' {
+            quote = Some(value);
+            index += value.len_utf8();
+            continue;
+        }
+
+        if bracket_depth == 0 && paren_depth == 0 && brace_depth == 0 {
+            // Once the operator is fixed, only split on that operator;
+            // otherwise scan all operators to find the first one.
+            let mut matched = None;
+            match operator {
+                Some(op) => {
+                    if rule[index..].starts_with(op) {
+                        matched = Some(op);
+                    }
+                }
+                None => {
+                    for op in &OPERATORS {
+                        if rule[index..].starts_with(*op) {
+                            matched = Some(*op);
+                            break;
+                        }
+                    }
+                }
+            }
+            if let Some(op) = matched {
+                if operator.is_none() {
+                    operator = Some(op);
+                }
+                let branch = rule[start..index].trim();
+                if branch.is_empty() {
+                    return None;
+                }
+                branches.push(branch);
+                index += op.len();
+                start = index;
+                continue;
+            }
+        }
+
+        match value {
+            '[' => bracket_depth += 1,
+            ']' if bracket_depth > 0 => bracket_depth -= 1,
+            '(' => paren_depth += 1,
+            ')' if paren_depth > 0 => paren_depth -= 1,
+            '{' => brace_depth += 1,
+            '}' if brace_depth > 0 => brace_depth -= 1,
+            _ => {}
+        }
+
+        index += value.len_utf8();
+    }
+
+    let operator = operator?;
+    let last = rule[start..].trim();
+    if last.is_empty() {
+        return None;
+    }
+    branches.push(last);
+    Some((operator, branches))
+}
+
+/// Combine per-branch results according to the Legado combination operator
+/// semantics (AnalyzeByXPath.getElements 52-89):
+/// - `||` OR-fallback: first non-empty branch wins.
+/// - `&&` AND-merge: every branch executed; results concatenated (empty
+///   branches skipped).
+/// - `%%` parallel zip: every branch executed; results interleaved by index
+///   (stops at the first branch's length, mirroring Legado).
+fn combine_legado_combined_results(
+    operator: &str,
+    branch_results: Vec<Vec<String>>,
+) -> Vec<String> {
+    match operator {
+        "||" => {
+            for results in branch_results {
+                if !results.is_empty() {
+                    return results;
+                }
+            }
+            Vec::new()
+        }
+        "&&" => {
+            let mut output = Vec::new();
+            for results in branch_results {
+                if !results.is_empty() {
+                    output.extend(results);
+                }
+            }
+            output
+        }
+        "%%" => {
+            let non_empty: Vec<&Vec<String>> =
+                branch_results.iter().filter(|r| !r.is_empty()).collect();
+            let Some(first) = non_empty.first().copied() else {
+                return Vec::new();
+            };
+            let len = first.len();
+            let mut output = Vec::new();
+            for index in 0..len {
+                for results in &non_empty {
+                    if let Some(value) = results.get(index) {
+                        output.push(value.clone());
+                    }
+                }
+            }
+            output
+        }
+        _ => Vec::new(),
     }
 }
 
@@ -3712,8 +3877,22 @@ fn parse_legado_css_step(part: &str) -> Result<Vec<LegadoCssStep>, String> {
     let segments = split_legado_css_at_pipeline(part)?;
 
     if segments.len() == 1 {
+        let segment = segments[0].trim();
+        // Legado `getString`/`getUrl` on a bare extraction keyword (e.g.
+        // `text`, `href`) means "extract from the current element", not
+        // "select a `<text>` tag". Real sources like yodu.org use
+        // `ruleToc.chapterName = "text"` / `ruleToc.chapterUrl = "href"`
+        // against each item returned by `chapterList`. Without this branch
+        // the keyword is fed to `Selector::parse` as a tag selector and
+        // matches nothing.
+        if let Some(extraction) = parse_bare_legado_css_extraction(segment) {
+            return Ok(vec![LegadoCssStep::Extract {
+                selector: None,
+                extraction,
+            }]);
+        }
         // 没有 `@`:整段是 select,抽取由管道末尾的默认 text 兜底。
-        return Ok(vec![LegadoCssStep::Select(segments[0].trim().to_string())]);
+        return Ok(vec![LegadoCssStep::Select(segment.to_string())]);
     }
 
     // 2+ 段:最后一段是抽取,倒数第二段是抽取步骤的 selector,前面所有段是独立 Select。
@@ -3758,6 +3937,33 @@ fn parse_legado_css_extraction(extraction: &str) -> LegadoCssExtraction {
     } else {
         LegadoCssExtraction::Attr(extraction.to_string())
     }
+}
+
+/// Detect a bare Legado CSS extraction keyword (no `@` prefix) and return
+/// the matching extraction. Mirrors Legado `AnalyzeRule` behavior where a
+/// single-segment rule that exactly matches a known extraction keyword is
+/// treated as "extract from the current element" rather than as a CSS tag
+/// selector.
+///
+/// Only matches the whole segment against the keyword (case-insensitive) —
+/// `text`, `html`, `href`, `src`, `alt`, `content`, `value`, `title`. This
+/// covers the `ruleToc.chapterName = "text"` / `ruleToc.chapterUrl = "href"`
+/// pattern used by real Legado sources like yodu.org. Compound segments
+/// (`div@text`, `class.x`) are handled by the multi-segment path.
+fn parse_bare_legado_css_extraction(segment: &str) -> Option<LegadoCssExtraction> {
+    if segment.eq_ignore_ascii_case("text") {
+        return Some(LegadoCssExtraction::Text);
+    }
+    if segment.eq_ignore_ascii_case("html") {
+        return Some(LegadoCssExtraction::Html);
+    }
+    const ATTR_KEYWORDS: &[&str] = &["href", "src", "alt", "content", "value", "title"];
+    for kw in ATTR_KEYWORDS {
+        if segment.eq_ignore_ascii_case(kw) {
+            return Some(LegadoCssExtraction::Attr((*kw).to_string()));
+        }
+    }
+    None
 }
 
 /// 按 top-level `@` 切分 Legado CSS 管道段,尊重引号/方括号/圆括号嵌套。
@@ -3988,12 +4194,29 @@ fn compile_legado_css_selector(selector: &str) -> RuleResult<Selector> {
 ///   - `tag.X`   -> `getElementsByTag(X)`   = CSS `X`
 ///   - `id.X`    -> `Evaluator.Id(X)`       = CSS `#X`
 ///
+/// For `class.X` where `X` contains whitespace (e.g. `class.mb15 lh1d2 oh`),
+/// Jsoup's `getElementsByClass("mb15 lh1d2 oh")` matches elements that have
+/// ALL the listed classes (Jsoup splits the attribute on whitespace and
+/// requires every requested class to be present). The CSS equivalent is a
+/// compound selector `.mb15.lh1d2.oh`, NOT `.mb15 lh1d2 oh` (descendant).
+/// Without this translation, multi-class Legado rules like yodu.org's
+/// `ruleBookInfo.name = "class.mb15 lh1d2 oh@text"` would match nothing.
+///
 /// Only translates when the selector starts with `class.`, `tag.`, or `id.`
 /// followed by a non-empty value. Other selectors pass through unchanged
 /// (Legado's `else -> temp.select(beforeRule)` branch handles raw CSS).
 fn translate_legado_css_shorthand(selector: &str) -> String {
     if let Some(rest) = selector.strip_prefix("class.") {
         if !rest.is_empty() {
+            // Jsoup getElementsByClass splits on whitespace and matches
+            // elements having ALL listed classes -> CSS compound selector.
+            if rest.contains(char::is_whitespace) {
+                let compound = rest
+                    .split_whitespace()
+                    .map(|class| format!(".{class}"))
+                    .collect::<String>();
+                return compound;
+            }
             return format!(".{rest}");
         }
     }
@@ -4048,6 +4271,39 @@ pub fn auto_complete_rule(rule: &str, pre_rule: Option<&str>, rule_type: u8) -> 
     } else {
         completed
     };
+    format!("{completed}{tail_str}")
+}
+
+/// Like `auto_complete_rule` but for list rules (`bookList` / `chapterList`):
+/// appends `@html` to each `||` / `&&` / `%%` branch that lacks a recognized
+/// extraction keyword.
+///
+/// Mirrors Legado `AnalyzeRule.getElements` (bookList / chapterList): every
+/// `@` segment is a selector and the element HTML is returned for per-item
+/// rule processing. Without this, a list rule like `class.ser-ret@li` is
+/// misparsed as "select `.ser-ret`, extract `li` attribute" (returns empty)
+/// instead of "select `.ser-ret`, select `li`, return HTML".
+///
+/// Branches that already end with a recognized extraction keyword
+/// (`@text`, `@href`, `@html`, ...) are left untouched, so rules like
+/// `tag.h3@tag.a@text` keep their semantic when reused as list rules.
+pub fn auto_complete_list_rule(rule: &str) -> String {
+    if rule.is_empty() {
+        return rule.to_string();
+    }
+    // JSONPath / @Json: / @XPath: rules carry their own extraction semantics
+    // — the path itself selects the value. Appending `@html` produces invalid
+    // paths like `$.books[*]@html` (rb-legado-jsonpath-html-suffix).
+    let lower = rule.to_lowercase();
+    if rule.starts_with("$.")
+        || rule.starts_with("$[")
+        || lower.starts_with("@json:")
+        || lower.starts_with("@xpath:")
+    {
+        return rule.to_string();
+    }
+    let (cleaned_rule, tail_str) = split_rule_tail(rule);
+    let completed = apply_need_complete(&cleaned_rule, "@html");
     format!("{completed}{tail_str}")
 }
 
@@ -4232,11 +4488,21 @@ fn is_valid_img_prefix(rule: &str, img_start: usize) -> bool {
 }
 
 fn legado_css_context_elements<'a>(contexts: &[LegadoCssContext<'a>]) -> Vec<ElementRef<'a>> {
+    // For bare extraction (selector: None), Document contexts yield their
+    // body's children — mirroring Legado's "current element" semantics when
+    // a per-item rule like `text` / `href` is evaluated against a fragment
+    // HTML string parsed as a document. Without this, bare extraction on a
+    // fresh document returns empty (the Document variant was filtered out),
+    // breaking real sources like yodu.org's `ruleToc.chapterName = "text"`
+    // and `ruleToc.chapterUrl = "href"` (rb-legado-bare-extraction-fragment).
+    let body_children = Selector::parse("body > *").expect("body > * is a valid selector");
     contexts
         .iter()
-        .filter_map(|context| match context {
-            LegadoCssContext::Document(_) => None,
-            LegadoCssContext::Element(element) => Some(*element),
+        .flat_map(|context| match context {
+            LegadoCssContext::Document(document) => {
+                document.select(&body_children).collect::<Vec<_>>()
+            }
+            LegadoCssContext::Element(element) => vec![*element],
         })
         .collect()
 }
@@ -4253,7 +4519,15 @@ fn extract_legado_css_values(
                 output.push(element_text(&element));
             }
             LegadoCssExtraction::Html => {
-                let value = element.inner_html();
+                // Legado `AnalyzeByJSoup.kt` `getResultList` / `getString`:
+                // `@html` uses `element.toString()` which is the OUTER HTML
+                // (element tag + content), not just inner content. Using
+                // `inner_html()` drops the element's own attributes, breaking
+                // per-item rules like yodu.org's `ruleToc.chapterUrl = "href"`
+                // where the list rule `id.chapterList@li@a@html` must preserve
+                // the `<a href="...">` tag for the bare `href` extraction to
+                // read (rb-legado-html-extraction-outer).
+                let value = element.html();
                 if !value.is_empty() {
                     output.push(value);
                 }
