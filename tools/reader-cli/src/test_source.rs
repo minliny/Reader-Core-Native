@@ -77,28 +77,28 @@ pub struct LevelResult {
 }
 
 impl LevelResult {
-    fn pass() -> Self {
+    pub fn pass() -> Self {
         Self {
             status: StepStatus::Pass,
             reason: None,
             detail: None,
         }
     }
-    fn fail(reason: impl Into<String>) -> Self {
+    pub fn fail(reason: impl Into<String>) -> Self {
         Self {
             status: StepStatus::Fail,
             reason: Some(reason.into()),
             detail: None,
         }
     }
-    fn fail_with(reason: impl Into<String>, detail: impl Into<String>) -> Self {
+    pub fn fail_with(reason: impl Into<String>, detail: impl Into<String>) -> Self {
         Self {
             status: StepStatus::Fail,
             reason: Some(reason.into()),
             detail: Some(detail.into()),
         }
     }
-    fn skip(reason: impl Into<String>) -> Self {
+    pub fn skip(reason: impl Into<String>) -> Self {
         Self {
             status: StepStatus::Skip,
             reason: Some(reason.into()),
@@ -120,6 +120,8 @@ pub struct TestSourceConfig {
     /// 当前 test_source 自身不打印,进度由 test_corpus 控制;保留字段供未来单源详情开关.
     #[allow(dead_code)]
     pub quiet: bool,
+    /// 详细日志模式:输出每步的 HTTP 请求/响应摘要、Core 事件、解析结果.
+    pub verbose: bool,
 }
 
 impl Default for TestSourceConfig {
@@ -131,6 +133,7 @@ impl Default for TestSourceConfig {
             record_dir: None,
             offline_dir: None,
             quiet: false,
+            verbose: false,
         }
     }
 }
@@ -151,6 +154,22 @@ struct HostHttpResponse {
     headers: Value,
     body: String,
     final_url: Option<String>,
+}
+
+/// 详细日志:输出到 stderr,仅在 verbose 模式下生效.
+fn vlog(config: &TestSourceConfig, level: &str, status: &str, msg: &str) {
+    if config.verbose {
+        eprintln!("  [{level}] {status}: {msg}");
+    }
+}
+
+/// 截断字符串到指定长度,末尾加 "..."
+fn truncate(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        s.to_string()
+    } else {
+        format!("{}...", &s[..max])
+    }
 }
 
 /// 单个 source 的完整 L1-L5 测试入口.
@@ -294,6 +313,7 @@ pub fn test_source(config: &TestSourceConfig) -> SourceTestResult {
     match recv_with_timeout(&rx, config.timeout) {
         Ok(Event::Result { data, .. }) => {
             if data.get("imported").and_then(Value::as_bool) == Some(true) {
+                vlog(config, "L1", "pass", &format!("source.import confirmed, sourceId={}", source_id));
                 result
                     .levels
                     .insert("L1-import".into(), LevelResult::pass());
@@ -367,12 +387,16 @@ pub fn test_source(config: &TestSourceConfig) -> SourceTestResult {
         "L2-search",
         &mut recording_steps,
         &mut next_request_id,
+        config.verbose,
     );
 
     let books = match search_result {
         CommandOutcome::Result(data) => {
             let books = data.get("books").cloned().unwrap_or(Value::Array(vec![]));
-            if books.as_array().map(|a| a.is_empty()).unwrap_or(true) {
+            let book_count = books.as_array().map(|a| a.len()).unwrap_or(0);
+            vlog(config, "L2", "result", &format!("book.search returned {} books", book_count));
+            if book_count == 0 {
+                vlog(config, "L2", "fail", "no_search_results — Core returned empty books array");
                 result
                     .levels
                     .insert("L2-search".into(), LevelResult::fail("no_search_results"));
@@ -381,6 +405,7 @@ pub fn test_source(config: &TestSourceConfig) -> SourceTestResult {
                 finalize(&mut result, &recording, &recording_steps, config, start);
                 return result;
             }
+            vlog(config, "L2", "pass", &format!("first book: {:?}", books.get(0).and_then(|b| b.get("title")).and_then(Value::as_str).unwrap_or("")));
             result
                 .levels
                 .insert("L2-search".into(), LevelResult::pass());
@@ -442,9 +467,11 @@ pub fn test_source(config: &TestSourceConfig) -> SourceTestResult {
         "L3-detail",
         &mut recording_steps,
         &mut next_request_id,
+        config.verbose,
     );
     let detail_data = match detail_result {
         CommandOutcome::Result(data) => {
+            vlog(config, "L3", "pass", "book.detail returned data");
             result
                 .levels
                 .insert("L3-detail".into(), LevelResult::pass());
@@ -502,11 +529,13 @@ pub fn test_source(config: &TestSourceConfig) -> SourceTestResult {
         "L4-toc",
         &mut recording_steps,
         &mut next_request_id,
+        config.verbose,
     );
     let toc_data = match toc_result {
         CommandOutcome::Result(data) => {
             let toc = data.get("toc").cloned().unwrap_or(Value::Array(vec![]));
             if toc.as_array().map(|a| a.is_empty()).unwrap_or(true) {
+                vlog(config, "L4", "fail", "no_toc_entries — Core returned empty toc");
                 result
                     .levels
                     .insert("L4-toc".into(), LevelResult::fail("no_toc_entries"));
@@ -515,6 +544,7 @@ pub fn test_source(config: &TestSourceConfig) -> SourceTestResult {
                 finalize(&mut result, &recording, &recording_steps, config, start);
                 return result;
             }
+            vlog(config, "L4", "pass", &format!("toc has {} entries, first: {:?}", toc.as_array().map(|a| a.len()).unwrap_or(0), toc.get(0).and_then(|c| c.get("title")).and_then(Value::as_str).unwrap_or("")));
             result.levels.insert("L4-toc".into(), LevelResult::pass());
             toc
         }
@@ -551,6 +581,7 @@ pub fn test_source(config: &TestSourceConfig) -> SourceTestResult {
         return result;
     }
 
+    vlog(config, "L5", "start", &format!("chapter_url={chapter_url} title={chapter_title}"));
     // L5: chapter.content
     let content_id = next_request_id;
     next_request_id += 1;
@@ -584,6 +615,7 @@ pub fn test_source(config: &TestSourceConfig) -> SourceTestResult {
         "L5-content",
         &mut recording_steps,
         &mut next_request_id,
+        config.verbose,
     );
     match content_result {
         CommandOutcome::Result(data) => {
@@ -639,6 +671,7 @@ fn run_command_with_http(
     level: &str,
     recording_steps: &mut Vec<RecordedStep>,
     next_request_id: &mut u64,
+    verbose: bool,
 ) -> CommandOutcome {
     if let Err(err) = runtime.send(Command::new(request_id, method, params)) {
         return CommandOutcome::Error {
@@ -725,6 +758,7 @@ fn run_command_with_http(
                     }
                 };
 
+                if verbose { eprintln!("  [{level}] HTTP {}: {} bytes", response.status, response.body.len()); }
                 // 记录这一步(录像)
                 if recording.is_none() {
                     recording_steps.push(RecordedStep {

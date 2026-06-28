@@ -74,6 +74,7 @@ struct TestSourceArgs {
     keyword: String,
     timeout: std::time::Duration,
     record_dir: Option<PathBuf>,
+    verbose: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -87,6 +88,8 @@ struct TestCorpusArgs {
     concurrency: usize,
     record_dir: Option<PathBuf>,
     recorded_dir: Option<PathBuf>,
+    verbose: bool,
+    save_interval: Option<usize>,
 }
 
 fn main() {
@@ -303,6 +306,7 @@ where
         keyword: String::new(),
         timeout: std::time::Duration::from_secs(15),
         record_dir: None,
+        verbose: false,
     };
     while let Some(opt) = iter.next() {
         match opt.as_str() {
@@ -330,6 +334,9 @@ where
                     ));
                 };
                 args.record_dir = Some(PathBuf::from(dir));
+            }
+            "--verbose" | "-v" => {
+                args.verbose = true;
             }
             other => {
                 return Err(CoreError::invalid_message(format!(
@@ -363,6 +370,8 @@ where
         concurrency: 1,
         record_dir: None,
         recorded_dir: None,
+        verbose: false,
+        save_interval: None,
     };
     while let Some(opt) = iter.next() {
         match opt.as_str() {
@@ -438,6 +447,20 @@ where
                 };
                 args.recorded_dir = Some(PathBuf::from(dir));
             }
+            "--verbose" | "-v" => {
+                args.verbose = true;
+            }
+            "--save-interval" => {
+                let Some(n) = iter.next() else {
+                    return Err(CoreError::invalid_message(
+                        "--save-interval requires a number",
+                    ));
+                };
+                let n: usize = n.parse().map_err(|_| {
+                    CoreError::invalid_message("--save-interval value must be a positive integer")
+                })?;
+                args.save_interval = Some(n);
+            }
             other => {
                 return Err(CoreError::invalid_message(format!(
                     "unknown --test-corpus option: {other}"
@@ -456,6 +479,7 @@ fn run_test_source(args: TestSourceArgs) -> Result<(), CoreError> {
         record_dir: args.record_dir,
         offline_dir: None,
         quiet: false,
+        verbose: args.verbose,
     };
     let result = test_source::test_source(&config);
     let json = serde_json::to_string_pretty(&result)
@@ -484,6 +508,8 @@ fn run_test_corpus_cmd(args: TestCorpusArgs, offline: bool) -> Result<(), CoreEr
         concurrency: args.concurrency,
         record_dir: args.record_dir,
         offline_dir: if offline { args.recorded_dir } else { None },
+        verbose: args.verbose,
+        save_interval: args.save_interval.unwrap_or(10),
     };
     let batch = test_corpus::run_test_corpus(&config).map_err(CoreError::internal)?;
     // 如果指定了 --out,结果已写入文件;否则打印到 stdout

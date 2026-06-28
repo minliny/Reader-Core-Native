@@ -62,9 +62,9 @@
 | 详情 (WebBook.getBookInfo) | BookInfo.kt | ✅ protocol book.detail | 3 源 fixture | 🔵 |
 | 目录 (WebBook.getChapterList) | BookChapterList.kt | ✅ protocol book.toc | 3 源 fixture | 🔵 |
 | 正文 (WebBook.getBookContent) | BookContent.kt | ✅ protocol chapter.content | 3 源 fixture | 🔵 |
-| 发现 (WebBook.exploreBook) | BookList.kt (explore) | 🔴 dispatch 被注释禁用，handler 死代码 | remote.rs:445-464 注释，handler 2235+ 不可达 | 🔴 |
+| 发现 (WebBook.exploreBook) | BookList.kt (explore) | ✅ dispatch 活跃，handler 可达 | remote.rs:466-468 dispatch + 2341 source_explore + 11 tests (explore_kinds.rs) | 🟢 |
 | 多页加载 (nextPage/nextTocUrl) | BookList/BookChapterList | ✅ 已实现 | 8 tests pagination | 🔵 |
-| 段评 (ReviewRule) | ruleReview | ❌ 未实现 | 0 代码 | 🔴 |
+| 段评 (ReviewRule) | ruleReview | 🟠 struct 已定义，dispatch 缺失 | reader-domain ReviewRule struct (lib.rs:543)，无 SOURCE_REVIEW dispatch | 🟠 |
 | 书源校验 (CheckSource) | CheckSource.kt + Service | ❌ 未实现 | 0 代码 | 🔴 |
 | 书源调试 (Debug) | Debug.kt + WebSocket | ❌ 未实现 | 0 代码 | 🔴 |
 
@@ -77,12 +77,12 @@
 | 文件操作 (getFile/readFile/unzipFile/unrarFile/un7zFile) | 14 | 🟡 descriptor 路由已实现，Host 执行 | reader-js GetFile/ReadFile/UnzipFile 等 9 变体 | 🟡 |
 | 编码 (base64/hex/encodeURI/bytesToStr) | 12 | ✅ 大部分已实现 | reader-js 单元测试 | 🔵 |
 | Cookie (getCookie) | 2 | 🟡 descriptor 路由已实现，JS 内调用未端到端验证 | reader-js GetCookie 变体 | 🟡 |
-| 字体反混淆 (queryTTF/replaceFont) | 4 | ❌ 未实现 | 0 代码 | 🔴 |
+| 字体反混淆 (queryTTF/replaceFont) | 4 | ✅ HostDescriptor 路由已实现+测试 | reader-js QueryTTF/ReplaceFont + host_routing_s3_closure.rs:465,516 | 🟢 |
 | 繁简转换 (t2s/s2t) | 2 | 🟠 缺 fixT2sDict 排除字典（仅 zhhz 裸转换） | reader-js 98 + reader-content 53 tests | 🔵 |
 | 时间格式化 (timeFormat/timeFormatUTC) | 2 | ✅ | 单元测试 | 🔵 |
 | 其他 (toast/log/randomUUID/androidId/openUrl) | 6 | ⚠️ 部分 | | 🟡 |
 | 缓存 (cacheFile/downloadFile) | 4 | 🟡 descriptor 路由已实现，Host 执行 | reader-js CacheFile/DownloadFile 变体 | 🟡 |
-| 脚本导入 (importScript) | 1 | ❌ 未实现 | 0 代码 | 🔴 |
+| 脚本导入 (importScript) | 1 | ✅ HostDescriptor 路由已实现+测试 | reader-js ImportScript + host_routing_residual.rs:151 | 🟢 |
 
 ---
 
@@ -94,7 +94,7 @@
 | EPUB | EpubFile.kt | ✅ reader-local-book/epub.rs | crate test | 🔵 |
 | PDF | PdfFile.kt | ✅ reader-local-book/pdf.rs | crate test | 🔵 |
 | Mobi | MobiFile.kt | ⚠️ reader-local-book/mobi.rs 有但未验证 | 0 真实文件 | 🟡 |
-| Umd | UmdFile.kt | ❌ 未实现 | 0 代码 | 🔴 |
+| Umd | UmdFile.kt | 🟡 检测+MIME 已实现，parser 延后 | reader-local-book Umd variant + detection (lib.rs:46,3189)，parser deferred（Legado 也委托第三方） | 🟡 |
 | TXT 目录规则 (TxtTocRule) | TxtTocRule.kt | 🟠 dispatch 被注释禁用 + 缺多规则择优算法（matchRule） | split_chapters 仅单规则；remote.rs:453-464 注释 | 🟡 |
 
 ---
@@ -106,8 +106,8 @@
 | RSS 源解析 (RssParserByRule) | RssParserByRule.kt | 🔵 合成 fixture，0 真实 RSS 源 | reader-rss crate test（123 处 example.com） | 🔵 |
 | 默认 RSS 解析 (RssParserDefault) | RssParserDefault.kt | ⚠️ 不确定 | | 🟡 |
 | RSS 文章内容 (ruleContent) | Rss.kt | ⚠️ 部分 | | 🟡 |
-| RSS 收藏 (RssStar) | RssStar entity | ❌ 未实现 | 0 代码 | 🔴 |
-| RSS 阅读记录 (RssReadRecord) | RssReadRecord entity | ❌ 未实现 | 0 代码 | 🔴 |
+| RSS 收藏 (RssStar) | RssStar entity | ✅ 已实现+测试 | reader-rss starred field + set_entry_starred (lib.rs:665,2125) + tests | 🟢 |
+| RSS 阅读记录 (RssReadRecord) | RssReadRecord entity | 🟠 读状态已跟踪，无独立实体 | reader-rss entry state map tracks read (lib.rs:919)，无 RssReadRecord entity | 🟠 |
 | RSS 订阅管理 (subscription) | ui/rss/subscription | ❌ UI 层，不在 Core | Host 侧 | 🟡 |
 
 ---
@@ -250,7 +250,7 @@
   - 繁简转换（🟠 缺 fixT2sDict 排除字典，仅 zhhz 裸转换）
 - **证据级别已实现（🟢+🔵）: 39/109 = 36%**（含 MultiRule blocker 已解、Bookmark/BookGroup/ReadRecord dispatch 已 WIRED、RSS 源解析有合成 fixture 测试）
 - **部分实现/代码存在（🟡+🟠）: 27/109 = 25%**（含死代码 explore/ TxtTocRule dispatch 注释禁用、ChineseUtils 缺 fixT2sDict、ContentProcessor 仅 3/6 阶段、JS 扩展 5 类 descriptor 路由已实现但 Host 执行未端到端验证、Web 服务/系统 TTS/蓝牙按键等边界正确项）
-- **未实现（🔴）: 32/109 = 29%**（段评/书源校验/书源调试/字体反混淆/封面解密/规则缓存/HttpTTS/搜索历史/规则订阅/内容净化/全文搜索/换源/换封面/漫画图片等 0 代码）
+- **未实现（🔴）: 25/109 = 23%**（修正：explore/importScript/queryTTF/RssStar 已实现，ReviewRule/Umd/RssReadRecord 降级为部分实现）（书源校验/书源调试/规则缓存/HttpTTS/搜索历史/规则订阅/内容净化/全文搜索/换源/换封面/漫画图片等 0 代码；段评=struct-only；字体反混淆=已路由）
 - **Host 层（N/A）: 11/109 = 10%**（翻页动画/排版/背景/主题/点击区域/自动阅读/封面加载/图片缓存/后台服务/通知/媒体键 — Core 不实现，Host 侧）
 
 > 达标率口径说明（三档）：
@@ -270,7 +270,7 @@
 4. DictRule: ❌ 0 代码 → 🟡 entity + table + CRUD 存在，无 dispatch/protocol（5 entity/storage tests）
 
 **虚报修正（✅ → 降级）：**
-1. explore: ✅ protocol → 🔴 dispatch 被注释禁用（remote.rs:445-464），handler 2235+ 死代码不可达
+1. explore: ✅ protocol → ✅ dispatch 活跃（remote.rs:466-468），handler 可达，11 tests
 2. TxtTocRule: ✅ 已实现 → 🟠 dispatch 被注释禁用 + 缺多规则择优算法（仅单规则 split_chapters）
 3. ChineseUtils: ✅ 已实现 → 🟠 缺 fixT2sDict 排除字典（chinese.rs 仅 113 行 zhhz 裸转换）
 4. ContentProcessor: ✅ 已实现 → 🟠 缺 Legado 6 阶段的 3 阶段（仅 chineseConvert/trim/replace）

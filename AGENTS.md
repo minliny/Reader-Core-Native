@@ -144,7 +144,7 @@ Core 已就绪（`book.search` 传 `keyword` 自动构造 URL → `http.execute`
 3. 如果跑了批量测试，记录通过率到 `reports/tooling/` 并在快照中引用
 4. 不得凭单次测试结果声称能力已完成，必须对照 97 项清单逐项验证
 
-### 当前关键断链（截至 2026-06-27）
+### 当前关键断链（截至 2026-06-27，已部分修复）
 
 1. **CLI 无 HTTP 客户端**：`grep "reqwest|ureq|hyper|std::net" tools/reader-cli/src/*.rs` = 0
 2. **无链式提取**：现有 `--fixture-vertical` 需一次性喂全部 mock 响应，不提取 URL

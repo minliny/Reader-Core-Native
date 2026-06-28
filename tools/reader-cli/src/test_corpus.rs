@@ -20,6 +20,10 @@ pub struct TestCorpusConfig {
     pub concurrency: usize, // 当前只支持 1(串行);>1 标记为 TODO
     pub record_dir: Option<PathBuf>,
     pub offline_dir: Option<PathBuf>,
+    /// 详细日志(单源级别)
+    pub verbose: bool,
+    /// 每完成 N 个源保存一次中间结果(防止崩溃丢失)
+    pub save_interval: usize,
 }
 
 impl Default for TestCorpusConfig {
@@ -34,6 +38,8 @@ impl Default for TestCorpusConfig {
             concurrency: 1,
             record_dir: None,
             offline_dir: None,
+            verbose: false,
+            save_interval: 10,
         }
     }
 }
@@ -121,6 +127,7 @@ pub fn run_test_corpus(config: &TestCorpusConfig) -> Result<CorpusBatchResult, S
 
     let mut results: Vec<SourceTestResult> = Vec::with_capacity(total);
     let start = Instant::now();
+    let save_interval = config.save_interval.max(1);
 
     for (idx, src_meta) in filtered.iter().enumerate() {
         let file = src_meta.get("file").and_then(Value::as_str).unwrap_or("");
@@ -138,9 +145,48 @@ pub fn run_test_corpus(config: &TestCorpusConfig) -> Result<CorpusBatchResult, S
             record_dir: config.record_dir.clone(),
             offline_dir: config.offline_dir.clone(),
             quiet: true,
+        verbose: config.verbose,
         };
 
-        let result = test_source(&test_config);
+        // Panic 隔离:每个源在 catch_unwind 中跑,防止某个源 panic 导致全批崩溃
+        let result = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            test_source(&test_config)
+        })) {
+            Ok(r) => r,
+            Err(panic_payload) => {
+                let panic_msg = if let Some(s) = panic_payload.downcast_ref::<&str>() {
+                    s.to_string()
+                } else if let Some(s) = panic_payload.downcast_ref::<String>() {
+                    s.clone()
+                } else {
+                    "unknown panic".to_string()
+                };
+                eprintln!("  ⚠ PANIC at source {idx}: {panic_msg}");
+                let mut panic_result = SourceTestResult {
+                    source_id: src_meta.get("id").and_then(Value::as_str).unwrap_or("").to_string(),
+                    source_file: file.to_string(),
+                    source_name: src_meta.get("book_source_name").and_then(Value::as_str).unwrap_or("").to_string(),
+                    source_url: src_meta.get("book_source_url").and_then(Value::as_str).unwrap_or("").to_string(),
+                    priority: None,
+                    rule_forms: vec![],
+                    has_js: false,
+                    has_multirule: false,
+                    has_regex: false,
+                    levels: {
+                        let mut m = BTreeMap::new();
+                        m.insert("L1-import".to_string(), crate::test_source::LevelResult::fail_with("panic", panic_msg.clone()));
+                        m
+                    },
+                    failure_reason: Some("panic".to_string()),
+                    duration_ms: 0,
+                };
+                // Mark remaining levels as skip
+                for level in &["L2-search", "L3-detail", "L4-toc", "L5-content"] {
+                    panic_result.levels.insert(level.to_string(), crate::test_source::LevelResult::skip("panic_in_previous_step"));
+                }
+                panic_result
+            }
+        };
         let mut result = result;
         // 把 manifest 里的元数据补回结果(priority/rule_forms/has_*)
         result.priority = src_meta
@@ -171,6 +217,27 @@ pub fn run_test_corpus(config: &TestCorpusConfig) -> Result<CorpusBatchResult, S
         eprintln!("{progress}");
 
         results.push(result);
+
+        // 中间结果保存:每 save_interval 个源写一次
+        if let Some(out) = &config.out_path {
+            if (idx + 1) % save_interval == 0 || idx + 1 == total {
+                let elapsed = start.elapsed().as_secs_f64();
+                let intermediate = CorpusBatchResult {
+                    version: "corpus-batch-result/1".into(),
+                    mode: mode.into(),
+                    keyword: config.keyword.clone(),
+                    generated_at: now_iso(),
+                    total: idx + 1,
+                    summary: aggregate(&results),
+                    sources: results.clone(),
+                };
+                let _ = fs::write(
+                    out,
+                    serde_json::to_string_pretty(&intermediate).unwrap_or_default(),
+                );
+                eprintln!("  [checkpoint] {}/{} sources saved ({:.1}s elapsed)", idx + 1, total, elapsed);
+            }
+        }
 
         // 防止 borrow 问题
         let _ = &mut test_config;
