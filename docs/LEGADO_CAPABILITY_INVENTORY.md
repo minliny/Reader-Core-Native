@@ -1,6 +1,6 @@
 # Legado 能力清单与 Reader 对标审计
 
-日期：2026-06-27
+日期：2026-06-27（2026-06-28 修正：基于 4 agent 真实代码交叉验证，修正虚报/漏报）
 审计来源：`/Users/minliny/Documents/legado` 源码（815 个 .kt/.java 文件）
 
 本文是 Legado 全部能力的枚举清单，作为 Reader "能力底线 = Legado" 的验收基准。
@@ -8,246 +8,281 @@
 
 ---
 
+## 证据级别说明
+
+每项能力均标注证据来源（"证据级别"列）：
+
+| 标记 | 含义 |
+|------|------|
+| 🟢 | 真实 Legado 书源跑通（459 源 batch 验证） |
+| 🔵 | 单元测试通（合成 fixture / conformance） |
+| 🟡 | 代码存在但未测试 / 未端到端验证 / 仅 entity+CRUD |
+| 🔴 | 死代码 / dispatch 缺失 / 0 代码 |
+
+---
+
 ## 1. 书源解析引擎（model/analyzeRule + model/webBook）
 
 ### 1.1 规则语言（AnalyzeRule.kt, 84 个方法）
 
-| 能力 | Legado 实现 | Reader Core 状态 | 证据 |
-|------|------------|-----------------|------|
-| CSS 选择器 (@css:/@text/@href/&&/;/\|\|) | AnalyzeByJSoup | ⚠️ 部分（MultiRule 已修，待批量验证） | fixture_vertical 3 源 |
-| XPath (@xpath:/@@) | AnalyzeByXPath | ✅ 有实现 | conformance |
-| JSONPath ($./$[) | AnalyzeByJSonPath | ✅ 有实现 | conformance |
-| 正则 (regex) | AnalyzeByRegex | ⚠️ 有 regex-suffix 但未完整验证 | 0 真实源 |
-| @put/@get 变量机制 | splitPutRule/evalPattern | ✅ 已实现 | reader-rule 单元测试 |
-| {{}} 模板 | evalPattern | ✅ 已实现 | 单元测试 |
-| <js> 内联 JS | evalJS | ⚠️ 有沙箱但 java.* 方法未全验证 | reader-js 79 方法 |
-| @js: 规则前缀 | evalJS | ⚠️ 同上 | |
-| MultiRule (&&/\|\|/%%) | splitSourceRule | ❌ blocker（CSS 路径未拆分） | release-blockers.json |
-| 规则补全 (RuleComplete) | RuleComplete.kt | ✅ 已实现 | 32 tests + reader-rule auto_complete_rule |
-| 规则缓存 | splitSourceRuleCacheString | ❌ 未实现 | |
+| 能力 | Legado 实现 | Reader Core 状态 | 证据 | 证据级别 |
+|------|------------|-----------------|------|---------|
+| CSS 选择器 (@css:/@text/@href/&&/;/\|\|) | AnalyzeByJSoup | ⚠️ 部分（MultiRule 已修，待批量验证） | fixture_vertical 3 源 | 🔵 |
+| XPath (@xpath:/@@) | AnalyzeByXPath | ✅ 有实现 | conformance | 🔵 |
+| JSONPath ($./$[) | AnalyzeByJSonPath | ✅ 有实现 | conformance | 🔵 |
+| 正则 (regex) | AnalyzeByRegex | ⚠️ 有 regex-suffix 但未完整验证 | 0 真实源 | 🟡 |
+| @put/@get 变量机制 | splitPutRule/evalPattern | ✅ 已实现 | reader-rule 单元测试 | 🔵 |
+| {{}} 模板 | evalPattern | ✅ 已实现 | 单元测试 | 🔵 |
+| <js> 内联 JS | evalJS | ⚠️ 有沙箱但 java.* 方法未全验证 | reader-js 79 方法 | 🔵 |
+| @js: 规则前缀 | evalJS | ⚠️ 同上 | reader-js 79 方法 | 🔵 |
+| MultiRule (&&/\|\|/%%) | splitSourceRule | ✅ 已实现（blocker 已解） | reader-rule 15 单元 + yodu 4 集成 = 19 tests | 🔵 |
+| 规则补全 (RuleComplete) | RuleComplete.kt | ✅ 已实现 | 32 tests + reader-rule auto_complete_rule | 🔵 |
+| 规则缓存 | splitSourceRuleCacheString | ❌ 未实现 | 0 代码 | 🔴 |
 
 ### 1.2 URL 构造（AnalyzeUrl.kt, 30+ 方法）
 
-| 能力 | Legado 实现 | Reader Core 状态 | 证据 |
-|------|------------|-----------------|------|
-| {{key}}/{{page}} 模板展开 | replaceKeyPageJs | ✅ | auto_build_search 测试 |
-| url,{json} DSL 格式 | analyzeUrl | ✅ | auto_build_search 测试 |
-| POST/GET/HEAD 方法 | setMethod | ✅ | auto_build_search 测试 |
-| charset 编码 (GBK/UTF-8) | encodeParams | ⚠️ Core 产出提示，Host 执行 | 未端到端验证 |
-| header 合并 (source + DSL) | analyzeFields | ✅ | 单元测试 |
-| Cookie 传递 | setCookie/saveCookie | ⚠️ Core 产出提示，Host 执行 | |
-| JS URL 构造 (@js:/<js>) | analyzeJs | ⚠️ 有沙箱但 java.get/post 未验证 | |
-| 重定向跟随 | OkHttp redirect | ❌ Core 不处理，Host 侧 | |
-| 文件上传 (multipart) | upload | ❌ 未实现 | 0 代码 |
-| GlideUrl (图片加载) | getGlideUrl | ❌ 未实现 | |
+| 能力 | Legado 实现 | Reader Core 状态 | 证据 | 证据级别 |
+|------|------------|-----------------|------|---------|
+| {{key}}/{{page}} 模板展开 | replaceKeyPageJs | ✅ | auto_build_search 测试 | 🔵 |
+| url,{json} DSL 格式 | analyzeUrl | ✅ | auto_build_search 测试 | 🔵 |
+| POST/GET/HEAD 方法 | setMethod | ✅ | auto_build_search 测试 | 🔵 |
+| charset 编码 (GBK/UTF-8) | encodeParams | ⚠️ Core 产出提示，Host 执行 | 未端到端验证 | 🟡 |
+| header 合并 (source + DSL) | analyzeFields | ✅ | 单元测试 | 🔵 |
+| Cookie 传递 | setCookie/saveCookie | ⚠️ Core 产出提示，Host 执行 | | 🟡 |
+| JS URL 构造 (@js:/<js>) | analyzeJs | ⚠️ 有沙箱但 java.get/post 未验证 | | 🟡 |
+| 重定向跟随 | OkHttp redirect | ❌ Core 不处理，Host 侧 | | 🟡 |
+| 文件上传 (multipart) | upload | ❌ 未实现 | 0 代码 | 🔴 |
+| GlideUrl (图片加载) | getGlideUrl | ❌ 未实现（Host 侧图片） | 0 代码 | 🔴 |
 
 ### 1.3 书源生命周期（model/webBook/）
 
-| 能力 | Legado 实现 | Reader Core 状态 | 证据 |
-|------|------------|-----------------|------|
-| 搜索 (WebBook.searchBook) | BookList.kt | ✅ protocol book.search | 3 源 fixture |
-| 详情 (WebBook.getBookInfo) | BookInfo.kt | ✅ protocol book.detail | 3 源 fixture |
-| 目录 (WebBook.getChapterList) | BookChapterList.kt | ✅ protocol book.toc | 3 源 fixture |
-| 正文 (WebBook.getBookContent) | BookContent.kt | ✅ protocol chapter.content | 3 源 fixture |
-| 发现 (WebBook.exploreBook) | BookList.kt (explore) | ✅ protocol source.exploreKinds + source.explore | 0 真实源 (待批量验证) |
-| 多页加载 (nextPage/nextTocUrl) | BookList/BookChapterList | ✅ 已实现 | 8 tests pagination(reader-runtime 循环翻页) |
-| 段评 (ReviewRule) | ruleReview | ❌ 未实现 | 0 代码 |
-| 书源校验 (CheckSource) | CheckSource.kt + Service | ❌ 未实现 | 0 代码 |
-| 书源调试 (Debug) | Debug.kt + WebSocket | ❌ 未实现 | 0 代码 |
+| 能力 | Legado 实现 | Reader Core 状态 | 证据 | 证据级别 |
+|------|------------|-----------------|------|---------|
+| 搜索 (WebBook.searchBook) | BookList.kt | ✅ protocol book.search | 3 源 fixture | 🔵 |
+| 详情 (WebBook.getBookInfo) | BookInfo.kt | ✅ protocol book.detail | 3 源 fixture | 🔵 |
+| 目录 (WebBook.getChapterList) | BookChapterList.kt | ✅ protocol book.toc | 3 源 fixture | 🔵 |
+| 正文 (WebBook.getBookContent) | BookContent.kt | ✅ protocol chapter.content | 3 源 fixture | 🔵 |
+| 发现 (WebBook.exploreBook) | BookList.kt (explore) | 🔴 dispatch 被注释禁用，handler 死代码 | remote.rs:445-464 注释，handler 2235+ 不可达 | 🔴 |
+| 多页加载 (nextPage/nextTocUrl) | BookList/BookChapterList | ✅ 已实现 | 8 tests pagination | 🔵 |
+| 段评 (ReviewRule) | ruleReview | ❌ 未实现 | 0 代码 | 🔴 |
+| 书源校验 (CheckSource) | CheckSource.kt + Service | ❌ 未实现 | 0 代码 | 🔴 |
+| 书源调试 (Debug) | Debug.kt + WebSocket | ❌ 未实现 | 0 代码 | 🔴 |
 
 ### 1.4 JS 扩展方法（JsExtensions.kt, 79 个方法）
 
-| 分类 | 方法数 | Reader Core 状态 | 证据 |
-|------|--------|-----------------|------|
-| HTTP (ajax/ajaxAll/connect/get/post/head) | 6 | ⚠️ 有 java.get/post 但端到端未验证 | reader-js 79/79 单元测试 |
-| WebView (webView/startBrowser/getVerificationCode) | 5 | ❌ Core 不碰 WebView（红线 4），需 Host | |
-| 文件操作 (getFile/readFile/unzipFile/unrarFile/un7zFile) | 14 | ❌ 未实现 | 0 代码 |
-| 编码 (base64/hex/encodeURI/bytesToStr) | 12 | ✅ 大部分已实现 | reader-js 单元测试 |
-| Cookie (getCookie) | 2 | ⚠️ 有协议 cookie.get/set 但 JS 内调用未验证 | |
-| 字体反混淆 (queryTTF/replaceFont) | 4 | ❌ 未实现 | 0 代码 |
-| 繁简转换 (t2s/s2t) | 2 | ✅ 已实现 | 98 reader-js + 53 reader-content tests |
-| 时间格式化 (timeFormat/timeFormatUTC) | 2 | ✅ | |
-| 其他 (toast/log/randomUUID/androidId/openUrl) | 6 | ⚠️ 部分 | |
-| 缓存 (cacheFile/downloadFile) | 4 | ❌ 未实现 | 0 代码 |
-| 脚本导入 (importScript) | 1 | ❌ 未实现 | 0 代码 |
+| 分类 | 方法数 | Reader Core 状态 | 证据 | 证据级别 |
+|------|--------|-----------------|------|---------|
+| HTTP (ajax/ajaxAll/connect/get/post/head) | 6 | 🟡 descriptor 路由已实现（HostDescriptor），Host 执行未端到端验证 | reader-js host_routing 76+ tests | 🟡 |
+| WebView (webView/startBrowser/getVerificationCode) | 5 | 🟡 descriptor 路由已实现，Core 不碰 WebView（红线 4），Host 执行 | reader-js WebView/StartBrowser 等 6 HostDescriptor 变体 | 🟡 |
+| 文件操作 (getFile/readFile/unzipFile/unrarFile/un7zFile) | 14 | 🟡 descriptor 路由已实现，Host 执行 | reader-js GetFile/ReadFile/UnzipFile 等 9 变体 | 🟡 |
+| 编码 (base64/hex/encodeURI/bytesToStr) | 12 | ✅ 大部分已实现 | reader-js 单元测试 | 🔵 |
+| Cookie (getCookie) | 2 | 🟡 descriptor 路由已实现，JS 内调用未端到端验证 | reader-js GetCookie 变体 | 🟡 |
+| 字体反混淆 (queryTTF/replaceFont) | 4 | ❌ 未实现 | 0 代码 | 🔴 |
+| 繁简转换 (t2s/s2t) | 2 | 🟠 缺 fixT2sDict 排除字典（仅 zhhz 裸转换） | reader-js 98 + reader-content 53 tests | 🔵 |
+| 时间格式化 (timeFormat/timeFormatUTC) | 2 | ✅ | 单元测试 | 🔵 |
+| 其他 (toast/log/randomUUID/androidId/openUrl) | 6 | ⚠️ 部分 | | 🟡 |
+| 缓存 (cacheFile/downloadFile) | 4 | 🟡 descriptor 路由已实现，Host 执行 | reader-js CacheFile/DownloadFile 变体 | 🟡 |
+| 脚本导入 (importScript) | 1 | ❌ 未实现 | 0 代码 | 🔴 |
 
 ---
 
 ## 2. 本地书（model/localBook/）
 
-| 格式 | Legado 实现 | Reader Core 状态 | 证据 |
-|------|------------|-----------------|------|
-| TXT | TextFile.kt | ✅ reader-local-book/txt.rs | crate test |
-| EPUB | EpubFile.kt | ✅ reader-local-book/epub.rs | crate test |
-| PDF | PdfFile.kt | ✅ reader-local-book/pdf.rs | crate test |
-| Mobi | MobiFile.kt | ⚠️ reader-local-book/mobi.rs 有但未验证 | 0 真实文件 |
-| Umd | UmdFile.kt | ❌ 未实现 | 0 代码 |
-| TXT 目录规则 (TxtTocRule) | TxtTocRule.kt | ✅ reader-domain + reader-local-book split_chapters + txt-toc-rule.* CRUD | 6 单元测试 |
+| 格式 | Legado 实现 | Reader Core 状态 | 证据 | 证据级别 |
+|------|------------|-----------------|------|---------|
+| TXT | TextFile.kt | ✅ reader-local-book/txt.rs | crate test | 🔵 |
+| EPUB | EpubFile.kt | ✅ reader-local-book/epub.rs | crate test | 🔵 |
+| PDF | PdfFile.kt | ✅ reader-local-book/pdf.rs | crate test | 🔵 |
+| Mobi | MobiFile.kt | ⚠️ reader-local-book/mobi.rs 有但未验证 | 0 真实文件 | 🟡 |
+| Umd | UmdFile.kt | ❌ 未实现 | 0 代码 | 🔴 |
+| TXT 目录规则 (TxtTocRule) | TxtTocRule.kt | 🟠 dispatch 被注释禁用 + 缺多规则择优算法（matchRule） | split_chapters 仅单规则；remote.rs:453-464 注释 | 🟡 |
 
 ---
 
 ## 3. RSS 订阅（model/rss/）
 
-| 能力 | Legado 实现 | Reader Core 状态 | 证据 |
-|------|------------|-----------------|------|
-| RSS 源解析 (RssParserByRule) | RssParserByRule.kt | ✅ reader-rss | crate test |
-| 默认 RSS 解析 (RssParserDefault) | RssParserDefault.kt | ⚠️ 不确定 | |
-| RSS 文章内容 (ruleContent) | Rss.kt | ⚠️ 部分 | |
-| RSS 收藏 (RssStar) | RssStar entity | ❌ 未实现 | 0 代码 |
-| RSS 阅读记录 (RssReadRecord) | RssReadRecord entity | ❌ 未实现 | 0 代码 |
-| RSS 订阅管理 (subscription) | ui/rss/subscription | ❌ UI 层，不在 Core | |
+| 能力 | Legado 实现 | Reader Core 状态 | 证据 | 证据级别 |
+|------|------------|-----------------|------|---------|
+| RSS 源解析 (RssParserByRule) | RssParserByRule.kt | 🔵 合成 fixture，0 真实 RSS 源 | reader-rss crate test（123 处 example.com） | 🔵 |
+| 默认 RSS 解析 (RssParserDefault) | RssParserDefault.kt | ⚠️ 不确定 | | 🟡 |
+| RSS 文章内容 (ruleContent) | Rss.kt | ⚠️ 部分 | | 🟡 |
+| RSS 收藏 (RssStar) | RssStar entity | ❌ 未实现 | 0 代码 | 🔴 |
+| RSS 阅读记录 (RssReadRecord) | RssReadRecord entity | ❌ 未实现 | 0 代码 | 🔴 |
+| RSS 订阅管理 (subscription) | ui/rss/subscription | ❌ UI 层，不在 Core | Host 侧 | 🟡 |
 
 ---
 
 ## 4. TTS 朗读（help/TTS.kt + service/）
 
-| 能力 | Legado 实现 | Reader Core 状态 | 证据 |
-|------|------------|-----------------|------|
-| 系统 TTS 发声 | TextToSpeech | ❌ Core 不发声（红线），Host 侧 | |
-| TTS 队列状态机 | TTSReadAloudService | ✅ reader-runtime/tts.rs | conformance |
-| 文本切片 | TTS.kt | ✅ tts.slice protocol | conformance |
-| HttpTTS (在线语音) | HttpTTS entity + HttpReadAloudService | ❌ 未实现 | 0 代码 |
-| TTS 配置 (engine/rate/followSys) | AppConfig | ❌ 未实现 | |
-| 蓝牙按键 (MediaButton) | MediaButtonReceiver | ❌ Host 侧 | |
+| 能力 | Legado 实现 | Reader Core 状态 | 证据 | 证据级别 |
+|------|------------|-----------------|------|---------|
+| 系统 TTS 发声 | TextToSpeech | ❌ Core 不发声（红线），Host 侧 | 边界正确 | 🟡 |
+| TTS 队列状态机 | TTSReadAloudService | ✅ reader-runtime/tts.rs | conformance | 🔵 |
+| 文本切片 | TTS.kt | ✅ tts.slice protocol | conformance | 🔵 |
+| HttpTTS (在线语音) | HttpTTS entity + HttpReadAloudService | ❌ 未实现 | 0 代码 | 🔴 |
+| TTS 配置 (engine/rate/followSys) | AppConfig | ❌ 未实现 | 0 代码 | 🔴 |
+| 蓝牙按键 (MediaButton) | MediaButtonReceiver | ❌ Host 侧 | 边界正确 | 🟡 |
 
 ---
 
 ## 5. 同步与备份（help/storage/ + lib/webdav/）
 
-| 能力 | Legado 实现 | Reader Core 状态 | 证据 |
-|------|------------|-----------------|------|
-| WebDAV 同步 | AppWebDav + WebDav.kt | ✅ reader-sync/webdav | crate test |
-| 备份 (JSON + AES) | Backup.kt + BackupAES.kt | ⚠️ sync.backup protocol 有但 AES 未验证 | |
-| 恢复 | Restore.kt | ⚠️ sync.merge protocol 有但未验证 | |
-| 备份配置 | BackupConfig.kt | ❌ 未实现 | |
-| 旧数据迁移 | ImportOldData.kt | ❌ 不需要 | |
+| 能力 | Legado 实现 | Reader Core 状态 | 证据 | 证据级别 |
+|------|------------|-----------------|------|---------|
+| WebDAV 同步 | AppWebDav + WebDav.kt | ✅ reader-sync/webdav | crate test | 🔵 |
+| 备份 (JSON + AES) | Backup.kt + BackupAES.kt | ⚠️ sync.backup protocol 有但 AES 未验证 | | 🟡 |
+| 恢复 | Restore.kt | ⚠️ sync.merge protocol 有但未验证 | | 🟡 |
+| 备份配置 | BackupConfig.kt | ❌ 未实现 | 0 代码 | 🔴 |
+| 旧数据迁移 | ImportOldData.kt | ❌ 不需要 | N/A | 🟡 |
 
 ---
 
 ## 6. 书架与数据管理（data/entities/）
 
-| 实体 | Legado 实现 | Reader Core 状态 | 证据 |
-|------|------------|-----------------|------|
-| Book | Book.kt | ✅ reader-domain | |
-| BookChapter | BookChapter.kt | ✅ reader-domain | |
-| BookSource | BookSource.kt | ✅ reader-domain | |
-| BookGroup (书架分组) | BookGroup.kt | ❌ 未实现 | 0 代码 |
-| Bookmark (书签) | Bookmark.kt | ❌ 未实现 | 0 代码 |
-| ReplaceRule (替换规则) | ReplaceRule.kt | ✅ 已实现 | ContentProcessor + 15+9 tests |
-| TxtTocRule | TxtTocRule.kt | ✅ reader-domain + storage CRUD + txt-toc-rule.* protocol | 6 单元测试 |
-| DictRule (字典规则) | DictRule.kt | ❌ 未实现 | 0 代码 |
-| HttpTTS | HttpTTS.kt | ❌ 未实现 | 0 代码 |
-| RssSource | RssSource.kt | ✅ reader-domain | |
-| RssArticle | RssArticle.kt | ✅ reader-domain | |
-| Cookie | Cookie.kt | ✅ cookie.get/set protocol | |
-| Cache | Cache.kt | ✅ cache.get/put protocol | |
-| ReadRecord (阅读时长) | ReadRecord.kt | ❌ 未实现 | 0 代码 |
-| SearchBook (搜索历史) | SearchBook.kt | ❌ 未实现 | 0 代码 |
-| SearchKeyword | SearchKeyword.kt | ❌ 未实现 | 0 代码 |
-| RuleSub (规则订阅) | RuleSub.kt | ❌ 未实现 | 0 代码 |
-| BookChapterReview (段评) | BookChapterReview.kt | ❌ 未实现 | 0 代码 |
+| 实体 | Legado 实现 | Reader Core 状态 | 证据 | 证据级别 |
+|------|------------|-----------------|------|---------|
+| Book | Book.kt | ✅ reader-domain | domain entity | 🔵 |
+| BookChapter | BookChapter.kt | ✅ reader-domain | domain entity | 🔵 |
+| BookSource | BookSource.kt | ✅ reader-domain | domain entity | 🔵 |
+| BookGroup (书架分组) | BookGroup.kt | ✅ 8 tests + storage CRUD + dispatch WIRED | bookmark_commands.rs 8 tests；remote.rs:421-432 活跃 | 🔵 |
+| Bookmark (书签) | Bookmark.kt | ✅ 8 tests + storage CRUD + dispatch WIRED | bookmark_commands.rs 8 tests + 5 entity/storage；remote.rs:409-420 活跃 | 🔵 |
+| ReplaceRule (替换规则) | ReplaceRule.kt | ✅ 已实现 | ContentProcessor + 15+9 tests | 🔵 |
+| TxtTocRule | TxtTocRule.kt | 🟠 dispatch 被注释禁用 + 缺多规则择优算法 | 6 单元测试；remote.rs:453-464 注释 | 🟡 |
+| DictRule (字典规则) | DictRule.kt | 🟡 entity + table + CRUD 存在，无 dispatch/protocol | 5 entity/storage tests；无 DICT_RULE_* 常量 | 🟡 |
+| HttpTTS | HttpTTS.kt | ❌ 未实现 | 0 代码 | 🔴 |
+| RssSource | RssSource.kt | ✅ reader-domain | domain entity | 🔵 |
+| RssArticle | RssArticle.kt | ✅ reader-domain | domain entity | 🔵 |
+| Cookie | Cookie.kt | ✅ cookie.get/set protocol | | 🔵 |
+| Cache | Cache.kt | ✅ cache.get/put protocol | | 🔵 |
+| ReadRecord (阅读时长) | ReadRecord.kt | ✅ 9 tests + storage CRUD + dispatch WIRED | read_record_commands.rs 9 tests；remote.rs:433-444 活跃 | 🔵 |
+| SearchBook (搜索历史) | SearchBook.kt | ❌ 未实现 | 0 代码 | 🔴 |
+| SearchKeyword | SearchKeyword.kt | ❌ 未实现 | 0 代码 | 🔴 |
+| RuleSub (规则订阅) | RuleSub.kt | ❌ 未实现 | 0 代码 | 🔴 |
+| BookChapterReview (段评) | BookChapterReview.kt | ❌ 未实现 | 0 代码 | 🔴 |
 
 ---
 
 ## 7. 内容处理（help/book/）
 
-| 能力 | Legado 实现 | Reader Core 状态 | 证据 |
-|------|------------|-----------------|------|
-| 替换规则 (ContentProcessor) | ContentProcessor.kt | ✅ 已实现 | reader-content/content_processor.rs |
-| 替换规则分析 (ReplaceAnalyzer) | ReplaceAnalyzer.kt | ⚠️ 部分实现（分析逻辑内嵌在 ContentProcessor 中） |
-| 内容净化 | ContentHelp.kt | ❌ 未实现 | 0 代码 |
-| 繁简转换 | ChineseUtils.kt | ✅ 已实现 | reader-content/chinese.rs + ContentProcessor |
-| 去除同名标题 | ContentProcessor.upRemoveSameTitle | ❌ 未实现 | 0 代码 |
-| 智能段落修正 | ContentHelp.kt | ❌ 未实现 | 0 代码 |
+| 能力 | Legado 实现 | Reader Core 状态 | 证据 | 证据级别 |
+|------|------------|-----------------|------|---------|
+| 替换规则 (ContentProcessor) | ContentProcessor.kt | 🟠 缺 Legado 6 阶段的 3 阶段（仅 chineseConvert/trim/replace） | reader-content/content_processor.rs:57 仅 3 stage | 🟡 |
+| 替换规则分析 (ReplaceAnalyzer) | ReplaceAnalyzer.kt | ⚠️ 部分实现（分析逻辑内嵌在 ContentProcessor 中） | | 🟡 |
+| 内容净化 | ContentHelp.kt | ❌ 未实现 | 0 代码 | 🔴 |
+| 繁简转换 | ChineseUtils.kt | 🟠 缺 fixT2sDict 排除字典（仅 zhhz 裸转换） | reader-content/chinese.rs 113 行，无 fixT2sDict | 🟡 |
+| 去除同名标题 | ContentProcessor.upRemoveSameTitle | ❌ 未实现 | 0 代码 | 🔴 |
+| 智能段落修正 | ContentHelp.kt | ❌ 未实现 | 0 代码 | 🔴 |
 
 ---
 
 ## 8. 阅读引擎（ui/book/read/）— Host/UI 层
 
-| 能力 | Legado 实现 | Reader Core 状态 | 备注 |
-|------|------------|-----------------|------|
-| 翻页动画 (Cover/Slide/Simulation/Scroll/None/Horizontal) | page/delegate/ 7 种 | N/A | Host/UI 层 |
-| 文字排版 (字号/行距/段距/缩进/粗体) | ReadBookConfig 224 配置项 | N/A | Host/UI 层 |
-| 背景设置 (颜色/图片/EInk) | ReadBookConfig | N/A | Host/UI 层 |
-| 主题 (白天/夜间/EInk) | ThemeConfig | N/A | Host/UI 层 |
-| 点击区域配置 | AppConfig 9 区域 | N/A | Host/UI 层 |
-| 自动阅读 | AutoReadDialog | N/A | Host/UI 层 |
-| 全文搜索 | SearchContentViewModel | ❌ 未实现 | Core 侧 0 代码 |
-| 内容编辑 | ContentEditDialog | ❌ 未实现 | |
-| 换源 | ChangeBookSourceDialog | ❌ 未实现 | |
-| 换封面 | ChangeCoverDialog | ❌ 未实现 | |
+| 能力 | Legado 实现 | Reader Core 状态 | 备注 | 证据级别 |
+|------|------------|-----------------|------|---------|
+| 翻页动画 (Cover/Slide/Simulation/Scroll/None/Horizontal) | page/delegate/ 7 种 | N/A | Host/UI 层 | 🟡 |
+| 文字排版 (字号/行距/段距/缩进/粗体) | ReadBookConfig 224 配置项 | N/A | Host/UI 层 | 🟡 |
+| 背景设置 (颜色/图片/EInk) | ReadBookConfig | N/A | Host/UI 层 | 🟡 |
+| 主题 (白天/夜间/EInk) | ThemeConfig | N/A | Host/UI 层 | 🟡 |
+| 点击区域配置 | AppConfig 9 区域 | N/A | Host/UI 层 | 🟡 |
+| 自动阅读 | AutoReadDialog | N/A | Host/UI 层 | 🟡 |
+| 全文搜索 | SearchContentViewModel | ❌ 未实现 | Core 侧 0 代码 | 🔴 |
+| 内容编辑 | ContentEditDialog | ❌ 未实现 | | 🔴 |
+| 换源 | ChangeBookSourceDialog | ❌ 未实现 | | 🔴 |
+| 换封面 | ChangeCoverDialog | ❌ 未实现 | | 🔴 |
 
 ---
 
 ## 9. 图片与封面（model/ImageProvider + model/BookCover）
 
-| 能力 | Legado 实现 | Reader Core 状态 | 证据 |
-|------|------------|-----------------|------|
-| 封面加载 | BookCover.kt | N/A | Host 侧 |
-| 封面规则搜索 | searchCover | ❌ 未实现 | 0 代码 |
-| 封面解密 (coverDecodeJs) | ImageUtils + coverDecodeJs | ❌ 未实现 | 0 代码 |
-| 图片缓存 | ImageProvider.BitmapLruCache | N/A | Host 侧 |
-| 漫画图片 | ReadManga.kt | ❌ 未实现 | 0 代码 |
+| 能力 | Legado 实现 | Reader Core 状态 | 证据 | 证据级别 |
+|------|------------|-----------------|------|---------|
+| 封面加载 | BookCover.kt | N/A | Host 侧 | 🟡 |
+| 封面规则搜索 | searchCover | ❌ 未实现 | 0 代码 | 🔴 |
+| 封面解密 (coverDecodeJs) | ImageUtils + coverDecodeJs | ❌ 未实现 | 0 代码 | 🔴 |
+| 图片缓存 | ImageProvider.BitmapLruCache | N/A | Host 侧 | 🟡 |
+| 漫画图片 | ReadManga.kt | ❌ 未实现 | 0 代码 | 🔴 |
 
 ---
 
 ## 10. 其他系统能力
 
-| 能力 | Legado 实现 | Reader Core 状态 | 备注 |
-|------|------------|-----------------|------|
-| Web 服务 (HttpServer + WebSocket) | web/ | ❌ 未实现 | Core 不开 socket（红线 4） |
-| ContentProvider API | api/controller/ | ❌ 未实现 | |
-| 书源/规则导入导出 | ui/association/ 7 种导入 | ❌ 未实现 | |
-| 后台服务 (Service) | 7 个 Service | N/A | Host 侧 |
-| 后台任务/通知 | Service + Notification | N/A | Host 侧 |
-| 媒体键 (MediaButton) | MediaButtonReceiver | N/A | Host 侧 |
+| 能力 | Legado 实现 | Reader Core 状态 | 备注 | 证据级别 |
+|------|------------|-----------------|------|---------|
+| Web 服务 (HttpServer + WebSocket) | web/ | ❌ Core 不开 socket（红线 4） | 边界正确 | 🟡 |
+| ContentProvider API | api/controller/ | ❌ 未实现 | | 🔴 |
+| 书源/规则导入导出 | ui/association/ 7 种导入 | ❌ 未实现 | | 🔴 |
+| 后台服务 (Service) | 7 个 Service | N/A | Host 侧 | 🟡 |
+| 后台任务/通知 | Service + Notification | N/A | Host 侧 | 🟡 |
+| 媒体键 (MediaButton) | MediaButtonReceiver | N/A | Host 侧 | 🟡 |
 
 ---
 
 ## 11. 能力覆盖率总结
 
-### Legado 全部能力模块统计
+### Legado 全部能力模块统计（2026-06-28 修正后）
 
-| 大类 | 子能力数 | Reader 已实现 | 部分实现 | 未实现 | 不适用(Host层) |
-|------|---------|-------------|---------|--------|--------------|
-| 书源解析引擎 | 28 | 8 | 12 | 8 | 0 |
-| 本地书 | 6 | 3 | 1 | 2 | 0 |
-| RSS | 6 | 2 | 1 | 3 | 0 |
-| TTS | 6 | 2 | 0 | 4 | 0 |
-| 同步备份 | 5 | 2 | 2 | 1 | 0 |
-| 书架数据实体 | 18 | 5 | 0 | 13 | 0 |
-| 内容处理 | 6 | 0 | 0 | 6 | 0 |
-| 阅读引擎 | 10 | 0 | 0 | 2 | 8 |
-| 图片封面 | 5 | 0 | 0 | 3 | 2 |
-| 其他系统 | 7 | 0 | 0 | 3 | 4 |
-| **合计** | **97** | **22** | **16** | **45** | **14** |
+| 大类 | 子能力数 | 已实现(✅) | 部分/代码存在(⚠️🟠🟡) | 未实现(❌🔴) |
+|------|---------|-----------|----------------------|-------------|
+| 书源解析引擎 | 41 | 17 | 16 | 8 |
+| 本地书 | 6 | 3 | 2 | 1 |
+| RSS | 6 | 0 | 3 | 2 |
+| TTS | 6 | 2 | 2 | 2 |
+| 同步备份 | 5 | 1 | 3 | 1 |
+| 书架数据实体 | 18 | 11 | 2 | 5 |
+| 内容处理 | 6 | 0 | 3 | 3 |
+| 阅读引擎 | 10 | 0 | 6（Host 边界正确） | 4 |
+| 图片封面 | 5 | 0 | 2（Host 边界正确） | 3 |
+| 其他系统 | 6 | 0 | 4（边界正确/Host） | 2 |
+| **合计** | **109** | **34 (31%)** | **43 (40%)** | **31 (28%)** |
+
+> 注：上文细项按方法分类粒度展开共 109 行（书源解析引擎 1.4 节 11 类方法展开后大于原 28 计数）。
+> 按 97 项能力框架（1.4 节合并计）口径：fully_passed ~32% / 代码存在 ~40% / 缺失 ~28%。
 
 ### 诚实评估
 
-- **Core 侧实际完成度: ~33%**（32/83 非Host能力 + MultiRule 已修，但批量测试 30 源 0% 完全通过）
-- **部分实现 16 项中，大部分从未用真实 Legado 数据验证过**
-- **35 项完全未实现**（书架分组/段评/换源/封面规则/字体反混淆/规则订阅/阅读记录/搜索历史/内容净化/去重标题等）
-- **之前声称的 "S1/S3/S5 100%" 严重高估** — 没有对照 Legado 全部能力清单做过系统验证
-- **459 源集合真实通过率: P0 抽样 30 源 = 0% 完全通过**（L1 100%, L2 3.3%, L3-L5 全 skip）
-  - L2 失败原因: no_search_results 34% / URL JS 失败 28% / 其他 38%
+- **Core 侧实际完成度: ~31%**（34/109 已实现且有测试证据；含 MultiRule blocker 已解、Bookmark/BookGroup/ReadRecord dispatch 已 WIRED）
+- **代码存在但未充分验证 ~40%**（含死代码 explore/ TxtTocRule dispatch 注释禁用、ChineseUtils 缺 fixT2sDict、ContentProcessor 仅 3/6 阶段、JS 扩展 5 类 descriptor 路由已实现但 Host 执行未端到端验证、Host 边界正确项）
+- **完全缺失 ~28%**（段评/书源校验/书源调试/字体反混淆/封面解密/规则缓存/HttpTTS/搜索历史/规则订阅等 0 代码）
+
+### 本轮修正项（2026-06-28，4 agent 真实代码交叉验证）
+
+**漏报修正（❌ → 实际已实现）：**
+1. Bookmark: ❌ 0 代码 → ✅ 8 tests + storage CRUD + dispatch WIRED（remote.rs:409-420 活跃）
+2. BookGroup: ❌ 0 代码 → ✅ 8 tests + storage CRUD + dispatch WIRED（remote.rs:421-432 活跃）
+3. ReadRecord: ❌ 0 代码 → ✅ 9 tests + storage CRUD + dispatch WIRED（remote.rs:433-444 活跃）
+4. DictRule: ❌ 0 代码 → 🟡 entity + table + CRUD 存在，无 dispatch/protocol（5 entity/storage tests）
+
+**虚报修正（✅ → 降级）：**
+1. explore: ✅ protocol → 🔴 dispatch 被注释禁用（remote.rs:445-464），handler 2235+ 死代码不可达
+2. TxtTocRule: ✅ 已实现 → 🟠 dispatch 被注释禁用 + 缺多规则择优算法（仅单规则 split_chapters）
+3. ChineseUtils: ✅ 已实现 → 🟠 缺 fixT2sDict 排除字典（chinese.rs 仅 113 行 zhhz 裸转换）
+4. ContentProcessor: ✅ 已实现 → 🟠 缺 Legado 6 阶段的 3 阶段（仅 chineseConvert/trim/replace）
+5. RssParserByRule: ✅ crate test → 🔵 合成 fixture，0 真实 RSS 源（123 处 example.com）
+
+**状态过期修正：**
+1. MultiRule: ❌ blocker → ✅ blocker 已解（split_legado_combined_rule + combine，19 tests）
+
+**JS 扩展方法 5 类从 ❌ → 🟡**（descriptor 路由已实现，符合 Core/Host 边界）：
+- HTTP / WebView / 文件操作 / Cookie / 缓存 — 均通过 HostDescriptor 强类型变体路由至 Host，76+ tests
 
 ### "能力不差于 Legado" 的验收缺口
 
 即使 459 源 L1-L5 全绿，仍有大量 Legado 能力未对标:
 1. 多页加载（nextPage/nextTocUrl）— 大量源有翻页
-2. 替换规则 — Legado 核心内容处理能力
-3. 繁简转换 — JsExtensions.t2s/s2t
-4. TXT 目录规则 — 本地书核心能力
-5. 书签/书架分组/阅读记录 — 数据管理基础
-6. 段评 — 书源 ruleReview
-7. 发现（explore）— 书源 exploreUrl
-8. 字体反混淆（queryTTF）— 反爬能力
-9. 封面解密（coverDecodeJs）— 反爬能力
-10. 规则补全（RuleComplete）— 源兼容性
-11. 全文搜索 — 阅读体验
-12. 换源 — 阅读体验
+2. 替换规则 — Legado 核心内容处理能力（ContentProcessor 缺 3 阶段）
+3. 繁简转换 — JsExtensions.t2s/s2t（缺 fixT2sDict 排除字典）
+4. TXT 目录规则 — 本地书核心能力（dispatch 禁用 + 缺多规则择优）
+5. 书签/书架分组/阅读记录 — 数据管理基础（✅ 已 WIRED，待真实数据验证）
+6. 段评 — 书源 ruleReview（❌ 0 代码）
+7. 发现（explore）— 书源 exploreUrl（🔴 dispatch 禁用，死代码）
+8. 字体反混淆（queryTTF）— 反爬能力（❌ 0 代码）
+9. 封面解密（coverDecodeJs）— 反爬能力（❌ 0 代码）
+10. 规则补全（RuleComplete）— 源兼容性（✅ 已实现）
+11. 全文搜索 — 阅读体验（❌ 0 代码）
+12. 换源 — 阅读体验（❌ 0 代码）
 
 ---
 
 *本文为 Legado 能力清单审计文档，是 "能力底线 = Legado" 的验收基准。
-任何 "能力已完成" 的判断必须对照本清单逐项验证。*
+任何 "能力已完成" 的判断必须对照本清单逐项验证，并标注证据级别。
+2026-06-28 修正基于 4 agent 真实代码交叉验证，修正虚报/漏报。*
