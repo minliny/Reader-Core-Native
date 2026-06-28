@@ -1,0 +1,3129 @@
+{
+  "version": "no-search-results-analysis/1",
+  "generated_at": "2026-06-28",
+  "background": "94 sources in corpus-batch-v4 with no_search_results and has_js=false (per corpus-manifest). Investigated via reader-cli --test-source with --record (full L2-search HTTP evidence captured for all 94).",
+  "methodology": [
+    "Extracted 94 no-JS no_search_results sources from reports/tooling/corpus-batch-v4.json",
+    "Ran reader-cli --test-source on ALL 94 with --keyword \"斗破苍穹\" --timeout 15 --record",
+    "Captured L2-search HTTP request URL, status, response body, final_url for each source",
+    "Inspected each source ruleSearch.bookList and searchUrl rules",
+    "Classified by HTTP outcome + body markers + rule syntax; refined to avoid false positives (weak anti-crawl markers like \"请登录\"/\"验证码\" only count in small challenge pages <3KB, since large legitimate search pages often contain nav-bar login links)"
+  ],
+  "category_definitions": {
+    "no_results": "HTTP 200, site responded normally but search genuinely returned 0 books (empty-state markers / empty JSON array / no-results page). Normal behavior, not a bug.",
+    "anti_crawl": "HTTP 403/429, Cloudflare challenge, captcha, login/verify redirect, or man-machine verification. Site blocks automated requests. Not fixable in Core rules.",
+    "website_dead": "Domain unreachable, server error (5xx), 404, redirect to empty/stub page, or site migrated/shut down (stopweb). Not fixable.",
+    "rule_bug": "HTTP 200 with substantial response, but Reader Core failed to extract books due to a rule-engine bug or unsupported/outdated rule syntax. Actionable.",
+    "encoding": "Response body decoding error (charset mismatch). Not observed in this batch."
+  },
+  "summary": {
+    "total": 94,
+    "by_category": {
+      "rule_bug": 28,
+      "anti_crawl": 13,
+      "no_results": 39,
+      "website_dead": 14
+    },
+    "recordings_captured": 94,
+    "keyword_used": "斗破苍穹"
+  },
+  "findings": {
+    "has_js_misclassification": {
+      "description": "corpus-manifest has_js flag is wrong for 27/94 sources in this set. The classifier (tools/corpus-manager/corpus_manager.py detect_rule_forms L61-109) only checks rule_str.startswith(\"@js:\"), missing @js: that appears mid-rule or after a newline (Legado \"prefix@js:transform\" pattern). has_js_search (L132) only checks searchUrl for @js:, not rule fields. 5 of the 27 have JS in ruleSearch.* (affects L2 path): 网易云说(bookList), 荔枝音乐(bookUrl), 荔枝有声(bookUrl), 纵横中文(kind), 酷我小说(kind).",
+      "count_misclassified": 27,
+      "count_with_js_in_ruleSearch": 5,
+      "fix": "In detect_rule_forms, also check (\"@js:\" in rule_str) and (\"<js>\" in rule_str), not just startswith. Or scan all rule field values for @js:/<js> substrings when computing has_js."
+    },
+    "url_construction_bug": {
+      "description": "Reader Core joins bookSourceUrl + relative searchUrl via STRING CONCATENATION, not RFC 3986 URL resolution. When bookSourceUrl contains a # fragment, the fragment is not stripped, producing a malformed URL where the search path becomes part of the fragment (e.g. \"http://m.yuedu.163.com#yc1101\" + \"/search/book/data.json\" -> \"http://m.yuedu.163.com#yc1101/search/book/data.json\" — the server sees path \"/\" with fragment \"yc1101/search/...\" and returns the homepage). These # suffixes (e.g. #yc1101, #♤yc, #一程, #按钮筛选) are Legado source labels/tags used for grouping in the Legado UI; Legado strips them before building request URLs, but Reader Core does not. All 7 affected sources verified by hand: the # originates from bookSourceUrl in every case (not from searchUrl).",
+      "location": "crates/reader-content/src/analyze_url.rs",
+      "functions": [
+        "url_origin (L907-915): rest.split(\"/\").next() only splits on \"/\", should split on [\"/\",\"?\",\"#\"]",
+        "resolve_relative_url (L862-893): format!(\"{origin}{url}\") string concat"
+      ],
+      "same_bug_also_in": "crates/reader-content/src/lib.rs url_origin (L2204-2212)",
+      "fix": "Use rest.split([\"/\", \"?\", \"#\"]).next() in url_origin, OR adopt the url crate Url::parse(base).join(relative) for proper RFC 3986 resolution. No test currently covers base_url with a # fragment. This single fix would likely recover 7 of the 94 sources (the url_fragment_not_stripped subset).",
+      "affected_sources_observed": [
+        "corpus-dc4d5f9d0aa5",
+        "corpus-8499163b43dc",
+        "corpus-421218f95102",
+        "corpus-319a513bce24",
+        "corpus-82228df0c4c0",
+        "corpus-85610ff65143",
+        "corpus-0ec8515ca614"
+      ],
+      "affected_count": 7,
+      "affected_source_labels": [
+        "网易云说 (m.yuedu.163.com#yc1101)",
+        "爱漫客栈 (www.mkzhan.com#yc1101)",
+        "笔尚小说 (www.bsxiaoshuo.com#yc1101)",
+        "安之原创 (www.azycjd.com#yc1101)",
+        "金庸小说 (www.jinyongwang.net#♤yc)",
+        "个性说网 (www.gexingshuo.com#一程)",
+        "起点中文 (m.qidian.com#按钮筛选)"
+      ]
+    },
+    "bookList_rule_mismatch": {
+      "description": "Largest actionable category. HTTP 200 with a real search-results or homepage body, but Reader Core extracted 0 books. Two sub-causes: (a) bookList rule references CSS classes that no longer exist in the HTML (site redesigned), (b) bookList rule uses @js: transform that Reader Core does not support (and which the manifest misclassified as no-JS).",
+      "count": 21,
+      "recommended_next_step": "For each rule_bug source, diff ruleSearch.bookList against the recorded L2-search HTML body (in /tmp/test-source-records*/corpus-<id>.json) to determine whether the rule is outdated (site redesign) or uses unsupported syntax. Sites that redesigned need updated rules (out of scope for Core); unsupported syntax needs Core rule-engine work."
+    }
+  },
+  "sources": [
+    {
+      "source_id": "corpus-315c22735cfa",
+      "source_file": "src-007-315c22735cfa.json",
+      "source_name": "得奇小说（优+++）",
+      "source_url": "https://www.deqibook.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "duration_ms": 564,
+      "bookList_rule": ".item",
+      "searchUrl": "/tag/?key={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.deqibook.com/tag/?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 2632,
+        "final_url": "https://www.deqibook.com/tag/?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 2632 bytes; bookList rule did not extract any books",
+        "bookList class(es) not in HTML: ['item']",
+        "bookList_rule='.item'",
+        "body sample: '<!doctype html>\\n<html lang=\"zh-CN\">\\n  <head>\\n    <meta charset=\"UTF-8\" />\\n    <link rel=\"icon\" type=\"image/png\" href=\"/logo.png\" />\\n    <meta name=\"viewport\" content=\"width=device-'"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": ".item",
+        "issues": [
+          "bookList class(es) not in HTML: ['item']"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-ffc837f6657b",
+      "source_file": "src-009-ffc837f6657b.json",
+      "source_name": "篱笆文学（优+++）",
+      "source_url": "https://m.libahao.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "duration_ms": 548,
+      "bookList_rule": ".book-item",
+      "searchUrl": "https://m.libahao.com/sou?wd={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://m.libahao.com/sou?wd=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 1922,
+        "final_url": "https://m.libahao.com/sou?wd=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 1922 bytes; bookList rule did not extract any books",
+        "bookList class(es) not in HTML: ['book-item']",
+        "bookList_rule='.book-item'",
+        "body sample: '<!DOCTYPE html>\\n<html lang=\"zh\">\\n<head>\\n\\t<meta charset=\"UTF-8\">\\n\\t<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">\\n\\t<title'"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": ".book-item",
+        "issues": [
+          "bookList class(es) not in HTML: ['book-item']"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-fda84013f7b8",
+      "source_file": "src-014-fda84013f7b8.json",
+      "source_name": "八零小说（优++）",
+      "source_url": "http://wap.80zw.la/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 1355,
+      "bookList_rule": ".line",
+      "searchUrl": "/modules/article/search.php,{\n  \"body\": \"searchkey={{key}}\",\n  \"charset\": \"UTF-8\",\n  \"method\": \"POST\"\n}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://wap.80zw.la/modules/article/search.php",
+        "method": "POST",
+        "status": 200,
+        "body_len": 1544,
+        "final_url": "http://wap.80ge.info/modules/article/search.php"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 1544 bytes; bookList rule did not extract any books",
+        "bookList class(es) not in HTML: ['line']",
+        "bookList_rule='.line'",
+        "body sample: '<!DOCTYPE html PUBLIC \"-//WAPFORUM//DTD XHTML Mobile 1.0//EN\" \"http://www.wapforum.org/DTD/xhtml-mobile10.dtd\">\\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head>\\n<title>与”“的小说_八零TX'"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": ".line",
+        "issues": [
+          "bookList class(es) not in HTML: ['line']"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-d56a57ade110",
+      "source_file": "src-015-d56a57ade110.json",
+      "source_name": "天天小说（优++）",
+      "source_url": "https://ttks.tw/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "duration_ms": 727,
+      "bookList_rule": "class.pure-u-1-1 pure-u-xl-1-3 pure-u-lg-1-3 pure-u-md-1-2 novel_cell",
+      "searchUrl": "/novel/search?q={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://ttks.tw/novel/search?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 403,
+        "body_len": 5487,
+        "final_url": "https://ttks.tw/novel/search?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "anti_crawl",
+      "evidence": [
+        "HTTP 403 (Cloudflare challenge)"
+      ]
+    },
+    {
+      "source_id": "corpus-234953cc1630",
+      "source_file": "src-020-234953cc1630.json",
+      "source_name": "鲸云轻说（优++）",
+      "source_url": "https://jyapi.jyacg.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "put-get",
+        "regex-suffix",
+        "template"
+      ],
+      "duration_ms": 165,
+      "bookList_rule": "data",
+      "searchUrl": "/web/search?name={{key}}&page={{page}}&type=1",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://jyapi.jyacg.com/web/search?name=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1&type=1",
+        "method": "GET",
+        "status": 200,
+        "body_len": 3388,
+        "final_url": "https://jyapi.jyacg.com/web/search?name=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1&type=1"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 3388 bytes; bookList rule did not extract any books",
+        "bookList_rule='data'",
+        "body sample: '<!doctype html>\\n<html>\\n<head>\\n<meta charset=\"utf-8\">\\n<title>抱歉，站点已暂停</title>\\n<style>\\nhtml,body,div,h1,*{margin:0;padding:0;}\\nbody{\\n\\tbackground-color:#fefefe;\\n\\tcolor:#333\\n}\\n.box{\\n\\tw'"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": "data",
+        "issues": [
+          "no empty-state/anti-crawl markers; rule likely does not match current HTML structure (site redesign or unsupported syntax)"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-ab9e1bbc3705",
+      "source_file": "src-032-ab9e1bbc3705.json",
+      "source_name": "趣悦小说（优++）",
+      "source_url": "https://vreader.vivo.com.cn/",
+      "priority": "P0",
+      "rule_forms": [
+        "json-jsonpath",
+        "put-get",
+        "regex-suffix",
+        "template"
+      ],
+      "duration_ms": 264,
+      "bookList_rule": "$..bookList[*]",
+      "searchUrl": "https://vreader.vivo.com.cn/book/search.do,{'method': 'POST',\n'body': '{\"model\":\"MI PAD 4\",\"imei\":\"123456789012345\",\"clientVersion\":\"121020\",\"elapsedtime\":\"343343\",\"sysver\":\"\",\"nt\":\"wifi\",\"ver\":\"121020\",\"u\":\"\",\"pver\":\"0\",\"resolution\":\"1920*1200\",\"bookVersion\":\"30800\",\"vreaderVersion\":121020,\"pixel\":\"320\",\"av\":\"27\",\"adrVerName\":\"8.1.0\",\"timestamp\":\"1675854786926\",\"openudid\":\"b443cebc6f614746\",\"udid\":\"\",\"channel\":\"0\",\"personalRecommend\":1,\"bookshelfBookIds\":[],\"bookShelfListenBookIds\":[],\"packageName\":\"com.vivo.vreader\",\"featureValues\":\"2\",\"androidId\":\"b443cebc6f614746\",\"page\":0,\"size\":20,\"keyword\":\"{{key}}\",\"tab\":0}'\n}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://vreader.vivo.com.cn/book/search.do",
+        "method": "POST",
+        "status": 200,
+        "body_len": 52,
+        "final_url": "https://vreader.vivo.com.cn/book/search.do"
+      },
+      "category": "no_results",
+      "evidence": [
+        "status 200 with small body (52 bytes); likely no-results/error page",
+        "body: '{\"thirdPartyCode\":2,\"code\":10001,\"msg\":\"小说搜索关键字为空！\"}'"
+      ]
+    },
+    {
+      "source_id": "corpus-40d721ef0cc4",
+      "source_file": "src-055-40d721ef0cc4.json",
+      "source_name": "天天书吧（优+）",
+      "source_url": "https://m.ttshu8.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "duration_ms": 3182,
+      "bookList_rule": ".list li",
+      "searchUrl": "/search.html,{\n  \"body\": \"searchkey={{key}}\",\n  \"method\": \"POST\"\n}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://m.ttshu8.com/search.html",
+        "method": "POST",
+        "status": 500,
+        "body_len": 0,
+        "final_url": "https://m.ttshu8.com/search.html"
+      },
+      "category": "website_dead",
+      "evidence": [
+        "HTTP 500 (server error / unreachable)"
+      ]
+    },
+    {
+      "source_id": "corpus-d08e1045a2e7",
+      "source_file": "src-068-d08e1045a2e7.json",
+      "source_name": "古龙武侠（优+）",
+      "source_url": "http://m.gulongbbs.com/wuxia",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "put-get",
+        "regex-suffix"
+      ],
+      "duration_ms": 440,
+      "bookList_rule": "class.c wrap@li",
+      "searchUrl": "http://m.gulongbbs.com/index.php?m=search&c=index&a=init&typeid=1&siteid=1&q={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://m.gulongbbs.com/index.php?m=search&c=index&a=init&typeid=1&siteid=1&q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 6395,
+        "final_url": "https://m.gulongbbs.com/index.php?m=search&c=index&a=init&typeid=1&siteid=1&q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['未找到']"
+      ]
+    },
+    {
+      "source_id": "corpus-dc4d5f9d0aa5",
+      "source_file": "src-071-dc4d5f9d0aa5.json",
+      "source_name": "金庸小说（优+）",
+      "source_url": "https://www.jinyongwang.net#♤yc",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "duration_ms": 626,
+      "bookList_rule": ".article_li",
+      "searchUrl": "/search/{{key}}/",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.jinyongwang.net#♤yc/search/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9/",
+        "method": "GET",
+        "status": 200,
+        "body_len": 30118,
+        "final_url": "https://www.jinyongwang.net/#%E2%99%A4yc/search/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9/"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "URL construction bug: # fragment in request URL breaks path resolution",
+        "request_url=https://www.jinyongwang.net#♤yc/search/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9/",
+        "final_url=https://www.jinyongwang.net/#%E2%99%A4yc/search/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9/ (server returned homepage/default page, not search API)"
+      ],
+      "rule_bug_detail": {
+        "type": "url_fragment_not_stripped",
+        "location": "crates/reader-content/src/analyze_url.rs url_origin (L907-915) + resolve_relative_url (L862-893); same bug in crates/reader-content/src/lib.rs url_origin (L2204-2212)",
+        "bug": "rest.split(\"/\").next() only splits on \"/\", not on \"#\" or \"?\"; # fragment from bookSourceUrl leaks into joined URL",
+        "fix": "Use rest.split([\"/\", \"?\", \"#\"]).next() in url_origin, or adopt url crate Url::parse(base).join(relative) for RFC 3986 resolution."
+      }
+    },
+    {
+      "source_id": "corpus-9b8eec0a5d1b",
+      "source_file": "src-072-9b8eec0a5d1b.json",
+      "source_name": "金庸小说（优+）",
+      "source_url": "https://www.jinyongwang.net",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "duration_ms": 214,
+      "bookList_rule": ".article_li",
+      "searchUrl": "/search/{{key}}/",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.jinyongwang.net/search/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9/",
+        "method": "GET",
+        "status": 404,
+        "body_len": 138,
+        "final_url": "https://www.jinyongwang.net/search/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9/"
+      },
+      "category": "website_dead",
+      "evidence": [
+        "HTTP 404"
+      ]
+    },
+    {
+      "source_id": "corpus-5fb2cc81284f",
+      "source_file": "src-076-5fb2cc81284f.json",
+      "source_name": "盐选文库（优+）",
+      "source_url": "https://www.yanxuanwk.com#",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "duration_ms": 1297,
+      "bookList_rule": "class.typology-posts@article",
+      "searchUrl": "https://www.yanxuanwk.com/?s={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.yanxuanwk.com/?s=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 42915,
+        "final_url": "https://www.yanxuanwk.com/?s=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['empty']"
+      ]
+    },
+    {
+      "source_id": "corpus-2e4049ae310e",
+      "source_file": "src-078-2e4049ae310e.json",
+      "source_name": "我是盐神（优+）",
+      "source_url": "https://onehu.xyz",
+      "priority": "P0",
+      "rule_forms": [
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "duration_ms": 689,
+      "bookList_rule": ".list-group a",
+      "searchUrl": "https://onehu.xyz/categories/{{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://onehu.xyz/categories/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 404,
+        "body_len": 10739,
+        "final_url": "https://onehu.xyz/categories/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "website_dead",
+      "evidence": [
+        "HTTP 404"
+      ]
+    },
+    {
+      "source_id": "corpus-272e05b10de0",
+      "source_file": "src-086-272e05b10de0.json",
+      "source_name": "天涯知识（优+）",
+      "source_url": "http://3g.sbkk8.com#",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "duration_ms": 615,
+      "bookList_rule": "class.result",
+      "searchUrl": "http://zhannei.baidu.com/cse/search?s=5140549751047532462&nsid=&q={{key}}&searchtype=title&isNeedCheckDomain=1&jump=1",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://zhannei.baidu.com/cse/search?s=5140549751047532462&nsid=&q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&searchtype=title&isNeedCheckDomain=1&jump=1",
+        "method": "GET",
+        "status": 200,
+        "body_len": 4811,
+        "final_url": "https://zhannei.baidu.com/cse/search?s=5140549751047532462&nsid=&q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&searchtype=title&isNeedCheckDomain=1&jump=1"
+      },
+      "rule_outdated_note": [
+        "result"
+      ],
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['没有找到']",
+        "note: rule also references classes ['result'] not in HTML (rule may be outdated, but page shows empty state)"
+      ]
+    },
+    {
+      "source_id": "corpus-6591ce96a8cf",
+      "source_file": "src-089-6591ce96a8cf.json",
+      "source_name": "百合爱会（优+）",
+      "source_url": "https://www.yamibo.com/site/novel",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "duration_ms": 3337,
+      "bookList_rule": "class.table table-hover@tag.tbody@tag.tr",
+      "searchUrl": "https://www.yamibo.com/search/novel?SearchForm%5Bkeyword%5D={{key}}&page={{page}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.yamibo.com/search/novel?SearchForm%5Bkeyword%5D=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1",
+        "method": "GET",
+        "status": 200,
+        "body_len": 6842,
+        "final_url": "https://www.yamibo.com/user/login"
+      },
+      "category": "anti_crawl",
+      "evidence": [
+        "redirected to login/verify URL: https://www.yamibo.com/user/login"
+      ]
+    },
+    {
+      "source_id": "corpus-70bef2795db4",
+      "source_file": "src-113-70bef2795db4.json",
+      "source_name": "轻之文库（优+）",
+      "source_url": "https://www.linovel.net:443/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 2837,
+      "bookList_rule": "class.rank-book||class.rank-book-list@tag.a",
+      "searchUrl": "https://www.linovel.net:443/search?kw={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.linovel.net:443/search?kw=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 17295,
+        "final_url": "https://www.linovel.net/search?kw=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "rule_outdated_note": [
+        "rank-book",
+        "rank-book-list"
+      ],
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['没有找到', 'empty', 'empty-tip', 'empty-content', 'cry-emoticon']",
+        "note: rule also references classes ['rank-book', 'rank-book-list'] not in HTML (rule may be outdated, but page shows empty state)"
+      ]
+    },
+    {
+      "source_id": "corpus-6124b315a8db",
+      "source_file": "src-118-6124b315a8db.json",
+      "source_name": "书法小说（优+）",
+      "source_url": "http://www.sfwx.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "put-get"
+      ],
+      "duration_ms": 1586,
+      "bookList_rule": ".col-12 dl",
+      "searchUrl": "/search.php?q={{key}}<,&p={{page}}>",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://www.sfwx.com/search.php?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9<,&p=1>",
+        "method": "GET",
+        "status": 200,
+        "body_len": 2543,
+        "final_url": "http://www.sfwx.com/search.php?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9%3C,&p=1%3E"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['共0']"
+      ]
+    },
+    {
+      "source_id": "corpus-e5d3ddf4e28a",
+      "source_file": "src-119-e5d3ddf4e28a.json",
+      "source_name": "爱久久网（优+）",
+      "source_url": "http://www.jjjxsw.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "duration_ms": 771,
+      "bookList_rule": ".searchTopic",
+      "searchUrl": "/e/search/index.php,{\n  \"method\": \"POST\",\n  \"body\": \"show=title&keyboard={{key}}\"\n}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://www.jjjxsw.com/e/search/index.php",
+        "method": "POST",
+        "status": 200,
+        "body_len": 1775,
+        "final_url": "https://www.ijjxsxzw.com/e/search/index.php"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 1775 bytes; bookList rule did not extract any books",
+        "bookList class(es) not in HTML: ['searchTopic']",
+        "bookList_rule='.searchTopic'",
+        "body sample: '<!DOCTYPE html>\\n<html>\\n<head>\\n    <meta http-equiv=\"content-type\" content=\"text/html;charset=utf-8\">\\n    <title>没有搜索到相关的内容</title>\\n    <meta name=\"keywords\" content=\"没有搜索到相关的内容\"/>\\n'"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": ".searchTopic",
+        "issues": [
+          "bookList class(es) not in HTML: ['searchTopic']"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-1658f261faf2",
+      "source_file": "src-124-1658f261faf2.json",
+      "source_name": "秋风书屋（优+）",
+      "source_url": "https://www.qiufengshuwu.com#",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "duration_ms": 1806,
+      "bookList_rule": "p.sone",
+      "searchUrl": "https://www.qiufengshuwu.com/s.html,{\n  \"body\": \"s={{key}}&type=articlename\",\n  \"charset\": \"GBK\",\n  \"method\": \"POST\"\n}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.qiufengshuwu.com/s.html",
+        "method": "POST",
+        "status": 403,
+        "body_len": 5884,
+        "final_url": "https://www.qiufengshuwu.com/s.html"
+      },
+      "category": "anti_crawl",
+      "evidence": [
+        "HTTP 403 (Cloudflare challenge)"
+      ]
+    },
+    {
+      "source_id": "corpus-5828a31dd2f8",
+      "source_file": "src-126-5828a31dd2f8.json",
+      "source_name": "铅笔轻说（优+）",
+      "source_url": "https://www.qxsw.cc",
+      "priority": "P0",
+      "rule_forms": [
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "duration_ms": 474,
+      "bookList_rule": "dl",
+      "searchUrl": "/search/?searchkey={{key}}&submit=",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.qxsw.cc/search/?searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&submit=",
+        "method": "GET",
+        "status": 200,
+        "body_len": 3694,
+        "final_url": "https://www.qxsw.cc/search/?searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&submit="
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 3694 bytes; bookList rule did not extract any books",
+        "bookList_rule='dl'",
+        "body sample: '<!DOCTYPE html>\\n<html>\\n<head> \\n  \\n  <title>yw1《{content_1内容标题}》无删减全集免费在线观看-电视剧-八婶蘑菇视频</title>\\n  \\n  <script type=\"text/javascript\" charset=\"utf-8\">\\n    function bRn1jBJhfQBK(e) {\\n  '"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": "dl",
+        "issues": [
+          "no empty-state/anti-crawl markers; rule likely does not match current HTML structure (site redesign or unsupported syntax)"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-55b24a3ab111",
+      "source_file": "src-128-55b24a3ab111.json",
+      "source_name": "七百小说（优+）",
+      "source_url": "https://m.x700txt.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "duration_ms": 930,
+      "bookList_rule": ".item",
+      "searchUrl": "https://www.sososhu.com/?q={{key}}&site=4,{'webView': true}",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleBookInfo.lastChapter"
+      ],
+      "http": {
+        "request_url": "https://www.sososhu.com/?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&site=4",
+        "method": "GET",
+        "status": 503,
+        "body_len": 14049,
+        "final_url": "https://www.sososhu.com/?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&site=4"
+      },
+      "category": "anti_crawl",
+      "evidence": [
+        "HTTP 503 Cloudflare (rate-limit / anti-crawl)"
+      ]
+    },
+    {
+      "source_id": "corpus-20ffce600ab8",
+      "source_file": "src-131-20ffce600ab8.json",
+      "source_name": "过期杂志（优+）",
+      "source_url": "https://m.fx361.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "duration_ms": 1000,
+      "bookList_rule": "ul li",
+      "searchUrl": "https://m.fx361.com/search/index.html?keyword={{key}},{\"webView\": true}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://m.fx361.com/search/index.html?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 118558,
+        "final_url": "https://m.fx361.com/search/index.html?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['暂无', '无搜索结果', 'empty', 'nodata', '无结果']"
+      ]
+    },
+    {
+      "source_id": "corpus-87f311b977de",
+      "source_file": "src-132-87f311b977de.json",
+      "source_name": "追光阅读（优）",
+      "source_url": "http://touchlife.cootekservice.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain"
+      ],
+      "duration_ms": 251,
+      "bookList_rule": "result",
+      "searchUrl": "http://touchlife.cootekservice.com/doReader/search_book?_token=e72ca407-9caa-475d-a829-46e15d3d4834&action=search_book&search_keyword={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://touchlife.cootekservice.com/doReader/search_book?_token=e72ca407-9caa-475d-a829-46e15d3d4834&action=search_book&search_keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 108,
+        "final_url": "http://touchlife.cootekservice.com/doReader/search_book?_token=e72ca407-9caa-475d-a829-46e15d3d4834&action=search_book&search_keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "no_results",
+      "evidence": [
+        "JSON response with empty array at rule target 'result'"
+      ]
+    },
+    {
+      "source_id": "corpus-6266d6d80c5d",
+      "source_file": "src-133-6266d6d80c5d.json",
+      "source_name": "追光阅读（优）",
+      "source_url": "http://touchlife.cootekservice.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain"
+      ],
+      "duration_ms": 255,
+      "bookList_rule": "result",
+      "searchUrl": "http://touchlife.cootekservice.com/doReader/search_book?_token=e72ca407-9caa-475d-a829-46e15d3d4834&action=search_book&search_keyword={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://touchlife.cootekservice.com/doReader/search_book?_token=e72ca407-9caa-475d-a829-46e15d3d4834&action=search_book&search_keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 108,
+        "final_url": "http://touchlife.cootekservice.com/doReader/search_book?_token=e72ca407-9caa-475d-a829-46e15d3d4834&action=search_book&search_keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "no_results",
+      "evidence": [
+        "JSON response with empty array at rule target 'result'"
+      ]
+    },
+    {
+      "source_id": "corpus-2bec2afbcb21",
+      "source_file": "src-137-2bec2afbcb21.json",
+      "source_name": "全本小说（优）",
+      "source_url": "https://www.qb5.io",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "template"
+      ],
+      "duration_ms": 745,
+      "bookList_rule": ".hot@dd",
+      "searchUrl": "/?c=xs&a=sou&q={{key}}&page={{page}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.qb5.io/?c=xs&a=sou&q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1",
+        "method": "GET",
+        "status": 200,
+        "body_len": 0,
+        "final_url": "https://www.qb5.io/?c=xs&a=sou&q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1"
+      },
+      "category": "no_results",
+      "evidence": [
+        "status 200 with small body (0 bytes); likely no-results/error page",
+        "body: ''"
+      ]
+    },
+    {
+      "source_id": "corpus-1a54c74d074d",
+      "source_file": "src-141-1a54c74d074d.json",
+      "source_name": "文桑小说（优）",
+      "source_url": "http://www.wensang.net",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 255,
+      "bookList_rule": "id.sitebox@dl",
+      "searchUrl": "/home/search?type=action&q={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://www.wensang.net/home/search?type=action&q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 10929,
+        "final_url": "http://183.192.65.101/"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 10929 bytes; bookList rule did not extract any books",
+        "bookList class(es) not in HTML: ['sitebox']",
+        "bookList_rule='id.sitebox@dl'",
+        "body sample: '<!DOCTYPE html>\\r\\n<html lang=\"en\">\\r\\n<head>\\r\\n  <meta charset=\"UTF-8\">\\r\\n  <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\\r\\n  <meta name=\"viewport\" content=\"width=device-width, i'"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": "id.sitebox@dl",
+        "issues": [
+          "bookList class(es) not in HTML: ['sitebox']"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-827c3d8b558b",
+      "source_file": "src-145-827c3d8b558b.json",
+      "source_name": "同人小说（优）",
+      "source_url": "http://tongren.faloo.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "duration_ms": 125,
+      "bookList_rule": "class.l_main1@class.l_bar",
+      "searchUrl": "/r/0/1.html?t=1&k={{key}},{\"charset\": \"gb2312\"}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://tongren.faloo.com/r/0/1.html?t=1&k=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 8595,
+        "final_url": "http://tongren.faloo.com/r/0/1.html?t=1&k=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 8595 bytes; bookList rule did not extract any books",
+        "bookList class(es) not in HTML: ['l_bar']",
+        "bookList_rule='class.l_main1@class.l_bar'",
+        "body sample: '\\r\\n<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\" \"http://www.w3c.org/TR/1999/REC-html401-19991224/loose.dtd\">\\r\\n<html xmlns=\"http://www.w3.org/1999/xhtml\">\\r\\n<head><m'"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": "class.l_main1@class.l_bar",
+        "issues": [
+          "bookList class(es) not in HTML: ['l_bar']"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-fd20681384e4",
+      "source_file": "src-148-fd20681384e4.json",
+      "source_name": "言情港吧（优）",
+      "source_url": "https://www.yanqinggang.com#",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "duration_ms": 10593,
+      "bookList_rule": "class.border3.commend.flex.flex-between.category-commend@.category-div",
+      "searchUrl": "https://www.yanqinggang.com/modules/article/search.php,{\n\t \"body\": \"searchkey={{key}}\",\n\t \"charset\": \"gbk\",\n\t \"method\": \"POST\"\n}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.yanqinggang.com/modules/article/search.php",
+        "method": "POST",
+        "status": 200,
+        "body_len": 2431,
+        "final_url": "https://www.yanqinggang.com/modules/article/search.php"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 2431 bytes; bookList rule did not extract any books",
+        "bookList class(es) not in HTML: ['category-div']",
+        "bookList_rule='class.border3.commend.flex.flex-between.category-commend@.category-div'",
+        "body sample: '<!DOCTYPE html>\\r\\n<html lang=\"zh\">\\r\\n<head>\\r\\n<meta charset=\"gbk\">\\r\\n<title>����_�����</title>\\r\\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, shrink-to-fit=no, '"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": "class.border3.commend.flex.flex-between.category-commend@.category-div",
+        "issues": [
+          "bookList class(es) not in HTML: ['category-div']"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-8e31b761bc55",
+      "source_file": "src-151-8e31b761bc55.json",
+      "source_name": "搜书小说（优）",
+      "source_url": "http://www.soshu8.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "template"
+      ],
+      "duration_ms": 1367,
+      "bookList_rule": ".row@dl",
+      "searchUrl": "http://www.soshu8.com/search.php?q={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://www.soshu8.com/search.php?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 10929,
+        "final_url": "http://183.192.65.101/"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 10929 bytes; bookList rule did not extract any books",
+        "bookList class(es) not in HTML: ['row']",
+        "bookList_rule='.row@dl'",
+        "body sample: '<!DOCTYPE html>\\r\\n<html lang=\"en\">\\r\\n<head>\\r\\n  <meta charset=\"UTF-8\">\\r\\n  <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\\r\\n  <meta name=\"viewport\" content=\"width=device-width, i'"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": ".row@dl",
+        "issues": [
+          "bookList class(es) not in HTML: ['row']"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-7dfb27b8b9d4",
+      "source_file": "src-156-7dfb27b8b9d4.json",
+      "source_name": "壹二小说（优）",
+      "source_url": "https://www.20xs.org",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "template"
+      ],
+      "duration_ms": 2125,
+      "bookList_rule": "id.sitembox@tag.dl",
+      "searchUrl": "https://www.20xs.org/search.html,{\r\n  \"method\": \"POST\",\r\n  \"body\": \"searchkey={{key}}\"\n}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.20xs.org/search.html",
+        "method": "POST",
+        "status": 200,
+        "body_len": 1443,
+        "final_url": "https://www.20xs.org/search.html"
+      },
+      "rule_outdated_note": [
+        "sitembox",
+        "dl"
+      ],
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['找不到您要', '找不到']",
+        "note: rule also references classes ['sitembox', 'dl'] not in HTML (rule may be outdated, but page shows empty state)"
+      ]
+    },
+    {
+      "source_id": "corpus-e73efa62cc2b",
+      "source_file": "src-165-e73efa62cc2b.json",
+      "source_name": "八一中文（优）",
+      "source_url": "https://www.blxs.info/",
+      "priority": "P0",
+      "rule_forms": [
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 1343,
+      "bookList_rule": "#nr",
+      "searchUrl": "/modules/article/search.php,{\"method\":\"post\",\"body\":\"searchkey={{key}}&searchtype=articlename\"}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.blxs.info/modules/article/search.php",
+        "method": "POST",
+        "status": 200,
+        "body_len": 2929,
+        "final_url": "http://www.81shuku.info/modules/article/search.php"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 2929 bytes; bookList rule did not extract any books",
+        "bookList_rule='#nr'",
+        "body sample: '<!doctype html>\\n<html>\\n<head>\\n<title>-搜索-八一中文网  </title>\\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\\n<meta name=\"keywords\" content=\"<title>标题、关键词、描述</titl'"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": "#nr",
+        "issues": [
+          "no empty-state/anti-crawl markers; rule likely does not match current HTML structure (site redesign or unsupported syntax)"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-86d5a9da5b78",
+      "source_file": "src-166-86d5a9da5b78.json",
+      "source_name": "铅笔小说（优）",
+      "source_url": "https://www.23qb.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 801,
+      "bookList_rule": "class.module-search-item",
+      "searchUrl": "/search.html?searchkey={{key}}",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleBookInfo.kind",
+        "ruleExplore.kind"
+      ],
+      "http": {
+        "request_url": "https://www.23qb.com/search.html?searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 403,
+        "body_len": 5488,
+        "final_url": "https://www.23qb.com/search.html?searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "anti_crawl",
+      "evidence": [
+        "HTTP 403 (Cloudflare challenge)"
+      ]
+    },
+    {
+      "source_id": "corpus-efbac2a694b8",
+      "source_file": "src-167-efbac2a694b8.json",
+      "source_name": "速读谷子（优）",
+      "source_url": "https://www.sudugu.org/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "duration_ms": 765,
+      "bookList_rule": ".item",
+      "searchUrl": "i/sor.aspx?key={{key}}<,&p={{page}}>",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.sudugu.org/i/sor.aspx?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9<,&p=1>",
+        "method": "GET",
+        "status": 200,
+        "body_len": 2133,
+        "final_url": "https://www.sudugu.org/i/sor.aspx?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9%3C,&p=1%3E"
+      },
+      "rule_outdated_note": [
+        "item"
+      ],
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['0本', '共0']",
+        "note: rule also references classes ['item'] not in HTML (rule may be outdated, but page shows empty state)"
+      ]
+    },
+    {
+      "source_id": "corpus-bb5f768cab69",
+      "source_file": "src-170-bb5f768cab69.json",
+      "source_name": "手机看书（优）",
+      "source_url": "https://www.sjks88.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "duration_ms": 1404,
+      "bookList_rule": ".box ul li",
+      "searchUrl": "/e/search/index.php,{\n  \"charset\": \"gb2312\",\n  \"method\": \"post\",\n  \"body\": \"keyboard={{key}}&show=title&classid=0\"\n}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.sjks88.com/e/search/index.php",
+        "method": "POST",
+        "status": 200,
+        "body_len": 950,
+        "final_url": "https://www.sjks88.com/e/search/index.php"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 950 bytes; bookList rule did not extract any books",
+        "bookList class(es) not in HTML: ['box']",
+        "bookList_rule='.box ul li'",
+        "body sample: '<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">\\n<html>\\n<head>\\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=gb2312\">\\n<title>��Ϣ��ʾ</title>\\n<link href='"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": ".box ul li",
+        "issues": [
+          "bookList class(es) not in HTML: ['box']"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-a6b8a42b06e3",
+      "source_file": "src-176-a6b8a42b06e3.json",
+      "source_name": "求书帮吧（优）",
+      "source_url": "https://www.qiushubang.com/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "duration_ms": 890,
+      "bookList_rule": "class.item",
+      "searchUrl": "https://www.sososhu.com/?q={{key}}&site=qiushubang&Submit=%E6%90%9C%E7%B4%A2,{\"webView\": true}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.sososhu.com/?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&site=qiushubang&Submit=%E6%90%9C%E7%B4%A2",
+        "method": "GET",
+        "status": 503,
+        "body_len": 14049,
+        "final_url": "https://www.sososhu.com/?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&site=qiushubang&Submit=%E6%90%9C%E7%B4%A2"
+      },
+      "category": "anti_crawl",
+      "evidence": [
+        "HTTP 503 Cloudflare (rate-limit / anti-crawl)"
+      ]
+    },
+    {
+      "source_id": "corpus-4bb8b755f9a5",
+      "source_file": "src-179-4bb8b755f9a5.json",
+      "source_name": "全本同人（优）",
+      "source_url": "https://www.qbtr.me/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "duration_ms": 901,
+      "bookList_rule": ".bk",
+      "searchUrl": "/e/search/index.php,{\n  \"charset\": \"gb2312\",\n  \"method\": \"POST\",\n  \"body\": \"keyboard={{key}}&show=title&classid=0\"\n}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.qbtr.me/e/search/index.php",
+        "method": "POST",
+        "status": 521,
+        "body_len": 6990,
+        "final_url": "https://www.qbtr.me/e/search/index.php"
+      },
+      "category": "website_dead",
+      "evidence": [
+        "HTTP 521 (server error / unreachable)"
+      ]
+    },
+    {
+      "source_id": "corpus-77c09b72358b",
+      "source_file": "src-209-77c09b72358b.json",
+      "source_name": "秋风书屋（导）",
+      "source_url": "https://www.qiufengshuwu.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "duration_ms": 586,
+      "bookList_rule": "p.sone",
+      "searchUrl": "https://www.qiufengshuwu.com/s.html,{\n  \"body\": \"s={{key}}&type=articlename\",\n  \"charset\": \"GBK\",\n  \"method\": \"POST\"\n}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.qiufengshuwu.com/s.html",
+        "method": "POST",
+        "status": 403,
+        "body_len": 5884,
+        "final_url": "https://www.qiufengshuwu.com/s.html"
+      },
+      "category": "anti_crawl",
+      "evidence": [
+        "HTTP 403 (Cloudflare challenge)"
+      ]
+    },
+    {
+      "source_id": "corpus-369541794ca6",
+      "source_file": "src-210-369541794ca6.json",
+      "source_name": "请看小说（导）",
+      "source_url": "https://www.qinkan.net",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "duration_ms": 685,
+      "bookList_rule": "tag.li",
+      "searchUrl": "/e/search/index.php,{\n  \"body\": \"show=title&classid=0&keyboard={{key}}&Submit22=搜索\",\n  \"charset\": \"GB2312\",\n  \"method\": \"POST\"\n}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.qinkan.net/e/search/index.php",
+        "method": "POST",
+        "status": 200,
+        "body_len": 21,
+        "final_url": "https://www.qinkan.net/e/search/index.php"
+      },
+      "category": "no_results",
+      "evidence": [
+        "status 200 with small body (21 bytes); likely no-results/error page",
+        "body: \"Cann't connect to DB!\""
+      ]
+    },
+    {
+      "source_id": "corpus-3b0b2873ddcb",
+      "source_file": "src-219-3b0b2873ddcb.json",
+      "source_name": "新读小说（繁）",
+      "source_url": "https://m.dxs.tw/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "duration_ms": 1846,
+      "bookList_rule": "class.sort-view-book",
+      "searchUrl": "https://m.dxs.tw/serch.html?siteid=m.dxs.tw&q={{key}}&page={{page}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://m.dxs.tw/serch.html?siteid=m.dxs.tw&q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1",
+        "method": "GET",
+        "status": 403,
+        "body_len": 6044,
+        "final_url": "https://m.dxs.tw/serch.html?siteid=m.dxs.tw&q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1"
+      },
+      "category": "anti_crawl",
+      "evidence": [
+        "HTTP 403 (Cloudflare challenge)"
+      ]
+    },
+    {
+      "source_id": "corpus-8dbf7f3614c7",
+      "source_file": "src-222-8dbf7f3614c7.json",
+      "source_name": "英文小说（英）",
+      "source_url": "http://novel.tingroom.com/wap",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule"
+      ],
+      "duration_ms": 815,
+      "bookList_rule": "class.zong_list@class.list_1",
+      "searchUrl": "http://novel.tingroom.com/wap/index.php?moduleid=1025&type=2&kw={{key}},{\n  \"charset\": \"utf-8\"\n}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://novel.tingroom.com/wap/index.php?moduleid=1025&type=2&kw=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 3386,
+        "final_url": "http://novel.tingroom.com/wap/index.php?moduleid=1025&type=2&kw=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 3386 bytes; bookList rule did not extract any books",
+        "bookList class(es) not in HTML: ['list_1']",
+        "bookList_rule='class.zong_list@class.list_1'",
+        "body sample: '<!DOCTYPE html>\\r\\n<html>\\r\\n<head>\\r\\n<meta charset=\"UTF-8\" />\\r\\n<title>斗破苍穹_小说_英文小说网手机版</title>\\r\\n<meta name=\"viewport\" content=\"initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, '"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": "class.zong_list@class.list_1",
+        "issues": [
+          "bookList class(es) not in HTML: ['list_1']"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-1fd243a7684d",
+      "source_file": "src-223-1fd243a7684d.json",
+      "source_name": "英文小说（英）",
+      "source_url": "https://www.yingyuxiaoshuo.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-explicit",
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "duration_ms": 95,
+      "bookList_rule": "@css:.main-list-container>div.h-36",
+      "searchUrl": "/search/{{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.yingyuxiaoshuo.com/search/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 44894,
+        "final_url": "https://www.yingyuxiaoshuo.com/search/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 44894 bytes; bookList rule did not extract any books",
+        "bookList class(es) not in HTML: ['main-list-container', 'h-36']",
+        "bookList_rule='@css:.main-list-container>div.h-36'",
+        "body sample: '<!DOCTYPE html>\\n<html lang=\"zh\" translate=\"no\">\\n  <head>\\n    <meta charset=\"UTF-8\">\\n    <link rel=\"icon\" href=\"/favicon.ico\">\\n    <meta name=\"viewport\" content=\"width=device-width,'"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": "@css:.main-list-container>div.h-36",
+        "issues": [
+          "bookList class(es) not in HTML: ['main-list-container', 'h-36']"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-33822f688091",
+      "source_file": "src-225-33822f688091.json",
+      "source_name": "双语小说（英）",
+      "source_url": "http://www.shubang.net/book#",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "duration_ms": 308,
+      "bookList_rule": "class.mcon@a",
+      "searchUrl": "http://www.shubang.net/book/?q={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://www.shubang.net/book/?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 6320,
+        "final_url": "https://www.shubang.net/book/?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 6320 bytes; bookList rule did not extract any books",
+        "bookList_rule='class.mcon@a'",
+        "body sample: '<!DOCTYPE html>\\r\\n<html>\\r\\n<head> \\r\\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\\r\\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-s'"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": "class.mcon@a",
+        "issues": [
+          "no empty-state/anti-crawl markers; rule likely does not match current HTML structure (site redesign or unsupported syntax)"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-4b0555b7f8ca",
+      "source_file": "src-229-4b0555b7f8ca.json",
+      "source_name": "名著阅读（优++）",
+      "source_url": "https://api.520diandu.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "json-jsonpath",
+        "plain",
+        "put-get",
+        "template"
+      ],
+      "duration_ms": 555,
+      "bookList_rule": "$..books[*]",
+      "searchUrl": "https://api.520diandu.com/api/read/allReadBooks?uid=&key=&name={{key}}&page={{page}}&cv=134&from=app",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleContent.content"
+      ],
+      "http": {
+        "request_url": "https://api.520diandu.com/api/read/allReadBooks?uid=&key=&name=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1&cv=134&from=app",
+        "method": "GET",
+        "status": 200,
+        "body_len": 64,
+        "final_url": "https://api.520diandu.com/api/read/allReadBooks?uid=&key=&name=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1&cv=134&from=app"
+      },
+      "category": "no_results",
+      "evidence": [
+        "status 200 with small body (64 bytes); likely no-results/error page",
+        "body: '{\"code\":2001,\"msg\":\"\\\\u5185\\\\u5bb9\\\\u5236\\\\u4f5c\\\\u4e2d\",\"data\":null}'"
+      ]
+    },
+    {
+      "source_id": "corpus-eb82fac79ef1",
+      "source_file": "src-234-eb82fac79ef1.json",
+      "source_name": "爱看漫画（优+）",
+      "source_url": "https://m.kanman.com#♤Haxc",
+      "priority": "P0",
+      "rule_forms": [
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "put-get",
+        "template"
+      ],
+      "duration_ms": 146,
+      "bookList_rule": "$.data.data||$.data",
+      "searchUrl": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey={{key}}&topNumber=10",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleContent.content"
+      ],
+      "http": {
+        "request_url": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&topNumber=10",
+        "method": "GET",
+        "status": 200,
+        "body_len": 33,
+        "final_url": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&topNumber=10"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['\"data\":[]']"
+      ]
+    },
+    {
+      "source_id": "corpus-760bada228f9",
+      "source_file": "src-235-760bada228f9.json",
+      "source_name": "爱看漫画（优+）",
+      "source_url": "https://m.kanman.com#Haxc1107",
+      "priority": "P0",
+      "rule_forms": [
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "put-get",
+        "template"
+      ],
+      "duration_ms": 81,
+      "bookList_rule": "$.data.data||$.data",
+      "searchUrl": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey={{key}}&topNumber=10",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleContent.content"
+      ],
+      "http": {
+        "request_url": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&topNumber=10",
+        "method": "GET",
+        "status": 200,
+        "body_len": 33,
+        "final_url": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&topNumber=10"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['\"data\":[]']"
+      ]
+    },
+    {
+      "source_id": "corpus-b2aa378f4e1a",
+      "source_file": "src-238-b2aa378f4e1a.json",
+      "source_name": "武芊漫画（优+）",
+      "source_url": "https://comic.mkzcdn.com",
+      "priority": "P0",
+      "rule_forms": [
+        "json-jsonpath",
+        "put-get",
+        "regex-suffix",
+        "template"
+      ],
+      "duration_ms": 202,
+      "bookList_rule": "$..list[*]",
+      "searchUrl": "https://comic.mkzcdn.com/search/keyword/?keyword={{key}}&page_num={{page}}&page_size=20",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleBookInfo.kind",
+        "ruleToc.updateTime",
+        "ruleContent.content"
+      ],
+      "http": {
+        "request_url": "https://comic.mkzcdn.com/search/keyword/?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page_num=1&page_size=20",
+        "method": "GET",
+        "status": 200,
+        "body_len": 33,
+        "final_url": "https://comic.mkzcdn.com/search/keyword/?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page_num=1&page_size=20"
+      },
+      "category": "no_results",
+      "evidence": [
+        "status 200 with small body (33 bytes); likely no-results/error page",
+        "body: '{\"code\":\"199\",\"message\":\"搜索结果为空\"}'"
+      ]
+    },
+    {
+      "source_id": "corpus-8a53f133b3bc",
+      "source_file": "src-242-8a53f133b3bc.json",
+      "source_name": "新爱漫画（优+）",
+      "source_url": "https://xapi.xinmanhua.net#♤Haxc",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain"
+      ],
+      "duration_ms": 258,
+      "bookList_rule": "@JSon:$.data.*",
+      "searchUrl": "https://xapi.xinmanhua.net/search/selfdefine,{\n  \"method\": \"POST\",\n  \"body\": \"keyword={{key}}&page={{page}}\"\n}",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleContent.content"
+      ],
+      "http": {
+        "request_url": "https://xapi.xinmanhua.net/search/selfdefine",
+        "method": "POST",
+        "status": 200,
+        "body_len": 113,
+        "final_url": "https://xapi.xinmanhua.net/search/selfdefine"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['\"data\":[]', 'count\":0', 'total\":0']"
+      ]
+    },
+    {
+      "source_id": "corpus-c1e1a0b1660e",
+      "source_file": "src-251-c1e1a0b1660e.json",
+      "source_name": "永远漫画（优）",
+      "source_url": "https://www.yydsmh.com/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "plain"
+      ],
+      "duration_ms": 661,
+      "bookList_rule": "#js_comicSortList > li",
+      "searchUrl": "{{cookie.removeCookie(source.getKey())}}\nhttps://www.yydsmh.com/search?searchkey={{key}}",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleToc.chapterName"
+      ],
+      "http": {
+        "request_url": "https://www.yydsmh.com/{{cookie.removeCookie(source.getKey())}}\nhttps://www.yydsmh.com/search?searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 404,
+        "body_len": 461,
+        "final_url": "https://www.yydsmh.com/%7B%7Bcookie.removeCookie(source.getKey())%7D%7Dhttps://www.yydsmh.com/search?searchkey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "website_dead",
+      "evidence": [
+        "HTTP 404"
+      ]
+    },
+    {
+      "source_id": "corpus-65382fed95b7",
+      "source_file": "src-256-65382fed95b7.json",
+      "source_name": "霓虹漫画（优）",
+      "source_url": "https://rawkuma.com/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "duration_ms": 1393,
+      "bookList_rule": ".bs",
+      "searchUrl": "page/{{page}}/?s={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://rawkuma.com/page/1/?s=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 404,
+        "body_len": 146,
+        "final_url": "https://rawkuma.com/page/1/?s=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "website_dead",
+      "evidence": [
+        "HTTP 404"
+      ]
+    },
+    {
+      "source_id": "corpus-8c1326dbc820",
+      "source_file": "src-259-8c1326dbc820.json",
+      "source_name": "爱看漫画（优）",
+      "source_url": "https://m.kanman.com已校验",
+      "priority": "P0",
+      "rule_forms": [
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "put-get",
+        "template"
+      ],
+      "duration_ms": 130,
+      "bookList_rule": "$.data.data||$.data",
+      "searchUrl": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey={{key}}&topNumber=10",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleContent.content"
+      ],
+      "http": {
+        "request_url": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&topNumber=10",
+        "method": "GET",
+        "status": 200,
+        "body_len": 33,
+        "final_url": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&topNumber=10"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['\"data\":[]']"
+      ]
+    },
+    {
+      "source_id": "corpus-fe9b92c6134b",
+      "source_file": "src-260-fe9b92c6134b.json",
+      "source_name": "爱看漫画（优）",
+      "source_url": "https://m.kanman.com/",
+      "priority": "P1",
+      "rule_forms": [
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "put-get",
+        "template"
+      ],
+      "duration_ms": 68,
+      "bookList_rule": "$.data.data||$.data",
+      "searchUrl": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey={{key}}&topNumber=10",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleContent.content"
+      ],
+      "http": {
+        "request_url": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&topNumber=10",
+        "method": "GET",
+        "status": 200,
+        "body_len": 33,
+        "final_url": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&topNumber=10"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['\"data\":[]']"
+      ]
+    },
+    {
+      "source_id": "corpus-b8a736026c32",
+      "source_file": "src-261-b8a736026c32.json",
+      "source_name": "爱看漫画（优）",
+      "source_url": "https://m.kanman.com",
+      "priority": "P1",
+      "rule_forms": [
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "put-get",
+        "template"
+      ],
+      "duration_ms": 76,
+      "bookList_rule": "$.data.data||$.data",
+      "searchUrl": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey={{key}}&topNumber=10",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleContent.content"
+      ],
+      "http": {
+        "request_url": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&topNumber=10",
+        "method": "GET",
+        "status": 200,
+        "body_len": 33,
+        "final_url": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&topNumber=10"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['\"data\":[]']"
+      ]
+    },
+    {
+      "source_id": "corpus-a8c574bfbec5",
+      "source_file": "src-262-a8c574bfbec5.json",
+      "source_name": "裤裤漫画（优）",
+      "source_url": "http://www.kukuc.net",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 297,
+      "bookList_rule": "#sitebox@dl",
+      "searchUrl": "/search/,{\n  \"body\": \"searchkey={{key}}\",\n  \"method\": \"POST\"\n}",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleContent.content"
+      ],
+      "http": {
+        "request_url": "http://www.kukuc.net/search/",
+        "method": "POST",
+        "status": 307,
+        "body_len": 0,
+        "final_url": "http://www.kukuc.net/search/"
+      },
+      "category": "website_dead",
+      "evidence": [
+        "HTTP 307 redirect with empty body; final_url=http://www.kukuc.net/search/ (site did not return content)"
+      ]
+    },
+    {
+      "source_id": "corpus-539e772ef698",
+      "source_file": "src-265-539e772ef698.json",
+      "source_name": "漫红漫画（优）",
+      "source_url": "https://manhuaus.com/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "duration_ms": 962,
+      "bookList_rule": "class.c-tabs-item@class.row c-tabs-item__content",
+      "searchUrl": "https://manhuaus.com/?s={{key}}&post_type=wp-manga&post_type=wp-manga",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://manhuaus.com/?s=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&post_type=wp-manga&post_type=wp-manga",
+        "method": "GET",
+        "status": 403,
+        "body_len": 6063,
+        "final_url": "https://manhuaus.com/?s=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&post_type=wp-manga&post_type=wp-manga"
+      },
+      "category": "anti_crawl",
+      "evidence": [
+        "HTTP 403 (Cloudflare challenge)"
+      ]
+    },
+    {
+      "source_id": "corpus-39800e604630",
+      "source_file": "src-266-39800e604630.json",
+      "source_name": "爱看漫画（优）",
+      "source_url": "https://m.kanman.com#",
+      "priority": "P1",
+      "rule_forms": [
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "put-get",
+        "template"
+      ],
+      "duration_ms": 88,
+      "bookList_rule": "$.data.data||$.data",
+      "searchUrl": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey={{key}}&topNumber=10",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleContent.content"
+      ],
+      "http": {
+        "request_url": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&topNumber=10",
+        "method": "GET",
+        "status": 200,
+        "body_len": 33,
+        "final_url": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&topNumber=10"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['\"data\":[]']"
+      ]
+    },
+    {
+      "source_id": "corpus-62a7a7241eb1",
+      "source_file": "src-272-62a7a7241eb1.json",
+      "source_name": "番茄短剧（优++）",
+      "source_url": "https://www.shanhuzs.com/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 882,
+      "bookList_rule": "class.col8",
+      "searchUrl": "/fqsansc/{{key}}----------{{page}}---.html",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleContent.content"
+      ],
+      "http": {
+        "request_url": "https://www.shanhuzs.com/fqsansc/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9----------1---.html",
+        "method": "GET",
+        "status": 200,
+        "body_len": 9881,
+        "final_url": "https://m.shanhuzs.com/fqsansc/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9----------1---.html"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 9881 bytes; bookList rule did not extract any books",
+        "bookList class(es) not in HTML: ['col8']",
+        "bookList_rule='class.col8'",
+        "body sample: '<!DOCTYPE html>\\n<html>\\n<head>\\n    <title>《斗破苍穹》搜索结果 - 番茄短剧</title>\\n<meta name=\"keywords\" content=\"斗破苍穹搜索结果\" />\\n<meta name=\"description\" content=\"斗破苍穹搜索结果\" />\\n\\t<meta charset=\"utf-8\"'"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": "class.col8",
+        "issues": [
+          "bookList class(es) not in HTML: ['col8']"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-3a965dbf6a8e",
+      "source_file": "src-294-3a965dbf6a8e.json",
+      "source_name": "天下书音（优）",
+      "source_url": "https://m.shuyinfm.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 632,
+      "bookList_rule": "ul.book-ol > li.book-li",
+      "searchUrl": "/e/search/index.php,{\n  \"body\": \"keyboard={{key}}&show=title,newstext,player,playadmin,movietime,filetype\",\n  \"method\": \"POST\"\n}",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleToc.chapterUrl"
+      ],
+      "http": {
+        "request_url": "https://m.shuyinfm.com/e/search/index.php",
+        "method": "POST",
+        "status": 404,
+        "body_len": 12037,
+        "final_url": "https://m.mekui.com/e/search/index.php"
+      },
+      "category": "website_dead",
+      "evidence": [
+        "HTTP 404"
+      ]
+    },
+    {
+      "source_id": "corpus-beca75ea15e0",
+      "source_file": "src-295-beca75ea15e0.json",
+      "source_name": "小米广播（优+）",
+      "source_url": "https://fm.music.xiaomi.com/fm",
+      "priority": "P1",
+      "rule_forms": [
+        "json-jsonpath"
+      ],
+      "duration_ms": 171,
+      "bookList_rule": "",
+      "searchUrl": "null",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://fm.music.xiaomi.com/null",
+        "method": "GET",
+        "status": 404,
+        "body_len": 0,
+        "final_url": "https://fm.music.xiaomi.com/null"
+      },
+      "category": "website_dead",
+      "evidence": [
+        "HTTP 404"
+      ]
+    },
+    {
+      "source_id": "corpus-b664f56aeac2",
+      "source_file": "src-305-b664f56aeac2.json",
+      "source_name": "漫播听书（优）",
+      "source_url": "https://api.kilamanbo.com",
+      "priority": "P0",
+      "rule_forms": [
+        "json-jsonpath",
+        "multirule",
+        "template"
+      ],
+      "duration_ms": 232,
+      "bookList_rule": "$.b.searchStructureNewRespList[0].timelineItemResp[*]",
+      "searchUrl": "https://api.kilamanbo.com/api/v476/search/page/content/new?type=5&keyWord={{key}}&pageNo={{page}}&pageSize=20",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://api.kilamanbo.com/api/v476/search/page/content/new?type=5&keyWord=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&pageNo=1&pageSize=20",
+        "method": "GET",
+        "status": 200,
+        "body_len": 156,
+        "final_url": "https://api.kilamanbo.com/api/v476/search/page/content/new?type=5&keyWord=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&pageNo=1&pageSize=20"
+      },
+      "category": "no_results",
+      "evidence": [
+        "status 200 with small body (156 bytes); likely no-results/error page",
+        "body: '{\"h\":{\"code\":200,\"msg\":\"操作成功\",\"success\":true,\"alert\":true,\"flush\":true,\"time\":1782657480910},\"b\":{\"searchStructureRespList\":[],\"aiConfig\":{\"isShow\":false}}}'"
+      ]
+    },
+    {
+      "source_id": "corpus-95a715ff78f5",
+      "source_file": "src-313-95a715ff78f5.json",
+      "source_name": "听蛙音乐（优+）",
+      "source_url": "https://so.itingwa.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "duration_ms": 645,
+      "bookList_rule": "class.music_list@tag.tr",
+      "searchUrl": "https://so.itingwa.com/?c=index&m=index&k={{key}}&t=1",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://so.itingwa.com/?c=index&m=index&k=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&t=1",
+        "method": "GET",
+        "status": 200,
+        "body_len": 7417,
+        "final_url": "https://so.itingwa.com/?c=index&m=index&k=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&t=1"
+      },
+      "rule_outdated_note": [
+        "music_list"
+      ],
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['没有找到']",
+        "note: rule also references classes ['music_list'] not in HTML (rule may be outdated, but page shows empty state)"
+      ]
+    },
+    {
+      "source_id": "corpus-30759c9a412b",
+      "source_file": "src-315-30759c9a412b.json",
+      "source_name": "荔枝音乐（优）",
+      "source_url": "https://m.lizhi.fm",
+      "priority": "P1",
+      "rule_forms": [
+        "json-jsonpath",
+        "plain"
+      ],
+      "duration_ms": 2439,
+      "bookList_rule": "$.data.*",
+      "searchUrl": "https://m.lizhi.fm/vodapi/search/voice?deviceId=h5-f93e74ac-0065-8207-4853-75dec8585db3&keywords={{key}}&page={{page}}&receiptData=CAASJ2g1LWY5M2U3NGFjLTAwNjUtODIwNy00ODUzLTc1ZGVjODU4NWRiMyj%2FhvGLxy0wDDgF",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleSearch.bookUrl"
+      ],
+      "http": {
+        "request_url": "https://m.lizhi.fm/vodapi/search/voice?deviceId=h5-f93e74ac-0065-8207-4853-75dec8585db3&keywords=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1&receiptData=CAASJ2g1LWY5M2U3NGFjLTAwNjUtODIwNy00ODUzLTc1ZGVjODU4NWRiMyj%2FhvGLxy0wDDgF",
+        "method": "GET",
+        "status": 200,
+        "body_len": 5650,
+        "final_url": "https://m.lizhi.fm/vodapi/search/voice?deviceId=h5-f93e74ac-0065-8207-4853-75dec8585db3&keywords=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1&receiptData=CAASJ2g1LWY5M2U3NGFjLTAwNjUtODIwNy00ODUzLTc1ZGVjODU4NWRiMyj%2FhvGLxy0wDDgF"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['count\":0']"
+      ]
+    },
+    {
+      "source_id": "corpus-382cc1c45562",
+      "source_file": "src-316-382cc1c45562.json",
+      "source_name": "荔枝有声（优）",
+      "source_url": "https://m.lizhi.fm/",
+      "priority": "P1",
+      "rule_forms": [
+        "json-jsonpath",
+        "plain"
+      ],
+      "duration_ms": 2457,
+      "bookList_rule": "$.data.*",
+      "searchUrl": "https://m.lizhi.fm/vodapi/search/voice?deviceId=h5-f93e74ac-0065-8207-4853-75dec8585db3&keywords={{key}}&page={{page}}&receiptData=CAASJ2g1LWY5M2U3NGFjLTAwNjUtODIwNy00ODUzLTc1ZGVjODU4NWRiMyj%2FhvGLxy0wDDgF",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleSearch.bookUrl"
+      ],
+      "http": {
+        "request_url": "https://m.lizhi.fm/vodapi/search/voice?deviceId=h5-f93e74ac-0065-8207-4853-75dec8585db3&keywords=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1&receiptData=CAASJ2g1LWY5M2U3NGFjLTAwNjUtODIwNy00ODUzLTc1ZGVjODU4NWRiMyj%2FhvGLxy0wDDgF",
+        "method": "GET",
+        "status": 200,
+        "body_len": 5650,
+        "final_url": "https://m.lizhi.fm/vodapi/search/voice?deviceId=h5-f93e74ac-0065-8207-4853-75dec8585db3&keywords=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1&receiptData=CAASJ2g1LWY5M2U3NGFjLTAwNjUtODIwNy00ODUzLTc1ZGVjODU4NWRiMyj%2FhvGLxy0wDDgF"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['count\":0']"
+      ]
+    },
+    {
+      "source_id": "corpus-b55bcb8ae9d4",
+      "source_file": "src-321-b55bcb8ae9d4.json",
+      "source_name": "九酷音乐（优）",
+      "source_url": "http://m.9ku.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 104,
+      "bookList_rule": "class.musicList@tag.li",
+      "searchUrl": "/search/?key={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://m.9ku.com/search/?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 404,
+        "body_len": 146,
+        "final_url": "http://m.9ku.com/search/?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "website_dead",
+      "evidence": [
+        "HTTP 404"
+      ]
+    },
+    {
+      "source_id": "corpus-7f5cd2c0faec",
+      "source_file": "src-332-7f5cd2c0faec.json",
+      "source_name": "个性说网（优+）",
+      "source_url": "https://www.gexingshuo.com/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "duration_ms": 814,
+      "bookList_rule": "class.section-list@tag.li",
+      "searchUrl": "search/{{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.gexingshuo.com/search/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 47581,
+        "final_url": "https://www.gexingshuo.com/search/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 47581 bytes; bookList rule did not extract any books",
+        "bookList_rule='class.section-list@tag.li'",
+        "body sample: '<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\\r\\n<html xmlns=\"http://www.w3.org/1999/xhtml\">\\r\\n<head>\\r\\n    '"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": "class.section-list@tag.li",
+        "issues": [
+          "no empty-state/anti-crawl markers; rule likely does not match current HTML structure (site redesign or unsupported syntax)"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-3c85445b7c5a",
+      "source_file": "src-333-3c85445b7c5a.json",
+      "source_name": "个性说网（优+）",
+      "source_url": "https://www.gexingshuo.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "duration_ms": 768,
+      "bookList_rule": "class.section-list@tag.li",
+      "searchUrl": "/search/{{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.gexingshuo.com/search/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 47581,
+        "final_url": "https://www.gexingshuo.com/search/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 47581 bytes; bookList rule did not extract any books",
+        "bookList_rule='class.section-list@tag.li'",
+        "body sample: '<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\\r\\n<html xmlns=\"http://www.w3.org/1999/xhtml\">\\r\\n<head>\\r\\n    '"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": "class.section-list@tag.li",
+        "issues": [
+          "no empty-state/anti-crawl markers; rule likely does not match current HTML structure (site redesign or unsupported syntax)"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-8499163b43dc",
+      "source_file": "src-334-8499163b43dc.json",
+      "source_name": "个性说网（优+）",
+      "source_url": "https://www.gexingshuo.com#一程",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "duration_ms": 495,
+      "bookList_rule": "class.section-list@tag.li",
+      "searchUrl": "/search/{{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.gexingshuo.com#一程/search/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 197765,
+        "final_url": "https://www.gexingshuo.com/#%E4%B8%80%E7%A8%8B/search/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "URL construction bug: # fragment in request URL breaks path resolution",
+        "request_url=https://www.gexingshuo.com#一程/search/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "final_url=https://www.gexingshuo.com/#%E4%B8%80%E7%A8%8B/search/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9 (server returned homepage/default page, not search API)"
+      ],
+      "rule_bug_detail": {
+        "type": "url_fragment_not_stripped",
+        "location": "crates/reader-content/src/analyze_url.rs url_origin (L907-915) + resolve_relative_url (L862-893); same bug in crates/reader-content/src/lib.rs url_origin (L2204-2212)",
+        "bug": "rest.split(\"/\").next() only splits on \"/\", not on \"#\" or \"?\"; # fragment from bookSourceUrl leaks into joined URL",
+        "fix": "Use rest.split([\"/\", \"?\", \"#\"]).next() in url_origin, or adopt url crate Url::parse(base).join(relative) for RFC 3986 resolution."
+      }
+    },
+    {
+      "source_id": "corpus-031ecbd7e40e",
+      "source_file": "src-343-031ecbd7e40e.json",
+      "source_name": "天涯知识（优）",
+      "source_url": "http://book.sbkk8.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "duration_ms": 1803,
+      "bookList_rule": ".mululist||.bookList",
+      "searchUrl": "/plus/search.php,{\n  'charset': 'gb2312',\n  'method': 'POST',\n  'body': 'kwtype=0&q={{key}}&searchtype=title'\n}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://book.sbkk8.com/plus/search.php",
+        "method": "POST",
+        "status": 404,
+        "body_len": 54865,
+        "final_url": "http://book.sbkk8.com/plus/search.php"
+      },
+      "category": "website_dead",
+      "evidence": [
+        "HTTP 404"
+      ]
+    },
+    {
+      "source_id": "corpus-f5c138e0c38f",
+      "source_file": "src-344-f5c138e0c38f.json",
+      "source_name": "我爱读者（优）",
+      "source_url": "https://www.52dzxy.com/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "duration_ms": 719,
+      "bookList_rule": "class.booklist@tag.td",
+      "searchUrl": "#",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.52dzxy.com/#",
+        "method": "GET",
+        "status": 200,
+        "body_len": 29342,
+        "final_url": "https://www.52dzxy.com/#"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 29342 bytes; bookList rule did not extract any books",
+        "bookList class(es) not in HTML: ['booklist']",
+        "bookList_rule='class.booklist@tag.td'",
+        "body sample: '<!DOCTYPE html>\\r\\n    <html lang=\"zh-CN\">\\r\\n    <head>\\r\\n        <meta charset=\"UTF-8\">\\r\\n        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\\r\\n        <title'"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": "class.booklist@tag.td",
+        "issues": [
+          "bookList class(es) not in HTML: ['booklist']"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-421218f95102",
+      "source_file": "src-362-421218f95102.json",
+      "source_name": "起点中文（优+）",
+      "source_url": "https://m.qidian.com#按钮筛选",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "duration_ms": 292,
+      "bookList_rule": ".y-list__item",
+      "searchUrl": "/so/{{key}}.html?pageNum={{page}}",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleToc.isVip",
+        "ruleToc.isVolume",
+        "ruleToc.updateTime",
+        "ruleExplore.wordCount"
+      ],
+      "http": {
+        "request_url": "https://m.qidian.com#按钮筛选/so/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9.html?pageNum=1",
+        "method": "GET",
+        "status": 200,
+        "body_len": 77687,
+        "final_url": "https://m.qidian.com/#%E6%8C%89%E9%92%AE%E7%AD%9B%E9%80%89/so/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9.html?pageNum=1"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "URL construction bug: # fragment in request URL breaks path resolution",
+        "request_url=https://m.qidian.com#按钮筛选/so/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9.html?pageNum=1",
+        "final_url=https://m.qidian.com/#%E6%8C%89%E9%92%AE%E7%AD%9B%E9%80%89/so/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9.html?pageNum=1 (server returned homepage/default page, not search API)"
+      ],
+      "rule_bug_detail": {
+        "type": "url_fragment_not_stripped",
+        "location": "crates/reader-content/src/analyze_url.rs url_origin (L907-915) + resolve_relative_url (L862-893); same bug in crates/reader-content/src/lib.rs url_origin (L2204-2212)",
+        "bug": "rest.split(\"/\").next() only splits on \"/\", not on \"#\" or \"?\"; # fragment from bookSourceUrl leaks into joined URL",
+        "fix": "Use rest.split([\"/\", \"?\", \"#\"]).next() in url_origin, or adopt url crate Url::parse(base).join(relative) for RFC 3986 resolution."
+      }
+    },
+    {
+      "source_id": "corpus-9a9b91312f3c",
+      "source_file": "src-366-9a9b91312f3c.json",
+      "source_name": "次元姬子（优）",
+      "source_url": "https://www.ciyuanji.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "duration_ms": 1121,
+      "bookList_rule": ".search_book__ieDvY||.card_card__yeC5Y li||.card_book__ctZ9S||.desc_list__R8WJh li",
+      "searchUrl": "/search/{{key}}_0_0_0_0_0_{{page}}.html",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.ciyuanji.com/search/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9_0_0_0_0_0_1.html",
+        "method": "GET",
+        "status": 200,
+        "body_len": 105862,
+        "final_url": "https://m.ciyuanji.com/"
+      },
+      "rule_outdated_note": [
+        "search_book__ieDvY",
+        "card_card__yeC5Y",
+        "card_book__ctZ9S",
+        "desc_list__R8WJh"
+      ],
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['\"list\":[]', 'count\":0']",
+        "note: rule also references classes ['search_book__ieDvY', 'card_card__yeC5Y', 'card_book__ctZ9S', 'desc_list__R8WJh'] not in HTML (rule may be outdated, but page shows empty state)"
+      ]
+    },
+    {
+      "source_id": "corpus-e068e1133f31",
+      "source_file": "src-368-e068e1133f31.json",
+      "source_name": "独阅读网",
+      "source_url": "https://www.duread8.com##喜静",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 1008,
+      "bookList_rule": "class.book-list@li",
+      "searchUrl": "https://www.duread8.com/index/get_search_book_list/{{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.duread8.com/index/get_search_book_list/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 1325,
+        "final_url": "https://www.cddaoyue.cn/reader/stopweb"
+      },
+      "category": "website_dead",
+      "evidence": [
+        "site dead marker; url=['stopweb'] body=[]; final_url=https://www.cddaoyue.cn/reader/stopweb"
+      ]
+    },
+    {
+      "source_id": "corpus-319a513bce24",
+      "source_file": "src-369-319a513bce24.json",
+      "source_name": "笔尚小说",
+      "source_url": "https://www.bsxiaoshuo.com#yc1101",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 231,
+      "bookList_rule": "#j li",
+      "searchUrl": "/s.php?sid=3&k={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.bsxiaoshuo.com#yc1101/s.php?sid=3&k=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 65119,
+        "final_url": "https://www.bsxiaoshuo.com/#yc1101/s.php?sid=3&k=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "URL construction bug: # fragment in request URL breaks path resolution",
+        "request_url=https://www.bsxiaoshuo.com#yc1101/s.php?sid=3&k=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "final_url=https://www.bsxiaoshuo.com/#yc1101/s.php?sid=3&k=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9 (server returned homepage/default page, not search API)"
+      ],
+      "rule_bug_detail": {
+        "type": "url_fragment_not_stripped",
+        "location": "crates/reader-content/src/analyze_url.rs url_origin (L907-915) + resolve_relative_url (L862-893); same bug in crates/reader-content/src/lib.rs url_origin (L2204-2212)",
+        "bug": "rest.split(\"/\").next() only splits on \"/\", not on \"#\" or \"?\"; # fragment from bookSourceUrl leaks into joined URL",
+        "fix": "Use rest.split([\"/\", \"?\", \"#\"]).next() in url_origin, or adopt url crate Url::parse(base).join(relative) for RFC 3986 resolution."
+      }
+    },
+    {
+      "source_id": "corpus-b1e31580620f",
+      "source_file": "src-377-b1e31580620f.json",
+      "source_name": "笔尚小说",
+      "source_url": "https://www.bsxiaoshuo.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 425,
+      "bookList_rule": "#j li",
+      "searchUrl": "/s.php?sid=3&k={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.bsxiaoshuo.com/s.php?sid=3&k=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 1893,
+        "final_url": "https://www.bsxiaoshuo.com/s.php?sid=3&k=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 1893 bytes; bookList rule did not extract any books",
+        "bookList_rule='#j li'",
+        "body sample: '<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1,initial-scale=1.0,maximum-scale=1.0,user-scalable=no\"><'"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": "#j li",
+        "issues": [
+          "no empty-state/anti-crawl markers; rule likely does not match current HTML structure (site redesign or unsupported syntax)"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-cd8bcafa35f7",
+      "source_file": "src-387-cd8bcafa35f7.json",
+      "source_name": "纵横中文",
+      "source_url": "https://www.zongheng.com/##zhbyjm7783",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "duration_ms": 184,
+      "bookList_rule": "data.datas.list",
+      "searchUrl": "https://search.zongheng.com/search/book?keyword={{key}}&sort=null&pageNo=1&pageNum=20&isFromHuayu=0",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleSearch.kind",
+        "ruleExplore.kind"
+      ],
+      "http": {
+        "request_url": "https://search.zongheng.com/search/book?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&sort=null&pageNo=1&pageNum=20&isFromHuayu=0",
+        "method": "GET",
+        "status": 200,
+        "body_len": 9066,
+        "final_url": "https://search.zongheng.com/search/book?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&sort=null&pageNo=1&pageNum=20&isFromHuayu=0"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "status 200, body 9066 bytes; bookList rule did not extract any books",
+        "bookList_rule='data.datas.list'",
+        "body sample: '{\"code\":0,\"data\":{\"datas\":{\"pageSize\":20,\"total\":5,\"pageNo\":1,\"totalPage\":1,\"list\":[{\"bookId\":1032580,\"name\":\"我在山寨当军师\",\"coverUrl\":\"/cover/37/12/37122b561271e14e7f960ef4d02ff4881780'"
+      ],
+      "rule_bug_detail": {
+        "type": "bookList_rule_mismatch",
+        "bookList_rule": "data.datas.list",
+        "issues": [
+          "no empty-state/anti-crawl markers; rule likely does not match current HTML structure (site redesign or unsupported syntax)"
+        ]
+      }
+    },
+    {
+      "source_id": "corpus-06ba55c4c54b",
+      "source_file": "src-394-06ba55c4c54b.json",
+      "source_name": "天地中文",
+      "source_url": "http://www.tiandizw.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 169,
+      "bookList_rule": "class.list_details@li",
+      "searchUrl": "http://www.tiandizw.com/search.php/newindex?keyword={{key}}&Paixu=0&page={{page}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://www.tiandizw.com/search.php/newindex?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&Paixu=0&page=1",
+        "method": "GET",
+        "status": 200,
+        "body_len": 22706,
+        "final_url": "http://www.tiandizw.com/search.php/newindex?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&Paixu=0&page=1"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['没有找到', '未找到']"
+      ]
+    },
+    {
+      "source_id": "corpus-cc054a6091d7",
+      "source_file": "src-398-cc054a6091d7.json",
+      "source_name": "栀子欢波",
+      "source_url": "http://m.zhizihuan.com#♤yc",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 15134,
+      "bookList_rule": ".column-2",
+      "searchUrl": "http://s.zhizihuan.com/m/?key={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://s.zhizihuan.com/m/?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 7790,
+        "final_url": "http://s.zhizihuan.com/m/?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "rule_outdated_note": [
+        "column-2"
+      ],
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['没有找到']",
+        "note: rule also references classes ['column-2'] not in HTML (rule may be outdated, but page shows empty state)"
+      ]
+    },
+    {
+      "source_id": "corpus-3c8c7de1b7ce",
+      "source_file": "src-399-3c8c7de1b7ce.json",
+      "source_name": "栀子欢子",
+      "source_url": "http://m.zhizihuan.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 15101,
+      "bookList_rule": ".column-2",
+      "searchUrl": "http://s.zhizihuan.com/m/?key={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://s.zhizihuan.com/m/?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 7790,
+        "final_url": "http://s.zhizihuan.com/m/?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "rule_outdated_note": [
+        "column-2"
+      ],
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['没有找到']",
+        "note: rule also references classes ['column-2'] not in HTML (rule may be outdated, but page shows empty state)"
+      ]
+    },
+    {
+      "source_id": "corpus-51a0136bf6d9",
+      "source_file": "src-400-51a0136bf6d9.json",
+      "source_name": "栀子欢网",
+      "source_url": "http://m.zhizihuan.com/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 15101,
+      "bookList_rule": ".column-2",
+      "searchUrl": "http://s.zhizihuan.com/m/?key={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://s.zhizihuan.com/m/?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 7790,
+        "final_url": "http://s.zhizihuan.com/m/?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "rule_outdated_note": [
+        "column-2"
+      ],
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['没有找到']",
+        "note: rule also references classes ['column-2'] not in HTML (rule may be outdated, but page shows empty state)"
+      ]
+    },
+    {
+      "source_id": "corpus-aaff4dd37922",
+      "source_file": "src-403-aaff4dd37922.json",
+      "source_name": "九怀小说",
+      "source_url": "https://www.jiuhuaiwenxue.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-explicit",
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "duration_ms": 115,
+      "bookList_rule": "class.allbook-item",
+      "searchUrl": "/search?content={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.jiuhuaiwenxue.com/search?content=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 403,
+        "body_len": 208,
+        "final_url": "https://www.jiuhuaiwenxue.com/search?content=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "anti_crawl",
+      "evidence": [
+        "HTTP 403"
+      ]
+    },
+    {
+      "source_id": "corpus-97a5dadda7bf",
+      "source_file": "src-404-97a5dadda7bf.json",
+      "source_name": "九怀文学",
+      "source_url": "https://www.jiuhuaiwenxue.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-explicit",
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "duration_ms": 74,
+      "bookList_rule": "class.allbook-item",
+      "searchUrl": "/search?content={{key}}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.jiuhuaiwenxue.com/search?content=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 403,
+        "body_len": 208,
+        "final_url": "https://www.jiuhuaiwenxue.com/search?content=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "anti_crawl",
+      "evidence": [
+        "HTTP 403"
+      ]
+    },
+    {
+      "source_id": "corpus-db60026d55bc",
+      "source_file": "src-406-db60026d55bc.json",
+      "source_name": "铁血读书",
+      "source_url": "http://book.tiexue.net/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "duration_ms": 478,
+      "bookList_rule": "class.tianZhi_list@tag.dl",
+      "searchUrl": "http://book.tiexue.net/SearchResults.aspx?pageindex={{page}}&PageSize=20&keywords={{key}}&noveltype=0,{\n  \"charset\": \"escape\"\n}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://book.tiexue.net/SearchResults.aspx?pageindex=1&PageSize=20&keywords=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&noveltype=0",
+        "method": "GET",
+        "status": 404,
+        "body_len": 3455,
+        "final_url": "https://book.tiexue.net/SearchResults.aspx?pageindex=1&PageSize=20&keywords=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&noveltype=0"
+      },
+      "category": "website_dead",
+      "evidence": [
+        "HTTP 404"
+      ]
+    },
+    {
+      "source_id": "corpus-62b50a988208",
+      "source_file": "src-409-62b50a988208.json",
+      "source_name": "轻次元姬",
+      "source_url": "https://www.ciyuanji.com/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "duration_ms": 1098,
+      "bookList_rule": ".search_book__ieDvY||.card_card__yeC5Y li||.card_book__ctZ9S||.desc_list__R8WJh li",
+      "searchUrl": "search/{{key}}_0_0_0_0_0_{{page}}.html",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "https://www.ciyuanji.com/search/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9_0_0_0_0_0_1.html",
+        "method": "GET",
+        "status": 200,
+        "body_len": 105862,
+        "final_url": "https://m.ciyuanji.com/"
+      },
+      "rule_outdated_note": [
+        "search_book__ieDvY",
+        "card_card__yeC5Y",
+        "card_book__ctZ9S",
+        "desc_list__R8WJh"
+      ],
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['\"list\":[]', 'count\":0']",
+        "note: rule also references classes ['search_book__ieDvY', 'card_card__yeC5Y', 'card_book__ctZ9S', 'desc_list__R8WJh'] not in HTML (rule may be outdated, but page shows empty state)"
+      ]
+    },
+    {
+      "source_id": "corpus-96df50da60d4",
+      "source_file": "src-410-96df50da60d4.json",
+      "source_name": "酷我小说",
+      "source_url": "http://appi.kuwo.cn",
+      "priority": "P0",
+      "rule_forms": [
+        "json-jsonpath",
+        "regex-suffix",
+        "template"
+      ],
+      "duration_ms": 265,
+      "bookList_rule": "$.data",
+      "searchUrl": "/novels/api/book/search?keyword={{key}}&pi={{page}}&ps=30",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleSearch.kind",
+        "ruleBookInfo.kind"
+      ],
+      "http": {
+        "request_url": "http://appi.kuwo.cn/novels/api/book/search?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&pi=1&ps=30",
+        "method": "GET",
+        "status": 200,
+        "body_len": 127,
+        "final_url": "http://appi.kuwo.cn/novels/api/book/search?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&pi=1&ps=30"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['\"data\":[]', 'count\":0']"
+      ]
+    },
+    {
+      "source_id": "corpus-20e555e68a94",
+      "source_file": "src-411-20e555e68a94.json",
+      "source_name": "酷我小说",
+      "source_url": "http://appi.kuwo.cn/novels/api/book",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "duration_ms": 133,
+      "bookList_rule": "data",
+      "searchUrl": "http://appi.kuwo.cn/novels/api/book/search?keyword={{key}}&pi={{page}}&ps=30",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://appi.kuwo.cn/novels/api/book/search?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&pi=1&ps=30",
+        "method": "GET",
+        "status": 200,
+        "body_len": 127,
+        "final_url": "http://appi.kuwo.cn/novels/api/book/search?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&pi=1&ps=30"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['\"data\":[]', 'count\":0']"
+      ]
+    },
+    {
+      "source_id": "corpus-a1f17aa3c4d5",
+      "source_file": "src-412-a1f17aa3c4d5.json",
+      "source_name": "酷我小说",
+      "source_url": "http://appi.kuwo.cn#",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "duration_ms": 134,
+      "bookList_rule": "data",
+      "searchUrl": "http://appi.kuwo.cn/novels/api/book/search?keyword={{key}}&pi={{page}}&ps=30",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://appi.kuwo.cn/novels/api/book/search?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&pi=1&ps=30",
+        "method": "GET",
+        "status": 200,
+        "body_len": 127,
+        "final_url": "http://appi.kuwo.cn/novels/api/book/search?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&pi=1&ps=30"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['\"data\":[]', 'count\":0']"
+      ]
+    },
+    {
+      "source_id": "corpus-1fde6981491c",
+      "source_file": "src-423-1fde6981491c.json",
+      "source_name": "安之原创",
+      "source_url": "http://www.azycjd.com-8",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand"
+      ],
+      "duration_ms": 283,
+      "bookList_rule": "class.list_main@tag.li",
+      "searchUrl": "http://www.azycjd.com/webnovelmis/mobile/msearchresult,{\n  \"method\": \"POST\",\n  \"body\": \"searchtxts={{key}}\"\n}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://www.azycjd.com/webnovelmis/mobile/msearchresult",
+        "method": "POST",
+        "status": 200,
+        "body_len": 3858,
+        "final_url": "http://www.azycjd.com/webnovelmis/mobile/msearchresult"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['没有找到']"
+      ]
+    },
+    {
+      "source_id": "corpus-99fbebbe8a24",
+      "source_file": "src-427-99fbebbe8a24.json",
+      "source_name": "网易小说",
+      "source_url": "https://m.yuedu.163.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "duration_ms": 407,
+      "bookList_rule": "data.books",
+      "searchUrl": "/search/book/data.json?key={{key}}",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleToc.chapterUrl",
+        "ruleContent.content"
+      ],
+      "http": {
+        "request_url": "https://m.yuedu.163.com/search/book/data.json?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 44211,
+        "final_url": "https://m.yuedu.163.com/search/book/data.json?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['count\":0']"
+      ]
+    },
+    {
+      "source_id": "corpus-82228df0c4c0",
+      "source_file": "src-428-82228df0c4c0.json",
+      "source_name": "网易云说",
+      "source_url": "http://m.yuedu.163.com#yc1101",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "plain"
+      ],
+      "duration_ms": 368,
+      "bookList_rule": "data.books[*]\n@js:JSON.parse(result).map(o=> {\n    var J = org.jsoup.Jsoup.parse(java.ajax(baseUrl.match(/(.+?\\/\\/.+?\\/)/)[1] + 'source/' + o.sourceUuid));\n    return {\n        name: o.title,\n        author: o.author,\n        tags: o.keyName,\n        num:o.showTotalCount+'字',\n        latest: String(J.select('.m-book-recent a').text()).replace(/[\\(（【].*[求更谢乐发合].*[】）\\)]/,'') +String(J.select('.m-book-recent p').text()).replace(/\\s*(\\d+-\\d+-\\d+).+/, '（$1）').replace(/\\s*(\\d+)月(\\d+)日.+/, '（$1-$2）'),\n        intro: o.description.replace(/<\\/?\\w+>/g, '').trim(),\n        cover: o.coverImage,\n        catalogUrl: '/reader/book/info.json?catalog_only=true&source_uuid=' + o.sourceUuid\n    }\n});",
+      "searchUrl": "/search/book/data.json?key={{key}}",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleSearch.bookList",
+        "ruleToc.chapterUrl",
+        "ruleContent.content"
+      ],
+      "http": {
+        "request_url": "http://m.yuedu.163.com#yc1101/search/book/data.json?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 23109,
+        "final_url": "https://m.yuedu.163.com/"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "URL construction bug: # fragment in request URL breaks path resolution",
+        "request_url=http://m.yuedu.163.com#yc1101/search/book/data.json?key=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "final_url=https://m.yuedu.163.com/ (server returned homepage/default page, not search API)"
+      ],
+      "rule_bug_detail": {
+        "type": "url_fragment_not_stripped",
+        "location": "crates/reader-content/src/analyze_url.rs url_origin (L907-915) + resolve_relative_url (L862-893); same bug in crates/reader-content/src/lib.rs url_origin (L2204-2212)",
+        "bug": "rest.split(\"/\").next() only splits on \"/\", not on \"#\" or \"?\"; # fragment from bookSourceUrl leaks into joined URL",
+        "fix": "Use rest.split([\"/\", \"?\", \"#\"]).next() in url_origin, or adopt url crate Url::parse(base).join(relative) for RFC 3986 resolution."
+      }
+    },
+    {
+      "source_id": "corpus-85610ff65143",
+      "source_file": "src-430-85610ff65143.json",
+      "source_name": "安之原创",
+      "source_url": "http://www.azycjd.com#yc1101",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 128,
+      "bookList_rule": ".list_main li",
+      "searchUrl": "/webnovelmis/mobile/msearchresult,{\n  \"method\": \"POST\",\n  \"body\": \"searchtxts={{key}}\"\n}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://www.azycjd.com#yc1101/webnovelmis/mobile/msearchresult",
+        "method": "POST",
+        "status": 200,
+        "body_len": 1534,
+        "final_url": "http://www.azycjd.com/#yc1101/webnovelmis/mobile/msearchresult"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "URL construction bug: # fragment in request URL breaks path resolution",
+        "request_url=http://www.azycjd.com#yc1101/webnovelmis/mobile/msearchresult",
+        "final_url=http://www.azycjd.com/#yc1101/webnovelmis/mobile/msearchresult (server returned homepage/default page, not search API)"
+      ],
+      "rule_bug_detail": {
+        "type": "url_fragment_not_stripped",
+        "location": "crates/reader-content/src/analyze_url.rs url_origin (L907-915) + resolve_relative_url (L862-893); same bug in crates/reader-content/src/lib.rs url_origin (L2204-2212)",
+        "bug": "rest.split(\"/\").next() only splits on \"/\", not on \"#\" or \"?\"; # fragment from bookSourceUrl leaks into joined URL",
+        "fix": "Use rest.split([\"/\", \"?\", \"#\"]).next() in url_origin, or adopt url crate Url::parse(base).join(relative) for RFC 3986 resolution."
+      }
+    },
+    {
+      "source_id": "corpus-09a658371c11",
+      "source_file": "src-431-09a658371c11.json",
+      "source_name": "安之原创",
+      "source_url": "http://www.azycjd.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 376,
+      "bookList_rule": ".list_main li",
+      "searchUrl": "/webnovelmis/mobile/msearchresult,{\n  \"method\": \"POST\",\n  \"body\": \"searchtxts={{key}}\"\n}",
+      "has_js_misclassified": false,
+      "js_locations": [],
+      "http": {
+        "request_url": "http://www.azycjd.com/webnovelmis/mobile/msearchresult",
+        "method": "POST",
+        "status": 200,
+        "body_len": 3858,
+        "final_url": "http://www.azycjd.com/webnovelmis/mobile/msearchresult"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['没有找到']"
+      ]
+    },
+    {
+      "source_id": "corpus-0b382541907d",
+      "source_file": "src-433-0b382541907d.json",
+      "source_name": "刺猬猫说",
+      "source_url": "刺猬猫",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 261,
+      "bookList_rule": ".book-item",
+      "searchUrl": "https://wap.ciweimao.com:443/book_list?keyword={{key}}",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleToc.chapterName",
+        "ruleToc.chapterUrl"
+      ],
+      "http": {
+        "request_url": "https://wap.ciweimao.com:443/book_list?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 4626,
+        "final_url": "https://wap.ciweimao.com/signup/man_machine_verify?redirect=https%3A%2F%2Fwap.ciweimao.com%2Fbook_list%3Fkeyword%3D%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&source=book_list"
+      },
+      "category": "anti_crawl",
+      "evidence": [
+        "redirected to login/verify URL: https://wap.ciweimao.com/signup/man_machine_verify?redirect=https%3A%2F%2Fwap.ciweimao.com%2Fbook_list%3Fkeyword%3D%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&source=book_list"
+      ]
+    },
+    {
+      "source_id": "corpus-92e931cf93cf",
+      "source_file": "src-434-92e931cf93cf.json",
+      "source_name": "刺猬猫吧",
+      "source_url": "https://wap.ciweimao.com1",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "duration_ms": 137,
+      "bookList_rule": ".book-item",
+      "searchUrl": "https://wap.ciweimao.com:443/book_list?keyword={{key}}",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleToc.chapterUrl"
+      ],
+      "http": {
+        "request_url": "https://wap.ciweimao.com:443/book_list?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9",
+        "method": "GET",
+        "status": 200,
+        "body_len": 4626,
+        "final_url": "https://wap.ciweimao.com/signup/man_machine_verify?redirect=https%3A%2F%2Fwap.ciweimao.com%2Fbook_list%3Fkeyword%3D%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&source=book_list"
+      },
+      "category": "anti_crawl",
+      "evidence": [
+        "redirected to login/verify URL: https://wap.ciweimao.com/signup/man_machine_verify?redirect=https%3A%2F%2Fwap.ciweimao.com%2Fbook_list%3Fkeyword%3D%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&source=book_list"
+      ]
+    },
+    {
+      "source_id": "corpus-7853e4d2d690",
+      "source_file": "src-442-7853e4d2d690.json",
+      "source_name": "爱奇艺漫",
+      "source_url": "https://www.iqiyi.com/manhua#♤Haxc",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 148,
+      "bookList_rule": "class.stacksList@tag.li||class.cartoon-hot-ul@tag.li",
+      "searchUrl": "https://www.iqiyi.com/manhua/search-keyword={{key}}_{{page}}",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleBookInfo.tocUrl"
+      ],
+      "http": {
+        "request_url": "https://www.iqiyi.com/manhua/search-keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9_1",
+        "method": "GET",
+        "status": 302,
+        "body_len": 152,
+        "final_url": "https://www.iqiyi.com/manhua/search-keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9_1"
+      },
+      "category": "website_dead",
+      "evidence": [
+        "HTTP 302 redirect stub (152 bytes); final_url=https://www.iqiyi.com/manhua/search-keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9_1"
+      ]
+    },
+    {
+      "source_id": "corpus-0ec8515ca614",
+      "source_file": "src-455-0ec8515ca614.json",
+      "source_name": "爱漫客栈",
+      "source_url": "https://www.mkzhan.com#yc1101",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "duration_ms": 218,
+      "bookList_rule": ".common-comic-item||.top-list__box-item",
+      "searchUrl": "/search/?keyword={{key}}&page={{page}}",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleToc.chapterUrl",
+        "ruleContent.content"
+      ],
+      "http": {
+        "request_url": "https://www.mkzhan.com#yc1101/search/?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1",
+        "method": "GET",
+        "status": 200,
+        "body_len": 109385,
+        "final_url": "https://www.mkzhan.com/#yc1101/search/?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1"
+      },
+      "category": "rule_bug",
+      "evidence": [
+        "URL construction bug: # fragment in request URL breaks path resolution",
+        "request_url=https://www.mkzhan.com#yc1101/search/?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1",
+        "final_url=https://www.mkzhan.com/#yc1101/search/?keyword=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1 (server returned homepage/default page, not search API)"
+      ],
+      "rule_bug_detail": {
+        "type": "url_fragment_not_stripped",
+        "location": "crates/reader-content/src/analyze_url.rs url_origin (L907-915) + resolve_relative_url (L862-893); same bug in crates/reader-content/src/lib.rs url_origin (L2204-2212)",
+        "bug": "rest.split(\"/\").next() only splits on \"/\", not on \"#\" or \"?\"; # fragment from bookSourceUrl leaks into joined URL",
+        "fix": "Use rest.split([\"/\", \"?\", \"#\"]).next() in url_origin, or adopt url crate Url::parse(base).join(relative) for RFC 3986 resolution."
+      }
+    },
+    {
+      "source_id": "corpus-2ebfa75cf421",
+      "source_file": "src-457-2ebfa75cf421.json",
+      "source_name": "新人漫画",
+      "source_url": "https://xapi.xinmanhua.net",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain"
+      ],
+      "duration_ms": 286,
+      "bookList_rule": "@JSon:$.data.*",
+      "searchUrl": "https://xapi.xinmanhua.net/search/selfdefine,{\n  \"method\": \"POST\",\n  \"body\": \"keyword={{key}}&page={{page}}\"\n}",
+      "has_js_misclassified": true,
+      "js_locations": [
+        "ruleContent.content"
+      ],
+      "http": {
+        "request_url": "https://xapi.xinmanhua.net/search/selfdefine",
+        "method": "POST",
+        "status": 200,
+        "body_len": 113,
+        "final_url": "https://xapi.xinmanhua.net/search/selfdefine"
+      },
+      "category": "no_results",
+      "evidence": [
+        "empty-state markers: ['\"data\":[]', 'count\":0', 'total\":0']"
+      ]
+    }
+  ]
+}
