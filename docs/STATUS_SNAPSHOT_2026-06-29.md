@@ -133,6 +133,33 @@
 - no_toc_entries: 9 (3%)
 - content_too_short: 3, parse_error: 3, no_chapter_url: 1
 
+### js_unsupported 根因分析（54 源，详见 `reports/tooling/js-unsupported-v6-analysis.json`）
+
+Agent 3 (P0) 完成根因分析，54 个 js_unsupported 失败归为 12 类，按影响源数排序：
+
+| 类别 | 源数 | 分类 | 修复方向 |
+|------|------|------|----------|
+| strict_mode_undeclared | 15 | 完全未实现（引擎级） | Patch rquickjs 清除 JS_EVAL_STRICT（QuickJS 默认 strict，Legado Rhino 非 strict） |
+| source_object_method_missing | 13 | 已实现但调用方式不同 | 注入 `source` 对象的 `getKey()`/`header`/`loginUrl` 等字段方法 |
+| rule_engine_json_parse | 11 | 完全未实现 | JS 返回 undefined 时强转为空串（镜像 Legado Rhino 字符串化） |
+| java_put_signature_mismatch | 5 | 已实现但调用方式不同 | `java.put` value 参数接受任意 JSON 值并强转字符串 |
+| source_object_field_missing | 3 | 已实现但调用方式不同 | 同上 source 对象注入 |
+| host_callback_unregistered | 1 | host callback 路由未接通 | CLI 测试 host 注册 `java.androidId` 等 stub |
+| with_statement_forbidden | 1 | 完全未实现（引擎级） | Rhino JavaImporter+with 不兼容，需移植源 JS 或文档为不兼容 |
+| nan_non_json | 1 | 完全未实现 | NaN/Infinity JSON 序列化为 null |
+| host_callback_redline | 1 | host callback 路由未接通 | 红线 4 — `java.webView` 需平台 Host 处理，CLI 无 WebView |
+| url_dsl_malformed | 1 | 源数据问题 | 源侧 DSL 语法错误 |
+| host_callback_network | 1 | 分类错误 | `java.ajax` 网络超时应归类为 http_error |
+| jsoup_global_not_exposed | 1 | 完全未实现 | JS 沙箱暴露 Jsoup 全局（用 reader-rule 的 scraper 实现） |
+
+**关键证据**：QuickJS 引擎默认 strict 模式（rquickjs 0.8.1）—— 即使 IIFE 包裹也无法绕过，
+因为 strictness 会被嵌套函数体继承。Legado Rhino 默认非 strict，未声明赋值创建全局变量。
+此为 15 源失败的根因，需在 FFI 层清除 `JS_EVAL_STRICT` flag 或更换引擎。
+
+**P0 修复（影响 31 源）**：strict_mode + source_object 注入
+**P1 修复（影响 17 源）**：JS 结果强转 + java.put 签名放宽
+**P2/P3 修复（影响 6 源）**：CLI host stub + Jsoup + 文档/分类修正
+
 ### v4 vs v6 对比
 
 | 指标 | v4 (459源) | v6 (270源) | 变化 |

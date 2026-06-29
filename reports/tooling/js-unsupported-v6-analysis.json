@@ -1,0 +1,979 @@
+{
+  "version": "js-unsupported-analysis/1",
+  "generated_at": "2026-06-29T00:00:00Z",
+  "analyst": "Agent 3 (P0)",
+  "input_data": "reports/tooling/corpus-batch-v6-partial-270.json",
+  "total_failures": 54,
+  "batch_total": 270,
+  "failure_rate": "54/270 = 20.0%",
+  "summary": {
+    "total_categorized": 54,
+    "category_count": 12,
+    "top_3_categories": [
+      {
+        "category": "strict_mode_undeclared",
+        "count": 15,
+        "pct": "15/54 = 27.8%"
+      },
+      {
+        "category": "source_object_method_missing",
+        "count": 13,
+        "pct": "13/54 = 24.1%"
+      },
+      {
+        "category": "rule_engine_json_parse",
+        "count": 11,
+        "pct": "11/54 = 20.4%"
+      }
+    ],
+    "engine_incompatible_count": 1,
+    "source_side_bug_count": 1,
+    "misclassification_count": 1
+  },
+  "categories": {
+    "strict_mode_undeclared": {
+      "count": 15,
+      "root_cause": "QuickJS (rquickjs 0.8.1) evaluates scripts in strict mode by default — undeclared variable assignments (e.g. `url = ...` without `var`/`let`/`const`) throw ReferenceError instead of creating a global. Legado's Rhino runs in non-strict mode where this creates a global. IIFE wrapping does NOT help because strictness is inherited.",
+      "legado_source": "modules/rhino/src/main/java/com/script/rhino/RhinoScriptEngine.kt (Rhino default mode is non-strict)",
+      "reader_source": "crates/reader-js/src/lib.rs:924 (ctx.eval) — JS_EVAL_STRICT flag is applied by rquickjs default EvalOptions",
+      "classification": "完全未实现 (engine-level strict mode mismatch)",
+      "fix_recommendation": "Either (a) patch rquickjs to clear JS_EVAL_STRICT flag for user-JS eval, OR (b) replace QuickJS with an engine that supports non-strict mode (e.g. V8 with per-context strict=false), OR (c) pre-process user JS to insert `var` declarations for all free variables (fragile). IIFE wrapping confirmed NOT to work (test 4 in strict-mode repro).",
+      "severity": "P0 — blocks 15 sources (28% of js_unsupported failures)",
+      "evidence_repro": "Confirmed via standalone rquickjs test: `ctx.eval(\"url = 'hello'; url\")` → 'url is not defined'; even `(function(){ url = 'inner'; return url; })()` → same error. `with({a:1}){a}` → 'invalid keyword: with'."
+    },
+    "source_object_method_missing": {
+      "count": 13,
+      "root_cause": "Reader injects `source` as `{}` (empty object) per crates/reader-content/src/lib.rs:1419-1423. Legado's BookSource model exposes `getKey()`, `header`, `loginUrl`, `getVariable()` methods/fields. Sources call `source.getKey()`, `source.header`, `source.key`, `source.loginUrl` and get 'not a function' / undefined.",
+      "legado_source": "app/src/main/java/io/legado/app/data/entities/BookSource.kt — getKey() returns bookSourceUrl; header is a JSON string field; loginUrl is a String field; getVariable() reads source-level variable",
+      "reader_source": "crates/reader-content/src/lib.rs:1419-1423 (source defaults to `{}` when caller doesn't provide); reader-cli test_source.rs never populates source either",
+      "classification": "已实现但调用方式不同 (source object shape mismatch)",
+      "fix_recommendation": "Inject `source` as a JSON object literal with: `bookSourceUrl` (=source URL), `key` (alias for bookSourceUrl), `header` (source.headers JSON string), `loginUrl` (source.loginUrl), `bookSourceName`, plus a `getVariable()` method (or `variables` map). Method-style calls like `source.getKey()` require a JS proxy wrapper that exposes methods. Add a host callback `java.getSource` returning the full source object (descriptor already exists in lib.rs:218).",
+      "severity": "P0 — blocks 13 sources (24% of js_unsupported failures)"
+    },
+    "rule_engine_json_parse": {
+      "count": 11,
+      "root_cause": "JS evaluation returns a non-JSON-serializable value (undefined, function, or empty) and Reader's rule engine then fails to parse it as JSON. Detail: 'invalid JSON input: expected value at line 1 column 1'.",
+      "legado_source": "app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeRule.kt — Rhino's toString() coerces undefined to 'undefined' string; Legado's rule engine tolerates non-JSON strings",
+      "reader_source": "crates/reader-js/src/lib.rs:928 (quickjs_value_to_json) — undefined is not a JSON value; serde_json::to_string(undefined) fails",
+      "classification": "完全未实现 (rule engine assumes JSON, JS can return undefined)",
+      "fix_recommendation": "When JS evaluates to undefined/null, coerce to empty string `\"\"` before JSON parse. Mirror Legado's Rhino string-coercion semantics: `String(result)` always returns a string. Update `evaluate_url_js` (crates/reader-content/src/lib.rs:1469-1472) and `quickjs_value_to_json` to coerce undefined → empty string.",
+      "severity": "P1 — blocks 11 sources (20% of js_unsupported failures)"
+    },
+    "java_put_signature_mismatch": {
+      "count": 5,
+      "root_cause": "Reader's `java.put` requires both key and value to be strings (ResidualArgShape::KeyValueStrings in lib.rs:7708). Legado's `java.put(key: String, value: Any)` accepts any value and stores it via `chapter.putVariable(key, value.toString())`. Sources call `java.put(\"extra\", true)`, `java.put(\"page\", page)` (page is a number), etc.",
+      "legado_source": "app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt:373 — `fun put(key: String, value: String)` — but Rhino auto-coerces non-strings to strings via toString()",
+      "reader_source": "crates/reader-js/src/lib.rs:7708 (make_residual_host_callback for java.put with KeyValueStrings shape)",
+      "classification": "已实现但调用方式不同 (signature mismatch — Reader requires strings, Legado auto-coerces)",
+      "fix_recommendation": "Loosen `java.put` value argument: accept any JSON value (string, number, boolean, object) and coerce to string before storing. Keep key as string. This mirrors Legado's Rhino auto-coercion. Update ResidualArgShape::KeyValueStrings validation to allow non-string values.",
+      "severity": "P1 — blocks 5 sources (9% of js_unsupported failures)"
+    },
+    "source_object_field_missing": {
+      "count": 3,
+      "root_cause": "Sources call `java.ajax(source.key)` or `java.ajax(source.getKey())` expecting `source.key` to return the source's base URL. Reader's `source` literal is `{}` so `source.key` is undefined → `java.ajax` rejects non-string URL.",
+      "legado_source": "app/src/main/java/io/legado/app/data/entities/BookSource.kt — `key` field = bookSourceUrl",
+      "reader_source": "crates/reader-content/src/lib.rs:1419-1423",
+      "classification": "已实现但调用方式不同 (source object missing key field)",
+      "fix_recommendation": "Same fix as `source_object_method_missing` — populate `source.key` (= bookSourceUrl) and `source.bookSourceUrl` in the injected source literal.",
+      "severity": "P1 — blocks 3 sources (6% of js_unsupported failures)"
+    },
+    "host_callback_unregistered": {
+      "count": 1,
+      "root_cause": "`java.androidId` is registered in Core as a host callback descriptor (lib.rs:7912), but the CLI test host (tools/reader-cli/src/test_source.rs) does NOT register a handler for it. When the JS calls `java.androidId()`, the host callback dispatch fails with 'unregistered host callback: java.androidId'.",
+      "legado_source": "app/src/main/java/io/legado/app/help/JsExtensions.kt:981 — `fun androidId(): String` returns Settings.systemId",
+      "reader_source": "crates/reader-js/src/lib.rs:7912 (descriptor registered); tools/reader-cli/src/test_source.rs (no host handler)",
+      "classification": "host callback 路由已实现但运行时未接通 (CLI test host gap)",
+      "fix_recommendation": "Register a stub host callback for `java.androidId` in the CLI test host (e.g. return a fixed test device ID like 'reader-cli-test-device-id'). Real platform hosts (iOS/Android/HarmonyOS) will register the real device ID. This is a CLI tool gap, not a Core gap.",
+      "severity": "P2 — blocks 1 source"
+    },
+    "with_statement_forbidden": {
+      "count": 1,
+      "root_cause": "Source uses Rhino-specific `JavaImporter` + `Packages.java.lang` + `with(javaImport){...}` to import Java crypto classes for AES encryption. QuickJS forbids `with` statement (strict mode) and has no Java interop. This is fundamentally incompatible with non-Rhino engines.",
+      "legado_source": "modules/rhino/src/main/java/com/script/rhino/RhinoScriptEngine.kt — Rhino provides full Java interop via Packages/JavaImporter",
+      "reader_source": "crates/reader-js/src/lib.rs:924 — QuickJS has no Java interop",
+      "classification": "完全未实现 (engine-level: QuickJS has no Java interop, `with` forbidden)",
+      "fix_recommendation": "Cannot be fixed at engine level. Options: (a) port the source's JS to pure ES (use reader-js's `java.createSymmetricCrypto`/`java.aesEncodeToBase64String` instead of javax.crypto), (b) document as 'incompatible source — requires Rhino', (c) long-term: embed a JS engine with Java interop on Android only (keeping QuickJS for iOS/HarmonyOS). This is a known Legado ecosystem dependency on Rhino's Java interop.",
+      "severity": "P3 — blocks 1 source (fundamentally incompatible)"
+    },
+    "nan_non_json": {
+      "count": 1,
+      "root_cause": "Source JS produces NaN (e.g. `1100000000+parseInt(result)` where `result` is non-numeric → NaN). Reader's quickjs_value_to_json rejects non-finite numbers. Legado's Rhino serializes NaN as `null` or coerces to string 'NaN'.",
+      "legado_source": "app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeRule.kt — Rhino JSON.stringify(NaN) returns 'null'",
+      "reader_source": "crates/reader-js/src/lib.rs:928 (quickjs_value_to_json rejects non-finite)",
+      "classification": "完全未实现 (JSON serialization of NaN/Infinity)",
+      "fix_recommendation": "In `quickjs_value_to_json`, coerce NaN/Infinity to `null` (matching standard JSON.stringify behavior, which Legado follows). This is a 1-line fix in the value-to-JSON converter.",
+      "severity": "P2 — blocks 1 source"
+    },
+    "host_callback_redline": {
+      "count": 1,
+      "root_cause": "Source calls `java.webView(null, baseUrl, null)`. Core intentionally refuses with 'java.webView is unsupported in Core (red line 4: Core does not touch WebView) — host platform adapter must handle'. CLI test host has no WebView. This is by design (Core/Host boundary).",
+      "legado_source": "app/src/main/java/io/legado/app/help/JsExtensions.kt:170 — `fun webView(...)` uses Android WebView",
+      "reader_source": "crates/reader-js/src/lib.rs:7724 (descriptor registered, dispatch rejected by Core red-line check)",
+      "classification": "host callback 路由已实现但运行时未接通 (intentional — CLI has no WebView)",
+      "fix_recommendation": "This is correct behavior per red line 4. The CLI test host should register a stub that returns null (or a clear error), and the failure should be classified as 'host_webview_unsupported' rather than 'js_unsupported'. Real platform hosts (iOS WKWebView, Android WebView, HarmonyOS WebView) will register real handlers. No Core change needed.",
+      "severity": "P3 — blocks 1 source (intentional, requires platform WebView)"
+    },
+    "url_dsl_malformed": {
+      "count": 1,
+      "root_cause": "Source-side malformed URL DSL: `{\"body\": \"id\"=\"search-form\"}` is invalid JSON/JS (the `=` should be `:`). Reader's UrlDslParser rejects this. Legado's parser is more lenient (or the source is also broken in Legado).",
+      "legado_source": "N/A — source-side bug",
+      "reader_source": "crates/reader-content/src/analyze_url.rs (UrlDslParser::parse rejects malformed JSON)",
+      "classification": "源数据问题 (malformed source-side DSL)",
+      "fix_recommendation": "No fix needed. This is a source-side bug. Optionally, add a 'url_dsl_malformed' failure reason distinct from 'js_unsupported' for clearer reporting.",
+      "severity": "P3 — blocks 1 source (source-side bug)"
+    },
+    "host_callback_network": {
+      "count": 1,
+      "root_cause": "Source calls `java.ajax(url)` which makes a real HTTP request via CLI's ureq client. The request timed out. This is a network timeout, NOT a JS unsupported method. Misclassified as js_unsupported because the failure originated in a JS-initiated host callback.",
+      "legado_source": "N/A — network timeout",
+      "reader_source": "tools/reader-cli/src/test_source.rs:751 (execute_http with timeout)",
+      "classification": "分类错误 (misclassification — should be http_error, not js_unsupported)",
+      "fix_recommendation": "In test_source.rs error classification, distinguish between JS engine errors (js_unsupported) and host callback network errors (http_error). A `java.ajax` network timeout should be classified as http_error.",
+      "severity": "P2 — blocks 1 source (misclassification, not a real JS gap)"
+    },
+    "jsoup_global_not_exposed": {
+      "count": 1,
+      "root_cause": "Source calls `org.jsoup.Jsoup.parse(body).select(...)` expecting Jsoup HTML parser as a JS global. Legado exposes Jsoup via Rhino's Java interop (`Packages.org.jsoup.Jsoup`). Reader has no Jsoup global in JS.",
+      "legado_source": "app/src/main/java/io/legado/app/help/JsExtensions.kt:57 — `import org.jsoup.Jsoup`; Rhino exposes all Java classes via Packages",
+      "reader_source": "crates/reader-js/src/lib.rs — no Jsoup global registered",
+      "classification": "完全未实现 (Jsoup global not exposed in JS sandbox)",
+      "fix_recommendation": "Register a `Jsoup` global object in the JS sandbox backed by Reader's existing HTML parser (reader-rule crate uses `scraper` which is a Jsoup-equivalent). Expose `Jsoup.parse(html)` returning a node with `.select(cssSelector)` returning an array-like. This is a moderate effort but unblocks Jsoup-dependent sources. Alternatively, document a workaround: use Reader's `java.getString(ruleStr)` rule-engine API instead of direct Jsoup access.",
+      "severity": "P2 — blocks 1 source (but likely affects more sources not in this batch)"
+    }
+  },
+  "sources": [
+    {
+      "source_id": "corpus-5ba6c58f3dd3",
+      "source_file": "src-001-5ba6c58f3dd3.json",
+      "source_name": "起点读书（优+++）",
+      "source_url": "https://api-x.shrtxs.cn/qd/",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[Internal] rule engine error: invalid JSON input: expected value at line 1 column 1",
+      "category": "rule_engine_json_parse",
+      "category_subtype": "non-JSON value from JS"
+    },
+    {
+      "source_id": "corpus-55dd939a661d",
+      "source_file": "src-002-55dd939a661d.json",
+      "source_name": "番茄小说（优+++）",
+      "source_url": "https://reading.snssdk.com#lcs",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: java.put key and value arguments must be strings",
+      "category": "java_put_signature_mismatch",
+      "category_subtype": "non-string value"
+    },
+    {
+      "source_id": "corpus-752f07e02faf",
+      "source_file": "src-003-752f07e02faf.json",
+      "source_name": "阅读助手（优+++）",
+      "source_url": "https://api-bc.wtzw.com",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: headers is not defined",
+      "category": "strict_mode_undeclared",
+      "category_subtype": "headers"
+    },
+    {
+      "source_id": "corpus-218f45f4902d",
+      "source_file": "src-010-218f45f4902d.json",
+      "source_name": "蓝批小说（优+++）",
+      "source_url": "https://www.pixiv.net/novel",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: java.put key and value arguments must be strings",
+      "category": "java_put_signature_mismatch",
+      "category_subtype": "non-string value"
+    },
+    {
+      "source_id": "corpus-c5146b3467e5",
+      "source_file": "src-011-c5146b3467e5.json",
+      "source_name": "蓝批小说（优+++）",
+      "source_url": "https://www.pixiv.net",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: java.put key and value arguments must be strings",
+      "category": "java_put_signature_mismatch",
+      "category_subtype": "non-string value"
+    },
+    {
+      "source_id": "corpus-b9c61ee9281f",
+      "source_file": "src-025-b9c61ee9281f.json",
+      "source_name": "轻文库说（优++）",
+      "source_url": "轻文库小说",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: base_url is not defined",
+      "category": "strict_mode_undeclared",
+      "category_subtype": "url"
+    },
+    {
+      "source_id": "corpus-cab248b2cb77",
+      "source_file": "src-029-cab248b2cb77.json",
+      "source_name": "立方体儿（优++）",
+      "source_url": "📖Lofter",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: HostCallback: host callback java.androidId failed: unregistered host callback: java.androidId",
+      "category": "host_callback_unregistered",
+      "category_subtype": "java.androidId"
+    },
+    {
+      "source_id": "corpus-73bd335a86b5",
+      "source_file": "src-031-73bd335a86b5.json",
+      "source_name": "全本小说（优++）",
+      "source_url": "http://119.45.176.116:5006",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[Internal] rule engine error: invalid JSON input: expected value at line 1 column 1",
+      "category": "rule_engine_json_parse",
+      "category_subtype": "non-JSON value from JS"
+    },
+    {
+      "source_id": "corpus-5d3bf46f7fd4",
+      "source_file": "src-038-5d3bf46f7fd4.json",
+      "source_name": "七猫小说（优++）",
+      "source_url": "https://api-bc.wtzw.com＃妍希",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: headers is not defined",
+      "category": "strict_mode_undeclared",
+      "category_subtype": "headers"
+    },
+    {
+      "source_id": "corpus-79cf9158f4e9",
+      "source_file": "src-039-79cf9158f4e9.json",
+      "source_name": "七猫小说（优++）",
+      "source_url": "https://api-bc.wtzw.com#md",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: headers is not defined",
+      "category": "strict_mode_undeclared",
+      "category_subtype": "headers"
+    },
+    {
+      "source_id": "corpus-fba91b551eb9",
+      "source_file": "src-040-fba91b551eb9.json",
+      "source_name": "七猫小说（优++）",
+      "source_url": "https://api-bc.wtzw.com#yc1101b",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: headers is not defined",
+      "category": "strict_mode_undeclared",
+      "category_subtype": "headers"
+    },
+    {
+      "source_id": "corpus-0fe107d5adaf",
+      "source_file": "src-041-0fe107d5adaf.json",
+      "source_name": "全免小说（优++）",
+      "source_url": "http://qmbook.taoyuewenhua.net/#@遇知",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: t is not defined",
+      "category": "strict_mode_undeclared",
+      "category_subtype": "t"
+    },
+    {
+      "source_id": "corpus-19651fd85550",
+      "source_file": "src-042-19651fd85550.json",
+      "source_name": "爱淘小说（优++）",
+      "source_url": "https://tybook.taoyuewenhua.net",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: sign is not defined",
+      "category": "strict_mode_undeclared",
+      "category_subtype": "sign"
+    },
+    {
+      "source_id": "corpus-bad386b854b3",
+      "source_file": "src-044-bad386b854b3.json",
+      "source_name": "阅友小说（优++）",
+      "source_url": "https://goway.reader.yueyouxs.com/",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: uth is not defined",
+      "category": "strict_mode_undeclared",
+      "category_subtype": "uth"
+    },
+    {
+      "source_id": "corpus-24710449e739",
+      "source_file": "src-045-24710449e739.json",
+      "source_name": "陶越文华（优++）",
+      "source_url": "https://qcbook.taoyuewenhua.net",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: not a function",
+      "category": "source_object_method_missing",
+      "category_subtype": "source.getKey()/source.header/etc"
+    },
+    {
+      "source_id": "corpus-7e57a9adfc58",
+      "source_file": "src-048-7e57a9adfc58.json",
+      "source_name": "番茄小说（优+）",
+      "source_url": "https://m.zym888.com",
+      "priority": "P1",
+      "has_js": false,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: not a function",
+      "category": "source_object_method_missing",
+      "category_subtype": "source.getKey()/source.header/etc"
+    },
+    {
+      "source_id": "corpus-5228df2c21ed",
+      "source_file": "src-049-5228df2c21ed.json",
+      "source_name": "番茄小说（优+）",
+      "source_url": "https://reading.snssdk.com#mgz",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: java.put key and value arguments must be strings",
+      "category": "java_put_signature_mismatch",
+      "category_subtype": "non-string value"
+    },
+    {
+      "source_id": "corpus-95943132eff4",
+      "source_file": "src-053-95943132eff4.json",
+      "source_name": "西瓜免费（优+）",
+      "source_url": "🥝西瓜免费小说App🍒",
+      "priority": "P1",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Syntax: invalid keyword: with",
+      "category": "with_statement_forbidden",
+      "category_subtype": "Rhino JavaImporter+with"
+    },
+    {
+      "source_id": "corpus-8d65ac5eef8b",
+      "source_file": "src-054-8d65ac5eef8b.json",
+      "source_name": "太极小说（优+）",
+      "source_url": "https://69shux.co/",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: url is not defined",
+      "category": "strict_mode_undeclared",
+      "category_subtype": "url"
+    },
+    {
+      "source_id": "corpus-04656a5f773a",
+      "source_file": "src-056-04656a5f773a.json",
+      "source_name": "天天书吧（优+）",
+      "source_url": "https://www.ttshu8.net",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: not a function",
+      "category": "source_object_method_missing",
+      "category_subtype": "source.getKey()/source.header/etc"
+    },
+    {
+      "source_id": "corpus-aa9cec42cbc4",
+      "source_file": "src-061-aa9cec42cbc4.json",
+      "source_name": "酷匠网吧（优+）",
+      "source_url": "https://app.kujiang.com",
+      "priority": "P1",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[Internal] rule engine error: invalid JSON input: expected value at line 1 column 1",
+      "category": "rule_engine_json_parse",
+      "category_subtype": "non-JSON value from JS"
+    },
+    {
+      "source_id": "corpus-2c9a105909bc",
+      "source_file": "src-092-2c9a105909bc.json",
+      "source_name": "城堡小说（优+）",
+      "source_url": "https://www.96cbtxt.com/",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: java.ajax URL argument must be a string",
+      "category": "source_object_field_missing",
+      "category_subtype": "source.key undefined"
+    },
+    {
+      "source_id": "corpus-b1bbc8922909",
+      "source_file": "src-094-b1bbc8922909.json",
+      "source_name": "七猫小说（优+）",
+      "source_url": "https://api-bc.wtzw.com#♤ycb",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: headers is not defined",
+      "category": "strict_mode_undeclared",
+      "category_subtype": "headers"
+    },
+    {
+      "source_id": "corpus-10f88c9e2b23",
+      "source_file": "src-095-10f88c9e2b23.json",
+      "source_name": "七猫小说（优+）",
+      "source_url": "https://api-bc.wtzw.com/",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: headers is not defined",
+      "category": "strict_mode_undeclared",
+      "category_subtype": "headers"
+    },
+    {
+      "source_id": "corpus-e08f957751a6",
+      "source_file": "src-102-e08f957751a6.json",
+      "source_name": "风云小说（优+）",
+      "source_url": "https://m.nauqmf.com",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: not a function",
+      "category": "source_object_method_missing",
+      "category_subtype": "source.getKey()/source.header/etc"
+    },
+    {
+      "source_id": "corpus-8c05fec02a4b",
+      "source_file": "src-109-8c05fec02a4b.json",
+      "source_name": "米读小说（优+）",
+      "source_url": "https://api.midureader.com/#@遇知",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L4-toc",
+      "error_detail": "[Internal] rule engine error: invalid JSON input: expected value at line 1 column 1",
+      "category": "rule_engine_json_parse",
+      "category_subtype": "non-JSON value from JS"
+    },
+    {
+      "source_id": "corpus-6b845d960f61",
+      "source_file": "src-112-6b845d960f61.json",
+      "source_name": "神凑轻说（优+）",
+      "source_url": "https://m.shencou.com",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: not a function",
+      "category": "source_object_method_missing",
+      "category_subtype": "source.getKey()/source.header/etc"
+    },
+    {
+      "source_id": "corpus-f74c17839a8d",
+      "source_file": "src-117-f74c17839a8d.json",
+      "source_name": "炫动小说（优+）",
+      "source_url": "https://www.xdxss.com",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: not a function",
+      "category": "source_object_method_missing",
+      "category_subtype": "source.getKey()/source.header/etc"
+    },
+    {
+      "source_id": "corpus-bd790e492409",
+      "source_file": "src-134-bd790e492409.json",
+      "source_name": "松鹤庭沐（优）",
+      "source_url": "https://so.html5.qq.com",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L3-detail",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: NonJsonValue: non-finite JavaScript number is not JSON-compatible",
+      "category": "nan_non_json",
+      "category_subtype": "NaN/Infinity result"
+    },
+    {
+      "source_id": "corpus-de676989d0bb",
+      "source_file": "src-138-de676989d0bb.json",
+      "source_name": "中文看书（优）",
+      "source_url": "http://wap.zwkan.com",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: not a function",
+      "category": "source_object_method_missing",
+      "category_subtype": "source.getKey()/source.header/etc"
+    },
+    {
+      "source_id": "corpus-242d4c429c4b",
+      "source_file": "src-146-242d4c429c4b.json",
+      "source_name": "车群小说（优）",
+      "source_url": "http://www.qunxs.com/",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: not a function",
+      "category": "source_object_method_missing",
+      "category_subtype": "source.getKey()/source.header/etc"
+    },
+    {
+      "source_id": "corpus-deceba122796",
+      "source_file": "src-157-deceba122796.json",
+      "source_name": "冰清小说（优）",
+      "source_url": "https://m.bqgcn.com/",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: java.ajax URL argument must be a string",
+      "category": "source_object_field_missing",
+      "category_subtype": "source.key undefined"
+    },
+    {
+      "source_id": "corpus-13e7f9805fd3",
+      "source_file": "src-160-13e7f9805fd3.json",
+      "source_name": "闲看小说（优）",
+      "source_url": "http://nav.jijia-co.com",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[Internal] rule engine error: invalid JSON input: expected value at line 1 column 1",
+      "category": "rule_engine_json_parse",
+      "category_subtype": "non-JSON value from JS"
+    },
+    {
+      "source_id": "corpus-c0f6dc0d8679",
+      "source_file": "src-168-c0f6dc0d8679.json",
+      "source_name": "阅友网络（优）",
+      "source_url": "https://goway.reader.yueyouxs.com",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: uth is not defined",
+      "category": "strict_mode_undeclared",
+      "category_subtype": "uth"
+    },
+    {
+      "source_id": "corpus-fdf626cf78c4",
+      "source_file": "src-169-fdf626cf78c4.json",
+      "source_name": "无忧书城（优）",
+      "source_url": "https://www.51shucheng.net",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: not a function",
+      "category": "source_object_method_missing",
+      "category_subtype": "source.getKey()/source.header/etc"
+    },
+    {
+      "source_id": "corpus-8df5424f4aaf",
+      "source_file": "src-177-8df5424f4aaf.json",
+      "source_name": "天悦小说（优）",
+      "source_url": "https://www.xtyxsw.org",
+      "priority": "P1",
+      "has_js": false,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: not a function",
+      "category": "source_object_method_missing",
+      "category_subtype": "source.getKey()/source.header/etc"
+    },
+    {
+      "source_id": "corpus-52bdc27a83bc",
+      "source_file": "src-178-52bdc27a83bc.json",
+      "source_name": "爱久小说（优）",
+      "source_url": "https://www.jjjjxsw.com",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: HostCallback: host callback java.webView failed: java.webView is unsupported in Core (red line 4: Core does not touch WebView) — host platforms handle WebView; sources requiring WebView cannot run in Core",
+      "category": "host_callback_redline",
+      "category_subtype": "java.webView"
+    },
+    {
+      "source_id": "corpus-9c7e4adc28b4",
+      "source_file": "src-184-9c7e4adc28b4.json",
+      "source_name": "花生小说（优）",
+      "source_url": "https://api.wan123x.com",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[Internal] rule engine error: invalid JSON input: EOF while parsing a value at line 1 column 0",
+      "category": "rule_engine_json_parse",
+      "category_subtype": "non-JSON value from JS"
+    },
+    {
+      "source_id": "corpus-110437f4c225",
+      "source_file": "src-187-110437f4c225.json",
+      "source_name": "全本小说（优）",
+      "source_url": "http://www.xqb5.cc",
+      "priority": "P1",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: java.ajax URL argument must be a string",
+      "category": "source_object_field_missing",
+      "category_subtype": "source.key undefined"
+    },
+    {
+      "source_id": "corpus-a72a3489aab8",
+      "source_file": "src-188-a72a3489aab8.json",
+      "source_name": "独步小说（优）",
+      "source_url": "https://www.dbxsn.com",
+      "priority": "P0",
+      "has_js": false,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL DSL parse error: malformed URL DSL JSON: expected `,` or `}` at line 1 column 14: {\"body\": \"id\"=\"search-form\"}",
+      "category": "url_dsl_malformed",
+      "category_subtype": "source-side malformed DSL"
+    },
+    {
+      "source_id": "corpus-c4152ac698c9",
+      "source_file": "src-190-c4152ac698c9.json",
+      "source_name": "零点看书（优）",
+      "source_url": "http://www.biqumx.com",
+      "priority": "P0",
+      "has_js": false,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: not a function",
+      "category": "source_object_method_missing",
+      "category_subtype": "source.getKey()/source.header/etc"
+    },
+    {
+      "source_id": "corpus-1916c394ec6a",
+      "source_file": "src-191-1916c394ec6a.json",
+      "source_name": "笔趣小说（优）",
+      "source_url": "https://m.bqgcn.net",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: HostCallback: host callback java.ajax failed: https://m.bqgcn.net/: Network Error: Network Error: Error encountered in the status line: timed out reading response",
+      "category": "host_callback_network",
+      "category_subtype": "java.ajax timeout"
+    },
+    {
+      "source_id": "corpus-f5cd1d6ee933",
+      "source_file": "src-193-f5cd1d6ee933.json",
+      "source_name": "棉花小说（优）",
+      "source_url": "http://www.mianhuatang8.net/",
+      "priority": "P1",
+      "has_js": false,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: not a function",
+      "category": "source_object_method_missing",
+      "category_subtype": "source.getKey()/source.header/etc"
+    },
+    {
+      "source_id": "corpus-b82a4d122103",
+      "source_file": "src-196-b82a4d122103.json",
+      "source_name": "顶点小说（优）",
+      "source_url": "https://www.23ddw.net/",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: not a function",
+      "category": "source_object_method_missing",
+      "category_subtype": "source.getKey()/source.header/etc"
+    },
+    {
+      "source_id": "corpus-0b78c9f24888",
+      "source_file": "src-200-0b78c9f24888.json",
+      "source_name": "万通蜡笔（优）",
+      "source_url": "https://wtr-lab.com",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: cannot read property 'Jsoup' of undefined",
+      "category": "jsoup_global_not_exposed",
+      "category_subtype": "org.jsoup.Jsoup"
+    },
+    {
+      "source_id": "corpus-fb38a2a5b249",
+      "source_file": "src-203-fb38a2a5b249.json",
+      "source_name": "存档书库（优）",
+      "source_url": "https://archive.org",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: Get is not defined",
+      "category": "strict_mode_undeclared",
+      "category_subtype": "t"
+    },
+    {
+      "source_id": "corpus-2950b06a1dd0",
+      "source_file": "src-211-2950b06a1dd0.json",
+      "source_name": "鸠摩搜书（导）",
+      "source_url": "https://www.jiumodiary.com#",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: url1 is not defined",
+      "category": "strict_mode_undeclared",
+      "category_subtype": "url1"
+    },
+    {
+      "source_id": "corpus-80f596484b84",
+      "source_file": "src-216-80f596484b84.json",
+      "source_name": "趣书网吧（导）",
+      "source_url": "https://www.qushu123.com",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: so is not defined",
+      "category": "strict_mode_undeclared",
+      "category_subtype": "so"
+    },
+    {
+      "source_id": "corpus-f65061510c32",
+      "source_file": "src-218-f65061510c32.json",
+      "source_name": "爱下电子（繁）",
+      "source_url": "https://ixdzs.tw/",
+      "priority": "P0",
+      "has_js": false,
+      "failed_level": "L4-toc",
+      "error_detail": "[Internal] rule engine error: invalid JSON input: expected value at line 1 column 1",
+      "category": "rule_engine_json_parse",
+      "category_subtype": "non-JSON value from JS"
+    },
+    {
+      "source_id": "corpus-454f025d6ede",
+      "source_file": "src-227-454f025d6ede.json",
+      "source_name": "蓝批漫画（优+++）",
+      "source_url": "https://www.pixiv.net/manga",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] AnalyzeUrl failed: URL JS execution failed: Exception: java.put key and value arguments must be strings",
+      "category": "java_put_signature_mismatch",
+      "category_subtype": "non-string value"
+    },
+    {
+      "source_id": "corpus-6447d8695b16",
+      "source_file": "src-245-6447d8695b16.json",
+      "source_name": "曼哈漫画（优+）",
+      "source_url": "https://mangadex.org",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L2-search",
+      "error_detail": "[Internal] rule engine error: invalid JSON input: expected value at line 1 column 1",
+      "category": "rule_engine_json_parse",
+      "category_subtype": "non-JSON value from JS"
+    },
+    {
+      "source_id": "corpus-96294887c25e",
+      "source_file": "src-249-96294887c25e.json",
+      "source_name": "吉站漫画（优+）",
+      "source_url": "https://manhuafree.com/",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L4-toc",
+      "error_detail": "[Internal] rule engine error: invalid JSON input: expected value at line 1 column 1",
+      "category": "rule_engine_json_parse",
+      "category_subtype": "non-JSON value from JS"
+    },
+    {
+      "source_id": "corpus-c90efa214ecb",
+      "source_file": "src-252-c90efa214ecb.json",
+      "source_name": "全免漫画（优）",
+      "source_url": "https://api-cdn.kaimanhua.com/##@遇知",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L3-detail",
+      "error_detail": "[Internal] rule engine error: invalid JSON input: expected value at line 1 column 1",
+      "category": "rule_engine_json_parse",
+      "category_subtype": "non-JSON value from JS"
+    },
+    {
+      "source_id": "corpus-553bec27a265",
+      "source_file": "src-253-553bec27a265.json",
+      "source_name": "全免漫画（优）",
+      "source_url": "https://api-cdn.kaimanhua.com/",
+      "priority": "P0",
+      "has_js": true,
+      "failed_level": "L3-detail",
+      "error_detail": "[Internal] rule engine error: invalid JSON input: expected value at line 1 column 1",
+      "category": "rule_engine_json_parse",
+      "category_subtype": "non-JSON value from JS"
+    }
+  ],
+  "evidence": {
+    "strict_mode_repro": {
+      "description": "Standalone rquickjs 0.8.1 test (mirrors reader-js QuickJsSandbox::evaluate)",
+      "results": [
+        {
+          "test": "ctx.eval(\"url = 'hello'; url\")",
+          "result": "Err: 'url is not defined' (ReferenceError)"
+        },
+        {
+          "test": "ctx.eval(\"with({a:1}){a}\")",
+          "result": "Err: 'invalid keyword: with' (SyntaxError)"
+        },
+        {
+          "test": "ctx.eval(\"(function(){ url = 'inner'; return url; })()\")",
+          "result": "Err: 'url is not defined' (strictness inherited)"
+        },
+        {
+          "test": "ctx.eval(\"'use strict'; url = 'hello'; url\")",
+          "result": "Err: 'url is not defined' (explicit strict, same)"
+        }
+      ],
+      "conclusion": "QuickJS evaluates scripts in strict mode by default via rquickjs. IIFE wrapping does NOT help because strictness is inherited by nested function bodies. Only fix is to clear JS_EVAL_STRICT flag at the FFI level or use a different engine."
+    },
+    "legado_prelude_bindings": {
+      "description": "Legado AnalyzeUrl.kt:348-361 evalJS bindings vs Reader evaluate_url_js",
+      "legado_bindings": [
+        "java",
+        "baseUrl",
+        "cookie",
+        "cache",
+        "page",
+        "key",
+        "speakText",
+        "speakSpeed",
+        "book",
+        "source",
+        "result"
+      ],
+      "reader_bindings": [
+        "key",
+        "page",
+        "baseUrl",
+        "bookUrl",
+        "chapterUrl",
+        "sourceId",
+        "result",
+        "cookie",
+        "source",
+        "org",
+        "time",
+        "sign_key",
+        "body",
+        "tab_type"
+      ],
+      "missing_in_reader": [
+        "cache (CacheManager)",
+        "book (Book object)",
+        "speakText",
+        "speakSpeed"
+      ],
+      "extra_in_reader": [
+        "org",
+        "time",
+        "sign_key",
+        "body",
+        "tab_type",
+        "bookUrl",
+        "chapterUrl",
+        "sourceId"
+      ],
+      "note": "Missing `cache` affects src-001 (起点读书: cache.get('fx')). Missing `book` does not affect any v6 failure but may affect detail/toc/content stages."
+    },
+    "legado_js_methods_audit": {
+      "description": "Legado JsExtensions.kt method count vs reader-js registered java.* methods",
+      "legado_method_count": 79,
+      "reader_registered_count": "79 (all Legado methods have descriptors in lib.rs HostDescriptor enum)",
+      "reader_host_callback_wired_in_cli": [
+        "java.get",
+        "java.post",
+        "java.connect",
+        "java.ajax",
+        "java.ajaxAll"
+      ],
+      "reader_host_callback_unwired_in_cli": [
+        "java.androidId",
+        "java.webView",
+        "java.webViewGetSource",
+        "java.webViewGetOverrideUrl",
+        "java.startBrowser",
+        "java.startBrowserAwait",
+        "java.getVerificationCode",
+        "java.getCookie",
+        "java.getFile",
+        "java.readFile",
+        "java.readTxtFile",
+        "java.deleteFile",
+        "java.unzipFile",
+        "java.un7zFile",
+        "java.unrarFile",
+        "java.unArchiveFile",
+        "java.getTxtInFolder",
+        "java.getZipStringContent",
+        "java.getRarStringContent",
+        "java.get7zStringContent",
+        "java.getZipByteArrayContent",
+        "java.getRarByteArrayContent",
+        "java.get7zByteArrayContent",
+        "java.queryBase64TTF",
+        "java.queryTTF",
+        "java.replaceFont",
+        "java.openUrl",
+        "java.head",
+        "java.getString",
+        "java.getStringList",
+        "java.getSource",
+        "java.downloadFile",
+        "java.cacheFile",
+        "java.importScript",
+        "java.setContent",
+        "java.put",
+        "java.reGetBook"
+      ],
+      "note": "CLI test host only wires HTTP-capable callbacks. Non-HTTP callbacks (androidId, webView, file ops, font, etc.) fail with 'unregistered host callback' when called. This is a CLI test host gap, not a Core gap. Real platform hosts must wire all 37 non-HTTP callbacks."
+    }
+  },
+  "fix_priority_order": [
+    {
+      "priority": "P0",
+      "fix": "Patch rquickjs to clear JS_EVAL_STRICT flag for user-JS eval (blocks 15 sources)",
+      "effort": "medium"
+    },
+    {
+      "priority": "P0",
+      "fix": "Populate `source` JS object with bookSourceUrl/key/header/loginUrl fields + getKey()/getVariable() methods (blocks 13+3=16 sources)",
+      "effort": "medium"
+    },
+    {
+      "priority": "P1",
+      "fix": "Coerce undefined/NaN JS results to empty string/null in rule engine (blocks 11+1=12 sources)",
+      "effort": "small"
+    },
+    {
+      "priority": "P1",
+      "fix": "Loosen java.put value argument to accept any JSON value, coerce to string (blocks 5 sources)",
+      "effort": "small"
+    },
+    {
+      "priority": "P2",
+      "fix": "Register stub host callbacks for java.androidId and other non-HTTP callbacks in CLI test host (blocks 1 source, unblocks real platform testing)",
+      "effort": "small"
+    },
+    {
+      "priority": "P2",
+      "fix": "Reclassify java.ajax network timeouts as http_error, not js_unsupported (blocks 1 source misclassification)",
+      "effort": "small"
+    },
+    {
+      "priority": "P2",
+      "fix": "Expose Jsoup global in JS sandbox backed by reader-rule's scraper (blocks 1 source)",
+      "effort": "medium"
+    },
+    {
+      "priority": "P3",
+      "fix": "Document java.webView as 'host-only, requires platform WebView' (blocks 1 source, intentional)",
+      "effort": "documentation only"
+    },
+    {
+      "priority": "P3",
+      "fix": "Document Rhino JavaImporter+with sources as 'engine-incompatible, requires source JS port' (blocks 1 source)",
+      "effort": "documentation only"
+    },
+    {
+      "priority": "P3",
+      "fix": "Add 'url_dsl_malformed' failure reason distinct from js_unsupported (blocks 1 source, source-side bug)",
+      "effort": "small"
+    }
+  ],
+  "acceptance_criteria_check": {
+    "missing_java_methods_list_clear": true,
+    "each_method_has_legado_source_location": true,
+    "sorted_by_impact": true,
+    "total_blocking_sources": 54,
+    "fixable_in_core_or_cli": 51,
+    "engine_incompatible_or_source_bug": 3
+  }
+}
