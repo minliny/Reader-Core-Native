@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
+use std::time::Duration;
 
 use reader_contract::{
     core_info, methods, Command, CoreError, EmptyParams, Event, HostCacheGetResponse,
@@ -333,12 +334,63 @@ impl Runtime {
 
 impl Drop for Runtime {
     fn drop(&mut self) {
+        // 1. Signal shutdown first so the worker loop breaks at the next
+        //    iteration boundary (between WorkItems).
         self.shutdown.store(true, Ordering::Release);
+
+        // 2. Abort any JS host callbacks still waiting for `host.complete` /
+        //    `host.error` inside `java.get`/`java.ajax`/etc. Without this,
+        //    the worker thread is stuck inside `PendingCallback::wait` for
+        //    up to DEFAULT_CALLBACK_TIMEOUT (30s) per pending call, and the
+        //    `join()` below would block until every one of them times out.
+        //    This was the root cause of batch corpus tests stalling at
+        //    270/459 sources: each source that issued a `java.get` and never
+        //    got a host.complete kept the worker blocked for 30s during Drop.
+        if let Some(bridge) = &self.host_callback_bridge {
+            bridge.abort_all_pending("runtime shutting down");
+        }
+
+        // 3. Enqueue the protocol Shutdown work item so the worker breaks
+        //    out of its recv loop even if it isn't currently dispatching.
         let _ = self.tx.send(WorkItem::Shutdown);
+
+        // 4. Join with a timeout. The abort above should wake the worker
+        //    promptly, but if it is stuck in some other uninterruptible
+        //    blocking call (e.g. inside JS execution that catches the abort
+        //    error and retries), we detach the worker instead of blocking
+        //    Drop indefinitely. The worker will exit on its own when its
+        //    current operation completes or its callback timeout fires.
         if let Some(handle) = self.worker.take() {
-            let _ = handle.join();
+            join_with_timeout(handle, Duration::from_secs(5));
         }
     }
+}
+
+/// Join a worker thread with a timeout. If the worker does not exit within
+/// `timeout`, the joiner thread is detached (the worker keeps running until
+/// it exits on its own). This prevents `Drop` from blocking indefinitely
+/// when the worker is stuck in an uninterruptible blocking call.
+///
+/// Implementation: spawn a helper thread that calls `handle.join()` and
+/// signals via a oneshot channel when done. `recv_timeout` on the channel
+/// gives us the timeout semantics; if it fires, we simply return and let
+/// the helper thread (and the worker it's joining) finish in the background.
+fn join_with_timeout(handle: JoinHandle<()>, timeout: Duration) {
+    let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+    let spawn = thread::Builder::new()
+        .name("reader-core-worker-join".into())
+        .spawn(move || {
+            let _ = handle.join();
+            let _ = done_tx.send(());
+        });
+    if spawn.is_err() {
+        // Could not spawn a join helper — fall back to blocking join. We
+        // cannot recover the handle (it was moved into the closure), so
+        // this branch is effectively unreachable; the worker thread will
+        // still terminate when the runtime's other resources drop.
+        return;
+    }
+    let _ = done_rx.recv_timeout(timeout);
 }
 
 fn dispatch_command(

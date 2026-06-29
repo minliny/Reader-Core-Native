@@ -180,6 +180,29 @@ impl HostCallbackBridge {
         self.current_request_id.store(request_id, Ordering::Release);
     }
 
+    /// Abort every pending JS host callback with the given error message.
+    ///
+    /// Used by [`crate::runtime::Runtime`] on drop to unblock the worker
+    /// thread when it is stuck inside [`PendingCallback::wait`] waiting for
+    /// `host.complete` / `host.error` (e.g. inside `java.get`/`java.ajax` JS
+    /// callbacks). Without this, `JoinHandle::join()` in `Drop` would block
+    /// for up to `DEFAULT_CALLBACK_TIMEOUT` (30s) per pending callback —
+    /// batch corpus tests were stalling at 270/459 sources because of this.
+    ///
+    /// After all pending callbacks are woken with `Err(reason)`, the worker
+    /// thread returns from `dispatch_and_wait`, JS propagates the error,
+    /// `dispatch_command` returns, the worker loop observes `shutdown=true`,
+    /// and exits — letting `Drop`'s `join()` complete promptly.
+    pub fn abort_all_pending(&self, reason: &str) {
+        let pending: Vec<Arc<PendingCallback>> = match self.pending.lock() {
+            Ok(mut map) => map.drain().map(|(_, v)| v).collect(),
+            Err(_) => return,
+        };
+        for callback in pending {
+            callback.complete(Err(reason.to_string()));
+        }
+    }
+
     /// Try to route a `host.complete` / `host.error` command to a pending JS
     /// callback. Returns `true` if `operation_id` was found and the callback
     /// was signaled (in which case `Runtime::send` must NOT enqueue the command).
