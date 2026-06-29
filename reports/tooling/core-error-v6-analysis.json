@@ -1,0 +1,664 @@
+{
+  "version": "core-error-analysis/1",
+  "generated_at": "2026-06-29T00:00:00Z",
+  "source_report": "reports/tooling/corpus-batch-v6-partial-270.json",
+  "total_core_error_sources": 29,
+  "total_sources_in_batch": 270,
+  "core_error_rate": 0.1074,
+  "summary": {
+    "by_category": {
+      "A_css_bang_index": 9,
+      "B_css_dot_range_slice": 6,
+      "C_css_attribute_pipe_separator": 1,
+      "D_css_bracket_index_slice": 2,
+      "E_jsonpath_dispatched_to_css": 2,
+      "F_searchurl_empty_explore_only": 9
+    },
+    "by_priority": {
+      "P0": 15,
+      "P1": 14
+    },
+    "by_failed_level": {
+      "L2-search": 21,
+      "L3-detail": 5,
+      "L4-toc": 3
+    }
+  },
+  "categories": {
+    "A_css_bang_index": {
+      "title": "CSS `!` index notation (Legado exclude/select-index shorthand)",
+      "description": "Legado `tr!0` / `tag.dd!0:1:2:...` uses `!` as index separator: `tag!N` selects the Nth element, `tag!N:M:K` selects/excludes a range. Reader-Core `parse_legado_css_index` (lib.rs:4228) only handles trailing `.N` / `.-N` dot-syntax; the `!` form is fed verbatim to `Selector::parse`, which rejects `!` as `UnexpectedToken(Delim('!'))`.",
+      "error_message_pattern": "invalid CSS selector `<sel>`: UnexpectedToken(Delim('!'))",
+      "count": 9,
+      "source_ids": [
+        "corpus-63bf00d7c85c",
+        "corpus-692dacb17cc9",
+        "corpus-4c45765b0884",
+        "corpus-f27d3faf97fd",
+        "corpus-6730fbd698ed",
+        "corpus-16994c985f4d",
+        "corpus-f7d6c4b5af00",
+        "corpus-05808ea726b5",
+        "corpus-ce6b76580663"
+      ],
+      "legado_reference": {
+        "file": "app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeByJSoup.kt",
+        "function": "findIndexSet (lines ~482-506) + ElementsSingle.getElementsSingle",
+        "note": "Legado splits the rule on `!` to obtain an exclusion/index list; `tr!0` = first <tr>; `tag.dd!0:1:2:...` = indices 0..11 of <dd>."
+      },
+      "reader_core_location": "crates/reader-rule/src/lib.rs:4228 (parse_legado_css_index) — doc comment explicitly states 'The `.!N` exclusion form ... are not yet supported.'",
+      "fix_gap": "Extend parse_legado_css_index (or add parse_legado_css_bang_index) to split on `!` and apply index/range selection after the base CSS select, mirroring Legado findIndexSet `!` branch."
+    },
+    "B_css_dot_range_slice": {
+      "title": "CSS `.` range/slice notation (Legado `tag.N:M:K`)",
+      "description": "Legado `span.3:7:-1` / `td.5:4` / `p.3:4:5:6:7` uses `.` followed by `N:M:K` (Python-style slice, multi-index, or negative step) to select a sub-range of matched elements. Reader-Core `parse_legado_css_index` only parses a single trailing integer `.N` / `.-N`; the `:` separator causes the digits to be misparsed and the `:` leaks into `Selector::parse` as `UnexpectedToken(Number)`.",
+      "error_message_pattern": "invalid CSS selector `<sel>`: UnexpectedToken(Number { has_sign: false, value: <v>, int_value: <iv> })",
+      "count": 6,
+      "source_ids": [
+        "corpus-51094c411127",
+        "corpus-07a3567aa68a",
+        "corpus-a0e8f9d6fc88",
+        "corpus-5fb14369e1a1",
+        "corpus-9bf80fd46111",
+        "corpus-4fde9a31053a"
+      ],
+      "legado_reference": {
+        "file": "app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeByJSoup.kt",
+        "function": "findIndexSet (lines ~482-506)",
+        "note": "Legado findIndexSet splits the trailing dot-segment on `:` and applies start:end:step slicing over the Elements list."
+      },
+      "reader_core_location": "crates/reader-rule/src/lib.rs:4228 (parse_legado_css_index) — only collects trailing digits, no `:` range parsing.",
+      "fix_gap": "Extend parse_legado_css_index to detect `.<digits>(:<digits>?(:<digits>?)?)?` and apply Legado slice semantics (start:end:step) over the selected elements."
+    },
+    "C_css_attribute_pipe_separator": {
+      "title": "CSS attribute selector `|` OR-separator",
+      "description": "Legado `[property~=category|status|update_time]` uses `|` inside an attribute value to match any of several property names (category OR status OR update_time). Standard CSS (scraper/cssparser) parses `|` as the namespace separator and rejects the unquoted value with `UnexpectedToken(Delim('|'))`.",
+      "error_message_pattern": "invalid CSS selector `<sel>`: UnexpectedToken(Delim('|'))",
+      "count": 1,
+      "source_ids": [
+        "corpus-89015fa282a2"
+      ],
+      "legado_reference": {
+        "file": "app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeByJSoup.kt",
+        "function": "getElements/getResultList attribute handling",
+        "note": "Legado's Jsoup-based Evaluator splits attribute values on `|` to OR-match multiple attribute names; standard CSS has no such semantics."
+      },
+      "reader_core_location": "crates/reader-rule/src/lib.rs:4283 (compile_legado_css_selector) → Selector::parse (scraper crate).",
+      "fix_gap": "Pre-translate Legado `[attr~=a|b|c]` into a CSS selector group `[attr~=a],[attr~=b],[attr~=c]` before calling Selector::parse, or handle the `|` OR-list in the attribute-extraction layer."
+    },
+    "D_css_bracket_index_slice": {
+      "title": "CSS bracket `[N:]` / `[N,M]` index list (Legado bracket shorthand)",
+      "description": "Legado `dl dd[8:]` (slice from index 8) and `class.pure-g[3,4]` (select indices 3 and 4) use bracket notation appended to a selector. Reader-Core passes these to `Selector::parse`, which interprets `[8:]` / `[3,4]` as malformed attribute selectors and fails with `NoQualifiedNameInAttributeSelector`.",
+      "error_message_pattern": "invalid CSS selector `<sel>`: UnexpectedSelectorParseError(NoQualifiedNameInAttributeSelector(...))",
+      "count": 2,
+      "source_ids": [
+        "corpus-fd7d1315dc04",
+        "corpus-bb44193bd3bd"
+      ],
+      "legado_reference": {
+        "file": "app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeByJSoup.kt",
+        "function": "findIndexSet bracket branch",
+        "note": "Legado findIndexSet recognizes `[N:M:K]` (slice) and `[N,M,...]` (index list) trailing brackets and applies them to the Elements result, not as CSS attribute selectors."
+      },
+      "reader_core_location": "crates/reader-rule/src/lib.rs:4228 (parse_legado_css_index doc comment) — explicitly states 'the bracket `[N:M:K]` range form are not yet supported.'",
+      "fix_gap": "Add a trailing-bracket parser that strips `[N:]` / `[N:M:K]` / `[N,M,...]` from the selector, runs the base CSS select, then applies slice/index-list post-selection."
+    },
+    "E_jsonpath_dispatched_to_css": {
+      "title": "JSONPath rule dispatched to CSS parser",
+      "description": "Sources with JSON responses use JSONPath rules like `data[*].dataJson` and `data.state[*]` (no `$.` prefix) in ruleSearch.bookList. Reader-Core's rule dispatch does not recognize these as JSONPath and routes them to the CSS analyzer, which fails with `EndOfLine` (the `[*]` / `.` JSONPath syntax is not valid CSS).",
+      "error_message_pattern": "invalid CSS selector `<sel>`: EndOfLine",
+      "count": 2,
+      "source_ids": [
+        "corpus-269ffcdf5fb3",
+        "corpus-8b65eb985924"
+      ],
+      "legado_reference": {
+        "file": "app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeRule.kt",
+        "function": "AnalyzeRule dispatch (getType / splitSource / putRule)",
+        "note": "Legado AnalyzeRule detects JSON content (response Content-Type or `$.`/`[*]`/`.` JSONPath markers) and dispatches to AnalyzeByJSonPath.kt instead of AnalyzeByJSoup.kt. Rules without `$.` prefix but with `[*]` or applied to JSON bodies are still routed to JSONPath."
+      },
+      "reader_core_location": "crates/reader-rule/src/lib.rs (rule dispatch — CSS vs XPath vs JSONPath detection).",
+      "fix_gap": "Add JSONPath detection in the rule dispatcher: when the response body is JSON (or the rule contains `[*]` / `[N]` index-on-array / `.`-delimited keys without CSS combinators), route to the JSONPath analyzer instead of CSS."
+    },
+    "F_searchurl_empty_explore_only": {
+      "title": "searchUrl empty — explore-only sources tested at L2-search",
+      "description": "These sources have NO `searchUrl` field in their JSON (verified: all 9 sources have `searchUrl` missing). They are explore/discovery-only sources (most have `ruleExplore` populated, several have empty `ruleSearch`). The test toolchain forces every source through L2-search, producing `[InvalidParams] cannot auto-build searchRequest: source.searchUrl is empty`. This is a test-design / classification issue, not a rule-engine bug: Legado would simply not offer search for these sources.",
+      "error_message_pattern": "[InvalidParams] cannot auto-build searchRequest: source.searchUrl is empty details={\"sourceId\":\"...\"}",
+      "count": 9,
+      "source_ids": [
+        "corpus-f55016541025",
+        "corpus-fe3268414856",
+        "corpus-ba7b4cdf6b47",
+        "corpus-7e3f52bafc32",
+        "corpus-4b6a91bdc22b",
+        "corpus-9ae218582584",
+        "corpus-695d4d5f1434",
+        "corpus-c2b0309a7596",
+        "corpus-91141567628d"
+      ],
+      "legado_reference": {
+        "file": "app/src/main/java/io/legado/app/data/entities/BookSource.kt + app/src/main/java/io/legado/app/model/webBook/WebBook.kt",
+        "function": "BookSource.searchUrl field + search entry guard",
+        "note": "Legado treats an empty/missing searchUrl as 'search disabled'; the source still works via explore (ruleExplore). Search is never attempted when searchUrl is blank."
+      },
+      "reader_core_location": "tools/reader-cli/src/test_source.rs (L2-search step) — does not skip L2 when searchUrl is empty.",
+      "fix_gap": "In the test toolchain, detect empty searchUrl at import time and SKIP L2-search (status=skip, reason=no_search_url) instead of emitting core_error; optionally fall through to L3 via explore for explore-only sources."
+    }
+  },
+  "sources": [
+    {
+      "source_id": "corpus-269ffcdf5fb3",
+      "source_file": "src-062-269ffcdf5fb3.json",
+      "source_name": "国学書库（优+）",
+      "source_url": "https://book.mywebos.cn",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `data[*].dataJson`: EndOfLine",
+      "category": "E_jsonpath_dispatched_to_css",
+      "duration_ms": 286
+    },
+    {
+      "source_id": "corpus-f55016541025",
+      "source_file": "src-063-f55016541025.json",
+      "source_name": "国学典籍（优+）",
+      "source_url": "http://ab.newdu.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] cannot auto-build searchRequest: source.searchUrl is empty details={\"sourceId\":\"corpus-f55016541025\"}",
+      "category": "F_searchurl_empty_explore_only",
+      "duration_ms": 1
+    },
+    {
+      "source_id": "corpus-63bf00d7c85c",
+      "source_file": "src-067-63bf00d7c85c.json",
+      "source_name": "中华典藏（优+）",
+      "source_url": "https://www.diancang.xyz",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `tr!0`: UnexpectedToken(Delim('!'))",
+      "category": "A_css_bang_index",
+      "duration_ms": 185
+    },
+    {
+      "source_id": "corpus-fe3268414856",
+      "source_file": "src-069-fe3268414856.json",
+      "source_name": "古龙全集（优+）",
+      "source_url": "https://www.gulongwang.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "js",
+        "plain"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] cannot auto-build searchRequest: source.searchUrl is empty details={\"sourceId\":\"corpus-fe3268414856\"}",
+      "category": "F_searchurl_empty_explore_only",
+      "duration_ms": 2
+    },
+    {
+      "source_id": "corpus-ba7b4cdf6b47",
+      "source_file": "src-070-ba7b4cdf6b47.json",
+      "source_name": "古龙武侠（优+）",
+      "source_url": "http://m.gulongbbs.com/wuxia/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] cannot auto-build searchRequest: source.searchUrl is empty details={\"sourceId\":\"corpus-ba7b4cdf6b47\"}",
+      "category": "F_searchurl_empty_explore_only",
+      "duration_ms": 1
+    },
+    {
+      "source_id": "corpus-7e3f52bafc32",
+      "source_file": "src-075-7e3f52bafc32.json",
+      "source_name": "鬼故事集（优+）",
+      "source_url": "http://www.guishiji.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "multirule",
+        "plain"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] cannot auto-build searchRequest: source.searchUrl is empty details={\"sourceId\":\"corpus-7e3f52bafc32\"}",
+      "category": "F_searchurl_empty_explore_only",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "corpus-4b6a91bdc22b",
+      "source_file": "src-085-4b6a91bdc22b.json",
+      "source_name": "古典文学（优+）",
+      "source_url": "https://www.zggdwx.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] cannot auto-build searchRequest: source.searchUrl is empty details={\"sourceId\":\"corpus-4b6a91bdc22b\"}",
+      "category": "F_searchurl_empty_explore_only",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "corpus-9ae218582584",
+      "source_file": "src-087-9ae218582584.json",
+      "source_name": "斗罗小说（优+）",
+      "source_url": "https://www.douluodalu1.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] cannot auto-build searchRequest: source.searchUrl is empty details={\"sourceId\":\"corpus-9ae218582584\"}",
+      "category": "F_searchurl_empty_explore_only",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "corpus-89015fa282a2",
+      "source_file": "src-097-89015fa282a2.json",
+      "source_name": "大唐小说（优+）",
+      "source_url": "https://www.dtxsw.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "failed_level": "L3-detail",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `[property~=category|status|update_time]`: UnexpectedToken(Delim('|'))",
+      "category": "C_css_attribute_pipe_separator",
+      "duration_ms": 1734
+    },
+    {
+      "source_id": "corpus-51094c411127",
+      "source_file": "src-104-51094c411127.json",
+      "source_name": "阅读库子（优+）",
+      "source_url": "http://www.yuedsk.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "regex-suffix"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `.c_tag span.3:7:-1`: UnexpectedToken(Number { has_sign: false, value: 0.3, int_value: None })",
+      "category": "B_css_dot_range_slice",
+      "duration_ms": 1525
+    },
+    {
+      "source_id": "corpus-692dacb17cc9",
+      "source_file": "src-105-692dacb17cc9.json",
+      "source_name": "安读书网（优+）",
+      "source_url": "https://www.88haoshu.com/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `tr!0`: UnexpectedToken(Delim('!'))",
+      "category": "A_css_bang_index",
+      "duration_ms": 537
+    },
+    {
+      "source_id": "corpus-4c45765b0884",
+      "source_file": "src-111-4c45765b0884.json",
+      "source_name": "独步小说（优+）",
+      "source_url": "https://www.dbxsd.com/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `tr!0`: UnexpectedToken(Delim('!'))",
+      "category": "A_css_bang_index",
+      "duration_ms": 1611
+    },
+    {
+      "source_id": "corpus-695d4d5f1434",
+      "source_file": "src-122-695d4d5f1434.json",
+      "source_name": "咸鱼小说（优+）",
+      "source_url": "https://ruarourou.top",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "plain"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] cannot auto-build searchRequest: source.searchUrl is empty details={\"sourceId\":\"corpus-695d4d5f1434\"}",
+      "category": "F_searchurl_empty_explore_only",
+      "duration_ms": 2
+    },
+    {
+      "source_id": "corpus-07a3567aa68a",
+      "source_file": "src-129-07a3567aa68a.json",
+      "source_name": "神话之后（优+）",
+      "source_url": "https://www.shenhuazhihou.com",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "regex-suffix"
+      ],
+      "failed_level": "L3-detail",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `span.1:2`: UnexpectedToken(Number { has_sign: false, value: 0.1, int_value: None })",
+      "category": "B_css_dot_range_slice",
+      "duration_ms": 2404
+    },
+    {
+      "source_id": "corpus-f27d3faf97fd",
+      "source_file": "src-135-f27d3faf97fd.json",
+      "source_name": "夜天连看（优）",
+      "source_url": "http://www.yetianlian.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "failed_level": "L4-toc",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `tag.dd!0:1:2:3:4:5:6:7:8:9:10:11`: UnexpectedToken(Delim('!'))",
+      "category": "A_css_bang_index",
+      "duration_ms": 3378
+    },
+    {
+      "source_id": "corpus-a0e8f9d6fc88",
+      "source_file": "src-139-a0e8f9d6fc88.json",
+      "source_name": "阅友小说（优）",
+      "source_url": "http://m.suixkan.com/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain"
+      ],
+      "failed_level": "L3-detail",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `.face-info span.1:3`: UnexpectedToken(Number { has_sign: false, value: 0.1, int_value: None })",
+      "category": "B_css_dot_range_slice",
+      "duration_ms": 135
+    },
+    {
+      "source_id": "corpus-6730fbd698ed",
+      "source_file": "src-143-6730fbd698ed.json",
+      "source_name": "五五读书（优）",
+      "source_url": "https://www.changduzw.com#",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `body > div.warpper > div.o_all > div.o_content > div > table > tbody > tr!0`: UnexpectedToken(Delim('!'))",
+      "category": "A_css_bang_index",
+      "duration_ms": 763
+    },
+    {
+      "source_id": "corpus-16994c985f4d",
+      "source_file": "src-153-16994c985f4d.json",
+      "source_name": "就爱文学（优）",
+      "source_url": "http://www.92xs.info",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `tr!0`: UnexpectedToken(Delim('!'))",
+      "category": "A_css_bang_index",
+      "duration_ms": 450
+    },
+    {
+      "source_id": "corpus-5fb14369e1a1",
+      "source_file": "src-155-5fb14369e1a1.json",
+      "source_name": "蚂蚁文学（优）",
+      "source_url": "https://www.mayiwsk.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "regex-suffix"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `td.5:4`: UnexpectedToken(Number { has_sign: false, value: 0.5, int_value: None })",
+      "category": "B_css_dot_range_slice",
+      "duration_ms": 1237
+    },
+    {
+      "source_id": "corpus-f7d6c4b5af00",
+      "source_file": "src-159-f7d6c4b5af00.json",
+      "source_name": "五五读书（优）",
+      "source_url": "https://www.changduzw.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `tr!0`: UnexpectedToken(Delim('!'))",
+      "category": "A_css_bang_index",
+      "duration_ms": 756
+    },
+    {
+      "source_id": "corpus-05808ea726b5",
+      "source_file": "src-164-05808ea726b5.json",
+      "source_name": "零零小说（优）",
+      "source_url": "https://www.00shu.la",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `tr!0`: UnexpectedToken(Delim('!'))",
+      "category": "A_css_bang_index",
+      "duration_ms": 828
+    },
+    {
+      "source_id": "corpus-8b65eb985924",
+      "source_file": "src-175-8b65eb985924.json",
+      "source_name": "南极小说（优）",
+      "source_url": "🐧",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "json-jsonpath",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `data.state[*]`: EndOfLine",
+      "category": "E_jsonpath_dispatched_to_css",
+      "duration_ms": 705
+    },
+    {
+      "source_id": "corpus-ce6b76580663",
+      "source_file": "src-186-ce6b76580663.json",
+      "source_name": "双零电子（优）",
+      "source_url": "http://www.wrlwx.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain",
+        "regex-suffix"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `tr!0`: UnexpectedToken(Delim('!'))",
+      "category": "A_css_bang_index",
+      "duration_ms": 1596
+    },
+    {
+      "source_id": "corpus-fd7d1315dc04",
+      "source_file": "src-199-fd7d1315dc04.json",
+      "source_name": "歌书网吧（优）",
+      "source_url": "http://www.gashuw.com/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "plain"
+      ],
+      "failed_level": "L4-toc",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `dl dd[8:]`: UnexpectedSelectorParseError(NoQualifiedNameInAttributeSelector(Number { has_sign: false, value: 8.0, int_value: Some(8) }))",
+      "category": "D_css_bracket_index_slice",
+      "duration_ms": 2480
+    },
+    {
+      "source_id": "corpus-9bf80fd46111",
+      "source_file": "src-204-9bf80fd46111.json",
+      "source_name": "八零电子（导）",
+      "source_url": "https://m.txt80.cc/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "inline-js",
+        "multirule",
+        "plain"
+      ],
+      "failed_level": "L3-detail",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `.gray.1:3`: UnexpectedToken(Number { has_sign: false, value: 0.1, int_value: None })",
+      "category": "B_css_dot_range_slice",
+      "duration_ms": 4401
+    },
+    {
+      "source_id": "corpus-4fde9a31053a",
+      "source_file": "src-208-4fde9a31053a.json",
+      "source_name": "知轩藏书（导）",
+      "source_url": "https://zxcs.zip/",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix",
+        "template"
+      ],
+      "failed_level": "L3-detail",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `p.3:4:5:6:7`: UnexpectedToken(Number { has_sign: false, value: 0.3, int_value: None })",
+      "category": "B_css_dot_range_slice",
+      "duration_ms": 1597
+    },
+    {
+      "source_id": "corpus-c2b0309a7596",
+      "source_file": "src-228-c2b0309a7596.json",
+      "source_name": "美女图站（优++）",
+      "source_url": "这是一个图集",
+      "priority": "P0",
+      "rule_forms": [
+        "inline-js",
+        "js",
+        "json-jsonpath",
+        "multirule",
+        "plain"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] cannot auto-build searchRequest: source.searchUrl is empty details={\"sourceId\":\"corpus-c2b0309a7596\"}",
+      "category": "F_searchurl_empty_explore_only",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "corpus-91141567628d",
+      "source_file": "src-233-91141567628d.json",
+      "source_name": "笔趣漫画（优+）",
+      "source_url": "https://www.biqug.org/",
+      "priority": "P0",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "template"
+      ],
+      "failed_level": "L2-search",
+      "error_detail": "[InvalidParams] cannot auto-build searchRequest: source.searchUrl is empty details={\"sourceId\":\"corpus-91141567628d\"}",
+      "category": "F_searchurl_empty_explore_only",
+      "duration_ms": 0
+    },
+    {
+      "source_id": "corpus-bb44193bd3bd",
+      "source_file": "src-250-bb44193bd3bd.json",
+      "source_name": "包子漫画（优+）",
+      "source_url": "https://cn.bzmanga.com",
+      "priority": "P1",
+      "rule_forms": [
+        "css-shorthand",
+        "multirule",
+        "plain",
+        "regex-suffix"
+      ],
+      "failed_level": "L4-toc",
+      "error_detail": "[Internal] rule engine error: invalid CSS selector `class.pure-g[3,4]`: UnexpectedSelectorParseError(NoQualifiedNameInAttributeSelector(Number { has_sign: false, value: 3.0, int_value: Some(3) }))",
+      "category": "D_css_bracket_index_slice",
+      "duration_ms": 8316
+    }
+  ],
+  "methodology": {
+    "extraction": "Extracted all 29 entries with failure_reason=='core_error' from corpus-batch-v6-partial-270.json.",
+    "verbose_verification": "Re-ran reader-cli --test-source --verbose on representative sources (src-067 tr!0, src-097 [property~=...|...], src-063 searchUrl empty); verbose detail matches the report's detail field exactly.",
+    "source_inspection": "Inspected each source JSON to confirm the offending rule (e.g. ruleSearch.bookList='tr!0', ruleToc.chapterList='class.pure-g[3,4]', ruleSearch.bookList='data[*].dataJson') and the presence/absence of searchUrl.",
+    "legado_reference": "Legado source files (AnalyzeByJSoup.kt / AnalyzeRule.kt / AnalyzeByJSonPath.kt) are not vendored in this repo; references cite the canonical upstream paths and the line numbers already documented in crates/reader-rule/src/lib.rs code comments."
+  },
+  "fix_priority": {
+    "P0_highest_impact": [
+      "A_css_bang_index (9 sources) — single fix to parse_legado_css_index covers the most sources",
+      "B_css_dot_range_slice (6 sources) — same parser extension covers range/slice"
+    ],
+    "P1_medium_impact": [
+      "F_searchurl_empty_explore_only (9 sources) — test-toolchain skip, no Core change needed",
+      "E_jsonpath_dispatched_to_css (2 sources) — JSONPath dispatch detection"
+    ],
+    "P2_low_impact": [
+      "D_css_bracket_index_slice (2 sources)",
+      "C_css_attribute_pipe_separator (1 source)"
+    ]
+  },
+  "notes": [
+    "All 29 core_errors are CSS-selector / rule-dispatch gaps, NOT rule-engine panics or unwraps. No panic/unwrap bugs were found.",
+    "No JS sandbox execution errors in this set (those are categorized as js_unsupported, 54 sources, separate from core_error).",
+    "20 of 29 failures (69%) are Legado CSS shorthand not supported by parse_legado_css_index; a single parser extension (categories A+B+D) would resolve 17 sources.",
+    "9 of 29 failures (31%) are explore-only sources misclassified as search failures — a test-toolchain fix, not a Core rule-engine fix."
+  ]
+}
